@@ -44,8 +44,9 @@ cmake -S cmake -B build
 cmake --build build --config Release
 ```
 
-The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. Debug builds pause
-for input after the tests; Release builds run the tests and exit.
+The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. The RAD Studio
+project writes its final executable to the same `build/bin/<Config>` directory. Debug builds pause for input after the
+tests; Release builds run the tests and exit.
 
 For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
 is the only unit in `src` that needs to be modified when adding a new test module. For example:
