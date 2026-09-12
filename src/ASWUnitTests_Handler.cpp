@@ -72,9 +72,21 @@ std::string TTestHandler::GetUTCTimeISO8601()
     return oss.str();
 }
 //---------------------------------------------------------------------------
+std::string TTestHandler::GetVersionStr()
+{
+    // Version bump is done here for now
+    // Format: major.2digitYear.month2DigitDay.build(ever increasing)
+    return "0.26.912.1";
+}
+//---------------------------------------------------------------------------
+std::string TTestHandler::GetVersionFullStr()
+{
+    return "ASWUnitTests - Version " + GetVersionStr();
+}
+//---------------------------------------------------------------------------
 void TTestHandler::Initialize()
 {
-    Log("ASWUnitTests - Version 0.26.912.1");
+    Log(GetVersionFullStr());
 
     Log("Initializing test handler and registering test groups...");
     RegisterTestGroups();

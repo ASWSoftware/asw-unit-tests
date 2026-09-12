@@ -72,6 +72,8 @@ private:
 
 public:
     static std::string GetUTCTimeISO8601();
+    static std::string GetVersionStr();
+    static std::string GetVersionFullStr();
 
 public:
     TTestHandler();

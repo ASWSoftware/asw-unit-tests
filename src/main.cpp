@@ -29,8 +29,15 @@ limitations under the License.
 using namespace ASWUnitTests;
 //---------------------------------------------------------------------------
 
-int main(int /*argc*/, char* /*argv*/[])
+int main(int argc, char* argv[])
 {
+    // Check if user requested the version flag
+    if (argc > 1 && std::string_view(argv[1]) == "--version")
+    {
+        std::cout << TTestHandler::GetVersionFullStr() << std::endl;
+        return 0;
+    }
+
     int returnCode = 0; // no error
 
     try
