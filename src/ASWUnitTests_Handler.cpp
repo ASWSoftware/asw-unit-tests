@@ -33,6 +33,8 @@ limitations under the License.
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 // Add includes for each "Test_" module here
+#include "Test_ASWTools_Random.h"
+#include "Test_ASWTools_String.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -111,6 +113,9 @@ void TTestHandler::RegisterTestGroups()
     // m_TestGroups.push_back(std::unique_ptr<TestClassName>(new TestClassName()));
 
     // ----- Add each class to be tested
+
+    m_TestGroups.push_back(std::unique_ptr<TTest_ASWTools_String>(new TTest_ASWTools_String()));
+    m_TestGroups.push_back(std::unique_ptr<TTest_TMersenneTwisterRandom>(new TTest_TMersenneTwisterRandom()));
 
     // ----- End adding classes to be tested
 }
