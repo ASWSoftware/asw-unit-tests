@@ -48,6 +48,10 @@ The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-con
 project writes its final executable to the same `build/bin/<Config>` directory. Debug builds pause for input after the
 tests; Release builds run the tests and exit.
 
+The executable uses semantic versioning for its `--version` output. Update `src/ASWUnitTests_Version.h` when preparing a
+release. The CMake project does not need a separate version declaration because it currently builds the test executable
+directly rather than packaging or installing it.
+
 For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
 is the only unit in `src` that needs to be modified when adding a new test module. For example:
 

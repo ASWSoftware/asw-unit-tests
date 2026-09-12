@@ -31,6 +31,7 @@ limitations under the License.
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
+#include "ASWUnitTests_Version.h"
 //---------------------------------------------------------------------------
 // Add includes for each "Test_" module here
 #include "Test_ASWTools_Random.h"
@@ -74,9 +75,7 @@ std::string TTestHandler::GetUTCTimeISO8601()
 //---------------------------------------------------------------------------
 std::string TTestHandler::GetVersionStr()
 {
-    // Version bump is done here for now
-    // Format: major.2digitYear.month2DigitDay.build(ever increasing)
-    return "0.26.912.1";
+    return Version;
 }
 //---------------------------------------------------------------------------
 std::string TTestHandler::GetVersionFullStr()
