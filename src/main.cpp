@@ -23,14 +23,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <exception>
 #include <iostream>
-#include <tchar.h>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
 using namespace ASWUnitTests;
 //---------------------------------------------------------------------------
 
-int _tmain(int /*argc*/, _TCHAR* /*argv*/[])
+int main(int /*argc*/, char* /*argv*/[])
 {
     int returnCode = 0; // no error
 
@@ -56,11 +55,13 @@ int _tmain(int /*argc*/, _TCHAR* /*argv*/[])
         returnCode = 3;
     }
 
-#if defined(_WIN32)
+#if !defined(NDEBUG)
+#  if defined(_WIN32)
     system("pause");
-#else
+#  else
     std::cout << "Press enter to continue..." << std::endl;
     std::cin.get();
+#  endif
 #endif
 
     return returnCode;

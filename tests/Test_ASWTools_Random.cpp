@@ -48,10 +48,10 @@ TTest_TMersenneTwisterRandom::TTest_TMersenneTwisterRandom()
 
 
     // Or you can register this way
-    RegisterTest(Test_Random_FloatRange, "Random_FloatRange");
-    RegisterTest(Test_Random_UIntRange, "Random_UIntRange");
-    RegisterTest(Test_Randomize_ChangesSeed, "Randomize_ChangesSeed");
-    RegisterTest(Test_SetAndGetSeed, "SetAndGetSeed");
+    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Random_FloatRange, "Random_FloatRange");
+    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Random_UIntRange, "Random_UIntRange");
+    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Randomize_ChangesSeed, "Randomize_ChangesSeed");
+    RegisterTest(&TTest_TMersenneTwisterRandom::Test_SetAndGetSeed, "SetAndGetSeed");
 }
 //---------------------------------------------------------------------------
 TTest_TMersenneTwisterRandom::~TTest_TMersenneTwisterRandom()

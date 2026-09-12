@@ -2161,16 +2161,12 @@ void TStrTool::TrimLeft(std::string& s)
     if (s.empty())
         return;
 
-#if __cplusplus >= 201103L
     s.erase(s.begin(),
         std::find_if(s.begin(), s.end(), [](unsigned char ch)
         {
             return !std::isspace(ch);
         })
     );
-#else
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-#endif
 }
 
 
@@ -2208,17 +2204,12 @@ void TStrTool::TrimLeft(std::wstring& s)
     if (s.empty())
         return;
 
-#if __cplusplus >= 201103L
     s.erase(s.begin(),
         std::find_if(s.begin(), s.end(), [](wchar_t ch)
         {
             return !std::iswspace(ch);
         })
     );
-#else
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(),
-        std::not1(std::ptr_fun(static_cast<int (*)(wchar_t)>(std::iswspace)))));
-#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2254,14 +2245,10 @@ void TStrTool::TrimRight(std::string& s)
     if (s.empty())
         return;
 
-#if __cplusplus >= 201103L
     s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch)
         {
             return !std::isspace(ch);
         }).base(), s.end());
-#else
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2297,15 +2284,10 @@ void TStrTool::TrimRight(std::wstring& s)
     if (s.empty())
         return;
 
-#if __cplusplus >= 201103L
     s.erase(std::find_if(s.rbegin(), s.rend(), [](wchar_t ch)
         {
             return !std::iswspace(ch);
         }).base(), s.end());
-#else
-    s.erase(std::find_if(s.rbegin(), s.rend(),
-        std::not1(std::ptr_fun(static_cast<int (*)(wchar_t)>(std::iswspace)))).base(), s.end());
-#endif
 }
 //---------------------------------------------------------------------------
 // -Static

@@ -159,6 +159,14 @@ protected:
     virtual void LogAppend(std::string const& msg);
     virtual void RegisterTest(TTestCase const& testCase);
     virtual void RegisterTest(ITestCase::TestCallback callback, std::string const& testName);
+    template <typename T>
+    void RegisterTest(void (T::*callback)(), std::string const& testName)
+    {
+        RegisterTest([this, callback]()
+            {
+                (static_cast<T*>(this)->*callback)();
+            }, testName);
+    }
     virtual void ResetTestFailedOneOrMoreChecks();
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);

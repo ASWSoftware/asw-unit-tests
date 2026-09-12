@@ -34,6 +34,19 @@ Modify the project files within (e.g. `rad370` or `cmake`, etc.) to point to you
 The `toTest` folder is an example of source that is to be tested. While this example folder exists in the root of this
 project, your source should be wherever you like.
 
+# CMake
+
+The `cmake` folder contains a portable CMake project for building with CMake, JetBrains CLion, Visual Studio, Clang,
+or MinGW. From the repository root, configure and build it with:
+
+```
+cmake -S cmake -B build
+cmake --build build --config Release
+```
+
+The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. Debug builds pause
+for input after the tests; Release builds run the tests and exit.
+
 For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
 is the only unit in `src` that needs to be modified when adding a new test module. For example:
 
