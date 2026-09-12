@@ -9,7 +9,7 @@ ASWUnitTests is a speedy light-weight C++ unit test tool.
 - `SetExceptionExpected()` - basic testing support for expected exceptions
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
-Se the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
+See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
 
 # Donations:
 
