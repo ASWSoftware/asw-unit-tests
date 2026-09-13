@@ -33,8 +33,52 @@ limitations under the License.
 #define ASWTools_CommonH
 //---------------------------------------------------------------------------
 #include <cstddef>
+#include <cstdint>
 #include <stdlib.h>
-#include <windows.h>
+#if defined(_WIN32)
+#  include <windows.h>
+#else
+#  include <mutex>
+
+using BYTE = std::uint8_t;
+using DWORD = std::uint32_t;
+using LONG = std::int32_t;
+using TCHAR = char;
+using HANDLE = void*;
+using LPVOID = void*;
+
+struct SYSTEMTIME
+{
+    std::uint16_t wYear;
+    std::uint16_t wMonth;
+    std::uint16_t wDayOfWeek;
+    std::uint16_t wDay;
+    std::uint16_t wHour;
+    std::uint16_t wMinute;
+    std::uint16_t wSecond;
+    std::uint16_t wMilliseconds;
+};
+
+struct TIME_ZONE_INFORMATION
+{
+    LONG Bias;
+};
+
+struct GUID
+{
+    std::uint32_t Data1;
+    std::uint16_t Data2;
+    std::uint16_t Data3;
+    std::uint8_t Data4[8];
+};
+
+struct CRITICAL_SECTION
+{
+    std::mutex mutex;
+};
+
+constexpr HANDLE INVALID_HANDLE_VALUE = nullptr;
+#endif
 //---------------------------------------------------------------------------
 
 #if __cplusplus < 201103L
@@ -69,8 +113,10 @@ public:
 
     ~RAII_Handle()
     {
+#if defined(_WIN32)
         if (INVALID_HANDLE_VALUE != m_handle && nullptr != m_handle)
             ::CloseHandle(m_handle);
+#endif
     }
 
     HANDLE Release()
@@ -144,13 +190,21 @@ public:
         : m_leave(true),
           m_mutex(mutex)
     {
+#if defined(_WIN32)
         ::EnterCriticalSection(&m_mutex);
+#else
+        m_mutex.mutex.lock();
+#endif
     }
 
     ~RAII_MutexLock()
     {
         if (m_leave)
+#if defined(_WIN32)
             ::LeaveCriticalSection(&m_mutex);
+#else
+            m_mutex.mutex.unlock();
+#endif
     }
 
     CRITICAL_SECTION& Release()

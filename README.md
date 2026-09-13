@@ -1,6 +1,6 @@
 # ASWUnitTests - https://github.com/ASWSoftware/asw-unit-tests
 
-ASWUnitTests is a speedy light-weight C++ unit test tool.
+ASWUnitTests is a speedy light-weight C++ unit test tool for Windows and Linux projects.
 
 # Features
 
@@ -18,7 +18,7 @@ If you find ASWUnitTests helpful, donations are always appreciated:
 PayPal:
 donate@aswsoftware.com
 
-BitCoin:
+Bitcoin:
 15rKqL1numHJyE36ottMbhs5cmCjJkuowV
 
 # How to Use
@@ -34,7 +34,7 @@ Modify the project files within (e.g. `rad370` or `cmake`, etc.) to point to you
 The `toTest` folder is an example of source that is to be tested. While this example folder exists in the root of this
 project, your source should be wherever you like.
 
-# CMake
+## CMake
 
 The `cmake` folder contains a portable CMake project for building with CMake, JetBrains CLion, Visual Studio, Clang,
 or MinGW. From the repository root, configure and build it with:
@@ -51,6 +51,8 @@ tests; Release builds run the tests and exit.
 The executable uses semantic versioning for its `--version` output. Update `src/ASWUnitTests_Version.h` when preparing a
 release. The CMake project does not need a separate version declaration because it currently builds the test executable
 directly rather than packaging or installing it.
+
+## Registering Tests
 
 For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
 is the only unit in `src` that needs to be modified when adding a new test module. For example:
@@ -89,8 +91,10 @@ TTest_TMyClassToTest::TTest_TMyClassToTest()
         }, "NameOfMethodBeingTested_WhatIsBeingTested");
 
     // Or you can register test methods this way
-    RegisterTest(Test_NameOfMethodBeingTested_WhatIsBeingTested, "NameOfMethodBeingTested_WhatIsBeingTested");
-    RegisterTest(Test_NameOfMethod2BeingTested_WhatIsBeingTested, "NameOfMethod2BeingTested_WhatIsBeingTested");
+    RegisterTest(&TTest_TMyClassToTest::Test_NameOfMethodBeingTested_WhatIsBeingTested,
+        "NameOfMethodBeingTested_WhatIsBeingTested");
+    RegisterTest(&TTest_TMyClassToTest::Test_NameOfMethod2BeingTested_WhatIsBeingTested,
+        "NameOfMethod2BeingTested_WhatIsBeingTested");
 }
 //---------------------------------------------------------------------------
 TTest_TMyClassToTest::~TTest_TMyClassToTest()

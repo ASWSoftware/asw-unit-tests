@@ -30,7 +30,6 @@ limitations under the License.
 #include <sstream>
 #include <string>
 #include <vector>
-#include <windows.h>
 //---------------------------------------------------------------------------
 #include "ASWTools_Common.h"
 //---------------------------------------------------------------------------
