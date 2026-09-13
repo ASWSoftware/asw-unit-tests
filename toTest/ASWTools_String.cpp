@@ -25,6 +25,10 @@ limitations under the License.
 #include "ASWTools_String.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <array>
+#include <charconv>
+#include <chrono>
+#include <cstdarg>
 
 // Visual Studio NOTE: '__cplusplus' is not defined to the latest unless '/Zc:__cplusplus' is added to
 // 'Additional Options' because Microsoft likes to make things difficult. If using C++ 11 and up, add
@@ -34,7 +38,6 @@ limitations under the License.
 #   include <codecvt>
 #else
 #   include <functional>
-#   include <stdarg.h> // va_start
 #   include <wctype.h>
 #endif // #if __cplusplus >= 201103L
 
@@ -45,15 +48,30 @@ limitations under the License.
 #include <memory>
 #include <stdexcept>
 #include <cwctype>
+#include <ctime>
+#include <system_error>
+#if !defined(_WIN32)
+#  include <cerrno>
+#  include <cstring>
+#  include <cwchar>
+#  include <strings.h>
+#endif
 //---------------------------------------------------------------------------
 
 #ifndef strcmpI
 #ifdef __BORLANDC__
     #define strcmpI stricmp
-#else
+#elif defined(_WIN32)
     #define strcmpI _stricmp
+#else
+    #define strcmpI strcasecmp
 #endif // #ifdef __BORLANDC__
 #endif // #ifndef strcmpI
+
+#if !defined(_WIN32)
+    #define _wcsicmp wcscasecmp
+    #define strncmpi strncasecmp
+#endif
 
 #ifdef _MSC_VER
 //See: https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros?view=vs-2019
@@ -66,20 +84,154 @@ limitations under the License.
 
 
 //---------------------------------------------------------------------------
-#ifdef _WIN64
+#if defined(_WIN32)
     #ifdef _MSC_VER
         #pragma comment(lib, "rpcrt4.lib") //for UUID stuff for VS
     #else
 
     #endif
-#else
-    #pragma comment(lib, "rpcrt4.lib") //for UUID stuff for VS
 #endif
 
 //---------------------------------------------------------------------------
 
 namespace ASWTools
 {
+
+namespace
+{
+
+#if !defined(_WIN32)
+
+std::string FormatGUID(GUID const& guid)
+{
+    std::ostringstream stream;
+    stream << std::hex << std::setfill('0') << std::setw(8) << guid.Data1 << '-'
+    << std::setw(4) << guid.Data2 << '-' << std::setw(4) << guid.Data3 << '-'
+    << std::setw(2) << static_cast<unsigned int>(guid.Data4[0])
+    << std::setw(2) << static_cast<unsigned int>(guid.Data4[1]) << '-';
+
+    for (size_t i = 2; i < 8; ++i)
+        stream << std::setw(2) << static_cast<unsigned int>(guid.Data4[i]);
+
+    return stream.str();
+}
+
+bool ParseGUID(std::string const& value, GUID& guid)
+{
+    if (value.size() == 38 && value.front() == '{' && value.back() == '}')
+        return ParseGUID(value.substr(1, value.size() - 2), guid);
+
+    if (value.size() != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-')
+        return false;
+
+    unsigned long long number = 0;
+    if (!ParseHex(value.substr(0, 8), &number))
+        return false;
+    guid.Data1 = static_cast<std::uint32_t>(number);
+    if (!ParseHex(value.substr(9, 4), &number))
+        return false;
+    guid.Data2 = static_cast<std::uint16_t>(number);
+    if (!ParseHex(value.substr(14, 4), &number))
+        return false;
+    guid.Data3 = static_cast<std::uint16_t>(number);
+
+    for (size_t i = 0; i < 8; ++i)
+    {
+        size_t const offset = i < 2 ? 19 + (i * 2) : 24 + (i * 2);
+        if (!ParseHex(value.substr(offset, 2), &number))
+            return false;
+        guid.Data4[i] = static_cast<std::uint8_t>(number);
+    }
+
+    return true;
+}
+
+bool ParseHex(std::string const& value, unsigned long long* result)
+{
+    auto conversion = std::from_chars(value.data(), value.data() + value.size(), *result, 16);
+    return conversion.ec == std::errc() && conversion.ptr == value.data() + value.size();
+}
+
+#endif
+
+void GetLocalSystemTime(SYSTEMTIME* time)
+{
+#if defined(_WIN32)
+    ::GetLocalTime(time);
+#else
+    auto now = std::chrono::system_clock::now();
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+    std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime{};
+    localtime_r(&nowTime, &localTime);
+
+    time->wYear = static_cast<std::uint16_t>(localTime.tm_year + 1900);
+    time->wMonth = static_cast<std::uint16_t>(localTime.tm_mon + 1);
+    time->wDayOfWeek = static_cast<std::uint16_t>(localTime.tm_wday);
+    time->wDay = static_cast<std::uint16_t>(localTime.tm_mday);
+    time->wHour = static_cast<std::uint16_t>(localTime.tm_hour);
+    time->wMinute = static_cast<std::uint16_t>(localTime.tm_min);
+    time->wSecond = static_cast<std::uint16_t>(localTime.tm_sec);
+    time->wMilliseconds = static_cast<std::uint16_t>(milliseconds.count());
+#endif
+}
+
+std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
+{
+    std::wstring value;
+
+    for (size_t i = 0; i + 1 < byteCount; i += 2)
+    {
+        std::uint16_t codeUnit = static_cast<std::uint16_t>(bytes[i]) |
+            (static_cast<std::uint16_t>(bytes[i + 1]) << 8);
+
+        if (sizeof(wchar_t) > sizeof(std::uint16_t) && codeUnit >= 0xd800 && codeUnit <= 0xdbff && i + 3 < byteCount)
+        {
+            std::uint16_t low = static_cast<std::uint16_t>(bytes[i + 2]) |
+                (static_cast<std::uint16_t>(bytes[i + 3]) << 8);
+            if (low >= 0xdc00 && low <= 0xdfff)
+            {
+                std::uint32_t codePoint = 0x10000 + ((codeUnit - 0xd800) << 10) + (low - 0xdc00);
+                value.push_back(static_cast<wchar_t>(codePoint));
+                i += 2;
+                continue;
+            }
+        }
+
+        value.push_back(static_cast<wchar_t>(codeUnit));
+    }
+
+    return value;
+}
+
+std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t length)
+{
+    std::vector<BYTE> bytes;
+
+    for (size_t i = 0; i < length; ++i)
+    {
+        std::uint32_t codePoint = static_cast<std::uint32_t>(value[i]);
+        if (sizeof(wchar_t) > sizeof(std::uint16_t) && codePoint > 0xffff)
+        {
+            codePoint -= 0x10000;
+            std::uint16_t high = static_cast<std::uint16_t>(0xd800 + (codePoint >> 10));
+            std::uint16_t low = static_cast<std::uint16_t>(0xdc00 + (codePoint & 0x3ff));
+            bytes.push_back(static_cast<BYTE>(high & 0xff));
+            bytes.push_back(static_cast<BYTE>(high >> 8));
+            bytes.push_back(static_cast<BYTE>(low & 0xff));
+            bytes.push_back(static_cast<BYTE>(low >> 8));
+            continue;
+        }
+
+        std::uint16_t codeUnit = static_cast<std::uint16_t>(codePoint);
+        bytes.push_back(static_cast<BYTE>(codeUnit & 0xff));
+        bytes.push_back(static_cast<BYTE>(codeUnit >> 8));
+    }
+
+    return bytes;
+}
+
+} // namespace
 
 /////////////////////////////////////////////////////////////////////////////
 // TStrTool
@@ -218,6 +370,7 @@ std::wstring TStrTool::Utf8ToUnicodeStr(char const* utf8Bytes, size_t length)
 // -Parameter 'winLastErr' must be the value of API call GetLastError()
 std::string TStrTool::GetWindowsLastErrorCodeAsStringA(DWORD const winLastErr)
 {
+#if defined(_WIN32)
     LPSTR error = nullptr;
     std::string errorStr;
 
@@ -240,12 +393,16 @@ std::string TStrTool::GetWindowsLastErrorCodeAsStringA(DWORD const winLastErr)
     //A trailing newline is sometimes present. Remove.
     TrimRight(errorStr);
     return errorStr;
+#else
+    return std::system_category().message(static_cast<int>(winLastErr));
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
 // -Parameter 'winLastErr' must be the value of API call GetLastError()
 std::wstring TStrTool::GetWindowsLastErrorCodeAsStringW(DWORD const winLastErr)
 {
+#if defined(_WIN32)
     LPWSTR error = nullptr;
     std::wstring errorStr;
 
@@ -268,6 +425,9 @@ std::wstring TStrTool::GetWindowsLastErrorCodeAsStringW(DWORD const winLastErr)
     //A trailing newline is sometimes present. Remove.
     TrimRight(errorStr);
     return errorStr;
+#else
+    return Utf8ToUnicodeStr(GetWindowsLastErrorCodeAsStringA(winLastErr));
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -640,8 +800,7 @@ std::wstring TStrTool::DecodeBase16HexToStrW(std::string const& inHex)
         return L"";
     }
 
-    std::wstring resultStr(reinterpret_cast<wchar_t*>(buff), static_cast<size_t>(bytesWritten) / sizeof(wchar_t));
-    return resultStr;
+    return Utf16BytesToWideString(buff, static_cast<size_t>(bytesWritten));
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -855,8 +1014,7 @@ std::wstring TStrTool::DecodeBase64ToStrW(std::string const& inB64)
         return L"";
     }
 
-    std::wstring resultStr(reinterpret_cast<wchar_t*>(buff), static_cast<size_t>(bytesWritten) / sizeof(wchar_t));
-    return resultStr;
+    return Utf16BytesToWideString(buff, static_cast<size_t>(bytesWritten));
 }
 //---------------------------------------------------------------------------
 // -Pass null for "destBytes" to calculate the needed buffer size, which, on success, will be
@@ -1182,7 +1340,8 @@ std::string TStrTool::EncodeStrToBase16Hex(std::wstring const& strW, bool upperC
     if (0 == length)
         return ""; //nothing to do
 
-    return EncodeToBase16Hex(reinterpret_cast<BYTE const*>(strW.c_str()), length * sizeof(wchar_t), upperCase);
+    std::vector<BYTE> bytes = WideStringToUtf16Bytes(strW, length);
+    return EncodeToBase16Hex(bytes.data(), bytes.size(), upperCase);
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -1196,7 +1355,8 @@ std::string TStrTool::EncodeStrToBase16Hex(std::wstring const& strW, size_t leng
     if (0 == length)
         return ""; //nothing to do
 
-    return EncodeToBase16Hex(reinterpret_cast<BYTE const*>(strW.c_str()), length * sizeof(wchar_t), upperCase);
+    std::vector<BYTE> bytes = WideStringToUtf16Bytes(strW, length);
+    return EncodeToBase16Hex(bytes.data(), bytes.size(), upperCase);
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -1264,7 +1424,8 @@ std::string TStrTool::EncodeStrToBase64Str(std::wstring const& strW, bool makeWe
     if (0 == length)
         return ""; //nothing to do
 
-    return EncodeToBase64Str_Native(reinterpret_cast<BYTE const*>(strW.c_str()), length * sizeof(wchar_t), makeWebFriendly);
+    std::vector<BYTE> bytes = WideStringToUtf16Bytes(strW, length);
+    return EncodeToBase64Str_Native(bytes.data(), bytes.size(), makeWebFriendly);
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -1278,7 +1439,8 @@ std::string TStrTool::EncodeStrToBase64Str(std::wstring const& strW, size_t leng
     if (0 == length)
         return ""; //nothing to do
 
-    return EncodeToBase64Str_Native(reinterpret_cast<BYTE const*>(strW.c_str()), length * sizeof(wchar_t), makeWebFriendly);
+    std::vector<BYTE> bytes = WideStringToUtf16Bytes(strW, length);
+    return EncodeToBase64Str_Native(bytes.data(), bytes.size(), makeWebFriendly);
 }
 //---------------------------------------------------------------------------
 //-Static
@@ -1424,12 +1586,14 @@ std::wstring TStrTool::Fmt_printf(wchar_t const* format, ...)
     //then were done because the printf worked.
 #ifdef __BORLANDC__
     len = vsnwprintf(text, bufferSize, format, args) + 1; //add 1 for null char
-#else
+#elif defined(_WIN32)
     #ifdef USE_SAFESTR_FUNCS
     len = _vsnwprintf_s(text, bufferSize, _TRUNCATE, format, args) + 1; //add 1 for null char
     #else
     len = _vsnwprintf(text, bufferSize, format, args) + 1; //add 1 for null char
     #endif
+#else
+    len = vswprintf(text, bufferSize, format, args) + 1; //add 1 for null char
 #endif
 
     if (len > static_cast<int>(bufferSize))
@@ -1440,12 +1604,14 @@ std::wstring TStrTool::Fmt_printf(wchar_t const* format, ...)
         //get the string again now that there is enough room for it
 #ifdef __BORLANDC__
         vsnwprintf(text, bufferSize, format, args);
-#else
+#elif defined(_WIN32)
     #ifdef USE_SAFESTR_FUNCS
         _vsnwprintf_s(text, bufferSize, _TRUNCATE, format, args);
     #else
         _vsnwprintf(text, bufferSize, format, args);
     #endif
+#else
+        vswprintf(text, bufferSize, format, args);
 #endif
     }
 
@@ -1461,7 +1627,7 @@ std::wstring TStrTool::GetDateTimeStr_LocalW(bool fileNameFriendly)
     wchar_t buffer[bufferSize];
 
     //get current time
-    GetLocalTime(&time);
+    GetLocalSystemTime(&time);
 
     if (fileNameFriendly)
     {
@@ -1487,7 +1653,7 @@ std::string TStrTool::GetDateTimeStr_LocalA(bool fileNameFriendly)
     char buffer[bufferSize];
 
     //get current time
-    GetLocalTime(&time);
+    GetLocalSystemTime(&time);
 
     if (fileNameFriendly)
     {
@@ -2546,7 +2712,7 @@ bool TStrTool::URL_Split(std::string const& url, std::string* hostUtf8, std::str
     char const* walker = urlStart;
 
     //skip http/s prefix, if there is one
-#if defined(_MSC_VER) || (defined(__clang__) && __clang_major__ >= 15) // Win64x
+#if defined(_WIN32)
     if (_strnicmp(walker, httpPrefix.c_str(), httpPrefix.length()) == 0)
         walker += httpPrefix.length();
     else if (_strnicmp(walker, httpsPrefix.c_str(), httpsPrefix.length()) == 0)
@@ -2697,6 +2863,7 @@ bool TStrTool::StrToGUID(char const* idStr, GUID& guid)
         return true;
     }
 
+#if defined(_WIN32)
     //UuidFromString does not take a const string, for some reason? Microsoft? So, make a duplicate
     char* nonConstStr = new char[idStrLen + 1];
     std::unique_ptr<char[]> auto_nonConstStr(nonConstStr);
@@ -2713,6 +2880,9 @@ bool TStrTool::StrToGUID(char const* idStr, GUID& guid)
     if (hr != RPC_S_OK)
         return false;
     return true;
+#else
+    return ParseGUID(idStr, guid);
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2734,6 +2904,7 @@ bool TStrTool::StrToGUID(wchar_t const* idStr, GUID& guid)
         return true;
     }
 
+#if defined(_WIN32)
     //UuidFromString does not take a const string, for some reason? Microsoft? So, make a duplicate
     wchar_t* nonConstStr = new wchar_t[idStrLen + 1];
     std::unique_ptr<wchar_t[]> auto_nonConstStr(nonConstStr);
@@ -2749,7 +2920,20 @@ bool TStrTool::StrToGUID(wchar_t const* idStr, GUID& guid)
 
     if (hr != RPC_S_OK)
         return false;
+
     return true;
+#else
+    std::string narrowString;
+    narrowString.reserve(idStrLen);
+    for (size_t i = 0; i < idStrLen; ++i)
+    {
+        if (idStr[i] > 127)
+            return false;
+        narrowString.push_back(static_cast<char>(idStr[i]));
+    }
+
+    return ParseGUID(narrowString, guid);
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2757,6 +2941,7 @@ bool TStrTool::StrToGUID(wchar_t const* idStr, GUID& guid)
 // -An zero length string is returned for errors.
 std::string TStrTool::StrFromGUID(GUID const* guid)
 {
+#if defined(_WIN32)
     RPC_CSTR szUuid = nullptr;
 
     if (nullptr == guid)
@@ -2770,6 +2955,12 @@ std::string TStrTool::StrFromGUID(GUID const* guid)
     }
 
     return "";
+#else
+    if (nullptr == guid)
+        return "00000000-0000-0000-0000-000000000000";
+
+    return FormatGUID(*guid);
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2777,6 +2968,7 @@ std::string TStrTool::StrFromGUID(GUID const* guid)
 // -An zero length string is returned for errors.
 std::wstring TStrTool::StrFromGUIDW(GUID const* guid)
 {
+#if defined(_WIN32)
     RPC_WSTR szUuid = nullptr;
 
     if (nullptr == guid)
@@ -2790,6 +2982,13 @@ std::wstring TStrTool::StrFromGUIDW(GUID const* guid)
     }
 
     return L"";
+#else
+    if (nullptr == guid)
+        return L"00000000-0000-0000-0000-000000000000";
+
+    std::string const guidString = FormatGUID(*guid);
+    return std::wstring(guidString.begin(), guidString.end());
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
@@ -2799,6 +2998,7 @@ std::wstring TStrTool::StrFromGUIDW(GUID const* guid)
 // -Returns -2 for errors.
 int TStrTool::CompareGUID(GUID* guid1, GUID* guid2)
 {
+#if defined(_WIN32)
     RPC_STATUS status;
     int result = ::UuidCompare(guid1, guid2, &status);
 
@@ -2806,6 +3006,39 @@ int TStrTool::CompareGUID(GUID* guid1, GUID* guid2)
         return -2;
 
     return result;
+#else
+    if (nullptr == guid1 || nullptr == guid2)
+        return -2;
+
+    std::array<std::uint8_t, 16> first = {
+        static_cast<std::uint8_t>((guid1->Data1 >> 24) & 0xff),
+        static_cast<std::uint8_t>((guid1->Data1 >> 16) & 0xff),
+        static_cast<std::uint8_t>((guid1->Data1 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid1->Data1 & 0xff),
+        static_cast<std::uint8_t>((guid1->Data2 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid1->Data2 & 0xff),
+        static_cast<std::uint8_t>((guid1->Data3 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid1->Data3 & 0xff),
+    };
+    std::array<std::uint8_t, 16> second = {
+        static_cast<std::uint8_t>((guid2->Data1 >> 24) & 0xff),
+        static_cast<std::uint8_t>((guid2->Data1 >> 16) & 0xff),
+        static_cast<std::uint8_t>((guid2->Data1 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid2->Data1 & 0xff),
+        static_cast<std::uint8_t>((guid2->Data2 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid2->Data2 & 0xff),
+        static_cast<std::uint8_t>((guid2->Data3 >> 8) & 0xff),
+        static_cast<std::uint8_t>(guid2->Data3 & 0xff),
+    };
+
+    for (size_t i = 0; i < 8; ++i)
+    {
+        first[8 + i] = guid1->Data4[i];
+        second[8 + i] = guid2->Data4[i];
+    }
+
+    return first < second ? -1 : first > second ? 1 : 0;
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
