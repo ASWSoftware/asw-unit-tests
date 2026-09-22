@@ -6,14 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../src/ASWUnitTests_Sources.cmake)
+
 add_executable(ASWUnitTests
-    ../src/ASWUnitTests_Exception.cpp
-    ../src/ASWUnitTests_Handler.cpp
-    ../src/ASWUnitTests_Registry.cpp
-    ../src/ASWUnitTests_Registry.h
-    ../src/ASWUnitTests_TestBase.cpp
-    ../src/ASWUnitTests_Version.h
-    ../src/main.cpp
+    ${ASWUNITTESTS_SOURCES}
     ../tests/Test_ASWTools_Random.cpp
     ../tests/Test_ASWTools_String.cpp
     ../toTest/ASWTools_Common.cpp
