@@ -31,11 +31,8 @@ limitations under the License.
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
+#include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_Version.h"
-//---------------------------------------------------------------------------
-// Add includes for each "Test_" module here
-#include "Test_ASWTools_Random.h"
-#include "Test_ASWTools_String.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -116,19 +113,15 @@ void TTestHandler::LogAppend(std::string const& msg)
 /*
     TTestHandler::RegisterTestGroups
 
-    Developer: Add test modules here.
+    Instantiates every test group that self-registered via the
+    ASW_REGISTER_TEST_GROUP macro (see ASWUnitTests_Registry.h). Test
+    modules are added or removed from their own .cpp files; this method
+    never needs to change.
 */
 void TTestHandler::RegisterTestGroups()
 {
-    // Example of how to add a module:
-    // m_TestGroups.push_back(std::unique_ptr<TestClassName>(new TestClassName()));
-
-    // ----- Add each class to be tested
-
-    m_TestGroups.push_back(std::unique_ptr<TTest_ASWTools_String>(new TTest_ASWTools_String()));
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMersenneTwisterRandom>(new TTest_TMersenneTwisterRandom()));
-
-    // ----- End adding classes to be tested
+    for (TTestGroupRegistry::TestGroupFactory const& factory : TTestGroupRegistry::Factories())
+        m_TestGroups.push_back(factory());
 }
 //---------------------------------------------------------------------------
 /*
