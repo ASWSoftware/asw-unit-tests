@@ -24,6 +24,8 @@ limitations under the License.
 // Module header
 #include "Test_ASWTools_String.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWTools_String.h"
 //---------------------------------------------------------------------------
 using namespace ASWTools;
@@ -622,3 +624,6 @@ void TTest_ASWTools_String::Test_URL_EncodeDecode()
 //---------------------------------------------------------------------------
 
 } // namespace ASWUnitTests
+
+//---------------------------------------------------------------------------
+ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_ASWTools_String)
