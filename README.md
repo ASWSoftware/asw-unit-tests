@@ -28,9 +28,8 @@ to the nature of unit testing.
 
 For examples of how to use, see the `tests` and `toTest` folders and `src\ASWUnitTests_Handler.cpp`.
 
-ASWUnitTests is intended to exist in a sub folder within your project at the root (e.g. `myProject\asw-unit-tests`).
-
-Modify the project files within (e.g. `rad370` or `cmake`, etc.) to point to your source.
+ASWUnitTests is intended to exist in a sub folder within your project, typically as a git submodule.
+See [Submodule Integration](#submodule-integration) below for how to wire it.
 The `toTest` folder is an example of source that is to be tested. While this example folder exists in the root of this
 project, your source should be wherever you like.
 
@@ -125,6 +124,51 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 ```
+
+## Submodule Integration
+
+This repository's own `cmake\CMakeLists.txt` and `rad370\ASWUnitTests.cbproj` only build *this* repo's own example
+tests and `toTest` code for its own development and CI. Don't use them from a consuming project, and don't modify
+them — doing either means your changes live inside the submodule and get lost or conflict the next time you update
+it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference its `src`
+files from your own project's build file, alongside your own test modules:
+
+```
+my-project/
+├── third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
+│   ├── src/                      <- framework core (never touched)
+│   └── cmake/, rad370/, tests/, toTest/   <- this framework's own example build, unused by you
+├── tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
+└── CMakeLists.txt / .cbproj      <- your own build file, in your own repo
+```
+
+Since `src\main.cpp` only calls into `TTestHandler` and never references a specific test class, you compile it
+as-is from the submodule — there's no need to copy or duplicate it into your own tree.
+
+### CMake
+
+Include `src\ASWUnitTests_Sources.cmake` from your own `CMakeLists.txt` rather than listing the framework's source
+filenames by hand; it exports `ASWUNITTESTS_SOURCES` (the compiled `.cpp` files) and `ASWUNITTESTS_SOURCE_DIR` (for
+the include path). It stays in sync automatically if a future version of this framework adds a core file:
+
+```cmake
+include(third_party/asw-unit-tests/src/ASWUnitTests_Sources.cmake)
+
+add_executable(MyTests
+    ${ASWUNITTESTS_SOURCES}
+    tests/Test_MyClass.cpp
+)
+
+target_include_directories(MyTests PRIVATE
+    ${ASWUNITTESTS_SOURCE_DIR}
+    tests
+)
+```
+
+### RAD Studio / Visual Studio / other IDE projects
+
+Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own project, plus
+your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after updating the submodule.
 
 # Coding Standards
 
