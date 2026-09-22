@@ -45,9 +45,9 @@ TTestGroupRegistry::TestGroupFactoryList& TTestGroupRegistry::Factories()
     return factories;
 }
 //---------------------------------------------------------------------------
-int TTestGroupRegistry::Register(TestGroupFactory factory)
+int TTestGroupRegistry::Register(TestGroupFactory factory, int order)
 {
-    Factories().push_back(factory);
+    Factories().push_back(TRegisteredTestGroupFactory{ factory, order });
     return 0;
 }
 //---------------------------------------------------------------------------

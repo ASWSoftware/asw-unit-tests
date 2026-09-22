@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -114,14 +115,37 @@ void TTestHandler::LogAppend(std::string const& msg)
     TTestHandler::RegisterTestGroups
 
     Instantiates every test group that self-registered via the
-    ASW_REGISTER_TEST_GROUP macro (see ASWUnitTests_Registry.h). Test
-    modules are added or removed from their own .cpp files; this method
-    never needs to change.
+    ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED macro (see
+    ASWUnitTests_Registry.h). Test modules are added or removed from their
+    own .cpp files; this method never needs to change.
+
+    Groups run in ascending order by their registered order (default 0),
+    with ties broken alphabetically by group name, so the default run
+    order is alphabetical and deterministic across compilers/linkers.
 */
 void TTestHandler::RegisterTestGroups()
 {
-    for (TTestGroupRegistry::TestGroupFactory const& factory : TTestGroupRegistry::Factories())
-        m_TestGroups.push_back(factory());
+    struct TOrderedGroup
+    {
+        int Order;
+        std::unique_ptr<ITestGroup> Group;
+    };
+
+    std::vector<TOrderedGroup> orderedGroups;
+
+    for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
+        orderedGroups.push_back(TOrderedGroup{ registered.Order, registered.Factory() });
+
+    std::stable_sort(orderedGroups.begin(), orderedGroups.end(),
+        [](TOrderedGroup const& a, TOrderedGroup const& b)
+        {
+            if (a.Order != b.Order)
+                return a.Order < b.Order;
+            return a.Group->GetTestGroupName() < b.Group->GetTestGroupName();
+        });
+
+    for (TOrderedGroup& orderedGroup : orderedGroups)
+        m_TestGroups.push_back(std::move(orderedGroup.Group));
 }
 //---------------------------------------------------------------------------
 /*

@@ -37,22 +37,39 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// TRegisteredTestGroupFactory
+//
+// A self-registered test group's factory function, plus its optional
+// ordering hint (see ASW_REGISTER_TEST_GROUP_ORDERED). Groups left at the
+// default order of 0 are run in alphabetical order by group name; an
+// explicit lower/higher order runs a group before/after that block. Order
+// is compared before name, so ties fall back to alphabetical order.
+/////////////////////////////////////////////////////////////////////////////
+struct TRegisteredTestGroupFactory
+{
+    std::function<std::unique_ptr<ITestGroup> ()> Factory;
+    int Order;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTestGroupRegistry
 //
 // Holds the factory functions for self-registered test groups. Test
-// modules register themselves via the ASW_REGISTER_TEST_GROUP macro rather
-// than being listed in TTestHandler::RegisterTestGroups(), so no framework
-// source file needs to change when a test module is added or removed.
+// modules register themselves via the ASW_REGISTER_TEST_GROUP or
+// ASW_REGISTER_TEST_GROUP_ORDERED macro rather than being listed in
+// TTestHandler::RegisterTestGroups(), so no framework source file needs to
+// change when a test module is added or removed.
 /////////////////////////////////////////////////////////////////////////////
 class TTestGroupRegistry
 {
 public:
     typedef std::function<std::unique_ptr<ITestGroup> ()> TestGroupFactory;
-    typedef std::vector<TestGroupFactory> TestGroupFactoryList;
+    typedef std::vector<TRegisteredTestGroupFactory> TestGroupFactoryList;
 
 public:
     static TestGroupFactoryList& Factories();
-    static int Register(TestGroupFactory factory);
+    static int Register(TestGroupFactory factory, int order = 0);
 };
 
 } // namespace ASWUnitTests
@@ -60,13 +77,18 @@ public:
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// ASW_REGISTER_TEST_GROUP
+// ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED
 //
 // Place at namespace or file scope in a test module's .cpp file to
 // self-register that test group's class with TTestHandler.
+// ASW_REGISTER_TEST_GROUP runs the group in alphabetical order by group
+// name, alongside every other group that doesn't specify an order.
+// ASW_REGISTER_TEST_GROUP_ORDERED overrides that with an explicit order:
+// groups run in ascending order, with ties broken alphabetically by name.
 //
-// Example:
+// Examples:
 //     ASW_REGISTER_TEST_GROUP(TTest_TMyClassToTest)
+//     ASW_REGISTER_TEST_GROUP_ORDERED(TTest_TMyClassToTest, -1) // runs first
 //---------------------------------------------------------------------------
 #define ASWUnitTests_CONCAT_INNER(a, b) a ## b
 #define ASWUnitTests_CONCAT(a, b) ASWUnitTests_CONCAT_INNER(a, b)
@@ -77,13 +99,16 @@ public:
 #  define ASWUnitTests_UNIQUE_NAME(base) ASWUnitTests_CONCAT(base, __LINE__)
 #endif
 
-#define ASW_REGISTER_TEST_GROUP(ClassName) \
+#define ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order) \
     static int const ASWUnitTests_UNIQUE_NAME(g_ASWUnitTests_Registered_) = \
         ::ASWUnitTests::TTestGroupRegistry::Register( \
             []() -> std::unique_ptr<::ASWUnitTests::ITestGroup> \
             { \
                 return std::make_unique<ClassName>(); \
-            });
+            }, (order));
+
+#define ASW_REGISTER_TEST_GROUP(ClassName) \
+    ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, 0)
 
 //---------------------------------------------------------------------------
 

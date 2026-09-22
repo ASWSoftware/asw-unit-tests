@@ -76,6 +76,17 @@ ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_TMyClassToTest)
 Only the test module's own `.cpp`/`.h` files need to be added to your project's build (CMake, RAD Studio, etc.) —
 see `tests\Test_ASWTools_String.cpp` and `tests\Test_ASWTools_Random.cpp` for working examples.
 
+By default, groups run in alphabetical order by group name, deterministically across compilers and linkers. To
+override that for a specific group, instead use `ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order)`. Groups run in
+ascending order, with ties broken alphabetically:
+
+```
+ASW_REGISTER_TEST_GROUP_ORDERED(ASWUnitTests::TTest_TMyClassToTest, -1) // runs before the alphabetical block
+```
+
+Run order is purely for readable, reproducible output. A group's `SetUp_Group`/`TearDown_Group` should still make
+no assumption about which other groups have or haven't already run.
+
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:
 
