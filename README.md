@@ -54,25 +54,26 @@ directly rather than packaging or installing it.
 
 ## Registering Tests
 
-For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
-is the only unit in `src` that needs to be modified when adding a new test module. For example:
+Test modules self-register with `TTestHandler` using the `ASW_REGISTER_TEST_GROUP` macro (declared in
+`src\ASWUnitTests_Registry.h`). No file in `src` ever needs to be modified to add, remove, or rename a test
+module. This makes it easy to drop ASWUnitTests into another repository (e.g. as a git submodule).
+Place the macro at file scope, after the closing brace of the `ASWUnitTests` namespace, in the test module's `.cpp` file:
 
 ```
-// Whatever includes at the top of the file for the test modules
+// Whatever includes at the top of the file for your `TMyClassToTest` class, etc.
+#include "ASWUnitTests_Registry.h"
 
-void TTestHandler::RegisterTestGroups()
+namespace ASWUnitTests
 {
-    // Example of how to add a module:
-    // m_TestGroups.push_back(std::unique_ptr<TestClassName>(new TestClassName()));
+    // ... TTest_TMyClassToTest class implementation ...
 
-    // ----- Add each class to be tested
+} // namespace ASWUnitTests
 
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMyClassToTest>(new TTest_TMyClassToTest()));
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMyClassToTest2>(new TTest_TMyClassToTest2()));
-
-    // ----- End adding classes to be tested
-}
+ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_TMyClassToTest)
 ```
+
+Only the test module's own `.cpp`/`.h` files need to be added to your project's build (CMake, RAD Studio, etc.) —
+see `tests\Test_ASWTools_String.cpp` and `tests\Test_ASWTools_Random.cpp` for working examples.
 
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:
