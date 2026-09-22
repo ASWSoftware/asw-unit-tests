@@ -169,20 +169,24 @@
             <DependentOn>..\src\ASWUnitTests_Handler.h</DependentOn>
             <BuildOrder>6</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Registry.cpp">
+            <DependentOn>..\src\ASWUnitTests_Registry.h</DependentOn>
+            <BuildOrder>7</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_TestBase.cpp">
             <DependentOn>..\src\ASWUnitTests_TestBase.h</DependentOn>
-            <BuildOrder>7</BuildOrder>
+            <BuildOrder>8</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\main.cpp">
             <BuildOrder>1</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\tests\Test_ASWTools_Random.cpp">
             <DependentOn>..\tests\Test_ASWTools_Random.h</DependentOn>
-            <BuildOrder>8</BuildOrder>
+            <BuildOrder>9</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\tests\Test_ASWTools_String.cpp">
             <DependentOn>..\tests\Test_ASWTools_String.h</DependentOn>
-            <BuildOrder>9</BuildOrder>
+            <BuildOrder>10</BuildOrder>
         </CppCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
