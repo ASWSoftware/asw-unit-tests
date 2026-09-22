@@ -4,8 +4,6 @@ Author: Anthony S. West - ASW Software
 
 Self-registration support for test groups.
 
-Requires C++ 11 or higher.
-
 Use the ASW_REGISTER_TEST_GROUP macro in a test module's .cpp file to
 register the test group with TTestHandler.
 

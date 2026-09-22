@@ -2,6 +2,8 @@
 
 ASWUnitTests is a speedy light-weight C++ unit test tool for Windows and Linux projects.
 
+Requires C++17 or higher; the project itself is built and tested at C++20.
+
 # Features
 
 - `Check` prefix methods for `assert` sections of unit tests that aren't intended to throw (e.g. CheckTrue())
