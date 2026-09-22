@@ -33,6 +33,12 @@ else()
     target_compile_options(ASWUnitTests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(WIN32)
+    # toTest/ASWTools_String.cpp uses the Win32 UUID/RPC string APIs. MSVC picks up
+    # rpcrt4.lib via a #pragma comment, but MinGW/Clang need it linked explicitly.
+    target_link_libraries(ASWUnitTests PRIVATE rpcrt4)
+endif()
+
 set_target_properties(ASWUnitTests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
