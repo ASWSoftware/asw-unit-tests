@@ -301,6 +301,27 @@ protected: // Assertion/Check methods - Not Equals
     virtual void CheckNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
+    virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void AssertNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void AssertNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void AssertNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void CheckNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void CheckNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void CheckNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void CheckNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
 protected: // Assertion/Check methods - Boolean
     virtual void AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg);

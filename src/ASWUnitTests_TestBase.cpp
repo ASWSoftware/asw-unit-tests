@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -169,6 +170,32 @@ void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int li
         throw TExceptFalse(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -247,6 +274,32 @@ void TTestGroupBase::AssertNotEquals(std::wstring const& expected, std::wstring 
 {
     if (expected == actual)
         throw TExceptNotEquals(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        throw TExceptNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        throw TExceptNotEquals(method, line, valueStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg)
@@ -344,6 +397,32 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -422,6 +501,32 @@ void TTestGroupBase::CheckNotEquals(std::wstring const& expected, std::wstring c
 {
     if (expected == actual)
         SetTestFailedCheckNotEquals(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg)

@@ -9,6 +9,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - `Check` prefix methods for `assert` sections of unit tests that aren't intended to throw (e.g. CheckTrue())
 - `Assert` prefix methods for `assert` sections of unit tests that should throw right away (e.g. AssertTrue())
 - `SetExceptionExpected()` - support for expected exceptions, with an optional exception-type and message check
+- `CheckNear()`/`AssertNear()` - tolerance-based `float`/`double` comparison
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -128,6 +129,21 @@ If the wrong exception type is thrown, or its message doesn't contain the given 
 message showing what was actually caught. This only works for exceptions deriving from `std::exception` — a thrown
 object that doesn't (uncommon in practice) can't be inspected, so a type/message expectation against it fails with
 an explanatory message rather than silently passing.
+
+### Comparing Floating-Point Values
+
+There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals` — exact equality comparison of
+floating-point values is unreliable (e.g. `0.1f + 0.2f != 0.3f`). Use `CheckNear`/`AssertNear` instead, which pass
+when the absolute difference between the two values is within a given tolerance, and `CheckNotNear`/`AssertNotNear`
+for the opposite (asserting two values are *not* within tolerance of each other):
+
+```
+float sum = 0.1f + 0.2f;
+CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
+```
+
+Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a sensible
+tolerance depends heavily on the magnitude and accumulated error of the values involved.
 
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:
