@@ -81,6 +81,7 @@ public:
     TTestHandler();
     ~TTestHandler();
 
+    std::vector<std::string> GetAllTestFullNames();
     std::string const& GetProjectName() const;
     void Initialize(std::string const& projectName = "ASWUnitTests");
     void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());

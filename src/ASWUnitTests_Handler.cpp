@@ -55,6 +55,34 @@ TTestHandler::~TTestHandler()
 {
 }
 //---------------------------------------------------------------------------
+/*
+    TTestHandler::GetAllTestFullNames
+
+    Returns every registered test's "GroupName.TestName" full name, in the same
+    canonical (unshuffled) order used by ListTests() and the default run order.
+
+    Requires Initialize() to have already been called.
+*/
+std::vector<std::string> TTestHandler::GetAllTestFullNames()
+{
+    std::vector<std::string> fullNames;
+
+    for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
+    {
+        ITestGroup& testGroup = *it->get();
+        std::string const& groupName = testGroup.GetTestGroupName();
+
+        for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
+             testIt != testGroup.GetTestCallbackList().end(); testIt++)
+        {
+            ITestCase& testCase = *testIt->get();
+            fullNames.push_back(groupName + "." + testCase.GetName());
+        }
+    }
+
+    return fullNames;
+}
+//---------------------------------------------------------------------------
 std::string const& TTestHandler::GetProjectName() const
 {
     return m_ProjectName;

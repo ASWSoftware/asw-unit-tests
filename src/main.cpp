@@ -27,6 +27,7 @@ limitations under the License.
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
@@ -103,6 +104,19 @@ void PrintUsage()
     "  --shuffle-seed <N>  Shuffle (implies --shuffle) using an explicit\n"
     "                      unsigned integer seed, to reproduce a previous\n"
     "                      --shuffle run's order.\n"
+    "  --partition-index <N>\n"
+    "                      1-based index of this run's partition, from 1 to\n"
+    "                      --partition-count. Requires --partition-count.\n"
+    "  --partition-count <N>\n"
+    "                      Splits the full test suite into <N> roughly-equal\n"
+    "                      partitions by each test's position in the canonical\n"
+    "                      registration order (the same order --list shows),\n"
+    "                      so every test runs in exactly one partition\n"
+    "                      regardless of which group it's in. Run <N> separate\n"
+    "                      invocations (e.g. one per CI job), each with its\n"
+    "                      own --partition-index, to run the suite in parallel\n"
+    "                      with no coordination between processes. Requires\n"
+    "                      --partition-index.\n"
     "  --color <mode>      One of \"auto\" (default; color only on an\n"
     "                      interactive terminal that supports it, and only\n"
     "                      if the NO_COLOR environment variable isn't set),\n"
@@ -168,6 +182,10 @@ int main(int argc, char* argv[])
     std::string filterPattern;
     bool shuffle = false;
     std::optional<unsigned int> shuffleSeed;
+    bool hasPartitionIndex = false;
+    bool hasPartitionCount = false;
+    unsigned int partitionIndex = 0;
+    unsigned int partitionCount = 0;
     TColorMode colorMode = TColorMode::Auto;
     std::optional<TConsoleColor> colorPass;
     std::optional<TConsoleColor> colorFail;
@@ -244,6 +262,66 @@ int main(int argc, char* argv[])
             }
 
             shuffle = true;
+        }
+        else if (arg == "--partition-index")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --partition-index requires a numeric argument.\n";
+                return 4;
+            }
+
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --partition-index requires a positive integer argument.\n";
+                return 4;
+            }
+
+            partitionIndex = *parsed;
+            hasPartitionIndex = true;
+        }
+        else if (arg.rfind("--partition-index=", 0) == 0)
+        {
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(std::string(arg.substr(18)));
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --partition-index requires a positive integer argument.\n";
+                return 4;
+            }
+
+            partitionIndex = *parsed;
+            hasPartitionIndex = true;
+        }
+        else if (arg == "--partition-count")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --partition-count requires a numeric argument.\n";
+                return 4;
+            }
+
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --partition-count requires a positive integer argument.\n";
+                return 4;
+            }
+
+            partitionCount = *parsed;
+            hasPartitionCount = true;
+        }
+        else if (arg.rfind("--partition-count=", 0) == 0)
+        {
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(std::string(arg.substr(18)));
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --partition-count requires a positive integer argument.\n";
+                return 4;
+            }
+
+            partitionCount = *parsed;
+            hasPartitionCount = true;
         }
         else if (arg == "--no-color")
         {
@@ -355,6 +433,28 @@ int main(int argc, char* argv[])
         }
     }
 
+    if (hasPartitionIndex != hasPartitionCount)
+    {
+        std::cout << "Error: --partition-index and --partition-count must be given together.\n";
+        return 4;
+    }
+
+    if (hasPartitionCount)
+    {
+        if (partitionCount == 0)
+        {
+            std::cout << "Error: --partition-count must be at least 1.\n";
+            return 4;
+        }
+
+        if (partitionIndex == 0 || partitionIndex > partitionCount)
+        {
+            std::cout << "Error: --partition-index must be between 1 and --partition-count ("
+            << partitionCount << ").\n";
+            return 4;
+        }
+    }
+
     TConsole::SetColorMode(colorMode);
 
     if (colorPass.has_value())
@@ -385,6 +485,41 @@ int main(int argc, char* argv[])
                 };
 
             filterDescription = "\"" + filterPattern + "\"" + (filterIgnoreCase ? " (case-insensitive)" : "");
+        }
+
+        if (hasPartitionCount)
+        {
+            // Membership is assigned by each test's position in the canonical (unshuffled) registration order (same
+            // order "--list" shows). Using the canonical order means a given test's partition never changes based on
+            // whether "--shuffle" is requested. The presence of "--shuffle" reorders execution within a partition. This
+            // allows for the suite to be split across separate process invocations (e.g. one per CI job) with no
+            // coordination between them and no merge step needed afterward when "--report-junit" output is requested
+            // (it's just another JUnit XML file for the CI system's own native multi-file merging).
+            std::vector<std::string> const allTestNames = tester.GetAllTestFullNames();
+            unsigned int const zeroBasedIndex = partitionIndex - 1;
+            std::unordered_set<std::string> partitionMembers;
+
+            for (size_t testPos = 0; testPos < allTestNames.size(); ++testPos)
+            {
+                if ((testPos % partitionCount) == zeroBasedIndex)
+                    partitionMembers.insert(allTestNames[testPos]);
+            }
+
+            TestFilter const previousFilter = filter;
+
+            filter = [previousFilter, partitionMembers = std::move(partitionMembers)](std::string const& fullTestName)
+                {
+                    if (previousFilter != nullptr && !previousFilter(fullTestName))
+                        return false;
+
+                    return partitionMembers.count(fullTestName) > 0;
+                };
+
+            if (!filterDescription.empty())
+                filterDescription += ", ";
+
+            filterDescription += "partition " + std::to_string(partitionIndex) + " of " +
+                std::to_string(partitionCount);
         }
 
         if (listOnly)

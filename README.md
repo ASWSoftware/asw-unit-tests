@@ -16,6 +16,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   hand-writing a loop or duplicating near-identical test methods
 - `JUnit Report` - writes a JUnit-style XML test report, recognized natively by most CI systems, with no
   third-party dependency
+- `--partition-index`/`--partition-count` - splits the suite across separate process invocations (e.g. a CI job
+  matrix) for parallel execution, with no in-process threading and no merge step
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -76,6 +78,15 @@ ASWUnitTests [options]
                        caused by order can be reproduced via --shuffle-seed.
   --shuffle-seed <N>   Shuffle (implies --shuffle) using an explicit unsigned integer seed,
                        to reproduce a previous --shuffle run's order.
+  --partition-index <N> 1-based index of this run's partition, from 1 to --partition-count.
+                       Requires --partition-count.
+  --partition-count <N> Splits the full test suite into <N> roughly-equal partitions by each
+                       test's position in the canonical registration order (the same order
+                       --list shows), so every test runs in exactly one partition regardless
+                       of which group it's in. Run <N> separate invocations (e.g. one per CI
+                       job), each with its own --partition-index, to run the suite in
+                       parallel with no coordination between processes. Requires
+                       --partition-index.
   --color <mode>       One of "auto" (default; color only on an interactive terminal that
                        supports it, and only if the NO_COLOR environment variable isn't set),
                        "always", or "never".
@@ -111,6 +122,18 @@ default (see [Registering Tests](#registering-tests)) is for readable, reproduci
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
 reproduce it exactly while debugging.
+
+`--partition-index`/`--partition-count` split the suite for parallel execution across separate OS processes.
+Each invocation still runs single-threaded and writes to its own console/JUnit output. Partitioning is by each
+test's position in the canonical registration order, not by group, so one large group doesn't dominate a single
+partition. Partition membership is independent of `--shuffle`, since it's computed from the canonical order rather
+than any shuffled one, so a given test's partition never changes based on whether `--shuffle` is also passed.
+A typical setup is a CI job matrix, e.g. 4 jobs each running:
+`--partition-index <1..4> --partition-count 4 --report-junit results-<index>.xml`.
+ASWUnitTests doesn't merge those reports itself, since most CI systems (GitHub Actions, GitLab CI, Jenkins, Azure
+DevOps, CircleCI) already merge multiple JUnit XML files from parallel jobs natively.
+Combine `--partition-index`/`--partition-count` with `--list` to preview which tests land in a given partition, the
+same way `--list` can preview `--filter`.
 
 Pass/fail/skip status text is colorized when writing to an interactive terminal that supports ANSI escape codes.
 Output redirected to a file or pipe, or a non-interactive CI log, automatically gets plain text with no escape
