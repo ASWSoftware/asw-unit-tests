@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
+#include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -31,6 +32,21 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
+
+namespace
+{
+
+std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
+{
+    double const elapsedMs = std::chrono::duration<double, std::milli>(
+        std::chrono::high_resolution_clock::now() - start).count();
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
+    return oss.str();
+}
+
+} // namespace
 
 namespace ASWUnitTests
 {
@@ -682,6 +698,9 @@ void TTestGroupBase::TearDown_Test(ITestCase& /*testCase*/)
 */
 void TTestGroupBase::Test(ITestCase& testCase)
 {
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
+
     try
     {
         // Reset for test
@@ -691,10 +710,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
         // Run test
         if (nullptr != testCase.GetTestCallback())
         {
-            std::string testFullName = m_Name + "." + testCase.GetName();
-
-            std::string msg = "Running test: " + testFullName;
-            Log(msg);
+            Log("Running test: " + testFullName);
 
             try
             {
@@ -739,34 +755,39 @@ void TTestGroupBase::Test(ITestCase& testCase)
         if (TestFailedOneOrMoreChecks())
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + m_Name + "\"";
+            std::string msg = "***Test failed: \"" + testFullName + "\"";
             m_Results.Messages.push_back(msg);
             Log(msg);
+            Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
             return;
         }
 
         // Test passed
         m_Results.SuccessCount++;
+        Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
     }
     catch (TExceptSkipped const& ex)
     {
         m_Results.SkippedCount++;
-        std::string msg = "***Test skipped: \"" + m_Name + "\": " + ex.what();
+        std::string msg = "***Test skipped: \"" + testFullName + "\": " + ex.what();
         m_Results.Messages.push_back(msg);
         Log(msg);
+        Log("Finished test: \"" + testFullName + "\" - skipped (" + FormatDurationMs(testStart) + ")");
     }
     catch (TTestException const& ex)
     {
         if (m_ExceptionExpected)
         {
             m_Results.SuccessCount++;
+            Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
         }
         else
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + m_Name + "\": " + ex.what();
+            std::string msg = "***Test failed: \"" + testFullName + "\": " + ex.what();
             m_Results.Messages.push_back(msg);
             Log(msg);
+            Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
         }
     }
     catch (std::exception const& ex)
@@ -782,12 +803,13 @@ void TTestGroupBase::Test(ITestCase& testCase)
             if (typeMatches && messageMatches)
             {
                 m_Results.SuccessCount++;
+                Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
             }
             else
             {
                 m_Results.FailedCount++;
 
-                std::string msg = "***Test failed: \"" + m_Name + "\": ";
+                std::string msg = "***Test failed: \"" + testFullName + "\": ";
                 if (!typeMatches)
                     msg += "expected exception type was not thrown (caught a different exception): " +
                         std::string(ex.what());
@@ -797,6 +819,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
                 m_Results.Messages.push_back(msg);
                 Log(msg);
+                Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
             }
         }
         else
@@ -815,14 +838,16 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
                 m_Results.FailedCount++;
 
-                std::string msg = "***Test failed: \"" + m_Name +
+                std::string msg = "***Test failed: \"" + testFullName +
                     "\": expected a specific exception type, but a non-std::exception object was thrown instead.";
                 m_Results.Messages.push_back(msg);
                 Log(msg);
+                Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
             }
             else
             {
                 m_Results.SuccessCount++;
+                Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
             }
         }
         else

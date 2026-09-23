@@ -78,6 +78,10 @@ The console output always states whether a filter is active (and its pattern) be
 `--list` reports how many tests/groups matched out of the total registered — so if output is redirected to a file,
 there's a record of why fewer tests ran or were listed than expected.
 
+Every test logs a `Finished test: "GroupName.TestName" - passed/failed/skipped (N.NNN ms)` line on completion,
+timing from just before `SetUp_Test` to just after the test's outcome is determined — useful for spotting slow
+tests without needing an external profiler.
+
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
 tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,
 `4` invalid command line arguments. Skipped tests never affect the exit code.
