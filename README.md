@@ -55,8 +55,7 @@ cmake --build build --config Release
 ```
 
 The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. The RAD Studio
-project writes its final executable to the same `build/bin/<Config>` directory. Debug builds pause for input after the
-tests; Release builds run the tests and exit.
+project writes its final executable to the same `build/bin/<Config>` directory.
 
 The executable uses semantic versioning for its `--version` output. Update `src/ASWUnitTests_Version.h` when preparing a
 release. The CMake project does not need a separate version declaration because it currently builds the test executable
@@ -108,6 +107,10 @@ ASWUnitTests [options]
   --list               List all registered tests as "GroupName.TestName" and exit, without
                        running anything. Combine with --filter to preview a pattern's matches
                        before running it.
+  --pause              Prompt "press enter to continue" before exiting after a --list command
+                       or test run. Useful when an IDE's Run command closes the console
+                       immediately, so its output can't be read; set this as an argument in
+                       that IDE's own run configuration.
   --version            Print the framework version and exit.
   --help               Show usage and exit.
 ```

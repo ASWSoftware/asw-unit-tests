@@ -52,7 +52,7 @@ Prefer standard C++ and portable library facilities. Avoid compiler-, IDE-, or o
 
 ## Building and Testing
 
-The RAD Studio debug build can be run from `rad370/Build_Win64x_Debug.bat` when the `Rad370` environment variable points to the RAD Studio installation. The debug console prompts for "press enter to continue" after the run. The release script is `rad370/Build_Win64x_Release.bat`; it runs the tests and exits without that pause.
+The RAD Studio debug build can be run from `rad370/Build_Win64x_Debug.bat` when the `Rad370` environment variable points to the RAD Studio installation. The release script is `rad370/Build_Win64x_Release.bat`. Neither pauses before exiting by default; pass `--pause` to have the console prompt "press enter to continue" first, e.g. when running from an IDE that would otherwise close the console immediately.
 
 For other environments, use the repository's CMake configuration when present or the IDE's native project configuration. Tests should be run outside the debugger unless debugging an expected exception is intentional. Before considering a change complete:
 

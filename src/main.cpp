@@ -21,6 +21,7 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <limits>
@@ -143,6 +144,8 @@ void PrintUsage()
     "                      \"ASWUnitTests\").\n"
     "  --list              List all registered tests as \"GroupName.TestName\"\n"
     "                      and exit, without running anything.\n"
+    "  --pause             Prompt \"press enter to continue\" before exiting\n"
+    "                      after a --list command or test run.\n"
     "  --version           Print the framework version and exit.\n"
     "  --help              Show this message and exit.\n";
 }
@@ -192,6 +195,7 @@ int main(int argc, char* argv[])
     std::optional<TConsoleColor> colorSkip;
     std::string junitReportPath;
     std::string projectName = "ASWUnitTests";
+    bool pauseOnExit = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -425,6 +429,10 @@ int main(int argc, char* argv[])
         {
             projectName = arg.substr(15);
         }
+        else if (arg == "--pause")
+        {
+            pauseOnExit = true;
+        }
         else
         {
             std::cout << "Error: unrecognized option \"" << arg << "\".\n\n";
@@ -555,14 +563,15 @@ int main(int argc, char* argv[])
         returnCode = 3;
     }
 
-#if !defined(NDEBUG) && defined(__BORLANDC__)
-#  if defined(_WIN32)
-    system("pause");
-#  else
-    std::cout << "Press enter to continue..." << std::endl;
-    std::cin.get();
-#  endif
+    if (pauseOnExit)
+    {
+#if defined(_WIN32)
+        system("pause");
+#else
+        std::cout << "Press enter to continue..." << std::endl;
+        std::cin.get();
 #endif
+    }
 
     return returnCode;
 }
