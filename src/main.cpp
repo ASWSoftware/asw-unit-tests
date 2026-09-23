@@ -27,9 +27,11 @@ limitations under the License.
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Handler.h"
+#include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
 using namespace ASWUnitTests;
 //---------------------------------------------------------------------------
@@ -40,6 +42,7 @@ namespace
 std::optional<TColorMode> ParseColorMode(std::string const& text);
 std::optional<unsigned int> ParseUnsignedInt(std::string const& text);
 void PrintUsage();
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records);
 
 //---------------------------------------------------------------------------
 std::optional<TColorMode> ParseColorMode(std::string const& text)
@@ -112,10 +115,43 @@ void PrintUsage()
     "                      or bright-<name> for the bright variant (e.g.\n"
     "                      bright-red). Defaults: pass=green, fail=red,\n"
     "                      skip=yellow.\n"
+    "  --report-junit <path>\n"
+    "                      Write a JUnit-style XML test report to <path>, in\n"
+    "                      addition to the normal console output. Recognized\n"
+    "                      by most CI systems (GitHub Actions, GitLab CI,\n"
+    "                      Jenkins, Azure DevOps, CircleCI) for native test\n"
+    "                      result reporting.\n"
+    "  --project-name <name>\n"
+    "                      Set the name this run is identified by: shown in\n"
+    "                      the console's \"Initializing...\" line and, if\n"
+    "                      --report-junit is also given, used as the report's\n"
+    "                      <testsuites name=\"...\"> attribute (default:\n"
+    "                      \"ASWUnitTests\").\n"
     "  --list              List all registered tests as \"GroupName.TestName\"\n"
     "                      and exit, without running anything.\n"
     "  --version           Print the framework version and exit.\n"
     "  --help              Show this message and exit.\n";
+}
+
+//---------------------------------------------------------------------------
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records)
+{
+    std::vector<TJUnitTestCase> testCases;
+    testCases.reserve(records.size());
+
+    for (TTestCaseRecord const& record : records)
+    {
+        TJUnitOutcome outcome = TJUnitOutcome::Pass;
+        if (record.Outcome == TTestOutcome::Fail)
+            outcome = TJUnitOutcome::Fail;
+        else if (record.Outcome == TTestOutcome::Skip)
+            outcome = TJUnitOutcome::Skip;
+
+        testCases.push_back(TJUnitTestCase{ record.GroupName, record.TestName, record.DurationSeconds, outcome,
+                                            record.Message });
+    }
+
+    return testCases;
 }
 
 //---------------------------------------------------------------------------
@@ -136,6 +172,8 @@ int main(int argc, char* argv[])
     std::optional<TConsoleColor> colorPass;
     std::optional<TConsoleColor> colorFail;
     std::optional<TConsoleColor> colorSkip;
+    std::string junitReportPath;
+    std::string projectName = "ASWUnitTests";
 
     for (int i = 1; i < argc; ++i)
     {
@@ -281,6 +319,34 @@ int main(int argc, char* argv[])
             else
                 colorSkip = parsed;
         }
+        else if (arg == "--report-junit")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --report-junit requires a file path argument.\n";
+                return 4;
+            }
+
+            junitReportPath = argv[++i];
+        }
+        else if (arg.rfind("--report-junit=", 0) == 0)
+        {
+            junitReportPath = arg.substr(15);
+        }
+        else if (arg == "--project-name")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --project-name requires a name argument.\n";
+                return 4;
+            }
+
+            projectName = argv[++i];
+        }
+        else if (arg.rfind("--project-name=", 0) == 0)
+        {
+            projectName = arg.substr(15);
+        }
         else
         {
             std::cout << "Error: unrecognized option \"" << arg << "\".\n\n";
@@ -306,7 +372,7 @@ int main(int argc, char* argv[])
     {
         TTestHandler tester;
 
-        tester.Initialize();
+        tester.Initialize(projectName);
 
         TestFilter filter;
         std::string filterDescription;
@@ -332,6 +398,15 @@ int main(int argc, char* argv[])
             unsigned int nTestsFailed = testResults.FailedCount;
             if (nTestsFailed > 0)
                 returnCode = 1;
+
+            if (!junitReportPath.empty())
+            {
+                std::vector<TJUnitTestCase> const junitTestCases = ToJUnitTestCases(testResults.CaseRecords);
+                if (TJUnitReportWriter::Write(junitReportPath, tester.GetProjectName(), junitTestCases))
+                    tester.Log("JUnit report written to: " + junitReportPath);
+                else
+                    tester.Log("Error: could not write JUnit report to: " + junitReportPath);
+            }
         }
     }
     catch (std::exception const& ex)

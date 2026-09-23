@@ -65,6 +65,7 @@ private:
     typedef std::vector<std::unique_ptr<ITestGroup> > ITestGroups;
 
 private:
+    std::string m_ProjectName;
     ITestGroups m_TestGroups;
 
 private:
@@ -80,7 +81,8 @@ public:
     TTestHandler();
     ~TTestHandler();
 
-    void Initialize();
+    std::string const& GetProjectName() const;
+    void Initialize(std::string const& projectName = "ASWUnitTests");
     void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
     void LogAppend(std::string const& msg);

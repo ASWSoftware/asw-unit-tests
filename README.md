@@ -12,6 +12,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - `CheckNear()`/`AssertNear()` - tolerance-based `float`/`double` comparison
 - `Skip()` - aborts a test and reports it as skipped, unconditionally or after a runtime check, without removing
   its registration
+- `JUnit Report` - writes a JUnit-style XML test report, recognized natively by most CI systems, with no
+  third-party dependency
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -81,6 +83,15 @@ ASWUnitTests [options]
                        one of: default, black, red, green, yellow, blue, magenta, cyan, white,
                        or bright-<name> for the bright variant (e.g. bright-red). Defaults:
                        pass=green, fail=red, skip=yellow.
+  --report-junit <path> Write a JUnit-style XML test report to <path>, in addition to the
+                       normal console output. Recognized by most CI systems (GitHub Actions,
+                       GitLab CI, Jenkins, Azure DevOps, CircleCI) for native test result
+                       reporting.
+  --project-name <name> Set the name this run is identified by: shown in the console's
+                       "Initializing..." line and, if --report-junit is also given, used as
+                       the report's <testsuites name="..."> attribute (default: "ASWUnitTests").
+                       Set this to your own project's name so console output and CI dashboards
+                       both identify the run correctly.
   --list               List all registered tests as "GroupName.TestName" and exit, without
                        running anything. Combine with --filter to preview a pattern's matches
                        before running it.
@@ -107,6 +118,10 @@ The [NO_COLOR](https://no-color.org) environment variable is also respected in t
 Every test logs a `Finished test: "GroupName.TestName" - passed/failed/skipped (N.NNN ms)` line on completion,
 timing from just before `SetUp_Test` to just after the test's outcome is determined — useful for spotting slow
 tests without needing an external profiler.
+
+`--report-junit` produces a standard `<testsuites>`/`<testsuite>`/`<testcase>` report. One `<testsuite>` per test
+group, with `<failure>`/`<skipped>` elements carrying the same detail message shown on the console. `--project-name`
+sets both the console's `Initializing...` line and the report's `<testsuites name="...">` attribute.
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
 tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,

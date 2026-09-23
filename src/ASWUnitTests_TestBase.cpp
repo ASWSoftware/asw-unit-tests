@@ -720,8 +720,29 @@ void TTestGroupBase::Test(ITestCase& testCase)
     std::string const testFullName = m_Name + "." + testCase.GetName();
     std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
 
-    auto logFinished = [&](TLogKind kind, char const* status)
+    // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
+    // for the console, never in the stored message/record), and logs the "Finished test" timing line.
+    // 'detailMessage' is the failure/skip detail text, or empty for a pass.
+    auto finish = [&](TTestOutcome outcome, char const* status, std::string const& detailMessage)
         {
+            TLogKind const kind = (outcome == TTestOutcome::Fail) ? TLogKind::Fail :
+                    (outcome == TTestOutcome::Skip) ? TLogKind::Skip : TLogKind::Pass;
+
+            if (outcome != TTestOutcome::Pass)
+            {
+                std::string const tag = (outcome == TTestOutcome::Fail) ? "***Test failed" : "***Test skipped";
+                std::string const plainMsg = tag + ": \"" + testFullName + "\"" +
+                    (detailMessage.empty() ? std::string() : (": " + detailMessage));
+
+                m_Results.Messages.push_back(plainMsg);
+                Log(TConsole::Colorize(tag, kind) + plainMsg.substr(tag.size()));
+            }
+
+            double const durationSeconds = std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - testStart).count();
+            m_Results.CaseRecords.push_back(
+                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, detailMessage });
+
             Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
                 FormatDurationMs(testStart) + ")");
         };
@@ -780,41 +801,30 @@ void TTestGroupBase::Test(ITestCase& testCase)
         if (TestFailedOneOrMoreChecks())
         {
             m_Results.FailedCount++;
-            std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName + "\"";
-            m_Results.Messages.push_back(msg);
-            Log(msg);
-            logFinished(TLogKind::Fail, "failed");
+            finish(TTestOutcome::Fail, "failed", std::string());
             return;
         }
 
         // Test passed
         m_Results.SuccessCount++;
-        logFinished(TLogKind::Pass, "passed");
+        finish(TTestOutcome::Pass, "passed", std::string());
     }
     catch (TExceptSkipped const& ex)
     {
         m_Results.SkippedCount++;
-        std::string msg = TConsole::Colorize("***Test skipped", TLogKind::Skip) + ": \"" + testFullName + "\": " +
-            ex.what();
-        m_Results.Messages.push_back(msg);
-        Log(msg);
-        logFinished(TLogKind::Skip, "skipped");
+        finish(TTestOutcome::Skip, "skipped", ex.what());
     }
     catch (TTestException const& ex)
     {
         if (m_ExceptionExpected)
         {
             m_Results.SuccessCount++;
-            logFinished(TLogKind::Pass, "passed");
+            finish(TTestOutcome::Pass, "passed", std::string());
         }
         else
         {
             m_Results.FailedCount++;
-            std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
-                "\": " + ex.what();
-            m_Results.Messages.push_back(msg);
-            Log(msg);
-            logFinished(TLogKind::Fail, "failed");
+            finish(TTestOutcome::Fail, "failed", ex.what());
         }
     }
     catch (std::exception const& ex)
@@ -830,24 +840,21 @@ void TTestGroupBase::Test(ITestCase& testCase)
             if (typeMatches && messageMatches)
             {
                 m_Results.SuccessCount++;
-                logFinished(TLogKind::Pass, "passed");
+                finish(TTestOutcome::Pass, "passed", std::string());
             }
             else
             {
                 m_Results.FailedCount++;
 
-                std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
-                    "\": ";
+                std::string detail;
                 if (!typeMatches)
-                    msg += "expected exception type was not thrown (caught a different exception): " +
+                    detail = "expected exception type was not thrown (caught a different exception): " +
                         std::string(ex.what());
                 else
-                    msg += "expected exception message to contain \"" + m_ExpectedExceptionMessage +
+                    detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
                         "\" but caught: " + std::string(ex.what());
 
-                m_Results.Messages.push_back(msg);
-                Log(msg);
-                logFinished(TLogKind::Fail, "failed");
+                finish(TTestOutcome::Fail, "failed", detail);
             }
         }
         else
@@ -865,17 +872,13 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 // A specific type was requested, but what was thrown isn't a std::exception, so it can't be
                 // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
                 m_Results.FailedCount++;
-
-                std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
-                    "\": expected a specific exception type, but a non-std::exception object was thrown instead.";
-                m_Results.Messages.push_back(msg);
-                Log(msg);
-                logFinished(TLogKind::Fail, "failed");
+                finish(TTestOutcome::Fail, "failed",
+                    "expected a specific exception type, but a non-std::exception object was thrown instead.");
             }
             else
             {
                 m_Results.SuccessCount++;
-                logFinished(TLogKind::Pass, "passed");
+                finish(TTestOutcome::Pass, "passed", std::string());
             }
         }
         else

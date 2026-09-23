@@ -55,6 +55,11 @@ TTestHandler::~TTestHandler()
 {
 }
 //---------------------------------------------------------------------------
+std::string const& TTestHandler::GetProjectName() const
+{
+    return m_ProjectName;
+}
+//---------------------------------------------------------------------------
 std::string TTestHandler::GetUTCTimeISO8601()
 {
     // Get the current time as a time_point
@@ -144,11 +149,13 @@ bool TTestHandler::WildcardMatch(std::string const& pattern, std::string const& 
     return p == pattern.size();
 }
 //---------------------------------------------------------------------------
-void TTestHandler::Initialize()
+void TTestHandler::Initialize(std::string const& projectName)
 {
+    m_ProjectName = projectName;
+
     Log(GetVersionFullStr());
 
-    Log("Initializing test handler and registering test groups...");
+    Log("Initializing test handler and registering test groups for " + m_ProjectName + "...");
     RegisterTestGroups();
 
     Log("Test groups registered: " + std::to_string(m_TestGroups.size()));
@@ -389,6 +396,8 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         testResults.SkippedCount += testGroupResults.SkippedCount;
         testResults.SuccessCount += testGroupResults.SuccessCount;
         testResults.AddMessages(testGroupResults.Messages);
+        testResults.CaseRecords.insert(testResults.CaseRecords.end(), testGroupResults.CaseRecords.begin(),
+            testGroupResults.CaseRecords.end());
 
         // tear down
         Log("[" + GetUTCTimeISO8601() + "] Tearing down group: \"" + name + "\"");

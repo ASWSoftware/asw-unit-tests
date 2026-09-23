@@ -40,6 +40,35 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// TTestOutcome
+/////////////////////////////////////////////////////////////////////////////
+enum class TTestOutcome
+{
+    Pass,
+    Fail,
+    Skip
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TTestCaseRecord
+//
+// One test's outcome, name, and timing, collected in TTestResults::CaseRecords.
+// Deliberately format-agnostic (no ANSI color codes, no XML/JSON, etc.), so a
+// caller can build a structured report from it without TTestResults itself
+// depending on any particular report format.
+/////////////////////////////////////////////////////////////////////////////
+struct TTestCaseRecord
+{
+    std::string GroupName;
+    std::string TestName;
+    double DurationSeconds;
+    TTestOutcome Outcome;
+    std::string Message; // Failure/skip detail; empty for Pass.
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTestResults
 //
 // Stores test results.
@@ -55,6 +84,7 @@ public:
     unsigned int SkippedCount;
     unsigned int SuccessCount;
     MsgList Messages;
+    std::vector<TTestCaseRecord> CaseRecords;
 
 public:
     TTestResults();
