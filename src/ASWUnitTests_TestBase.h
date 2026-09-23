@@ -28,6 +28,7 @@ limitations under the License.
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <string>
@@ -162,6 +163,8 @@ protected:
     bool m_ExceptionExpected;
     bool m_TestFailedCheck;
     std::string m_ExceptionExpectedText;
+    std::string m_ExpectedExceptionMessage;
+    std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;
     std::string m_Name;
     TTestResults m_Results;
     TestCallbackList m_TestCallbacks;
@@ -180,6 +183,19 @@ protected:
     }
     virtual void ResetTestFailedOneOrMoreChecks();
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
+    // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
+    // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
+    template <typename TException>
+    void SetExceptionExpected(std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        SetExceptionExpected(true, method, line, msg);
+        m_ExpectedExceptionMessage = expectedMessage;
+        m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
+            {
+                return dynamic_cast<TException const*>(&ex) != nullptr;
+            };
+    }
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& expected,
         std::string const& actual, std::string const& msg);

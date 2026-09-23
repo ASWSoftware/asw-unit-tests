@@ -503,6 +503,8 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
 {
     m_ExceptionExpected = expected;
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
+    m_ExpectedExceptionMessage.clear();
+    m_ExpectedExceptionTypeChecker = nullptr;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
@@ -641,11 +643,61 @@ void TTestGroupBase::Test(ITestCase& testCase)
             Log(msg);
         }
     }
+    catch (std::exception const& ex)
+    {
+        if (m_ExceptionExpected)
+        {
+            // A type/message check is only requested via the templated SetExceptionExpected<TException>()
+            // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
+            bool const typeMatches = (m_ExpectedExceptionTypeChecker == nullptr) || m_ExpectedExceptionTypeChecker(ex);
+            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
+                (std::string(ex.what()).find(m_ExpectedExceptionMessage) != std::string::npos);
+
+            if (typeMatches && messageMatches)
+            {
+                m_Results.SuccessCount++;
+            }
+            else
+            {
+                m_Results.FailedCount++;
+
+                std::string msg = "***Test failed: \"" + m_Name + "\": ";
+                if (!typeMatches)
+                    msg += "expected exception type was not thrown (caught a different exception): " +
+                        std::string(ex.what());
+                else
+                    msg += "expected exception message to contain \"" + m_ExpectedExceptionMessage +
+                        "\" but caught: " + std::string(ex.what());
+
+                m_Results.Messages.push_back(msg);
+                Log(msg);
+            }
+        }
+        else
+        {
+            m_Results.FailedCount++;
+            throw; // Unexpected failure
+        }
+    }
     catch (...)
     {
         if (m_ExceptionExpected)
         {
-            m_Results.SuccessCount++;
+            if (m_ExpectedExceptionTypeChecker != nullptr)
+            {
+                // A specific type was requested, but what was thrown isn't a std::exception, so it can't be
+                // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
+                m_Results.FailedCount++;
+
+                std::string msg = "***Test failed: \"" + m_Name +
+                    "\": expected a specific exception type, but a non-std::exception object was thrown instead.";
+                m_Results.Messages.push_back(msg);
+                Log(msg);
+            }
+            else
+            {
+                m_Results.SuccessCount++;
+            }
         }
         else
         {

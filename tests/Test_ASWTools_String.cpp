@@ -26,6 +26,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include <stdexcept>
+//---------------------------------------------------------------------------
 #include "ASWTools_String.h"
 //---------------------------------------------------------------------------
 using namespace ASWTools;
@@ -508,7 +510,7 @@ void TTest_ASWTools_String::Test_StrToInt32_Invalid()
     std::string invalid = "abc";
 
     // Act & Assert
-    SetExceptionExpected(true, __func__, __LINE__, "StrToInt32 invalid");
+    SetExceptionExpected<std::invalid_argument>(__func__, __LINE__, "StrToInt32 invalid", "signed 32-bit int");
     int32_t i = TStrTool::StrToInt32(invalid);
 
     // Assert

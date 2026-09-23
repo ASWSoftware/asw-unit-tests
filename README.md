@@ -8,7 +8,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 
 - `Check` prefix methods for `assert` sections of unit tests that aren't intended to throw (e.g. CheckTrue())
 - `Assert` prefix methods for `assert` sections of unit tests that should throw right away (e.g. AssertTrue())
-- `SetExceptionExpected()` - basic testing support for expected exceptions
+- `SetExceptionExpected()` - support for expected exceptions, with an optional exception-type and message check
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -112,6 +112,22 @@ ASW_REGISTER_TEST_GROUP_ORDERED(ASWUnitTests::TTest_TMyClassToTest, -1) // runs 
 
 Run order is purely for readable, reproducible output. A group's `SetUp_Group`/`TearDown_Group` should still make
 no assumption about which other groups have or haven't already run.
+
+### Expecting a Specific Exception Type or Message
+
+`SetExceptionExpected(true, ...)` passes on any thrown exception, regardless of its type. To also verify the
+exception's type (matched polymorphically, so a base class also matches its subclasses) and, optionally, that its
+`what()` contains a given substring, use the templated overload instead:
+
+```
+SetExceptionExpected<std::invalid_argument>(__func__, __LINE__, "StrToInt32 invalid", "signed 32-bit int");
+int32_t i = TStrTool::StrToInt32(invalid);
+```
+
+If the wrong exception type is thrown, or its message doesn't contain the given substring, the test fails with a
+message showing what was actually caught. This only works for exceptions deriving from `std::exception` — a thrown
+object that doesn't (uncommon in practice) can't be inspected, so a type/message expectation against it fails with
+an explanatory message rather than silently passing.
 
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:
