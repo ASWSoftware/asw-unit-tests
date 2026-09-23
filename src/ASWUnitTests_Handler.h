@@ -30,6 +30,7 @@ limitations under the License.
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -83,7 +84,8 @@ public:
     void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
     void LogAppend(std::string const& msg);
-    TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
+    TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string(),
+        bool shuffle = false, std::optional<unsigned int> shuffleSeed = std::nullopt);
 };
 
 } // namespace ASWUnitTests

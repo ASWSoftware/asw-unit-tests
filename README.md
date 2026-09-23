@@ -67,6 +67,11 @@ ASWUnitTests [options]
                        a substring search.
   --filter-ignore-case Match --filter's <pattern> case-insensitively. Has no effect without
                        --filter.
+  --shuffle            Run groups, and each group's tests, in a randomized order instead of
+                       the default deterministic order. The seed used is logged so a failure
+                       caused by order can be reproduced via --shuffle-seed.
+  --shuffle-seed <N>   Shuffle (implies --shuffle) using an explicit unsigned integer seed,
+                       to reproduce a previous --shuffle run's order.
   --list               List all registered tests as "GroupName.TestName" and exit, without
                        running anything. Combine with --filter to preview a pattern's matches
                        before running it.
@@ -76,7 +81,14 @@ ASWUnitTests [options]
 
 The console output always states whether a filter is active (and its pattern) before running or listing tests, and
 `--list` reports how many tests/groups matched out of the total registered — so if output is redirected to a file,
-there's a record of why fewer tests ran or were listed than expected.
+there's a record of why fewer tests ran or were listed than expected. Likewise, it always states whether shuffle is
+enabled and, if so, the seed in use.
+
+`--shuffle` is a sanity check against hidden inter-test/inter-group coupling — the deterministic alphabetical
+default (see [Registering Tests](#registering-tests)) is for readable, reproducible output day-to-day, while
+`--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
+via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
+reproduce it exactly while debugging.
 
 Every test logs a `Finished test: "GroupName.TestName" - passed/failed/skipped (N.NNN ms)` line on completion,
 timing from just before `SetUp_Test` to just after the test's outcome is determined — useful for spotting slow

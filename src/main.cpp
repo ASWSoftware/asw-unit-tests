@@ -23,6 +23,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <exception>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 //---------------------------------------------------------------------------
@@ -34,6 +36,32 @@ using namespace ASWUnitTests;
 namespace
 {
 
+std::optional<unsigned int> ParseUnsignedInt(std::string const& text);
+void PrintUsage();
+
+//---------------------------------------------------------------------------
+std::optional<unsigned int> ParseUnsignedInt(std::string const& text)
+{
+    if (text.empty())
+        return std::nullopt;
+
+    try
+    {
+        size_t charsConsumed = 0;
+        unsigned long const value = std::stoul(text, &charsConsumed);
+
+        if (charsConsumed != text.size() || value > std::numeric_limits<unsigned int>::max())
+            return std::nullopt;
+
+        return static_cast<unsigned int>(value);
+    }
+    catch (std::exception const&)
+    {
+        return std::nullopt;
+    }
+}
+
+//---------------------------------------------------------------------------
 void PrintUsage()
 {
     std::cout
@@ -48,11 +76,20 @@ void PrintUsage()
     "  --filter-ignore-case\n"
     "                      Match --filter's <pattern> case-insensitively.\n"
     "                      Has no effect without --filter.\n"
+    "  --shuffle           Run groups, and each group's tests, in a randomized\n"
+    "                      order instead of the default deterministic order.\n"
+    "                      The seed used is logged so a failure caused by\n"
+    "                      order can be reproduced via --shuffle-seed.\n"
+    "  --shuffle-seed <N>  Shuffle (implies --shuffle) using an explicit\n"
+    "                      unsigned integer seed, to reproduce a previous\n"
+    "                      --shuffle run's order.\n"
     "  --list              List all registered tests as \"GroupName.TestName\"\n"
     "                      and exit, without running anything.\n"
     "  --version           Print the framework version and exit.\n"
     "  --help              Show this message and exit.\n";
 }
+
+//---------------------------------------------------------------------------
 
 } // namespace
 
@@ -64,6 +101,8 @@ int main(int argc, char* argv[])
     bool hasFilter = false;
     bool filterIgnoreCase = false;
     std::string filterPattern;
+    bool shuffle = false;
+    std::optional<unsigned int> shuffleSeed;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -103,6 +142,38 @@ int main(int argc, char* argv[])
         {
             filterIgnoreCase = true;
         }
+        else if (arg == "--shuffle")
+        {
+            shuffle = true;
+        }
+        else if (arg == "--shuffle-seed")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --shuffle-seed requires a numeric argument.\n";
+                return 4;
+            }
+
+            shuffleSeed = ParseUnsignedInt(argv[++i]);
+            if (!shuffleSeed.has_value())
+            {
+                std::cout << "Error: --shuffle-seed requires a non-negative integer argument.\n";
+                return 4;
+            }
+
+            shuffle = true;
+        }
+        else if (arg.rfind("--shuffle-seed=", 0) == 0)
+        {
+            shuffleSeed = ParseUnsignedInt(std::string(arg.substr(15)));
+            if (!shuffleSeed.has_value())
+            {
+                std::cout << "Error: --shuffle-seed requires a non-negative integer argument.\n";
+                return 4;
+            }
+
+            shuffle = true;
+        }
         else
         {
             std::cout << "Error: unrecognized option \"" << arg << "\".\n\n";
@@ -139,7 +210,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            TTestResults testResults = tester.Run(filter, filterDescription);
+            TTestResults testResults = tester.Run(filter, filterDescription, shuffle, shuffleSeed);
             unsigned int nTestsFailed = testResults.FailedCount;
             if (nTestsFailed > 0)
                 returnCode = 1;

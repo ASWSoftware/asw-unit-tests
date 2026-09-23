@@ -24,10 +24,12 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
@@ -600,13 +602,29 @@ TTestResults const& TTestGroupBase::Results() const
     return m_Results;
 }
 //---------------------------------------------------------------------------
-void TTestGroupBase::Run(TestFilter const& filter)
+/*
+    TTestGroupBase::Run
+
+    'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
+    TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
+*/
+void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
 
-    for (TestCallbackList::iterator it = m_TestCallbacks.begin(); it != m_TestCallbacks.end(); it++)
+    std::vector<size_t> order(m_TestCallbacks.size());
+    for (size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+
+    if (shuffleSeed.has_value())
     {
-        ITestCase& testCase = *it->get();
+        std::mt19937 rng(*shuffleSeed);
+        std::shuffle(order.begin(), order.end(), rng);
+    }
+
+    for (size_t index : order)
+    {
+        ITestCase& testCase = *m_TestCallbacks[index].get();
 
         if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
             continue;

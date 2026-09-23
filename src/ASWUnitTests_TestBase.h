@@ -31,6 +31,7 @@ limitations under the License.
 #include <exception>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ public:
     virtual TestCallbackList& GetTestCallbackList() = 0;
     virtual std::string const& GetTestGroupName() const = 0;
     virtual TTestResults const& Results() const = 0;
-    virtual void Run(TestFilter const& filter) = 0;
+    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) = 0;
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -336,7 +337,7 @@ public:
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
-    void Run(TestFilter const& filter) override;
+    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) override;
 };
 
 } // namespace ASWUnitTests

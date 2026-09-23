@@ -30,6 +30,7 @@ limitations under the License.
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
@@ -276,8 +277,16 @@ void TTestHandler::RegisterTestGroups()
     no log entries), and group numbering in the log reflects only the
     groups that actually run. The active filter (or lack of one) is always
     logged, so redirected output still explains why fewer tests ran.
+
+    When 'shuffle' is set, group order is randomized, and each group's test
+    order is independently randomized too (each from a seed derived from the
+    master seed and the group's name, so results stay reproducible without
+    every equally-sized group shuffling identically). The master seed is
+    'shuffleSeed' if given, otherwise one is generated and logged so a
+    failure caused by shuffled order can be reproduced.
 */
-TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription)
+TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription, bool shuffle,
+    std::optional<unsigned int> shuffleSeed)
 {
     TTestResults testResults;
     std::vector<ITestGroup*> groupsToRun;
@@ -319,6 +328,21 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     if (filter != nullptr && groupsToRun.empty())
         Log("No registered tests matched the filter.");
 
+    std::optional<unsigned int> resolvedSeed;
+
+    if (shuffle)
+    {
+        resolvedSeed = shuffleSeed.has_value() ? shuffleSeed : std::random_device{}();
+        Log("Shuffle: enabled (seed " + std::to_string(*resolvedSeed) + ")");
+
+        std::mt19937 rng(*resolvedSeed);
+        std::shuffle(groupsToRun.begin(), groupsToRun.end(), rng);
+    }
+    else
+    {
+        Log("Shuffle: disabled");
+    }
+
     size_t groupNum = 0;
     size_t nGroups = groupsToRun.size();
     std::chrono::high_resolution_clock::time_point const start = std::chrono::high_resolution_clock::now();
@@ -348,7 +372,12 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
         // run
         Log("Running " + std::to_string(nTestsInGroup) + " test" + std::string((nTestsInGroup == 1) ? "." : "s."));
-        testGroup.Run(filter);
+
+        std::optional<unsigned int> groupSeed;
+        if (resolvedSeed.has_value())
+            groupSeed = *resolvedSeed + static_cast<unsigned int>(std::hash<std::string>{}(name));
+
+        testGroup.Run(filter, groupSeed);
         TTestResults const& testGroupResults = testGroup.Results();
         Log("Done. Succeeded: " + std::to_string(testGroupResults.SuccessCount) + ", failed: " +
             std::to_string(testGroupResults.FailedCount) + ", skipped: " +
