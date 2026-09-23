@@ -420,7 +420,7 @@ int main(int argc, char* argv[])
         returnCode = 3;
     }
 
-#if !defined(NDEBUG)
+#if !defined(NDEBUG) && defined(__BORLANDC__)
 #  if defined(_WIN32)
     system("pause");
 #  else
