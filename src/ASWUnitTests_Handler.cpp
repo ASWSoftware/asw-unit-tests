@@ -351,9 +351,11 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         testGroup.Run(filter);
         TTestResults const& testGroupResults = testGroup.Results();
         Log("Done. Succeeded: " + std::to_string(testGroupResults.SuccessCount) + ", failed: " +
-            std::to_string(testGroupResults.FailedCount));
+            std::to_string(testGroupResults.FailedCount) + ", skipped: " +
+            std::to_string(testGroupResults.SkippedCount));
 
         testResults.FailedCount += testGroupResults.FailedCount;
+        testResults.SkippedCount += testGroupResults.SkippedCount;
         testResults.SuccessCount += testGroupResults.SuccessCount;
         testResults.AddMessages(testGroupResults.Messages);
 
@@ -367,7 +369,8 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     Log("--------------------------------------------------------------------------------");
 
     Log("\n[" + GetUTCTimeISO8601() + "] Tests done: Totals: succeeded: " + std::to_string(testResults.SuccessCount) +
-        ", failed: " + std::to_string(testResults.FailedCount));
+        ", failed: " + std::to_string(testResults.FailedCount) + ", skipped: " +
+        std::to_string(testResults.SkippedCount));
 
     // Get elapsed time
     std::chrono::milliseconds const elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

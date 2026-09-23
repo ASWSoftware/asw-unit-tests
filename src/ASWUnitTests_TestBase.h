@@ -51,6 +51,7 @@ public:
 
 public:
     unsigned int FailedCount;
+    unsigned int SkippedCount;
     unsigned int SuccessCount;
     MsgList Messages;
 
@@ -203,6 +204,7 @@ protected:
     virtual void SetTestFailedCheckNotEquals(std::string const& method, int line, std::string const& value,
         std::string const& msg);
     virtual void SetUp_Test(ITestCase& testCase); // Called just before calling the test callback
+    virtual void Skip(std::string const& method, int line, std::string const& reason); // Aborts current test
     virtual void TearDown_Test(ITestCase& testCase); // Called just after calling the test callback
     virtual void Test(ITestCase& testCase); // Called for each registered test
     virtual bool TestFailedOneOrMoreChecks();

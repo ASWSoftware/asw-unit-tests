@@ -10,6 +10,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - `Assert` prefix methods for `assert` sections of unit tests that should throw right away (e.g. AssertTrue())
 - `SetExceptionExpected()` - support for expected exceptions, with an optional exception-type and message check
 - `CheckNear()`/`AssertNear()` - tolerance-based `float`/`double` comparison
+- `Skip()` - aborts a test and reports it as skipped, unconditionally or after a runtime check, without removing
+  its registration
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -76,9 +78,9 @@ The console output always states whether a filter is active (and its pattern) be
 `--list` reports how many tests/groups matched out of the total registered — so if output is redirected to a file,
 there's a record of why fewer tests ran or were listed than expected.
 
-Exit codes: `0` all run tests passed (or `--version`/`--list`/`--help` completed), `1` one or more tests failed,
-`2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test, `4` invalid
-command line arguments.
+Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
+tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,
+`4` invalid command line arguments. Skipped tests never affect the exit code.
 
 ## Registering Tests
 
@@ -144,6 +146,26 @@ CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
 
 Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a sensible
 tolerance depends heavily on the magnitude and accumulated error of the values involved.
+
+### Skipping a Test
+
+Call `Skip(method, line, reason)` from within a test to abort it and have it reported as skipped. It is separately
+counted from passed/failed, and does not affect the process exit code. No explicit `return` is needed afterward,
+since `Skip()` throws to unwind the rest of the test body, the same way `Assert*` methods do:
+
+```
+void TTest_TMyClassToTest::Test_WindowsOnlyFeature()
+{
+#if !defined(_WIN32)
+    Skip(__func__, __LINE__, "Windows-only feature");
+#endif
+    // ... test body ...
+}
+```
+
+This keeps a known-broken, environment-specific, or not-yet-implemented test's registration (and its place in
+`--list` output) intact, instead of commenting out or deleting its `RegisterTest()` call and losing the reminder
+that it exists. The reason is required, so future readers always know *why* a test is being skipped.
 
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:

@@ -652,6 +652,20 @@ void TTestGroupBase::SetUp_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 /*
+    TTestGroupBase::Skip
+
+    Call from within a test to abort it and have it reported as skipped.
+
+    Can be called unconditionally to permanently skip a test without removing its RegisterTest() call,
+    or after a runtime check to skip conditionally (e.g. a platform or environment-specific test).
+    No explicit 'return' is needed afterward.
+*/
+void TTestGroupBase::Skip(std::string const& method, int line, std::string const& reason)
+{
+    throw TExceptSkipped(method, line, reason);
+}
+//---------------------------------------------------------------------------
+/*
     TTestGroupBase::TearDown_Test
 
     Called just after calling the test callback
@@ -733,6 +747,13 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
         // Test passed
         m_Results.SuccessCount++;
+    }
+    catch (TExceptSkipped const& ex)
+    {
+        m_Results.SkippedCount++;
+        std::string msg = "***Test skipped: \"" + m_Name + "\": " + ex.what();
+        m_Results.Messages.push_back(msg);
+        Log(msg);
     }
     catch (TTestException const& ex)
     {
@@ -826,6 +847,7 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 //---------------------------------------------------------------------------
 TTestResults::TTestResults()
     : FailedCount(0),
+      SkippedCount(0),
       SuccessCount(0)
 {
 }
