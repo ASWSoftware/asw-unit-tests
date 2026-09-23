@@ -27,6 +27,7 @@ limitations under the License.
 #ifndef ASWUnitTests_TestBaseH
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <functional>
@@ -203,6 +204,7 @@ protected:
 
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
+
     virtual void RegisterTest(TTestCase const& testCase);
     virtual void RegisterTest(ITestCase::TestCallback callback, std::string const& testName);
     template <typename T>
@@ -213,6 +215,34 @@ protected:
                 (static_cast<T*>(this)->*callback)();
             }, testName);
     }
+
+    template <typename TParam>
+    struct TNonDeduced
+    {
+        typedef TParam Type;
+    };
+
+    // Registers one test case per element of 'params', invoking 'callback' with that element in turn.
+    // Generated test names are "testNameBase[i]", using the row's zero-based index, unless 'nameGenerator'
+    // supplies a per-row label instead.
+    template <typename T, typename TParam>
+    void RegisterTestCases(void (T::*callback)(TParam const&), std::string const& testNameBase,
+        std::vector<TParam> const& params,
+        std::function<std::string (typename TNonDeduced<TParam>::Type const&)> const& nameGenerator = nullptr)
+    {
+        for (std::size_t i = 0; i < params.size(); ++i)
+        {
+            TParam const param = params[i];
+            std::string const caseName = nameGenerator ?
+                    (testNameBase + "[" + nameGenerator(param) + "]") :
+                    (testNameBase + "[" + std::to_string(i) + "]");
+            RegisterTest([this, callback, param]()
+                {
+                    (static_cast<T*>(this)->*callback)(param);
+                }, caseName);
+        }
+    }
+
     virtual void ResetTestFailedOneOrMoreChecks();
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).

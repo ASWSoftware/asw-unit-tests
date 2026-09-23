@@ -12,6 +12,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - `CheckNear()`/`AssertNear()` - tolerance-based `float`/`double` comparison
 - `Skip()` - aborts a test and reports it as skipped, unconditionally or after a runtime check, without removing
   its registration
+- `RegisterTestCases()` - registers one test case per row of data for parameterized/data-driven tests, instead of
+  hand-writing a loop or duplicating near-identical test methods
 - `JUnit Report` - writes a JUnit-style XML test report, recognized natively by most CI systems, with no
   third-party dependency
 
@@ -262,6 +264,37 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 ```
+
+### Parameterized Tests
+
+`RegisterTestCases()` registers one test case per element of a `std::vector<TParam>`, calling the given method with
+each element in turn, instead of hand-writing a loop inside a single test or duplicating near-identical test
+methods for each input. Each row becomes an independent, individually named, individually filterable test case,
+so `--filter`, `--shuffle`, colorized output, and the JUnit report all work on it exactly like any other test:
+
+```
+struct THexCase
+{
+    char Input;
+    int Expected;
+};
+
+// In the constructor, in place of a plain RegisterTest() call:
+std::vector<THexCase> const hexCases =
+{
+    { 'A', 10 },
+    { 'f', 15 },
+    { '0', 0 },
+};
+RegisterTestCases(&TTest_TMyClassToTest::Test_HexSingleToByte, "HexSingleToByte", hexCases);
+
+// Test_HexSingleToByte(THexCase const& testCase) then runs once per row, generating
+// test names "HexSingleToByte[0]", "HexSingleToByte[1]", "HexSingleToByte[2]".
+```
+
+Pass an optional `std::function<std::string (TParam const&)>` name generator as a fourth argument to label each row
+with something more meaningful than its index (e.g. `"HexSingleToByte[A]"`), which is especially useful for reading
+`--filter` matches or a failing row's name in CI output.
 
 ## Submodule Integration
 
