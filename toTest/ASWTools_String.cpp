@@ -100,8 +100,17 @@ namespace ASWTools
 namespace
 {
 
+void GetLocalSystemTime(SYSTEMTIME* time);
+std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount);
+std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t length);
+
 #if !defined(_WIN32)
 
+std::string FormatGUID(GUID const& guid);
+bool ParseGUID(std::string const& value, GUID& guid);
+bool ParseHex(std::string const& value, unsigned long long* result);
+
+//---------------------------------------------------------------------------
 std::string FormatGUID(GUID const& guid)
 {
     std::ostringstream stream;
@@ -116,6 +125,7 @@ std::string FormatGUID(GUID const& guid)
     return stream.str();
 }
 
+//---------------------------------------------------------------------------
 bool ParseGUID(std::string const& value, GUID& guid)
 {
     if (value.size() == 38 && value.front() == '{' && value.back() == '}')
@@ -146,6 +156,7 @@ bool ParseGUID(std::string const& value, GUID& guid)
     return true;
 }
 
+//---------------------------------------------------------------------------
 bool ParseHex(std::string const& value, unsigned long long* result)
 {
     auto conversion = std::from_chars(value.data(), value.data() + value.size(), *result, 16);
@@ -154,6 +165,7 @@ bool ParseHex(std::string const& value, unsigned long long* result)
 
 #endif
 
+//---------------------------------------------------------------------------
 void GetLocalSystemTime(SYSTEMTIME* time)
 {
 #if defined(_WIN32)
@@ -176,6 +188,7 @@ void GetLocalSystemTime(SYSTEMTIME* time)
 #endif
 }
 
+//---------------------------------------------------------------------------
 std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
 {
     std::wstring value;
@@ -204,6 +217,7 @@ std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
     return value;
 }
 
+//---------------------------------------------------------------------------
 std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t length)
 {
     std::vector<BYTE> bytes;
@@ -231,7 +245,11 @@ std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t lengt
     return bytes;
 }
 
+//---------------------------------------------------------------------------
+
 } // namespace
+
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TStrTool
