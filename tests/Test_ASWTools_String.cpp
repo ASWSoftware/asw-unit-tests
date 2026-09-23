@@ -59,7 +59,20 @@ TTest_ASWTools_String::TTest_ASWTools_String()
     RegisterTest(&TTest_ASWTools_String::Test_EndsWith, "EndsWith");
     RegisterTest(&TTest_ASWTools_String::Test_EndsWithIC, "EndsWithIC");
     RegisterTest(&TTest_ASWTools_String::Test_Fmt_printf, "Fmt_printf");
-    RegisterTest(&TTest_ASWTools_String::Test_HexSingleToByte, "HexSingleToByte");
+
+    // Parameterized testing example
+    std::vector<THexSingleToByteCase> const hexSingleToByteCases =
+    {
+        { 'A', 10 },
+        { 'f', 15 },
+        { '0', 0 },
+        { '9', 9 },
+    };
+    RegisterTestCases(&TTest_ASWTools_String::Test_HexSingleToByte, "HexSingleToByte", hexSingleToByteCases,
+        [](THexSingleToByteCase const& testCase) {
+            return std::string(1, testCase.Input);
+        });
+
     RegisterTest(&TTest_ASWTools_String::Test_IsEmptyOrWhiteSpace, "IsEmptyOrWhiteSpace");
     RegisterTest(&TTest_ASWTools_String::Test_IsSpace, "IsSpace");
     RegisterTest(&TTest_ASWTools_String::Test_IsValidBase64, "IsValidBase64");
@@ -292,19 +305,19 @@ void TTest_ASWTools_String::Test_EndsWithIC()
     CheckFalse(TStrTool::EndsWithIC(ws, L"hello"), __func__, __LINE__, "Not endsWithIC wide");
 }
 //---------------------------------------------------------------------------
-void TTest_ASWTools_String::Test_HexSingleToByte()
-{
-    // Arrange
-    char hex1 = 'A';
-    char hex2 = 'f';
-    char hex3 = '0';
-    char hex4 = '9';
+/*
+    TTest_ASWTools_String::Test_HexSingleToByte
 
-    // Act & Assert
-    CheckEquals(10, TStrTool::HexSingleToByte(hex1), __func__, __LINE__, "HexSingleToByte A");
-    CheckEquals(15, TStrTool::HexSingleToByte(hex2), __func__, __LINE__, "HexSingleToByte f");
-    CheckEquals(0, TStrTool::HexSingleToByte(hex3), __func__, __LINE__, "HexSingleToByte 0");
-    CheckEquals(9, TStrTool::HexSingleToByte(hex4), __func__, __LINE__, "HexSingleToByte 9");
+    Parameterized testing example method that demonstrates how to process multiple
+    test criteria with a single method that is called for each test case.
+*/
+void TTest_ASWTools_String::Test_HexSingleToByte(THexSingleToByteCase const& testCase)
+{
+    // Act
+    int actual = TStrTool::HexSingleToByte(testCase.Input);
+
+    // Assert
+    CheckEquals(testCase.Expected, actual, __func__, __LINE__, "HexSingleToByte " + std::string(1, testCase.Input));
 }
 //---------------------------------------------------------------------------
 void TTest_ASWTools_String::Test_EncodeToBase16Hex_Bytes()

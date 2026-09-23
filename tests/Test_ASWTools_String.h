@@ -29,6 +29,19 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// THexSingleToByteCase
+//
+// One (hex character, expected nibble value) row for the parameterized
+// Test_HexSingleToByte test case.
+/////////////////////////////////////////////////////////////////////////////
+struct THexSingleToByteCase
+{
+    char Input;
+    int Expected;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTest_ASWTools_String
 /////////////////////////////////////////////////////////////////////////////
 class TTest_ASWTools_String : public TTestGroupBase
@@ -52,7 +65,7 @@ private: // Test methods
     void Test_EndsWith();
     void Test_EndsWithIC();
     void Test_Fmt_printf();
-    void Test_HexSingleToByte();
+    void Test_HexSingleToByte(THexSingleToByteCase const& testCase);
     void Test_IsEmptyOrWhiteSpace();
     void Test_IsSpace();
     void Test_IsValidBase64();
