@@ -28,6 +28,7 @@ limitations under the License.
 #include <string>
 #include <string_view>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
 using namespace ASWUnitTests;
@@ -36,8 +37,24 @@ using namespace ASWUnitTests;
 namespace
 {
 
+std::optional<TColorMode> ParseColorMode(std::string const& text);
 std::optional<unsigned int> ParseUnsignedInt(std::string const& text);
 void PrintUsage();
+
+//---------------------------------------------------------------------------
+std::optional<TColorMode> ParseColorMode(std::string const& text)
+{
+    if (text == "auto")
+        return TColorMode::Auto;
+
+    if (text == "always")
+        return TColorMode::Always;
+
+    if (text == "never")
+        return TColorMode::Never;
+
+    return std::nullopt;
+}
 
 //---------------------------------------------------------------------------
 std::optional<unsigned int> ParseUnsignedInt(std::string const& text)
@@ -83,6 +100,18 @@ void PrintUsage()
     "  --shuffle-seed <N>  Shuffle (implies --shuffle) using an explicit\n"
     "                      unsigned integer seed, to reproduce a previous\n"
     "                      --shuffle run's order.\n"
+    "  --color <mode>      One of \"auto\" (default; color only on an\n"
+    "                      interactive terminal that supports it, and only\n"
+    "                      if the NO_COLOR environment variable isn't set),\n"
+    "                      \"always\", or \"never\".\n"
+    "  --no-color          Shorthand for --color never.\n"
+    "  --color-pass/--color-fail/--color-skip <color>\n"
+    "                      Set the color used for passed/failed/skipped\n"
+    "                      status text. <color> is one of: default, black,\n"
+    "                      red, green, yellow, blue, magenta, cyan, white,\n"
+    "                      or bright-<name> for the bright variant (e.g.\n"
+    "                      bright-red). Defaults: pass=green, fail=red,\n"
+    "                      skip=yellow.\n"
     "  --list              List all registered tests as \"GroupName.TestName\"\n"
     "                      and exit, without running anything.\n"
     "  --version           Print the framework version and exit.\n"
@@ -103,6 +132,10 @@ int main(int argc, char* argv[])
     std::string filterPattern;
     bool shuffle = false;
     std::optional<unsigned int> shuffleSeed;
+    TColorMode colorMode = TColorMode::Auto;
+    std::optional<TConsoleColor> colorPass;
+    std::optional<TConsoleColor> colorFail;
+    std::optional<TConsoleColor> colorSkip;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -174,6 +207,80 @@ int main(int argc, char* argv[])
 
             shuffle = true;
         }
+        else if (arg == "--no-color")
+        {
+            colorMode = TColorMode::Never;
+        }
+        else if (arg == "--color")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --color requires \"auto\", \"always\", or \"never\".\n";
+                return 4;
+            }
+
+            std::optional<TColorMode> const parsed = ParseColorMode(argv[++i]);
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --color requires \"auto\", \"always\", or \"never\".\n";
+                return 4;
+            }
+
+            colorMode = *parsed;
+        }
+        else if (arg.rfind("--color=", 0) == 0)
+        {
+            std::optional<TColorMode> const parsed = ParseColorMode(std::string(arg.substr(8)));
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: --color requires \"auto\", \"always\", or \"never\".\n";
+                return 4;
+            }
+
+            colorMode = *parsed;
+        }
+        else if (arg == "--color-pass" || arg == "--color-fail" || arg == "--color-skip")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: " << arg << " requires a color name argument.\n";
+                return 4;
+            }
+
+            std::optional<TConsoleColor> const parsed = TConsole::ParseColorName(argv[++i]);
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: " << arg << " was given an unrecognized color name.\n";
+                return 4;
+            }
+
+            if (arg == "--color-pass")
+                colorPass = parsed;
+            else if (arg == "--color-fail")
+                colorFail = parsed;
+            else
+                colorSkip = parsed;
+        }
+        else if (arg.rfind("--color-pass=", 0) == 0 || arg.rfind("--color-fail=", 0) == 0 ||
+                 arg.rfind("--color-skip=", 0) == 0)
+        {
+            size_t const equalsPos = arg.find('=');
+            std::string const flagName(arg.substr(0, equalsPos));
+            std::optional<TConsoleColor> const parsed = TConsole::ParseColorName(std::string(arg.substr(equalsPos + 1)));
+
+            if (!parsed.has_value())
+            {
+                std::cout << "Error: " << flagName << " was given an unrecognized color name.\n";
+                return 4;
+            }
+
+            if (flagName == "--color-pass")
+                colorPass = parsed;
+            else if (flagName == "--color-fail")
+                colorFail = parsed;
+            else
+                colorSkip = parsed;
+        }
         else
         {
             std::cout << "Error: unrecognized option \"" << arg << "\".\n\n";
@@ -181,6 +288,17 @@ int main(int argc, char* argv[])
             return 4;
         }
     }
+
+    TConsole::SetColorMode(colorMode);
+
+    if (colorPass.has_value())
+        TConsole::SetColor(TLogKind::Pass, *colorPass);
+
+    if (colorFail.has_value())
+        TConsole::SetColor(TLogKind::Fail, *colorFail);
+
+    if (colorSkip.has_value())
+        TConsole::SetColor(TLogKind::Skip, *colorSkip);
 
     int returnCode = 0; // no error
 

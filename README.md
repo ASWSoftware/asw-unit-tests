@@ -72,6 +72,15 @@ ASWUnitTests [options]
                        caused by order can be reproduced via --shuffle-seed.
   --shuffle-seed <N>   Shuffle (implies --shuffle) using an explicit unsigned integer seed,
                        to reproduce a previous --shuffle run's order.
+  --color <mode>       One of "auto" (default; color only on an interactive terminal that
+                       supports it, and only if the NO_COLOR environment variable isn't set),
+                       "always", or "never".
+  --no-color           Shorthand for --color never.
+  --color-pass/--color-fail/--color-skip <color>
+                       Set the color used for passed/failed/skipped status text. <color> is
+                       one of: default, black, red, green, yellow, blue, magenta, cyan, white,
+                       or bright-<name> for the bright variant (e.g. bright-red). Defaults:
+                       pass=green, fail=red, skip=yellow.
   --list               List all registered tests as "GroupName.TestName" and exit, without
                        running anything. Combine with --filter to preview a pattern's matches
                        before running it.
@@ -89,6 +98,11 @@ default (see [Registering Tests](#registering-tests)) is for readable, reproduci
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
 reproduce it exactly while debugging.
+
+Pass/fail/skip status text is colorized when writing to an interactive terminal that supports ANSI escape codes.
+Output redirected to a file or pipe, or a non-interactive CI log, automatically gets plain text with no escape
+codes, unless `--color=always` forces it (e.g. for a CI system that supports ANSI in its own log viewer).
+The [NO_COLOR](https://no-color.org) environment variable is also respected in the default `auto` mode.
 
 Every test logs a `Finished test: "GroupName.TestName" - passed/failed/skipped (N.NNN ms)` line on completion,
 timing from just before `SetUp_Test` to just after the test's outcome is determined — useful for spotting slow

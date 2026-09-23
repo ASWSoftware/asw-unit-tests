@@ -33,6 +33,7 @@ limitations under the License.
 #include <random>
 #include <sstream>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_Version.h"
@@ -379,9 +380,10 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
         testGroup.Run(filter, groupSeed);
         TTestResults const& testGroupResults = testGroup.Results();
-        Log("Done. Succeeded: " + std::to_string(testGroupResults.SuccessCount) + ", failed: " +
-            std::to_string(testGroupResults.FailedCount) + ", skipped: " +
-            std::to_string(testGroupResults.SkippedCount));
+        Log("Done. " +
+            TConsole::Colorize("Succeeded: " + std::to_string(testGroupResults.SuccessCount), TLogKind::Pass) +
+            ", " + TConsole::Colorize("failed: " + std::to_string(testGroupResults.FailedCount), TLogKind::Fail) +
+            ", " + TConsole::Colorize("skipped: " + std::to_string(testGroupResults.SkippedCount), TLogKind::Skip));
 
         testResults.FailedCount += testGroupResults.FailedCount;
         testResults.SkippedCount += testGroupResults.SkippedCount;
@@ -397,9 +399,10 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
     Log("--------------------------------------------------------------------------------");
 
-    Log("\n[" + GetUTCTimeISO8601() + "] Tests done: Totals: succeeded: " + std::to_string(testResults.SuccessCount) +
-        ", failed: " + std::to_string(testResults.FailedCount) + ", skipped: " +
-        std::to_string(testResults.SkippedCount));
+    Log("\n[" + GetUTCTimeISO8601() + "] Tests done: Totals: " +
+        TConsole::Colorize("succeeded: " + std::to_string(testResults.SuccessCount), TLogKind::Pass) + ", " +
+        TConsole::Colorize("failed: " + std::to_string(testResults.FailedCount), TLogKind::Fail) + ", " +
+        TConsole::Colorize("skipped: " + std::to_string(testResults.SkippedCount), TLogKind::Skip));
 
     // Get elapsed time
     std::chrono::milliseconds const elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

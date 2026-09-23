@@ -32,6 +32,7 @@ limitations under the License.
 #include <random>
 #include <sstream>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 
@@ -719,6 +720,12 @@ void TTestGroupBase::Test(ITestCase& testCase)
     std::string const testFullName = m_Name + "." + testCase.GetName();
     std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
 
+    auto logFinished = [&](TLogKind kind, char const* status)
+        {
+            Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
+                FormatDurationMs(testStart) + ")");
+        };
+
     try
     {
         // Reset for test
@@ -773,39 +780,41 @@ void TTestGroupBase::Test(ITestCase& testCase)
         if (TestFailedOneOrMoreChecks())
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + testFullName + "\"";
+            std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName + "\"";
             m_Results.Messages.push_back(msg);
             Log(msg);
-            Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
+            logFinished(TLogKind::Fail, "failed");
             return;
         }
 
         // Test passed
         m_Results.SuccessCount++;
-        Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
+        logFinished(TLogKind::Pass, "passed");
     }
     catch (TExceptSkipped const& ex)
     {
         m_Results.SkippedCount++;
-        std::string msg = "***Test skipped: \"" + testFullName + "\": " + ex.what();
+        std::string msg = TConsole::Colorize("***Test skipped", TLogKind::Skip) + ": \"" + testFullName + "\": " +
+            ex.what();
         m_Results.Messages.push_back(msg);
         Log(msg);
-        Log("Finished test: \"" + testFullName + "\" - skipped (" + FormatDurationMs(testStart) + ")");
+        logFinished(TLogKind::Skip, "skipped");
     }
     catch (TTestException const& ex)
     {
         if (m_ExceptionExpected)
         {
             m_Results.SuccessCount++;
-            Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
+            logFinished(TLogKind::Pass, "passed");
         }
         else
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + testFullName + "\": " + ex.what();
+            std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
+                "\": " + ex.what();
             m_Results.Messages.push_back(msg);
             Log(msg);
-            Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
+            logFinished(TLogKind::Fail, "failed");
         }
     }
     catch (std::exception const& ex)
@@ -821,13 +830,14 @@ void TTestGroupBase::Test(ITestCase& testCase)
             if (typeMatches && messageMatches)
             {
                 m_Results.SuccessCount++;
-                Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
+                logFinished(TLogKind::Pass, "passed");
             }
             else
             {
                 m_Results.FailedCount++;
 
-                std::string msg = "***Test failed: \"" + testFullName + "\": ";
+                std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
+                    "\": ";
                 if (!typeMatches)
                     msg += "expected exception type was not thrown (caught a different exception): " +
                         std::string(ex.what());
@@ -837,7 +847,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
                 m_Results.Messages.push_back(msg);
                 Log(msg);
-                Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
+                logFinished(TLogKind::Fail, "failed");
             }
         }
         else
@@ -856,16 +866,16 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
                 m_Results.FailedCount++;
 
-                std::string msg = "***Test failed: \"" + testFullName +
+                std::string msg = TConsole::Colorize("***Test failed", TLogKind::Fail) + ": \"" + testFullName +
                     "\": expected a specific exception type, but a non-std::exception object was thrown instead.";
                 m_Results.Messages.push_back(msg);
                 Log(msg);
-                Log("Finished test: \"" + testFullName + "\" - failed (" + FormatDurationMs(testStart) + ")");
+                logFinished(TLogKind::Fail, "failed");
             }
             else
             {
                 m_Results.SuccessCount++;
-                Log("Finished test: \"" + testFullName + "\" - passed (" + FormatDurationMs(testStart) + ")");
+                logFinished(TLogKind::Pass, "passed");
             }
         }
         else
