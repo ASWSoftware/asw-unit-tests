@@ -479,13 +479,17 @@ TTestResults const& TTestGroupBase::Results() const
     return m_Results;
 }
 //---------------------------------------------------------------------------
-void TTestGroupBase::Run()
+void TTestGroupBase::Run(TestFilter const& filter)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
 
     for (TestCallbackList::iterator it = m_TestCallbacks.begin(); it != m_TestCallbacks.end(); it++)
     {
         ITestCase& testCase = *it->get();
+
+        if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
+            continue;
+
         Test(testCase);
     }
 }

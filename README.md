@@ -53,6 +53,32 @@ The executable uses semantic versioning for its `--version` output. Update `src/
 release. The CMake project does not need a separate version declaration because it currently builds the test executable
 directly rather than packaging or installing it.
 
+## Command Line Options
+
+```
+ASWUnitTests [options]
+
+  --filter <pattern>   Run only tests whose "GroupName.TestName" full name matches <pattern>.
+                       '*' matches any sequence of characters (including none); '?' matches
+                       exactly one character. The whole name must match, e.g. "*String*" for
+                       a substring search.
+  --filter-ignore-case Match --filter's <pattern> case-insensitively. Has no effect without
+                       --filter.
+  --list               List all registered tests as "GroupName.TestName" and exit, without
+                       running anything. Combine with --filter to preview a pattern's matches
+                       before running it.
+  --version            Print the framework version and exit.
+  --help               Show usage and exit.
+```
+
+The console output always states whether a filter is active (and its pattern) before running or listing tests, and
+`--list` reports how many tests/groups matched out of the total registered — so if output is redirected to a file,
+there's a record of why fewer tests ran or were listed than expected.
+
+Exit codes: `0` all run tests passed (or `--version`/`--list`/`--help` completed), `1` one or more tests failed,
+`2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test, `4` invalid
+command line arguments.
+
 ## Registering Tests
 
 Test modules self-register with `TTestHandler` using the `ASW_REGISTER_TEST_GROUP` macro (declared in

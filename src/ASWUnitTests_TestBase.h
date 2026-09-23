@@ -61,6 +61,18 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TestFilter
+//
+// A predicate matched against each test's "GroupName.TestName" full name.
+// An empty (default-constructed) TestFilter means "run everything." Used
+// by TTestHandler::Run() and ITestGroup::Run() to support CLI filtering
+// (see main.cpp's --filter option) without either needing to know how the
+// pattern itself is matched.
+/////////////////////////////////////////////////////////////////////////////
+typedef std::function<bool (std::string const& fullTestName)> TestFilter;
+
+
+/////////////////////////////////////////////////////////////////////////////
 // ITestCase
 //
 // Interface for a test case.
@@ -126,7 +138,7 @@ public:
     virtual TestCallbackList& GetTestCallbackList() = 0;
     virtual std::string const& GetTestGroupName() const = 0;
     virtual TTestResults const& Results() const = 0;
-    virtual void Run() = 0;
+    virtual void Run(TestFilter const& filter) = 0;
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -285,7 +297,7 @@ public:
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
-    void Run() override;
+    void Run(TestFilter const& filter) override;
 };
 
 } // namespace ASWUnitTests

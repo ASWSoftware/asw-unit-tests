@@ -71,17 +71,19 @@ private:
 
 public:
     static std::string GetUTCTimeISO8601();
-    static std::string GetVersionStr();
     static std::string GetVersionFullStr();
+    static std::string GetVersionStr();
+    static bool WildcardMatch(std::string const& pattern, std::string const& text, bool ignoreCase = false);
 
 public:
     TTestHandler();
     ~TTestHandler();
 
     void Initialize();
+    void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
     void LogAppend(std::string const& msg);
-    TTestResults Run();
+    TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
 };
 
 } // namespace ASWUnitTests

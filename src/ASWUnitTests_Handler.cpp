@@ -25,6 +25,7 @@ limitations under the License.
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -81,6 +82,66 @@ std::string TTestHandler::GetVersionFullStr()
     return "ASWUnitTests - Version " + GetVersionStr();
 }
 //---------------------------------------------------------------------------
+/*
+    TTestHandler::WildcardMatch
+
+    Matches 'text' against 'pattern' in full (not a substring search),
+    where '*' matches any sequence of characters (including none) and '?'
+    matches exactly one character. When 'ignoreCase' is true, matching is
+    ASCII case-insensitive. Used to implement --filter/--filter-ignore-case
+    in main.cpp.
+*/
+bool TTestHandler::WildcardMatch(std::string const& pattern, std::string const& text, bool ignoreCase)
+{
+    if (ignoreCase)
+    {
+        std::string lowerPattern = pattern;
+        std::string lowerText = text;
+
+        for (char& ch : lowerPattern)
+            ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+
+        for (char& ch : lowerText)
+            ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+
+        return WildcardMatch(lowerPattern, lowerText, false);
+    }
+
+    size_t p = 0;
+    size_t t = 0;
+    size_t starIdx = std::string::npos;
+    size_t matchIdx = 0;
+
+    while (t < text.size())
+    {
+        if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
+        {
+            ++p;
+            ++t;
+        }
+        else if (p < pattern.size() && pattern[p] == '*')
+        {
+            starIdx = p;
+            matchIdx = t;
+            ++p;
+        }
+        else if (starIdx != std::string::npos)
+        {
+            p = starIdx + 1;
+            t = ++matchIdx;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    while (p < pattern.size() && pattern[p] == '*')
+        ++p;
+
+    return p == pattern.size();
+}
+//---------------------------------------------------------------------------
 void TTestHandler::Initialize()
 {
     Log(GetVersionFullStr());
@@ -99,6 +160,64 @@ void TTestHandler::Initialize()
     }
 
     Log("Total tests registered: " + std::to_string(totalTests));
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::ListTests
+
+    Logs every registered test as "GroupName.TestName", one per line,
+    without running any of them. Backs main.cpp's --list option. When
+    'filter' is set, only matching tests are listed, so a --list --filter
+    combination lets the caller verify a pattern before running it.
+*/
+void TTestHandler::ListTests(TestFilter const& filter, std::string const& filterDescription)
+{
+    if (filter != nullptr)
+        Log("Listing tests, filtered: " + filterDescription);
+    else
+        Log("Listing tests, unfiltered.");
+
+    size_t totalTests = 0;
+    size_t matchedTests = 0;
+    size_t totalGroups = m_TestGroups.size();
+    size_t matchedGroups = 0;
+
+    for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
+    {
+        ITestGroup& testGroup = *it->get();
+        std::string const& groupName = testGroup.GetTestGroupName();
+        bool groupHasMatch = false;
+
+        for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
+             testIt != testGroup.GetTestCallbackList().end(); testIt++)
+        {
+            ITestCase& testCase = *testIt->get();
+            std::string const fullName = groupName + "." + testCase.GetName();
+
+            ++totalTests;
+
+            if (filter == nullptr || filter(fullName))
+            {
+                Log(fullName);
+                ++matchedTests;
+                groupHasMatch = true;
+            }
+        }
+
+        if (groupHasMatch)
+            ++matchedGroups;
+    }
+
+    if (filter != nullptr)
+    {
+        Log("Listed " + std::to_string(matchedTests) + " of " + std::to_string(totalTests) +
+            " registered test(s), in " + std::to_string(matchedGroups) + " of " + std::to_string(totalGroups) +
+            " registered group(s), matching the filter.");
+    }
+    else
+    {
+        Log("Listed " + std::to_string(totalTests) + " test(s) in " + std::to_string(totalGroups) + " group(s).");
+    }
 }
 //---------------------------------------------------------------------------
 void TTestHandler::Log(std::string const& msg)
@@ -151,22 +270,75 @@ void TTestHandler::RegisterTestGroups()
 /*
     TTestHandler::Run
 
-    Returns the number of tests that failed.
+    Returns the number of tests that failed. When 'filter' is set, only
+    tests whose "GroupName.TestName" full name matches it are run; groups
+    with no matching test are skipped entirely (no SetUp_Group/TearDown_Group,
+    no log entries), and group numbering in the log reflects only the
+    groups that actually run. The active filter (or lack of one) is always
+    logged, so redirected output still explains why fewer tests ran.
 */
-TTestResults TTestHandler::Run()
+TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription)
 {
     TTestResults testResults;
-    size_t groupNum = 0;
-    size_t nGroups = m_TestGroups.size();
-    std::chrono::high_resolution_clock::time_point const start = std::chrono::high_resolution_clock::now();
+    std::vector<ITestGroup*> groupsToRun;
 
-    Log("\n[" + GetUTCTimeISO8601() + "] Tests started.\n");
+    if (filter != nullptr)
+        Log("Filter: " + filterDescription);
+    else
+        Log("No filter: running all tests.");
 
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
+
+        if (filter == nullptr)
+        {
+            groupsToRun.push_back(&testGroup);
+            continue;
+        }
+
+        std::string const& groupName = testGroup.GetTestGroupName();
+        bool anyMatch = false;
+
+        for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
+             testIt != testGroup.GetTestCallbackList().end(); testIt++)
+        {
+            ITestCase& testCase = *testIt->get();
+
+            if (filter(groupName + "." + testCase.GetName()))
+            {
+                anyMatch = true;
+                break;
+            }
+        }
+
+        if (anyMatch)
+            groupsToRun.push_back(&testGroup);
+    }
+
+    if (filter != nullptr && groupsToRun.empty())
+        Log("No registered tests matched the filter.");
+
+    size_t groupNum = 0;
+    size_t nGroups = groupsToRun.size();
+    std::chrono::high_resolution_clock::time_point const start = std::chrono::high_resolution_clock::now();
+
+    Log("\n[" + GetUTCTimeISO8601() + "] Tests started.\n");
+
+    for (std::vector<ITestGroup*>::iterator it = groupsToRun.begin(); it != groupsToRun.end(); it++)
+    {
+        ITestGroup& testGroup = **it;
         std::string const& name = testGroup.GetTestGroupName();
-        size_t nTestsInGroup = testGroup.GetTestCallbackList().size();
+        size_t nTestsInGroup = 0;
+
+        for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
+             testIt != testGroup.GetTestCallbackList().end(); testIt++)
+        {
+            ITestCase& testCase = *testIt->get();
+
+            if (filter == nullptr || filter(name + "." + testCase.GetName()))
+                ++nTestsInGroup;
+        }
 
         // set up
         Log("--------------------------------------------------------------------------------");
@@ -176,7 +348,7 @@ TTestResults TTestHandler::Run()
 
         // run
         Log("Running " + std::to_string(nTestsInGroup) + " test" + std::string((nTestsInGroup == 1) ? "." : "s."));
-        testGroup.Run();
+        testGroup.Run(filter);
         TTestResults const& testGroupResults = testGroup.Results();
         Log("Done. Succeeded: " + std::to_string(testGroupResults.SuccessCount) + ", failed: " +
             std::to_string(testGroupResults.FailedCount));
