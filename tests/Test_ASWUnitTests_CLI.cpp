@@ -24,9 +24,9 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_CLI.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
+#include "ASWUnitTests_Registry.h"
+#include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -67,6 +67,10 @@ std::optional<int> TTest_ASWUnitTests_CLI::ParseArgs(std::vector<std::string> ar
     for (std::string& arg : args)
         argv.push_back(arg.data());
 
+    // ParseArguments() writes its own parse errors, and --help/--version's text, directly to
+    // std::cout (it has no TTestGroupBase to suppress); redirect so that doesn't print into the
+    // real suite's console output and look like a genuine failure.
+    TStdOutRedirect const suppressOutput;
     return TCLIParser::ParseArguments(static_cast<int>(argv.size()), argv.data(), options);
 }
 //---------------------------------------------------------------------------
@@ -94,7 +98,10 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter()
 {
     // Arrange
     TTestHandler tester;
-    tester.Initialize("Test_BuildTestFilter_Filter");
+    {
+        TStdOutRedirect const suppressOutput; // Initialize() logs its own version/registration banner.
+        tester.Initialize("Test_BuildTestFilter_Filter");
+    }
 
     TCLIOptions options;
     options.HasFilter = true;
@@ -117,7 +124,10 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
 {
     // Arrange
     TTestHandler tester;
-    tester.Initialize("Test_BuildTestFilter_Partition");
+    {
+        TStdOutRedirect const suppressOutput; // Initialize() logs its own version/registration banner.
+        tester.Initialize("Test_BuildTestFilter_Partition");
+    }
 
     std::vector<std::string> const allNames = tester.GetAllTestFullNames();
 

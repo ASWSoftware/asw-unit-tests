@@ -176,6 +176,10 @@
             <DependentOn>..\src\ASWUnitTests_Registry.h</DependentOn>
             <BuildOrder>9</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_StdOutRedirect.cpp">
+            <DependentOn>..\src\ASWUnitTests_StdOutRedirect.h</DependentOn>
+            <BuildOrder>19</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_TestBase.cpp">
             <DependentOn>..\src\ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>10</BuildOrder>
@@ -210,6 +214,10 @@
         <CppCompile Include="..\tests\Test_ASWUnitTests_JUnitReport.cpp">
             <DependentOn>..\tests\Test_ASWUnitTests_JUnitReport.h</DependentOn>
             <BuildOrder>17</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_StdOutRedirect.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_StdOutRedirect.h</DependentOn>
+            <BuildOrder>20</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\tests\Test_ASWUnitTests_TestBase.cpp">
             <DependentOn>..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>

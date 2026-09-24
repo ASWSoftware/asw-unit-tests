@@ -25,44 +25,13 @@ limitations under the License.
 #include "Test_ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
-#include <iostream>
-#include <sstream>
+#include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
 
 namespace
 {
 
 using namespace ASWUnitTests;
-
-// Temporarily redirects std::cout into an in-memory buffer for its lifetime, restoring the
-// original stream buffer on destruction. Used to verify SetLogSuppressed(false) still logs
-// normally (i.e. that the suppression test below isn't trivially passing because nothing ever
-// logs at all).
-class TStdoutRedirect
-{
-private:
-    // Declaration order matters here: members initialize in this order regardless of the
-    // constructor's initializer-list order, and m_OriginalBuffer's initializer reads m_Captured.
-    std::ostringstream m_Captured;
-    std::streambuf* m_OriginalBuffer;
-
-public:
-    TStdoutRedirect()
-        : m_OriginalBuffer(std::cout.rdbuf(m_Captured.rdbuf()))
-    {
-    }
-
-    ~TStdoutRedirect()
-    {
-        std::cout.rdbuf(m_OriginalBuffer);
-    }
-
-    std::string Str() const
-    {
-        return m_Captured.str();
-    }
-};
 
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
 // TTestGroupBase can produce, plus one that fails twice in a row to prove a Check failure doesn't
@@ -235,12 +204,12 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
 
     // Act
     {
-        TStdoutRedirect redirect;
+        TStdOutRedirect redirect;
         verboseFixture.Run(TestFilter(), std::nullopt);
         verboseOutput = redirect.Str();
     }
     {
-        TStdoutRedirect redirect;
+        TStdOutRedirect redirect;
         suppressedFixture.Run(TestFilter(), std::nullopt);
         suppressedOutput = redirect.Str();
     }
