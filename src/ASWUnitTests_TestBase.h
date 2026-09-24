@@ -27,15 +27,47 @@ limitations under the License.
 #ifndef ASWUnitTests_TestBaseH
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
+#include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+/////////////////////////////////////////////////////////////////////////////
+// TTestOutcome
+/////////////////////////////////////////////////////////////////////////////
+enum class TTestOutcome
+{
+    Pass,
+    Fail,
+    Skip
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TTestCaseRecord
+//
+// One test's outcome, name, and timing, collected in TTestResults::CaseRecords.
+// Deliberately format-agnostic (no ANSI color codes, no XML/JSON, etc.), so a
+// caller can build a structured report from it without TTestResults itself
+// depending on any particular report format.
+/////////////////////////////////////////////////////////////////////////////
+struct TTestCaseRecord
+{
+    std::string GroupName;
+    std::string TestName;
+    double DurationSeconds;
+    TTestOutcome Outcome;
+    std::string Message; // Failure/skip detail; empty for Pass.
+};
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TTestResults
@@ -50,14 +82,28 @@ public:
 
 public:
     unsigned int FailedCount;
+    unsigned int SkippedCount;
     unsigned int SuccessCount;
     MsgList Messages;
+    std::vector<TTestCaseRecord> CaseRecords;
 
 public:
     TTestResults();
 
     void AddMessages(MsgList const& list);
 };
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TestFilter
+//
+// A predicate matched against each test's "GroupName.TestName" full name.
+// An empty (default-constructed) TestFilter means "run everything." Used
+// by TTestHandler::Run() and ITestGroup::Run() to support CLI filtering
+// (see main.cpp's --filter option) without either needing to know how the
+// pattern itself is matched.
+/////////////////////////////////////////////////////////////////////////////
+typedef std::function<bool (std::string const& fullTestName)> TestFilter;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -126,7 +172,7 @@ public:
     virtual TestCallbackList& GetTestCallbackList() = 0;
     virtual std::string const& GetTestGroupName() const = 0;
     virtual TTestResults const& Results() const = 0;
-    virtual void Run() = 0;
+    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) = 0;
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -148,14 +194,18 @@ private:
 
 protected:
     bool m_ExceptionExpected;
+    bool m_LogSuppressed;
     bool m_TestFailedCheck;
     std::string m_ExceptionExpectedText;
+    std::string m_ExpectedExceptionMessage;
+    std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;
     std::string m_Name;
     TTestResults m_Results;
     TestCallbackList m_TestCallbacks;
 
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
+
     virtual void RegisterTest(TTestCase const& testCase);
     virtual void RegisterTest(ITestCase::TestCallback callback, std::string const& testName);
     template <typename T>
@@ -166,8 +216,49 @@ protected:
                 (static_cast<T*>(this)->*callback)();
             }, testName);
     }
+
+    template <typename TParam>
+    struct TNonDeduced
+    {
+        typedef TParam Type;
+    };
+
+    // Registers one test case per element of 'params', invoking 'callback' with that element in turn.
+    // Generated test names are "testNameBase[i]", using the row's zero-based index, unless 'nameGenerator'
+    // supplies a per-row label instead.
+    template <typename T, typename TParam>
+    void RegisterTestCases(void (T::*callback)(TParam const&), std::string const& testNameBase,
+        std::vector<TParam> const& params,
+        std::function<std::string (typename TNonDeduced<TParam>::Type const&)> const& nameGenerator = nullptr)
+    {
+        for (std::size_t i = 0; i < params.size(); ++i)
+        {
+            TParam const param = params[i];
+            std::string const caseName = nameGenerator ?
+                    (testNameBase + "[" + nameGenerator(param) + "]") :
+                    (testNameBase + "[" + std::to_string(i) + "]");
+            RegisterTest([this, callback, param]()
+                {
+                    (static_cast<T*>(this)->*callback)(param);
+                }, caseName);
+        }
+    }
+
     virtual void ResetTestFailedOneOrMoreChecks();
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
+    // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
+    // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
+    template <typename TException>
+    void SetExceptionExpected(std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        SetExceptionExpected(true, method, line, msg);
+        m_ExpectedExceptionMessage = expectedMessage;
+        m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
+            {
+                return dynamic_cast<TException const*>(&ex) != nullptr;
+            };
+    }
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& expected,
         std::string const& actual, std::string const& msg);
@@ -175,6 +266,7 @@ protected:
     virtual void SetTestFailedCheckNotEquals(std::string const& method, int line, std::string const& value,
         std::string const& msg);
     virtual void SetUp_Test(ITestCase& testCase); // Called just before calling the test callback
+    virtual void Skip(std::string const& method, int line, std::string const& reason); // Aborts current test
     virtual void TearDown_Test(ITestCase& testCase); // Called just after calling the test callback
     virtual void Test(ITestCase& testCase); // Called for each registered test
     virtual bool TestFailedOneOrMoreChecks();
@@ -273,6 +365,27 @@ protected: // Assertion/Check methods - Not Equals
     virtual void CheckNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
+    virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void AssertNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void AssertNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void AssertNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void CheckNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void CheckNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
+    virtual void CheckNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
+        std::string const& msg);
+    virtual void CheckNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg);
+
 protected: // Assertion/Check methods - Boolean
     virtual void AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg);
@@ -285,7 +398,8 @@ public:
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
-    void Run() override;
+    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) override;
+    virtual void SetLogSuppressed(bool suppressed);
 };
 
 } // namespace ASWUnitTests

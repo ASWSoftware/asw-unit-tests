@@ -21,9 +21,13 @@
 set(ASWUNITTESTS_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 set(ASWUNITTESTS_SOURCES
+    "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_CLI.cpp"
+    "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Console.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Exception.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Handler.cpp"
+    "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_JUnitReport.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Registry.cpp"
+    "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_StdOutRedirect.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_TestBase.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Version.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/main.cpp"

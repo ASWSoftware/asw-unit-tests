@@ -47,6 +47,14 @@ call :CopyFile "rad370\Build_Win64x_Debug.bat" "rad370\Build_Win64x_Debug.bat"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win64x_Release.bat" "rad370\Build_Win64x_Release.bat"
 if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_CLI.cpp" "src\ASWUnitTests_CLI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_CLI.h" "src\ASWUnitTests_CLI.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Console.cpp" "src\ASWUnitTests_Console.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Console.h" "src\ASWUnitTests_Console.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Exception.cpp" "src\ASWUnitTests_Exception.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Exception.h" "src\ASWUnitTests_Exception.h"
@@ -55,9 +63,25 @@ call :CopyFile "src\ASWUnitTests_Handler.cpp" "src\ASWUnitTests_Handler.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Handler.h" "src\ASWUnitTests_Handler.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_JUnitReport.cpp" "src\ASWUnitTests_JUnitReport.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_JUnitReport.h" "src\ASWUnitTests_JUnitReport.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Registry.cpp" "src\ASWUnitTests_Registry.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Registry.h" "src\ASWUnitTests_Registry.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Sources.cmake" "src\ASWUnitTests_Sources.cmake"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_StdOutRedirect.cpp" "src\ASWUnitTests_StdOutRedirect.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_StdOutRedirect.h" "src\ASWUnitTests_StdOutRedirect.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_TestBase.cpp" "src\ASWUnitTests_TestBase.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_TestBase.h" "src\ASWUnitTests_TestBase.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Version.cpp" "src\ASWUnitTests_Version.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Version.h" "src\ASWUnitTests_Version.h"
 if errorlevel 1 exit /b 1
@@ -70,6 +94,30 @@ if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWTools_String.cpp" "tests\Test_ASWTools_String.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWTools_String.h" "tests\Test_ASWTools_String.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_CLI.cpp" "tests\Test_ASWUnitTests_CLI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_CLI.h" "tests\Test_ASWUnitTests_CLI.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Console.cpp" "tests\Test_ASWUnitTests_Console.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Console.h" "tests\Test_ASWUnitTests_Console.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Handler.cpp" "tests\Test_ASWUnitTests_Handler.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Handler.h" "tests\Test_ASWUnitTests_Handler.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_JUnitReport.cpp" "tests\Test_ASWUnitTests_JUnitReport.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_JUnitReport.h" "tests\Test_ASWUnitTests_JUnitReport.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_StdOutRedirect.cpp" "tests\Test_ASWUnitTests_StdOutRedirect.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_StdOutRedirect.h" "tests\Test_ASWUnitTests_StdOutRedirect.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_TestBase.cpp" "tests\Test_ASWUnitTests_TestBase.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_TestBase.h" "tests\Test_ASWUnitTests_TestBase.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.cpp" "toTest\ASWTools_Common.cpp"
 if errorlevel 1 exit /b 1

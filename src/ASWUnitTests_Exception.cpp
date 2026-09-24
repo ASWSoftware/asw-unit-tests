@@ -141,4 +141,21 @@ TExceptTrue::TExceptTrue(std::string const& method, int line, std::string const&
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptSkipped
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptSkipped::TExceptSkipped(std::string const& msg)
+{
+    m_Message = "Test skipped: " + msg;
+}
+//---------------------------------------------------------------------------
+TExceptSkipped::TExceptSkipped(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Test skipped: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
 } // namespace ASWUnitTests

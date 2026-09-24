@@ -135,11 +135,10 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <ILINK_LibraryPath>$(BDSLIB)\$(PLATFORM)$(CC_SUFFIX)\debug;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <Debugger_RunParams>--pause</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64x)'!=''">
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <Manifest_File>(None)</Manifest_File>
-        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+        <Debugger_RunParams>--pause</Debugger_RunParams>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <Defines>NDEBUG;$(Defines)</Defines>
@@ -149,6 +148,81 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <ItemGroup>
+        <PCHCompile Include="ASWUnitTestsPCH1.h">
+            <BuildOrder>0</BuildOrder>
+            <PCH>true</PCH>
+        </PCHCompile>
+        <CppCompile Include="..\src\ASWUnitTests_CLI.cpp">
+            <DependentOn>..\src\ASWUnitTests_CLI.h</DependentOn>
+            <BuildOrder>2</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Console.cpp">
+            <DependentOn>..\src\ASWUnitTests_Console.h</DependentOn>
+            <BuildOrder>5</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Exception.cpp">
+            <DependentOn>..\src\ASWUnitTests_Exception.h</DependentOn>
+            <BuildOrder>6</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Handler.cpp">
+            <DependentOn>..\src\ASWUnitTests_Handler.h</DependentOn>
+            <BuildOrder>7</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_JUnitReport.cpp">
+            <DependentOn>..\src\ASWUnitTests_JUnitReport.h</DependentOn>
+            <BuildOrder>8</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Registry.cpp">
+            <DependentOn>..\src\ASWUnitTests_Registry.h</DependentOn>
+            <BuildOrder>9</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_StdOutRedirect.cpp">
+            <DependentOn>..\src\ASWUnitTests_StdOutRedirect.h</DependentOn>
+            <BuildOrder>19</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_TestBase.cpp">
+            <DependentOn>..\src\ASWUnitTests_TestBase.h</DependentOn>
+            <BuildOrder>10</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Version.cpp">
+            <DependentOn>..\src\ASWUnitTests_Version.h</DependentOn>
+            <BuildOrder>11</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\main.cpp">
+            <BuildOrder>1</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWTools_Random.cpp">
+            <DependentOn>..\tests\Test_ASWTools_Random.h</DependentOn>
+            <BuildOrder>12</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWTools_String.cpp">
+            <DependentOn>..\tests\Test_ASWTools_String.h</DependentOn>
+            <BuildOrder>13</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_CLI.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_CLI.h</DependentOn>
+            <BuildOrder>14</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Console.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Console.h</DependentOn>
+            <BuildOrder>15</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Handler.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Handler.h</DependentOn>
+            <BuildOrder>16</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_JUnitReport.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_JUnitReport.h</DependentOn>
+            <BuildOrder>17</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_StdOutRedirect.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_StdOutRedirect.h</DependentOn>
+            <BuildOrder>20</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_TestBase.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
+            <BuildOrder>18</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\toTest\ASWTools_Random.h</DependentOn>
             <BuildOrder>3</BuildOrder>
@@ -156,41 +230,6 @@
         <CppCompile Include="..\toTest\ASWTools_String.cpp">
             <DependentOn>..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>4</BuildOrder>
-        </CppCompile>
-        <PCHCompile Include="ASWUnitTestsPCH1.h">
-            <BuildOrder>0</BuildOrder>
-            <PCH>true</PCH>
-        </PCHCompile>
-        <CppCompile Include="..\src\ASWUnitTests_Exception.cpp">
-            <DependentOn>..\src\ASWUnitTests_Exception.h</DependentOn>
-            <BuildOrder>5</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\src\ASWUnitTests_Handler.cpp">
-            <DependentOn>..\src\ASWUnitTests_Handler.h</DependentOn>
-            <BuildOrder>6</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\src\ASWUnitTests_Registry.cpp">
-            <DependentOn>..\src\ASWUnitTests_Registry.h</DependentOn>
-            <BuildOrder>7</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\src\ASWUnitTests_TestBase.cpp">
-            <DependentOn>..\src\ASWUnitTests_TestBase.h</DependentOn>
-            <BuildOrder>8</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\src\ASWUnitTests_Version.cpp">
-            <DependentOn>..\src\ASWUnitTests_Version.h</DependentOn>
-            <BuildOrder>9</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\src\main.cpp">
-            <BuildOrder>1</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\tests\Test_ASWTools_Random.cpp">
-            <DependentOn>..\tests\Test_ASWTools_Random.h</DependentOn>
-            <BuildOrder>10</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="..\tests\Test_ASWTools_String.cpp">
-            <DependentOn>..\tests\Test_ASWTools_String.h</DependentOn>
-            <BuildOrder>11</BuildOrder>
         </CppCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
