@@ -116,11 +116,11 @@ ASWUnitTests [options]
 ```
 
 The console output always states whether a filter is active (and its pattern) before running or listing tests, and
-`--list` reports how many tests/groups matched out of the total registered — so if output is redirected to a file,
+`--list` reports how many tests/groups matched out of the total registered, so when output is redirected to a file,
 there's a record of why fewer tests ran or were listed than expected. Likewise, it always states whether shuffle is
 enabled and, if so, the seed in use.
 
-`--shuffle` is a sanity check against hidden inter-test/inter-group coupling — the deterministic alphabetical
+`--shuffle` is a sanity check against hidden inter-test/inter-group coupling. The deterministic alphabetical
 default (see [Registering Tests](#registering-tests)) is for readable, reproducible output day-to-day, while
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
@@ -144,8 +144,8 @@ codes, unless `--color=always` forces it (e.g. for a CI system that supports ANS
 The [NO_COLOR](https://no-color.org) environment variable is also respected in the default `auto` mode.
 
 Every test logs a `Finished test: "GroupName.TestName" - passed/failed/skipped (N.NNN ms)` line on completion,
-timing from just before `SetUp_Test` to just after the test's outcome is determined — useful for spotting slow
-tests without needing an external profiler.
+timing from just before `SetUp_Test` to just after the test's outcome is determined. This is useful for spotting
+slow tests without needing an external profiler.
 
 `--report-junit` produces a standard `<testsuites>`/`<testsuite>`/`<testcase>` report. One `<testsuite>` per test
 group, with `<failure>`/`<skipped>` elements carrying the same detail message shown on the console. `--project-name`
@@ -175,8 +175,8 @@ namespace ASWUnitTests
 ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_TMyClassToTest)
 ```
 
-Only the test module's own `.cpp`/`.h` files need to be added to your project's build (CMake, RAD Studio, etc.) —
-see `tests\Test_ASWTools_String.cpp` and `tests\Test_ASWTools_Random.cpp` for working examples.
+Only the test module's own `.cpp`/`.h` files need to be added to your project's build (CMake, RAD Studio, etc.).
+See `tests\Test_ASWTools_String.cpp` and `tests\Test_ASWTools_Random.cpp` for working examples.
 
 By default, groups run in alphabetical order by group name, deterministically across compilers and linkers. To
 override that for a specific group, instead use `ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order)`. Groups run in
@@ -201,13 +201,13 @@ int32_t i = TStrTool::StrToInt32(invalid);
 ```
 
 If the wrong exception type is thrown, or its message doesn't contain the given substring, the test fails with a
-message showing what was actually caught. This only works for exceptions deriving from `std::exception` — a thrown
-object that doesn't (uncommon in practice) can't be inspected, so a type/message expectation against it fails with
-an explanatory message rather than silently passing.
+message showing what was actually caught. This only works for exceptions deriving from `std::exception`. A thrown
+object that doesn't can't be inspected, so a type/message expectation against it fails with an explanatory message
+rather than silently passing.
 
 ### Comparing Floating-Point Values
 
-There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals` — exact equality comparison of
+There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals`. Exact equality comparison of
 floating-point values is unreliable (e.g. `0.1f + 0.2f != 0.3f`). Use `CheckNear`/`AssertNear` instead, which pass
 when the absolute difference between the two values is within a given tolerance, and `CheckNotNear`/`AssertNotNear`
 for the opposite (asserting two values are *not* within tolerance of each other):
@@ -326,21 +326,21 @@ with something more meaningful than its index (e.g. `"HexSingleToByte[A]"`), whi
 
 This repository's own `cmake\CMakeLists.txt` and `rad370\ASWUnitTests.cbproj` only build *this* repo's own example
 tests and `toTest` code for its own development and CI. Don't use them from a consuming project, and don't modify
-them — doing either means your changes live inside the submodule and get lost or conflict the next time you update
+them. Doing either means your changes live inside the submodule and get lost or conflict the next time you update
 it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference its `src`
 files from your own project's build file, alongside your own test modules:
 
 ```
 my-project/
-├── third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
-│   ├── src/                      <- framework core (never touched)
-│   └── cmake/, rad370/, tests/, toTest/   <- this framework's own example build, unused by you
-├── tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
-└── CMakeLists.txt / .cbproj      <- your own build file, in your own repo
++-- third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
+|   +-- src/                      <- framework core (never touched)
+|   `-- cmake/, rad370/, tests/, toTest/   <- this framework's own example build, unused by you
++-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
+`-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo
 ```
 
 Since `src\main.cpp` only calls into `TTestHandler` and never references a specific test class, you compile it
-as-is from the submodule — there's no need to copy or duplicate it into your own tree.
+as-is from the submodule. There's no need to copy or duplicate it into your own tree.
 
 ### CMake
 

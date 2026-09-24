@@ -42,6 +42,8 @@ New and modified code must be compatible with C++ console projects using C++20 a
 
 Prefer standard C++ and portable library facilities. Avoid compiler-, IDE-, or operating-system-specific extensions unless they are isolated behind a clear portability boundary. For OS-specific code, use valid preprocessor checks such as `#if defined(_WIN32)` and provide the corresponding Linux or portable path where appropriate. Keep headers self-contained and avoid relying on transitive includes.
 
+Keep all source files (`.cpp`/`.h`) plain ASCII, including comments. MSVC reads a BOM-less file using the system code page by default, unlike GCC/Clang/RAD Studio's Clang-based compiler, which default to UTF-8. A literal non-ASCII character can therefore silently compile to the wrong value on MSVC while working correctly everywhere else, with no error or warning. If a string needs a specific non-ASCII character, use a numeric escape instead of typing the character literally (e.g. `"\xC3\xA9"` for UTF-8 bytes, or `L"\x00E9"` for a wide-string code point), splitting adjacent escapes into separate concatenated string literals if needed so one escape doesn't consume a following hex digit.
+
 ## Code Organization
 
 - Insert new class methods in alphabetical order within their existing section. If the class has named or visibly separated sections, preserve those sections and alphabetize only within the relevant section.

@@ -60,7 +60,7 @@ struct TJUnitTestCase
 /////////////////////////////////////////////////////////////////////////////
 // TJUnitReportWriter
 //
-// Writes a JUnit-style XML report (<testsuites>/<testsuite>/<testcase>) —
+// Writes a JUnit-style XML report (<testsuites>/<testsuite>/<testcase>),
 // the de facto standard most CI systems (GitHub Actions, GitLab CI,
 // Jenkins, Azure DevOps, CircleCI) natively recognize for test results.
 // Self-contained: depends only on the standard library, including its own
