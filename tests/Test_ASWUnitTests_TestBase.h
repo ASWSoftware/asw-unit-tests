@@ -43,8 +43,12 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_CheckNear_ToleranceBoundaryIsInclusive();
     void Test_Check_ContinuesButAssert_Aborts();
+    void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
+    void Test_Run_ShuffleSeedProducesDeterministicOrder();
+    void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
 
 public:
