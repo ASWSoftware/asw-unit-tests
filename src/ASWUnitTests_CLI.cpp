@@ -458,7 +458,7 @@ std::optional<TColorMode> TCLIParser::ParseColorMode(std::string const& text)
 //---------------------------------------------------------------------------
 std::optional<unsigned int> TCLIParser::ParseUnsignedInt(std::string const& text)
 {
-    if (text.empty())
+    if (text.empty() || text[0] == '-')
         return std::nullopt;
 
     try
