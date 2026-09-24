@@ -4,10 +4,9 @@ Author: Anthony S. West - ASW Software
 
 A simple unit testing framework.
 
-Requires C++ 11 or higher.
-
-To register a test module, create a class that inherits 'TTestGroupBase'.
-Add the module's .h and register it in: 'TTestHandler::RegisterTestGroups()'
+To register a test module, create a class that inherits 'TTestGroupBase'
+and self-register it with the ASW_REGISTER_TEST_GROUP macro
+(see ASWUnitTests_Registry.h). No framework source file needs to change.
 
 Copyright 2025 Anthony S. West
 

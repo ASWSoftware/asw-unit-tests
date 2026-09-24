@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -31,11 +32,8 @@ limitations under the License.
 #include <sstream>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
+#include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_Version.h"
-//---------------------------------------------------------------------------
-// Add includes for each "Test_" module here
-#include "Test_ASWTools_Random.h"
-#include "Test_ASWTools_String.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -116,19 +114,38 @@ void TTestHandler::LogAppend(std::string const& msg)
 /*
     TTestHandler::RegisterTestGroups
 
-    Developer: Add test modules here.
+    Instantiates every test group that self-registered via the
+    ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED macro (see
+    ASWUnitTests_Registry.h). Test modules are added or removed from their
+    own .cpp files; this method never needs to change.
+
+    Groups run in ascending order by their registered order (default 0),
+    with ties broken alphabetically by group name, so the default run
+    order is alphabetical and deterministic across compilers/linkers.
 */
 void TTestHandler::RegisterTestGroups()
 {
-    // Example of how to add a module:
-    // m_TestGroups.push_back(std::unique_ptr<TestClassName>(new TestClassName()));
+    struct TOrderedGroup
+    {
+        int Order;
+        std::unique_ptr<ITestGroup> Group;
+    };
 
-    // ----- Add each class to be tested
+    std::vector<TOrderedGroup> orderedGroups;
 
-    m_TestGroups.push_back(std::unique_ptr<TTest_ASWTools_String>(new TTest_ASWTools_String()));
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMersenneTwisterRandom>(new TTest_TMersenneTwisterRandom()));
+    for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
+        orderedGroups.push_back(TOrderedGroup{ registered.Order, registered.Factory() });
 
-    // ----- End adding classes to be tested
+    std::stable_sort(orderedGroups.begin(), orderedGroups.end(),
+        [](TOrderedGroup const& a, TOrderedGroup const& b)
+        {
+            if (a.Order != b.Order)
+                return a.Order < b.Order;
+            return a.Group->GetTestGroupName() < b.Group->GetTestGroupName();
+        });
+
+    for (TOrderedGroup& orderedGroup : orderedGroups)
+        m_TestGroups.push_back(std::move(orderedGroup.Group));
 }
 //---------------------------------------------------------------------------
 /*

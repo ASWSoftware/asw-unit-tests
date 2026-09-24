@@ -2,6 +2,8 @@
 
 ASWUnitTests is a speedy light-weight C++ unit test tool for Windows and Linux projects.
 
+Requires C++17 or higher; the project itself is built and tested at C++20.
+
 # Features
 
 - `Check` prefix methods for `assert` sections of unit tests that aren't intended to throw (e.g. CheckTrue())
@@ -28,9 +30,8 @@ to the nature of unit testing.
 
 For examples of how to use, see the `tests` and `toTest` folders and `src\ASWUnitTests_Handler.cpp`.
 
-ASWUnitTests is intended to exist in a sub folder within your project at the root (e.g. `myProject\asw-unit-tests`).
-
-Modify the project files within (e.g. `rad370` or `cmake`, etc.) to point to your source.
+ASWUnitTests is intended to exist in a sub folder within your project, typically as a git submodule.
+See [Submodule Integration](#submodule-integration) below for how to wire it.
 The `toTest` folder is an example of source that is to be tested. While this example folder exists in the root of this
 project, your source should be wherever you like.
 
@@ -54,25 +55,37 @@ directly rather than packaging or installing it.
 
 ## Registering Tests
 
-For registering a test group/module, see: TTestHandler::RegisterTestGroups() in `src\ASWUnitTests_Handler.cpp`. This
-is the only unit in `src` that needs to be modified when adding a new test module. For example:
+Test modules self-register with `TTestHandler` using the `ASW_REGISTER_TEST_GROUP` macro (declared in
+`src\ASWUnitTests_Registry.h`). No file in `src` ever needs to be modified to add, remove, or rename a test
+module. This makes it easy to drop ASWUnitTests into another repository (e.g. as a git submodule).
+Place the macro at file scope, after the closing brace of the `ASWUnitTests` namespace, in the test module's `.cpp` file:
 
 ```
-// Whatever includes at the top of the file for the test modules
+// Whatever includes at the top of the file for your `TMyClassToTest` class, etc.
+#include "ASWUnitTests_Registry.h"
 
-void TTestHandler::RegisterTestGroups()
+namespace ASWUnitTests
 {
-    // Example of how to add a module:
-    // m_TestGroups.push_back(std::unique_ptr<TestClassName>(new TestClassName()));
+    // ... TTest_TMyClassToTest class implementation ...
 
-    // ----- Add each class to be tested
+} // namespace ASWUnitTests
 
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMyClassToTest>(new TTest_TMyClassToTest()));
-    m_TestGroups.push_back(std::unique_ptr<TTest_TMyClassToTest2>(new TTest_TMyClassToTest2()));
-
-    // ----- End adding classes to be tested
-}
+ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_TMyClassToTest)
 ```
+
+Only the test module's own `.cpp`/`.h` files need to be added to your project's build (CMake, RAD Studio, etc.) —
+see `tests\Test_ASWTools_String.cpp` and `tests\Test_ASWTools_Random.cpp` for working examples.
+
+By default, groups run in alphabetical order by group name, deterministically across compilers and linkers. To
+override that for a specific group, instead use `ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order)`. Groups run in
+ascending order, with ties broken alphabetically:
+
+```
+ASW_REGISTER_TEST_GROUP_ORDERED(ASWUnitTests::TTest_TMyClassToTest, -1) // runs before the alphabetical block
+```
+
+Run order is purely for readable, reproducible output. A group's `SetUp_Group`/`TearDown_Group` should still make
+no assumption about which other groups have or haven't already run.
 
 Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
 be explicitely registered within that module's constructor. For example:
@@ -124,6 +137,51 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 ```
+
+## Submodule Integration
+
+This repository's own `cmake\CMakeLists.txt` and `rad370\ASWUnitTests.cbproj` only build *this* repo's own example
+tests and `toTest` code for its own development and CI. Don't use them from a consuming project, and don't modify
+them — doing either means your changes live inside the submodule and get lost or conflict the next time you update
+it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference its `src`
+files from your own project's build file, alongside your own test modules:
+
+```
+my-project/
+├── third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
+│   ├── src/                      <- framework core (never touched)
+│   └── cmake/, rad370/, tests/, toTest/   <- this framework's own example build, unused by you
+├── tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
+└── CMakeLists.txt / .cbproj      <- your own build file, in your own repo
+```
+
+Since `src\main.cpp` only calls into `TTestHandler` and never references a specific test class, you compile it
+as-is from the submodule — there's no need to copy or duplicate it into your own tree.
+
+### CMake
+
+Include `src\ASWUnitTests_Sources.cmake` from your own `CMakeLists.txt` rather than listing the framework's source
+filenames by hand; it exports `ASWUNITTESTS_SOURCES` (the compiled `.cpp` files) and `ASWUNITTESTS_SOURCE_DIR` (for
+the include path). It stays in sync automatically if a future version of this framework adds a core file:
+
+```cmake
+include(third_party/asw-unit-tests/src/ASWUnitTests_Sources.cmake)
+
+add_executable(MyTests
+    ${ASWUNITTESTS_SOURCES}
+    tests/Test_MyClass.cpp
+)
+
+target_include_directories(MyTests PRIVATE
+    ${ASWUNITTESTS_SOURCE_DIR}
+    tests
+)
+```
+
+### RAD Studio / Visual Studio / other IDE projects
+
+Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own project, plus
+your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after updating the submodule.
 
 # Coding Standards
 
