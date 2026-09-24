@@ -84,6 +84,8 @@ private: // Test methods
     void Test_TrimRight_Copy();
     void Test_TryStrToInt32();
     void Test_URL_EncodeDecode();
+    void Test_UnicodeStrToUtf8();
+    void Test_Utf8ToUnicodeStr();
 
 public:
     TTest_ASWTools_String();

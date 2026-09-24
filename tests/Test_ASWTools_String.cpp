@@ -91,6 +91,8 @@ TTest_ASWTools_String::TTest_ASWTools_String()
     RegisterTest(&TTest_ASWTools_String::Test_TrimRight_Copy, "TrimRight_Copy");
     RegisterTest(&TTest_ASWTools_String::Test_TryStrToInt32, "TryStrToInt32");
     RegisterTest(&TTest_ASWTools_String::Test_URL_EncodeDecode, "URL_EncodeDecode");
+    RegisterTest(&TTest_ASWTools_String::Test_UnicodeStrToUtf8, "UnicodeStrToUtf8");
+    RegisterTest(&TTest_ASWTools_String::Test_Utf8ToUnicodeStr, "Utf8ToUnicodeStr");
 }
 //---------------------------------------------------------------------------
 TTest_ASWTools_String::~TTest_ASWTools_String()
@@ -635,6 +637,49 @@ void TTest_ASWTools_String::Test_URL_EncodeDecode()
     CheckEquals("a%20b%2Bc%2Fd", encoded, __func__, __LINE__, "URL encode");
     CheckEquals(url, decoded, __func__, __LINE__, "URL decode");
     CheckFalse(invalid, __func__, __LINE__, "URL decode valid");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWTools_String::Test_UnicodeStrToUtf8()
+{
+    // Arrange
+    std::wstring ascii = L"abc";
+    // Written as numeric escapes, not literal characters: MSVC reads a BOM-less source file using
+    // the system code page by default (unlike GCC/Clang/RAD Studio, which default to UTF-8), so a
+    // literal non-ASCII character here would silently decode to the wrong code point under MSVC.
+    // Each escape is its own adjacent literal so it can't swallow a following hex digit.
+    std::wstring mixed = L"a" L"\x00E9" L"\x20AC" L"b"; // 'a', e-acute (2-byte), euro sign (3-byte), 'b'
+    std::string const expectedMixedUtf8 = std::string("a") + "\xC3\xA9" + "\xE2\x82\xAC" + "b";
+
+    // Act
+    std::string asciiUtf8 = TStrTool::UnicodeStrToUtf8(ascii);
+    std::string mixedUtf8 = TStrTool::UnicodeStrToUtf8(mixed);
+    std::string emptyUtf8 = TStrTool::UnicodeStrToUtf8(std::wstring());
+
+    // Assert
+    CheckEquals("abc", asciiUtf8, __func__, __LINE__, "ASCII to UTF-8");
+    CheckEquals(expectedMixedUtf8, mixedUtf8, __func__, __LINE__, "1/2/3-byte UTF-8 sequences");
+    CheckEquals("", emptyUtf8, __func__, __LINE__, "Empty wstring to UTF-8");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWTools_String::Test_Utf8ToUnicodeStr()
+{
+    // Arrange
+    std::string ascii = "abc";
+    std::string const mixedUtf8 = std::string("a") + "\xC3\xA9" + "\xE2\x82\xAC" + "b";
+    std::wstring const expectedMixed = L"a" L"\x00E9" L"\x20AC" L"b"; // see Test_UnicodeStrToUtf8 re: escapes
+
+    // Act
+    std::wstring asciiWide = TStrTool::Utf8ToUnicodeStr(ascii);
+    std::wstring mixedWide = TStrTool::Utf8ToUnicodeStr(mixedUtf8);
+    std::wstring mixedWideFromPtr = TStrTool::Utf8ToUnicodeStr(mixedUtf8.c_str(), mixedUtf8.size());
+    std::wstring emptyWide = TStrTool::Utf8ToUnicodeStr(std::string());
+
+    // Assert
+    CheckEquals(L"abc", asciiWide, __func__, __LINE__, "ASCII from UTF-8");
+    CheckEquals(expectedMixed, mixedWide, __func__, __LINE__, "1/2/3-byte UTF-8 sequences, string overload");
+    CheckEquals(expectedMixed, mixedWideFromPtr, __func__, __LINE__,
+        "1/2/3-byte UTF-8 sequences, pointer+length overload");
+    CheckEquals(L"", emptyWide, __func__, __LINE__, "Empty string to wstring");
 }
 //---------------------------------------------------------------------------
 
