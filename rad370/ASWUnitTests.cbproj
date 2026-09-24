@@ -152,6 +152,10 @@
             <BuildOrder>0</BuildOrder>
             <PCH>true</PCH>
         </PCHCompile>
+        <CppCompile Include="..\src\ASWUnitTests_CLI.cpp">
+            <DependentOn>..\src\ASWUnitTests_CLI.h</DependentOn>
+            <BuildOrder>2</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Console.cpp">
             <DependentOn>..\src\ASWUnitTests_Console.h</DependentOn>
             <BuildOrder>5</BuildOrder>
