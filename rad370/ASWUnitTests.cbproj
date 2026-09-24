@@ -195,6 +195,26 @@
             <DependentOn>..\tests\Test_ASWTools_String.h</DependentOn>
             <BuildOrder>13</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_CLI.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_CLI.h</DependentOn>
+            <BuildOrder>14</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Console.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Console.h</DependentOn>
+            <BuildOrder>15</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Handler.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Handler.h</DependentOn>
+            <BuildOrder>16</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_JUnitReport.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_JUnitReport.h</DependentOn>
+            <BuildOrder>17</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_TestBase.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
+            <BuildOrder>18</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\toTest\ASWTools_Random.h</DependentOn>
             <BuildOrder>3</BuildOrder>

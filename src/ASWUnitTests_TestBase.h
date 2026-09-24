@@ -194,6 +194,7 @@ private:
 
 protected:
     bool m_ExceptionExpected;
+    bool m_LogSuppressed;
     bool m_TestFailedCheck;
     std::string m_ExceptionExpectedText;
     std::string m_ExpectedExceptionMessage;
@@ -398,6 +399,7 @@ public:
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
     void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) override;
+    virtual void SetLogSuppressed(bool suppressed);
 };
 
 } // namespace ASWUnitTests

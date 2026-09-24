@@ -97,6 +97,7 @@ ITestCase::TestCallback TTestCase::GetTestCallback() const
 //---------------------------------------------------------------------------
 TTestGroupBase::TTestGroupBase(std::string const& name)
     : m_ExceptionExpected(false),
+      m_LogSuppressed(false),
       m_TestFailedCheck(false),
       m_Name(name)
 {
@@ -569,11 +570,17 @@ std::string const& TTestGroupBase::GetTestGroupName() const
 //---------------------------------------------------------------------------
 void TTestGroupBase::Log(std::string const& msg)
 {
+    if (m_LogSuppressed)
+        return;
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::LogAppend(std::string const& msg)
 {
+    if (m_LogSuppressed)
+        return;
+
     std::cout << msg;
 }
 //---------------------------------------------------------------------------
@@ -645,6 +652,11 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
     m_ExpectedExceptionMessage.clear();
     m_ExpectedExceptionTypeChecker = nullptr;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::SetLogSuppressed(bool suppressed)
+{
+    m_LogSuppressed = suppressed;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
