@@ -4,10 +4,9 @@ Author: Anthony S. West - ASW Software
 
 A simple unit testing framework.
 
-Requires C++ 11 or higher.
-
-To register a test module, create a class that inherits 'TTestGroupBase'.
-Add the module's .h and register it in: 'TTestHandler::RegisterTestGroups()'
+To register a test module, create a class that inherits 'TTestGroupBase'
+and self-register it with the ASW_REGISTER_TEST_GROUP macro
+(see ASWUnitTests_Registry.h). No framework source file needs to change.
 
 Copyright 2025 Anthony S. West
 
@@ -31,6 +30,7 @@ limitations under the License.
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -65,6 +65,7 @@ private:
     typedef std::vector<std::unique_ptr<ITestGroup> > ITestGroups;
 
 private:
+    std::string m_ProjectName;
     ITestGroups m_TestGroups;
 
 private:
@@ -72,17 +73,22 @@ private:
 
 public:
     static std::string GetUTCTimeISO8601();
-    static std::string GetVersionStr();
     static std::string GetVersionFullStr();
+    static std::string GetVersionStr();
+    static bool WildcardMatch(std::string const& pattern, std::string const& text, bool ignoreCase = false);
 
 public:
     TTestHandler();
     ~TTestHandler();
 
-    void Initialize();
+    std::vector<std::string> GetAllTestFullNames();
+    std::string const& GetProjectName() const;
+    void Initialize(std::string const& projectName = "ASWUnitTests");
+    void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
     void LogAppend(std::string const& msg);
-    TTestResults Run();
+    TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string(),
+        bool shuffle = false, std::optional<unsigned int> shuffleSeed = std::nullopt);
 };
 
 } // namespace ASWUnitTests

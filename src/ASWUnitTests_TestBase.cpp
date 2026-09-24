@@ -24,12 +24,32 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
+
+namespace
+{
+
+std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
+{
+    double const elapsedMs = std::chrono::duration<double, std::milli>(
+        std::chrono::high_resolution_clock::now() - start).count();
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
+    return oss.str();
+}
+
+} // namespace
 
 namespace ASWUnitTests
 {
@@ -77,6 +97,7 @@ ITestCase::TestCallback TTestCase::GetTestCallback() const
 //---------------------------------------------------------------------------
 TTestGroupBase::TTestGroupBase(std::string const& name)
     : m_ExceptionExpected(false),
+      m_LogSuppressed(false),
       m_TestFailedCheck(false),
       m_Name(name)
 {
@@ -169,6 +190,32 @@ void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int li
         throw TExceptFalse(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -247,6 +294,32 @@ void TTestGroupBase::AssertNotEquals(std::wstring const& expected, std::wstring 
 {
     if (expected == actual)
         throw TExceptNotEquals(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        throw TExceptNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        throw TExceptNotEquals(method, line, valueStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg)
@@ -344,6 +417,32 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff > tolerance)
+    {
+        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
+        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -424,6 +523,32 @@ void TTestGroupBase::CheckNotEquals(std::wstring const& expected, std::wstring c
         SetTestFailedCheckNotEquals(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotNear(
+    float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
+{
+    float const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotNear(
+    double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
+{
+    double const diff = std::fabs(expected - actual);
+
+    if (diff <= tolerance)
+    {
+        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
+            std::to_string(tolerance) + ")";
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (!testVal)
@@ -445,11 +570,17 @@ std::string const& TTestGroupBase::GetTestGroupName() const
 //---------------------------------------------------------------------------
 void TTestGroupBase::Log(std::string const& msg)
 {
+    if (m_LogSuppressed)
+        return;
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::LogAppend(std::string const& msg)
 {
+    if (m_LogSuppressed)
+        return;
+
     std::cout << msg;
 }
 //---------------------------------------------------------------------------
@@ -479,13 +610,33 @@ TTestResults const& TTestGroupBase::Results() const
     return m_Results;
 }
 //---------------------------------------------------------------------------
-void TTestGroupBase::Run()
+/*
+    TTestGroupBase::Run
+
+    'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
+    TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
+*/
+void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
 
-    for (TestCallbackList::iterator it = m_TestCallbacks.begin(); it != m_TestCallbacks.end(); it++)
+    std::vector<size_t> order(m_TestCallbacks.size());
+    for (size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+
+    if (shuffleSeed.has_value())
     {
-        ITestCase& testCase = *it->get();
+        std::mt19937 rng(*shuffleSeed);
+        std::shuffle(order.begin(), order.end(), rng);
+    }
+
+    for (size_t index : order)
+    {
+        ITestCase& testCase = *m_TestCallbacks[index].get();
+
+        if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
+            continue;
+
         Test(testCase);
     }
 }
@@ -499,6 +650,13 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
 {
     m_ExceptionExpected = expected;
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
+    m_ExpectedExceptionMessage.clear();
+    m_ExpectedExceptionTypeChecker = nullptr;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::SetLogSuppressed(bool suppressed)
+{
+    m_LogSuppressed = suppressed;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
@@ -541,6 +699,20 @@ void TTestGroupBase::SetUp_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 /*
+    TTestGroupBase::Skip
+
+    Call from within a test to abort it and have it reported as skipped.
+
+    Can be called unconditionally to permanently skip a test without removing its RegisterTest() call,
+    or after a runtime check to skip conditionally (e.g. a platform or environment-specific test).
+    No explicit 'return' is needed afterward.
+*/
+void TTestGroupBase::Skip(std::string const& method, int line, std::string const& reason)
+{
+    throw TExceptSkipped(method, line, reason);
+}
+//---------------------------------------------------------------------------
+/*
     TTestGroupBase::TearDown_Test
 
     Called just after calling the test callback
@@ -557,6 +729,36 @@ void TTestGroupBase::TearDown_Test(ITestCase& /*testCase*/)
 */
 void TTestGroupBase::Test(ITestCase& testCase)
 {
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
+
+    // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
+    // for the console, never in the stored message/record), and logs the "Finished test" timing line.
+    // 'detailMessage' is the failure/skip detail text, or empty for a pass.
+    auto finish = [&](TTestOutcome outcome, char const* status, std::string const& detailMessage)
+        {
+            TLogKind const kind = (outcome == TTestOutcome::Fail) ? TLogKind::Fail :
+                    (outcome == TTestOutcome::Skip) ? TLogKind::Skip : TLogKind::Pass;
+
+            if (outcome != TTestOutcome::Pass)
+            {
+                std::string const tag = (outcome == TTestOutcome::Fail) ? "***Test failed" : "***Test skipped";
+                std::string const plainMsg = tag + ": \"" + testFullName + "\"" +
+                    (detailMessage.empty() ? std::string() : (": " + detailMessage));
+
+                m_Results.Messages.push_back(plainMsg);
+                Log(TConsole::Colorize(tag, kind) + plainMsg.substr(tag.size()));
+            }
+
+            double const durationSeconds = std::chrono::duration<double>(
+                std::chrono::high_resolution_clock::now() - testStart).count();
+            m_Results.CaseRecords.push_back(
+                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, detailMessage });
+
+            Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
+                FormatDurationMs(testStart) + ")");
+        };
+
     try
     {
         // Reset for test
@@ -566,10 +768,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
         // Run test
         if (nullptr != testCase.GetTestCallback())
         {
-            std::string testFullName = m_Name + "." + testCase.GetName();
-
-            std::string msg = "Running test: " + testFullName;
-            Log(msg);
+            Log("Running test: " + testFullName);
 
             try
             {
@@ -614,34 +813,85 @@ void TTestGroupBase::Test(ITestCase& testCase)
         if (TestFailedOneOrMoreChecks())
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + m_Name + "\"";
-            m_Results.Messages.push_back(msg);
-            Log(msg);
+            finish(TTestOutcome::Fail, "failed", std::string());
             return;
         }
 
         // Test passed
         m_Results.SuccessCount++;
+        finish(TTestOutcome::Pass, "passed", std::string());
+    }
+    catch (TExceptSkipped const& ex)
+    {
+        m_Results.SkippedCount++;
+        finish(TTestOutcome::Skip, "skipped", ex.what());
     }
     catch (TTestException const& ex)
     {
         if (m_ExceptionExpected)
         {
             m_Results.SuccessCount++;
+            finish(TTestOutcome::Pass, "passed", std::string());
         }
         else
         {
             m_Results.FailedCount++;
-            std::string msg = "***Test failed: \"" + m_Name + "\": " + ex.what();
-            m_Results.Messages.push_back(msg);
-            Log(msg);
+            finish(TTestOutcome::Fail, "failed", ex.what());
+        }
+    }
+    catch (std::exception const& ex)
+    {
+        if (m_ExceptionExpected)
+        {
+            // A type/message check is only requested via the templated SetExceptionExpected<TException>()
+            // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
+            bool const typeMatches = (m_ExpectedExceptionTypeChecker == nullptr) || m_ExpectedExceptionTypeChecker(ex);
+            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
+                (std::string(ex.what()).find(m_ExpectedExceptionMessage) != std::string::npos);
+
+            if (typeMatches && messageMatches)
+            {
+                m_Results.SuccessCount++;
+                finish(TTestOutcome::Pass, "passed", std::string());
+            }
+            else
+            {
+                m_Results.FailedCount++;
+
+                std::string detail;
+                if (!typeMatches)
+                    detail = "expected exception type was not thrown (caught a different exception): " +
+                        std::string(ex.what());
+                else
+                    detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
+                        "\" but caught: " + std::string(ex.what());
+
+                finish(TTestOutcome::Fail, "failed", detail);
+            }
+        }
+        else
+        {
+            m_Results.FailedCount++;
+            throw; // Unexpected failure
         }
     }
     catch (...)
     {
         if (m_ExceptionExpected)
         {
-            m_Results.SuccessCount++;
+            if (m_ExpectedExceptionTypeChecker != nullptr)
+            {
+                // A specific type was requested, but what was thrown isn't a std::exception, so it can't be
+                // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
+                m_Results.FailedCount++;
+                finish(TTestOutcome::Fail, "failed",
+                    "expected a specific exception type, but a non-std::exception object was thrown instead.");
+            }
+            else
+            {
+                m_Results.SuccessCount++;
+                finish(TTestOutcome::Pass, "passed", std::string());
+            }
         }
         else
         {
@@ -665,6 +915,7 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 //---------------------------------------------------------------------------
 TTestResults::TTestResults()
     : FailedCount(0),
+      SkippedCount(0),
       SuccessCount(0)
 {
 }

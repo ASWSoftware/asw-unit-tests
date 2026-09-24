@@ -34,13 +34,6 @@ limitations under the License.
 // 'Additional Options' because Microsoft likes to make things difficult. If using C++ 11 and up, add
 // this option to: Properties-> C/C++ -> All Options -> Additional Options
 
-#if __cplusplus >= 201103L
-#   include <codecvt>
-#else
-#   include <functional>
-#   include <wctype.h>
-#endif // #if __cplusplus >= 201103L
-
 //#include <cstdarg> //va_start
 //#include <cctype>
 #include <limits>
@@ -94,14 +87,126 @@ limitations under the License.
 
 //---------------------------------------------------------------------------
 
+namespace
+{
+
+#if !defined(_WIN32)
+
+// Appends 'codePoint' to 'out' as UTF-8 bytes. Used only on non-Windows platforms (see
+// DecodeUtf8ToWideStr below for why), where wchar_t is UTF-32, so each code point is exactly one
+// wchar_t and no surrogate-pair handling is needed on this side either.
+void AppendUtf8CodePoint(std::string& out, char32_t codePoint)
+{
+    if (codePoint <= 0x7F)
+    {
+        out += static_cast<char>(codePoint);
+    }
+    else if (codePoint <= 0x7FF)
+    {
+        out += static_cast<char>(0xC0 | (codePoint >> 6));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+    else if (codePoint <= 0xFFFF)
+    {
+        out += static_cast<char>(0xE0 | (codePoint >> 12));
+        out += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+    else
+    {
+        out += static_cast<char>(0xF0 | (codePoint >> 18));
+        out += static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+}
+
+// Decodes UTF-8 bytes [utf8Bytes, utf8Bytes + length) into one wchar_t per code point. Non-Windows
+// only: wchar_t there is UTF-32 (unlike Windows' UTF-16, which needs surrogate-pair handling that
+// the native WideCharToMultiByte/MultiByteToWideChar APIs already provide, so Windows uses those
+// instead of this). A malformed or truncated sequence is skipped rather than throwing, matching the
+// tolerant behavior TStrTool's callers previously got from std::wstring_convert.
+std::wstring DecodeUtf8ToWideStr(char const* utf8Bytes, size_t length)
+{
+    std::wstring result;
+    char const* pos = utf8Bytes;
+    char const* const end = utf8Bytes + length;
+
+    while (pos != end)
+    {
+        unsigned char const lead = static_cast<unsigned char>(*pos);
+        char32_t codePoint = 0;
+        int extraBytes = 0;
+
+        if ((lead & 0x80) == 0x00)
+        {
+            codePoint = lead;
+        }
+        else if ((lead & 0xE0) == 0xC0)
+        {
+            codePoint = lead & 0x1F;
+            extraBytes = 1;
+        }
+        else if ((lead & 0xF0) == 0xE0)
+        {
+            codePoint = lead & 0x0F;
+            extraBytes = 2;
+        }
+        else if ((lead & 0xF8) == 0xF0)
+        {
+            codePoint = lead & 0x07;
+            extraBytes = 3;
+        }
+        else
+        {
+            ++pos; // Invalid lead byte; skip it.
+            continue;
+        }
+
+        ++pos;
+
+        bool validSequence = true;
+
+        for (int i = 0; i < extraBytes; ++i)
+        {
+            if (pos == end || (static_cast<unsigned char>(*pos) & 0xC0) != 0x80)
+            {
+                validSequence = false;
+                break;
+            }
+
+            codePoint = (codePoint << 6) | (static_cast<unsigned char>(*pos) & 0x3F);
+            ++pos;
+        }
+
+        if (validSequence)
+            result += static_cast<wchar_t>(codePoint);
+    }
+
+    return result;
+}
+
+#endif // #if !defined(_WIN32)
+
+} // namespace
+
 namespace ASWTools
 {
 
 namespace
 {
 
+void GetLocalSystemTime(SYSTEMTIME* time);
+std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount);
+std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t length);
+
 #if !defined(_WIN32)
 
+std::string FormatGUID(GUID const& guid);
+bool ParseGUID(std::string const& value, GUID& guid);
+bool ParseHex(std::string const& value, unsigned long long* result);
+
+//---------------------------------------------------------------------------
 std::string FormatGUID(GUID const& guid)
 {
     std::ostringstream stream;
@@ -116,6 +221,7 @@ std::string FormatGUID(GUID const& guid)
     return stream.str();
 }
 
+//---------------------------------------------------------------------------
 bool ParseGUID(std::string const& value, GUID& guid)
 {
     if (value.size() == 38 && value.front() == '{' && value.back() == '}')
@@ -146,6 +252,7 @@ bool ParseGUID(std::string const& value, GUID& guid)
     return true;
 }
 
+//---------------------------------------------------------------------------
 bool ParseHex(std::string const& value, unsigned long long* result)
 {
     auto conversion = std::from_chars(value.data(), value.data() + value.size(), *result, 16);
@@ -154,6 +261,7 @@ bool ParseHex(std::string const& value, unsigned long long* result)
 
 #endif
 
+//---------------------------------------------------------------------------
 void GetLocalSystemTime(SYSTEMTIME* time)
 {
 #if defined(_WIN32)
@@ -176,6 +284,7 @@ void GetLocalSystemTime(SYSTEMTIME* time)
 #endif
 }
 
+//---------------------------------------------------------------------------
 std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
 {
     std::wstring value;
@@ -204,6 +313,7 @@ std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
     return value;
 }
 
+//---------------------------------------------------------------------------
 std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t length)
 {
     std::vector<BYTE> bytes;
@@ -231,7 +341,11 @@ std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t lengt
     return bytes;
 }
 
+//---------------------------------------------------------------------------
+
 } // namespace
+
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TStrTool
@@ -282,20 +396,9 @@ std::string TStrTool::UnicodeStrToUtf8(std::wstring const& str)
     if (str.empty())
         return "";
 
-#if __cplusplus >= 201103L
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-    return myconv.to_bytes(str);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#else
-    int utf16Len = str.length();
-    int utf8Len = ::WideCharToMultiByte(CP_UTF8, 0, str.c_str(), utf16Len, nullptr, 0, nullptr, nullptr);
+#if defined(_WIN32)
+    int const utf16Len = static_cast<int>(str.length());
+    int const utf8Len = ::WideCharToMultiByte(CP_UTF8, 0, str.c_str(), utf16Len, nullptr, 0, nullptr, nullptr);
     if (0 == utf8Len)
         return "";
 
@@ -303,38 +406,20 @@ std::string TStrTool::UnicodeStrToUtf8(std::wstring const& str)
     ::WideCharToMultiByte(CP_UTF8, 0, str.c_str(), utf16Len, &utf8Str[0], utf8Len, nullptr, nullptr);
 
     return utf8Str;
-#endif // #if __cplusplus >= 201103L
+#else
+    std::string utf8Str;
+
+    for (wchar_t const wch : str)
+        AppendUtf8CodePoint(utf8Str, static_cast<char32_t>(wch));
+
+    return utf8Str;
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static
 std::wstring TStrTool::Utf8ToUnicodeStr(const std::string& str)
 {
-    if (str.empty())
-        return L"";
-
-#if __cplusplus >= 201103L
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-    return myconv.from_bytes(str);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#else
-    int wideCharLen = ::MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
-    if (0 == wideCharLen)
-        return L"";
-
-    std::wstring strW(wideCharLen, L'\0');
-    ::MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &strW[0], wideCharLen);
-    return strW;
-//    std::vector<wchar_t> wideCharBuffer(wideCharLen);
-//    ::MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wideCharBuffer.data(), wideCharLen);
-//    return std::wstring(wideCharBuffer.begin(), wideCharBuffer.end() - 1);
-#endif // #if __cplusplus >= 201103L
+    return Utf8ToUnicodeStr(str.c_str(), str.size());
 }
 //---------------------------------------------------------------------------
 // - Static
@@ -343,27 +428,18 @@ std::wstring TStrTool::Utf8ToUnicodeStr(char const* utf8Bytes, size_t length)
     if (0 == length || nullptr == utf8Bytes)
         return L"";
 
-#if __cplusplus >= 201103L
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    std::wstring_convert<std::codecvt_utf8<wchar_t> > myconv;
-    // Note that from_bytes does not include the character pointed to by "last", the 2nd parameter
-    return myconv.from_bytes(utf8Bytes, utf8Bytes + length);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#else
-    int wideCharLen = ::MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, length, nullptr, 0);
+#if defined(_WIN32)
+    int const utf8Len = static_cast<int>(length);
+    int const wideCharLen = ::MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, utf8Len, nullptr, 0);
     if (0 == wideCharLen)
         return L"";
 
     std::wstring strW(wideCharLen, L'\0');
-    ::MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, length, &strW[0], wideCharLen);
+    ::MultiByteToWideChar(CP_UTF8, 0, utf8Bytes, utf8Len, &strW[0], wideCharLen);
     return strW;
-#endif // #if __cplusplus >= 201103L
+#else
+    return DecodeUtf8ToWideStr(utf8Bytes, length);
+#endif
 }
 //---------------------------------------------------------------------------
 // -Static

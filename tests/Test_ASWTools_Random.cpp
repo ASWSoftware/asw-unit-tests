@@ -24,6 +24,8 @@ limitations under the License.
 // Module header
 #include "Test_ASWTools_Random.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWTools_Random.h"
 //---------------------------------------------------------------------------
 using namespace ASWTools;
@@ -173,3 +175,6 @@ void TTest_TMersenneTwisterRandom::Test_SetAndGetSeed()
 //---------------------------------------------------------------------------
 
 } // namespace ASWUnitTests
+
+//---------------------------------------------------------------------------
+ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_TMersenneTwisterRandom)
