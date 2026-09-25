@@ -143,7 +143,11 @@ TConsoleColor GetColorFor(TLogKind kind)
 //---------------------------------------------------------------------------
 bool IsStdoutTTY()
 {
-#if defined(_WIN32)
+#if defined(__BORLANDC__) && defined(_WIN32) && !defined(_WIN64)
+    // RAD Studio's 32-bit compiler (bcc32c) declares the POSIX-style name in <io.h>, not the
+    // underscore-prefixed one MSVC/MinGW and RAD Studio's own 64-bit compiler use.
+    return isatty(_fileno(stdout)) != 0;
+#elif defined(_WIN32)
     return _isatty(_fileno(stdout)) != 0;
 #else
     return isatty(fileno(stdout)) != 0;
