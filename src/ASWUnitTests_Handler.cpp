@@ -98,7 +98,16 @@ std::string TTestHandler::GetUTCTimeISO8601()
     auto milliSecs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
     // Convert to UTC time structure
+    // std::gmtime() is flagged by MSVC in favor of gmtime_s(), which is Windows-only and has a
+    // different signature than POSIX's gmtime_r(), so there's no single portable replacement.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     std::tm utc_tm = *std::gmtime(&now_time_t);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     // Format the time into a string
     std::ostringstream oss;

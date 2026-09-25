@@ -294,6 +294,11 @@ std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
         std::uint16_t codeUnit = static_cast<std::uint16_t>(bytes[i]) |
             (static_cast<std::uint16_t>(bytes[i + 1]) << 8);
 
+        // sizeof(wchar_t) is a compile-time constant by design (16-bit on Windows, 32-bit on Linux).
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4127)
+#endif
         if (sizeof(wchar_t) > sizeof(std::uint16_t) && codeUnit >= 0xd800 && codeUnit <= 0xdbff && i + 3 < byteCount)
         {
             std::uint16_t low = static_cast<std::uint16_t>(bytes[i + 2]) |
@@ -306,6 +311,9 @@ std::wstring Utf16BytesToWideString(BYTE const* bytes, size_t byteCount)
                 continue;
             }
         }
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
         value.push_back(static_cast<wchar_t>(codeUnit));
     }
@@ -321,6 +329,11 @@ std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t lengt
     for (size_t i = 0; i < length; ++i)
     {
         std::uint32_t codePoint = static_cast<std::uint32_t>(value[i]);
+        // sizeof(wchar_t) is a compile-time constant by design (16-bit on Windows, 32-bit on Linux).
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4127)
+#endif
         if (sizeof(wchar_t) > sizeof(std::uint16_t) && codePoint > 0xffff)
         {
             codePoint -= 0x10000;
@@ -332,6 +345,9 @@ std::vector<BYTE> WideStringToUtf16Bytes(std::wstring const& value, size_t lengt
             bytes.push_back(static_cast<BYTE>(low >> 8));
             continue;
         }
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
         std::uint16_t codeUnit = static_cast<std::uint16_t>(codePoint);
         bytes.push_back(static_cast<BYTE>(codeUnit & 0xff));
@@ -727,7 +743,16 @@ std::string TStrTool::DateTime_GetUTCNow_ISO8601()
     time(&now);
     char buf[sizeof "0001-01-01T00:00:00Z" + 1];
     //strftime(buf, sizeof buf, "%FT%TZ", gmtime(&now)); //C++ builder appears to not work for the date part
+    // gmtime() is flagged by MSVC in favor of gmtime_s(), which is Windows-only and has a different
+    // signature than POSIX's gmtime_r(), so there's no single portable replacement.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     strftime(buf, sizeof buf, "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
     return buf;
 }
 //---------------------------------------------------------------------------
@@ -801,7 +826,17 @@ bool TStrTool::DateTime_Parse_ISO8601(std::string const& iso8601Str,
 
     //Variation of: https://visdap.blogspot.com/2018/12/how-do-i-parse-iso-8601-date-with.html
     //but cleaned, added error checking and a correction for float/double base10 to base2 issue.
+    // sscanf() is flagged by MSVC in favor of sscanf_s(), which is Windows-only; it also buys nothing
+    // here, since sscanf_s only needs extra size arguments for %s/%c/%[ conversions, none of which
+    // this format string uses.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     int nScanned = sscanf(iso8601Str.c_str(), "%d-%d-%dT%d:%d:%f%d:%dZ", &y, &month, &d, &h, &min, &secsF, &tzH, &tzM);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     if (EOF == nScanned)
         return false;
@@ -2336,7 +2371,7 @@ std::string TStrTool::ToLower(std::string const& str)
     result.resize(str.size());
 #if __cplusplus >= 201103L
     std::transform(str.begin(), str.end(), result.begin(), [](unsigned char c){
-            return std::tolower(c);
+            return static_cast<char>(std::tolower(c));
         });
 #else
     std::transform(str.begin(), str.end(), result.begin(), (int (*)(int)) std::tolower);
@@ -2370,7 +2405,7 @@ std::string TStrTool::ToUpper(std::string const& str)
     result.resize(str.size());
 #if __cplusplus >= 201103L
     std::transform(str.begin(), str.end(), result.begin(), [](unsigned char c){
-            return std::toupper(c);
+            return static_cast<char>(std::toupper(c));
         });
 #else
     std::transform(str.begin(), str.end(), result.begin(), (int (*)(int)) std::toupper);

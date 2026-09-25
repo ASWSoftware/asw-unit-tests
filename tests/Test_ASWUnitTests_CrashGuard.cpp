@@ -37,11 +37,14 @@ namespace
 // turn this into a loop with constant stack usage the way it could a simple tail-recursive
 // version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
 // MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
-// permanent test - see the commit that added this file. The infinite recursion GCC/Clang warn
+// permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
 // about here is the deliberate point, not a mistake, hence silencing just that one warning.
 #if defined(__GNUC__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Winfinite-recursion"
+#elif defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4717)
 #endif
 int RecurseUntilStackOverflows(int depth)
 {
@@ -52,6 +55,8 @@ int RecurseUntilStackOverflows(int depth)
 }
 #if defined(__GNUC__)
 #  pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#  pragma warning(pop)
 #endif
 
 // A small per-frame footprint (unlike RecurseUntilStackOverflows() above), so 20 frames of this

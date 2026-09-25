@@ -68,6 +68,13 @@ bool IsRecognizedFault(unsigned long code);
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+// MSVC's C4702 (unreachable code) is a code-generation warning, evaluated against the warning state
+// in effect at the end of the function rather than at the offending line, so it has to be disabled
+// around the whole function; the unreachable return below is intentional (see its comment).
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4702)
+#endif
 LONG WINAPI CrashVectoredHandler(PEXCEPTION_POINTERS info)
 {
     unsigned long const code = info->ExceptionRecord->ExceptionCode;
@@ -79,6 +86,9 @@ LONG WINAPI CrashVectoredHandler(PEXCEPTION_POINTERS info)
     std::longjmp(*g_JumpBuf, 1); // Never returns.
     return EXCEPTION_CONTINUE_SEARCH; // Unreachable; silences a "no return" warning on some compilers.
 }
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
 //---------------------------------------------------------------------------
 std::string DescribeFault(unsigned long code)
@@ -299,6 +309,10 @@ TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
     // does not resume execution there, but instead restores the CPU/stack state saved by this same
     // setjmp() call and makes it return again, this time with the value longjmp() passed (1, so
     // nonzero), landing in the else branch below instead of falling through to body() a second time.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4611) // Intentional and already documented above TCrashGuard::Run().
+#endif
     if (setjmp(jumpBuf) == 0)
     {
         body();
@@ -309,6 +323,9 @@ TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
         result.ShouldAbortRun = (g_FaultCode == EXCEPTION_STACK_OVERFLOW);
         result.Description = DescribeFault(g_FaultCode);
     }
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     g_JumpBuf = previousJumpBuf;
 #else

@@ -121,7 +121,17 @@ bool EnableWindowsAnsiSupport()
 //---------------------------------------------------------------------------
 bool EnvVarIsSet(char const* name)
 {
+    // std::getenv() is flagged by MSVC in favor of _dupenv_s(), which is Windows-only and would need
+    // its own portability boundary for no real benefit here: this only reads a single value to check
+    // whether it's set, never writes through the returned pointer.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     char const* value = std::getenv(name);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
     return value != nullptr && value[0] != '\0';
 }
 //---------------------------------------------------------------------------
