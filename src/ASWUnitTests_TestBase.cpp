@@ -36,6 +36,7 @@ limitations under the License.
 #include <thread>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
+#include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 
@@ -604,6 +605,42 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
 }
 //---------------------------------------------------------------------------
 /*
+    TTestGroupBase::ReportCrashedTest
+
+    Called by RunCatchingCrashes() when TCrashGuard::Run() catches a native crash while running
+    'testCase'. The synthetic failure record is added directly (not via Test()'s own finish() lambda,
+    for the same reason ReportTimedOutTest() below does the same) so this group's Results() ends up
+    exactly like any other completed run: safe for TTestHandler::Run() to merge and for
+    --report-junit to write out.
+
+    Throws TExceptTestCrashed only when 'abortRun' is set (see TCrashGuard::Run() for when that is);
+    otherwise returns normally; RunWithTimeout()'s loop in Run() simply continues to the next test.
+*/
+void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& description, bool abortRun)
+{
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const detail = "Test crashed: " + description + ".";
+    std::string const tag = "***Test failed";
+    std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
+
+    m_Results.FailedCount++;
+    m_Results.Messages.push_back(plainMsg);
+    m_Results.CaseRecords.push_back(
+        TTestCaseRecord{ m_Name, testCase.GetName(), 0.0, TTestOutcome::Fail, detail });
+
+    Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+
+    if (abortRun)
+    {
+        Log("!!CRASH!!: \"" + testFullName + "\" crashed in a way that isn't safe to continue past (" +
+            description + "); abandoning the remaining run.");
+        throw TExceptTestCrashed("Test \"" + testFullName + "\" crashed: " + description + ".");
+    }
+
+    Log("!!CRASH!!: \"" + testFullName + "\" crashed (" + description + "); continuing with the next test.");
+}
+//---------------------------------------------------------------------------
+/*
     TTestGroupBase::ReportTimedOutTest
 
     Called by RunWithTimeout() when a test's worker thread does not finish within its allotted
@@ -649,11 +686,12 @@ TTestResults const& TTestGroupBase::Results() const
     TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
 
     'testTimeoutSeconds', when set, aborts the run (see RunWithTimeout()/ReportTimedOutTest()) if any
-    single test does not finish within that many seconds. TExceptTestTimedOut propagates out of this
-    method in that case, skipping any tests after the one that timed out.
+    single test does not finish within that many seconds. 'catchCrashes' additionally protects each
+    test against a native crash (see RunCatchingCrashes()/ReportCrashedTest()). Either can throw a
+    TExceptAbortRun out of this method, skipping any tests after the one that triggered it.
 */
 void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
-    std::optional<unsigned int> testTimeoutSeconds)
+    std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
 
@@ -674,28 +712,58 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
         if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
             continue;
 
-        RunWithTimeout(testCase, testTimeoutSeconds);
+        RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
     }
+}
+//---------------------------------------------------------------------------
+/*
+    TTestGroupBase::RunCatchingCrashes
+
+    With 'catchCrashes' false, calls Test(testCase) directly: no guard, no overhead.
+
+    Otherwise, runs Test(testCase) through TCrashGuard::Run() (see ASWUnitTests_CrashGuard.h). A
+    normal completion, including via an ordinary C++ exception, passes through unaffected. A caught
+    crash is handed to ReportCrashedTest(), which either records it as a failure and returns (the
+    common case: the next test still runs) or additionally throws to abort the rest of the run, for
+    the specific crash types TCrashGuard::Run() considers too severe to continue past.
+*/
+void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
+{
+    if (!catchCrashes)
+    {
+        Test(testCase);
+        return;
+    }
+
+    TCrashGuardResult const result = TCrashGuard::Run([this, &testCase]()
+        {
+            Test(testCase);
+        });
+
+    if (result.Crashed)
+        ReportCrashedTest(testCase, result.Description, result.ShouldAbortRun);
 }
 //---------------------------------------------------------------------------
 /*
     TTestGroupBase::RunWithTimeout
 
-    With no 'testTimeoutSeconds', calls Test(testCase) directly: no thread, no overhead.
+    With no 'testTimeoutSeconds', calls RunCatchingCrashes(testCase, catchCrashes) directly: no
+    thread, no overhead beyond whatever that call itself adds.
 
-    Otherwise, runs Test(testCase) on a worker thread and waits on it with a timeout. The worker
-    thread is the only one that ever touches 'testCase' or this group's members while it's running,
-    so there's no data race with the waiting thread here. If it finishes in time, whatever it threw
-    (if anything) is rethrown by future.get(), preserving Test()'s normal exception propagation
-    exactly as if it had run directly. If it times out, the worker thread is detached (never joined:
-    it may be stuck forever, and there is no safe, portable way to force a thread to unwind) and
-    ReportTimedOutTest() records the failure and throws to abort the rest of the run.
+    Otherwise, runs it on a worker thread and waits on it with a timeout. The worker thread is the
+    only one that ever touches 'testCase' or this group's members while it's running, so there's no
+    data race with the waiting thread here. If it finishes in time, whatever it threw (if anything)
+    is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
+    directly. If it times out, the worker thread is detached (never joined: it may be stuck forever,
+    and there is no safe, portable way to force a thread to unwind) and ReportTimedOutTest() records
+    the failure and throws to abort the rest of the run.
 */
-void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds)
+void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds,
+    bool catchCrashes)
 {
     if (!testTimeoutSeconds.has_value())
     {
-        Test(testCase);
+        RunCatchingCrashes(testCase, catchCrashes);
         return;
     }
 
@@ -704,11 +772,11 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     std::shared_ptr<std::promise<void> > done = std::make_shared<std::promise<void> >();
     std::future<void> future = done->get_future();
 
-    std::thread worker([this, &testCase, done]()
+    std::thread worker([this, &testCase, done, catchCrashes]()
             {
         try
         {
-            Test(testCase);
+            RunCatchingCrashes(testCase, catchCrashes);
             done->set_value();
         }
         catch (...)
@@ -1000,7 +1068,8 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 
 //---------------------------------------------------------------------------
 TTestResults::TTestResults()
-    : FailedCount(0),
+    : Crashed(false),
+      FailedCount(0),
       SkippedCount(0),
       SuccessCount(0),
       TimedOut(false)

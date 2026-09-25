@@ -49,6 +49,7 @@ private:
 private: // Test methods
     void Test_BuildTestFilter_Filter();
     void Test_BuildTestFilter_Partition();
+    void Test_ParseArguments_CatchCrashes();
     void Test_ParseArguments_Color();
     void Test_ParseArguments_Filter();
     void Test_ParseArguments_HelpVersionList();

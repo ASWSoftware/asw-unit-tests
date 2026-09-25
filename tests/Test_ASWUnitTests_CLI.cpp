@@ -42,6 +42,7 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
 {
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter, "BuildTestFilter_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition, "BuildTestFilter_Partition");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes, "ParseArguments_CatchCrashes");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Color, "ParseArguments_Color");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Filter, "ParseArguments_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_HelpVersionList, "ParseArguments_HelpVersionList");
@@ -169,6 +170,21 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
     CheckEquals(allNames.size(), matchedByEither, __func__, __LINE__, "the two partitions cover every test exactly once");
     CheckTrue(description1.find("partition 1 of 2") != std::string::npos, __func__, __LINE__, "partition 1 description");
     CheckTrue(description2.find("partition 2 of 2") != std::string::npos, __func__, __LINE__, "partition 2 description");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes()
+{
+    // Arrange
+    TCLIOptions optionsDefault;
+    TCLIOptions optionsCatchCrashes;
+
+    // Act
+    ParseArgs({ "ASWUnitTests" }, optionsDefault);
+    ParseArgs({ "ASWUnitTests", "--catch-crashes" }, optionsCatchCrashes);
+
+    // Assert
+    CheckFalse(optionsDefault.CatchCrashes, __func__, __LINE__, "CatchCrashes defaults to false");
+    CheckTrue(optionsCatchCrashes.CatchCrashes, __func__, __LINE__, "--catch-crashes sets CatchCrashes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseArguments_Color()

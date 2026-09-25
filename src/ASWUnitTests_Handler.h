@@ -89,7 +89,7 @@ public:
     void LogAppend(std::string const& msg);
     TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string(),
         bool shuffle = false, std::optional<unsigned int> shuffleSeed = std::nullopt,
-        std::optional<unsigned int> testTimeoutSeconds = std::nullopt);
+        std::optional<unsigned int> testTimeoutSeconds = std::nullopt, bool catchCrashes = false);
 };
 
 } // namespace ASWUnitTests

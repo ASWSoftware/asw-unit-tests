@@ -119,18 +119,53 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptAbortRun
+//
+// Common base for a signal that a single test's failure is severe enough that
+// running any further tests or groups in this process isn't considered safe.
+// Caught by TTestHandler::Run() (matched by this base, not by either derived
+// type individually) to stop running further groups after merging in the
+// group's own results, which already include a synthetic failure record for
+// the test that triggered it. Never caught inside TTestGroupBase::Test()
+// itself.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptAbortRun : public TTestException
+{
+public:
+    TExceptAbortRun(std::string const& msg);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptTestTimedOut
 //
 // Thrown by TTestGroupBase::Run() when a test's worker thread does not finish
 // within its --test-timeout-seconds allotment, to unwind the run after the
 // abandoned test's own synthetic failure record has already been added to
-// its group's results. Caught by TTestHandler::Run() to stop running further
-// groups; never caught inside TTestGroupBase::Test() itself.
+// its group's results.
 /////////////////////////////////////////////////////////////////////////////
-class TExceptTestTimedOut : public TTestException
+class TExceptTestTimedOut : public TExceptAbortRun
 {
 public:
     TExceptTestTimedOut(std::string const& msg);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTestCrashed
+//
+// Thrown by TTestGroupBase::ReportCrashedTest() when --catch-crashes caught a
+// native fault (see ASWUnitTests_CrashGuard.h) severe enough to abort the run
+// rather than continue (currently: a stack overflow on Windows, or any
+// SIGSEGV on POSIX, since POSIX can't cheaply distinguish an ordinary
+// segfault from a stack overflow - see TCrashGuard::Run()). A crash that
+// isn't severe enough to abort is recorded as a failure without throwing at
+// all, so the run continues normally.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptTestCrashed : public TExceptAbortRun
+{
+public:
+    TExceptTestCrashed(std::string const& msg);
 };
 
 } // namespace ASWUnitTests

@@ -20,6 +20,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   matrix) for parallel execution, with no in-process threading and no merge step
 - `--test-timeout-seconds` - aborts the run if a single test hangs (e.g. an infinite loop) past a given number of
   seconds, instead of blocking forever
+- `--catch-crashes` - catches a native crash (e.g. an access violation or segmentation fault) in a test and
+  records it as failed instead of letting it take down the whole process
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -93,6 +95,14 @@ ASWUnitTests [options]
                        offending test is recorded as failed (with a message explaining why) and no
                        further tests or groups run afterward. There is no default; a hung test runs
                        indefinitely unless this is given.
+  --catch-crashes      Catch a native crash (e.g. an access violation or segmentation fault) in a
+                       test and record it as failed instead of letting it take down the whole
+                       process. Most crash types let the run continue with the next test; a few (a
+                       stack overflow on Windows, or any segmentation fault on POSIX, which can't
+                       be cheaply told apart from a stack overflow there) abort the run afterward
+                       instead, the same way --test-timeout-seconds does. Never attempts to catch
+                       SIGABRT. Off by default; a crash terminates the process as usual unless this
+                       is given.
   --color <mode>       One of "auto" (default; color only on an interactive terminal that
                        supports it, and only if the NO_COLOR environment variable isn't set),
                        "always", or "never".
@@ -158,6 +168,38 @@ after being abandoned rather than truly hanging forever, its outcome may be reco
 synchronizes it with the timeout-handling thread at that point. In practice this only matters for a "barely"
 timed-out test, not a genuinely hung one, and the process exits immediately afterward regardless.
 
+`--catch-crashes` guards against a single test crashing (e.g. dereferencing a null pointer) and taking down the
+whole process with it. There is no default; without it, a crashing test still crashes the process as usual. On
+Windows (MSVC, MinGW, and RAD Studio's Clang-based 32/64-bit compilers alike) this is implemented with
+`AddVectoredExceptionHandler` rather than `__try`/`__except`: the latter is the textbook approach and unwinds C++
+objects properly when it works, but it silently fails to catch anything at runtime under RAD Studio's compilers
+even though it compiles, and GCC/MinGW does not implement the keywords at all, so this framework only relies on
+the mechanism it directly verified actually works, across all four Windows compiler targets, including recovering
+from a genuine stack overflow. On POSIX (Linux/Mac) it's a signal handler for `SIGSEGV`/`SIGFPE`/`SIGILL`/`SIGBUS`
+that jumps back to a point just before the test started; `SIGABRT` is never caught, since it usually means the C
+runtime itself already detected the process's state is corrupt and is deliberately terminating rather than letting
+it continue.
+
+A crash that's caught still gets recorded as a failed test, with a message describing the fault, exactly like any
+other failure; if `--report-junit` was also given, it shows up in the report the same way. Most crash types let
+the run continue with the next test afterward, since the whole point of catching it (unlike a timeout, which can
+only abandon-and-abort) is that the harness can safely keep going. A few specific crash types abort the run
+afterward instead, with a dedicated exit code (`6`) distinct from an ordinary test failure (`1`), which is what a
+continued-past crash still shows up as: a Windows stack overflow (`EXCEPTION_STACK_OVERFLOW` is unambiguous), or
+*any* `SIGSEGV` on POSIX. That second one is a deliberate platform difference, not an
+oversight: unlike Windows, POSIX delivers a stack overflow and an ordinary segfault as the exact same signal, and
+reliably telling them apart needs inspecting the faulting address against the thread's stack bounds - real extra
+complexity for what's already treated as an edge case on both platforms. The practical effect is that the same
+ordinary null-pointer dereference continues the run on Windows but aborts it on Linux/Mac. Catching a genuine
+stack overflow at all on POSIX (as opposed to distinguishing it from an ordinary segfault) does rely on
+`sigaltstack()`/`SA_ONSTACK`: the default signal handler would otherwise run on the same, already-exhausted stack
+that just overflowed, leaving it nowhere to run and crashing the process for real instead.
+
+Recovering from a crash at all is a raw jump back to before the test started (the same fundamental technique
+`--test-timeout-seconds`' abandoned worker thread relies on, for a different reason): it does not run destructors
+for any objects that were under construction on the crashing test's stack at the moment of the fault. This is a
+real, accepted limitation of recovering from a hardware-level fault, on any platform, not an oversight either.
+
 Pass/fail/skip status text is colorized when writing to an interactive terminal that supports ANSI escape codes.
 Output redirected to a file or pipe, or a non-interactive CI log, automatically gets plain text with no escape
 codes, unless `--color=always` forces it (e.g. for a CI system that supports ANSI in its own log viewer).
@@ -173,7 +215,9 @@ sets both the console's `Initializing...` line and the report's `<testsuites nam
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
 tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,
-`4` invalid command line arguments, `5` a test exceeded `--test-timeout-seconds` and the run was aborted. Skipped
+`4` invalid command line arguments, `5` a test exceeded `--test-timeout-seconds` and the run was aborted, `6` a test
+crashed severely enough (with `--catch-crashes` given) that the run was aborted. A crash caught by
+`--catch-crashes` that didn't force an abort is just an ordinary test failure (exit code `1`), not `6`. Skipped
 tests never affect the exit code.
 
 ## Registering Tests

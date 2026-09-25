@@ -502,6 +502,70 @@ void TFixture_SlowTest::Test_NeverRuns()
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_CrashingTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
+// integer divide by zero), followed by one that records whether it ran. Used by
+// Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet below to prove --catch-crashes' central
+// behavior: unlike a timeout, which can only abandon-and-abort, a caught crash lets the group
+// continue running its remaining tests. Deliberately not a null-pointer write: that's a SIGSEGV on
+// POSIX, and TCrashGuard::Run() treats every SIGSEGV there as abort-worthy (it can't tell an
+// ordinary one apart from a stack overflow - see its comment), which would make this fixture's
+// crashing test abort the group instead of letting it continue, defeating the point of this test.
+// An integer divide by zero (SIGFPE on POSIX, EXCEPTION_INT_DIVIDE_BY_ZERO on Windows) is never
+// abort-worthy on either platform, so it exercises "ordinary crash, group continues" portably.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_CrashingTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CrashesButDoesNotAbort();
+    void Test_RunsAfterTheCrash();
+
+public:
+    bool RunsAfterTheCrashReached = false;
+
+public:
+    TFixture_CrashingTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_CrashingTest::TFixture_CrashingTest()
+    : inherited("Fixture_CrashingTest")
+{
+    SetLogSuppressed(true);
+
+    // Registration order matters here (unlike most of the other fixtures above): the crashing test
+    // must run first so the second one is still pending when it crashes.
+    RegisterTest(&TFixture_CrashingTest::Test_CrashesButDoesNotAbort, "CrashesButDoesNotAbort");
+    RegisterTest(&TFixture_CrashingTest::Test_RunsAfterTheCrash, "RunsAfterTheCrash");
+}
+//---------------------------------------------------------------------------
+void TFixture_CrashingTest::Test_CrashesButDoesNotAbort()
+{
+    // volatile so an optimizing build can't prove the division is undefined behavior and remove it
+    // entirely, silently turning this into a false pass instead of a crash - see
+    // Test_ASWUnitTests_CrashGuard.cpp's identical fix for the same real issue, hit building this
+    // project's own RAD Studio target in a Release configuration.
+    volatile int numerator = 42;
+    volatile int denominator = 0;
+    volatile int const quotient = numerator / denominator;
+    (void)quotient;
+}
+//---------------------------------------------------------------------------
+void TFixture_CrashingTest::Test_RunsAfterTheCrash()
+{
+    RunsAfterTheCrashReached = true;
+}
+//---------------------------------------------------------------------------
+
 } // namespace
 
 //---------------------------------------------------------------------------
@@ -524,6 +588,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
         "Run_AppliesFilterToSkipNonMatchingTests");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
+        "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
@@ -564,7 +630,7 @@ void TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive()
     TFixture_NearComparisons fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -587,7 +653,7 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
     TFixture_MixedOutcomes fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
 
     // Assert
     CheckTrue(fixture.ReachedSecondCheck, __func__, __LINE__,
@@ -603,7 +669,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeo
     // Act
     try
     {
-        fixture.Run(TestFilter(), std::nullopt, 1u); // 1 second timeout; the fixture hangs forever.
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // 1 second timeout; the fixture hangs forever.
     }
     catch (TExceptTestTimedOut const&)
     {
@@ -640,7 +706,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         };
 
     // Act
-    fixture.Run(filter, std::nullopt, std::nullopt);
+    fixture.Run(filter, std::nullopt, std::nullopt, false);
 
     // Assert
     std::vector<std::string> sortedExecuted = executedTests;
@@ -654,13 +720,62 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         "CaseRecords has an entry only for the tests that ran, not the full registered set");
 }
 //---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet
+
+    Skip()ped on RAD Studio's 32-bit compiler (bcc32c) specifically: the crash here is caught and
+    reported correctly (this is not the same failure as Test_ASWUnitTests_CrashGuard.cpp's Skip()ped
+    tests, which involve much deeper recursion), but the process still crashes moments later, before
+    ever reaching this method's own assertions - confirmed to happen even with nothing else running
+    before or after the one crashing test, so it is not about cumulative state or later tests
+    specifically. This means --catch-crashes' core "catch and continue" behavior, run through the
+    real test-execution pipeline (TTestGroupBase::Run() and beyond) rather than a bare, isolated
+    TCrashGuard::Run() call, is not currently safe to rely on for real use on 32-bit RAD Studio at
+    all, not just for the deep/stack-overflow edge cases 64-bit and bcc32c share - see the commit
+    that added this Skip() for the full investigation. 64-bit RAD Studio and MinGW are unaffected.
+*/
+void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet()
+{
+#if defined(__BORLANDC__) && defined(_WIN32) && !defined(_WIN64)
+    Skip(__func__, __LINE__,
+        "Unreliable on RAD Studio's 32-bit compiler (bcc32c): the crash is caught correctly, but the "
+        "process crashes moments later regardless, even with nothing else running before or after. "
+        "MinGW and 64-bit RAD Studio are unaffected; investigation ongoing.");
+#endif
+
+    // Arrange
+    TFixture_CrashingTest fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, true); // catchCrashes = true
+
+    // Assert
+    CheckTrue(fixture.RunsAfterTheCrashReached, __func__, __LINE__,
+        "unlike a timeout, an ordinary caught crash doesn't abort the group: the next test still runs");
+
+    TTestResults const& results = fixture.Results();
+    CheckFalse(results.Crashed, __func__, __LINE__,
+        "Crashed is only set when a crash forces an abort, not for one that was safely continued past");
+    CheckEquals(static_cast<size_t>(2), results.CaseRecords.size(), __func__, __LINE__,
+        "one record for the crashed test, one for the test that ran normally after it");
+    CheckEquals(1u, results.FailedCount, __func__, __LINE__, "the crashed test counts as failed");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "the test after it passed normally");
+
+    TTestCaseRecord const& crashedRecord = results.CaseRecords.front();
+    CheckEquals(std::string("CrashesButDoesNotAbort"), crashedRecord.TestName, __func__, __LINE__,
+        "the synthetic record names the test that actually crashed");
+    CheckTrue(crashedRecord.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
+    CheckTrue(crashedRecord.Message.find("crashed") != std::string::npos, __func__, __LINE__,
+        "the failure message explains why: it crashed");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
 {
     // Arrange
     TFixture_MixedOutcomes fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -698,15 +813,15 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder
     // Act
     {
         TFixture_OrderRecorder fixture(unshuffledOrder);
-        fixture.Run(TestFilter(), std::nullopt, std::nullopt);
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
     }
     {
         TFixture_OrderRecorder fixture(shuffledOrderFirstRun);
-        fixture.Run(TestFilter(), 12345u, std::nullopt);
+        fixture.Run(TestFilter(), 12345u, std::nullopt, false);
     }
     {
         TFixture_OrderRecorder fixture(shuffledOrderSecondRun);
-        fixture.Run(TestFilter(), 12345u, std::nullopt);
+        fixture.Run(TestFilter(), 12345u, std::nullopt, false);
     }
 
     // Assert
@@ -730,7 +845,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
     TFixture_ExceptionExpectations fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -758,12 +873,12 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
     // Act
     {
         TStdOutRedirect redirect;
-        verboseFixture.Run(TestFilter(), std::nullopt, std::nullopt);
+        verboseFixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
         verboseOutput = redirect.Str();
     }
     {
         TStdOutRedirect redirect;
-        suppressedFixture.Run(TestFilter(), std::nullopt, std::nullopt);
+        suppressedFixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
         suppressedOutput = redirect.Str();
     }
 

@@ -321,13 +321,14 @@ void TTestHandler::RegisterTestGroups()
     'shuffleSeed' if given, otherwise one is generated and logged so a
     failure caused by shuffled order can be reproduced.
 
-    'testTimeoutSeconds', when given, is passed through to each group's Run(). If a group's Run()
-    throws TExceptTestTimedOut, that group's (now-augmented, see TTestGroupBase::ReportTimedOutTest())
-    results are still merged in exactly like a normal completion, but no further groups are run, and
-    the returned TTestResults has TimedOut set.
+    'testTimeoutSeconds' and 'catchCrashes' are both passed through to each group's Run(). If a
+    group's Run() throws a TExceptAbortRun (TExceptTestTimedOut or TExceptTestCrashed), that group's
+    (now-augmented, see TTestGroupBase::ReportTimedOutTest()/ReportCrashedTest()) results are still
+    merged in exactly like a normal completion, but no further groups are run, and the returned
+    TTestResults has TimedOut or Crashed set accordingly.
 */
 TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription, bool shuffle,
-    std::optional<unsigned int> shuffleSeed, std::optional<unsigned int> testTimeoutSeconds)
+    std::optional<unsigned int> shuffleSeed, std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
 {
     TTestResults testResults;
     std::vector<ITestGroup*> groupsToRun;
@@ -419,13 +420,18 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
             groupSeed = *resolvedSeed + static_cast<unsigned int>(std::hash<std::string>{}(name));
 
         bool groupTimedOut = false;
+        bool groupCrashed = false;
         try
         {
-            testGroup.Run(filter, groupSeed, testTimeoutSeconds);
+            testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
         }
         catch (TExceptTestTimedOut const&)
         {
             groupTimedOut = true;
+        }
+        catch (TExceptTestCrashed const&)
+        {
+            groupCrashed = true;
         }
 
         TTestResults const& testGroupResults = testGroup.Results();
@@ -445,9 +451,10 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         Log("[" + GetUTCTimeISO8601() + "] Tearing down group: \"" + name + "\"");
         testGroup.TearDown_Group();
 
-        if (groupTimedOut)
+        if (groupTimedOut || groupCrashed)
         {
-            testResults.TimedOut = true;
+            testResults.TimedOut = groupTimedOut;
+            testResults.Crashed = groupCrashed;
             break;
         }
     }

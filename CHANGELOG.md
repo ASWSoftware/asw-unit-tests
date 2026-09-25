@@ -26,6 +26,21 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 - `rad370/Build_Win32_Debug.bat` and `Build_Win32_Release.bat`, for building
   and testing the RAD Studio 32-bit target the same way the existing Win64x
   scripts already covered the 64-bit one.
+- `--catch-crashes`, catching a native crash (e.g. an access violation or
+  segmentation fault) in a test and recording it as failed instead of letting
+  it take down the whole process. Most crash types let the run continue with
+  the next test; a stack overflow on Windows, or any segmentation fault on
+  POSIX (which can't be cheaply told apart from a stack overflow there),
+  aborts the run afterward instead, with its own dedicated exit code (`6`).
+  Never attempts to catch `SIGABRT`. Implemented with
+  `AddVectoredExceptionHandler` on Windows, verified directly (including
+  recovering from a genuine stack overflow) across MSVC, MinGW, and RAD
+  Studio's `bcc32c`/`bcc64`, after `__try`/`__except` turned out to compile
+  but not actually work on RAD Studio's compilers. On POSIX, catching a
+  genuine stack overflow relies on an alternate signal stack
+  (`sigaltstack()`/`SA_ONSTACK`), since the default handler would otherwise
+  run on the same, already-exhausted stack that just overflowed and have
+  nowhere to run; verified on Linux via CLion/SSH.
 
 ### Fixed
 

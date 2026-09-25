@@ -82,7 +82,13 @@ jobs:
 
       - name: Run self-tests
         shell: bash
-        run: ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI" --report-junit junit-results.xml
+        # --test-timeout-seconds and --catch-crashes are both defense-in-depth safety nets here: if
+        # a test ever regresses into a genuine hang or a native crash (rather than failing
+        # normally), this turns that into a clean, reported failure instead of relying solely on
+        # the job's own timeout-minutes, or an opaque crashed job, to eventually notice.
+        run: >-
+          ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI" --report-junit junit-results.xml
+          --test-timeout-seconds 60 --catch-crashes
 
       - name: Report test results
         # Runs even if the tests above failed, so a failure still shows up as

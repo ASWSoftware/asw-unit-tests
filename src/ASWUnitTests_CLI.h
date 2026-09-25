@@ -43,6 +43,7 @@ constexpr int ExitCode_UnhandledException = 2;
 constexpr int ExitCode_UnhandledExceptionUnknown = 3;
 constexpr int ExitCode_InvalidArguments = 4;
 constexpr int ExitCode_TestTimedOut = 5;
+constexpr int ExitCode_TestCrashed = 6;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -64,6 +65,7 @@ struct TCLIOptions
     unsigned int PartitionIndex = 0;
     unsigned int PartitionCount = 0;
     std::optional<unsigned int> TestTimeoutSeconds;
+    bool CatchCrashes = false;
     TColorMode ColorMode = TColorMode::Auto;
     std::optional<TConsoleColor> ColorPass;
     std::optional<TConsoleColor> ColorFail;
