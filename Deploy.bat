@@ -47,6 +47,10 @@ call :CopyFile "rad370\Build_Win64x_Debug.bat" "rad370\Build_Win64x_Debug.bat"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win64x_Release.bat" "rad370\Build_Win64x_Release.bat"
 if errorlevel 1 exit /b 1
+call :CopyFile "rad370\Build_Win32_Debug.bat" "rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "rad370\Build_Win32_Release.bat" "rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.cpp" "src\ASWUnitTests_CLI.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.h" "src\ASWUnitTests_CLI.h"

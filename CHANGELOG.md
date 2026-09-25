@@ -15,6 +15,24 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 - CONTRIBUTING.md, documenting the contribution workflow, branch and commit
   conventions, and bug report format.
 - This CHANGELOG.md file.
+- CI workflow (`.github/workflows/ci.yml`), building and running the self-test
+  suite on Windows (MSVC, MinGW) and Linux (GCC, Clang), plus a JUnit-based
+  native test-results summary and a partitioning smoke test.
+- `--test-timeout-seconds`, aborting the run if a single test doesn't finish
+  in time (e.g. an infinite loop), instead of hanging forever. The offending
+  test is recorded as failed and the process exits with a dedicated exit code
+  (`5`); if `--report-junit` was also given, the report still gets written,
+  covering everything that completed before the timeout.
+- `rad370/Build_Win32_Debug.bat` and `Build_Win32_Release.bat`, for building
+  and testing the RAD Studio 32-bit target the same way the existing Win64x
+  scripts already covered the 64-bit one.
+
+### Fixed
+
+- `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
+  which declares the POSIX-style `isatty()` in `<io.h>` rather than the
+  underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit
+  compiler use. Windows64/MSVC/MinGW are unaffected.
 
 ## [0.26.5] - 2026-09-24
 
