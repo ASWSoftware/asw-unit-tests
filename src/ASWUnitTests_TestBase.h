@@ -84,6 +84,7 @@ public:
     unsigned int FailedCount;
     unsigned int SkippedCount;
     unsigned int SuccessCount;
+    bool TimedOut;
     MsgList Messages;
     std::vector<TTestCaseRecord> CaseRecords;
 
@@ -172,7 +173,10 @@ public:
     virtual TestCallbackList& GetTestCallbackList() = 0;
     virtual std::string const& GetTestGroupName() const = 0;
     virtual TTestResults const& Results() const = 0;
-    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) = 0;
+    // Throws TExceptTestTimedOut if a test does not finish within 'testTimeoutSeconds' (when given),
+    // after recording a synthetic failure for the abandoned test in this group's own Results().
+    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+        std::optional<unsigned int> testTimeoutSeconds) = 0;
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -244,7 +248,17 @@ protected:
         }
     }
 
+    // Called when a test's worker thread does not finish within 'testTimeoutSeconds'. Records a
+    // synthetic failed outcome for the abandoned test (so it flows into the normal results/JUnit
+    // report exactly like any other failure) and throws TExceptTestTimedOut. The worker thread
+    // itself is never joined; there is no safe way to stop a thread that may be stuck in an
+    // infinite loop, so it is abandoned.
+    virtual void ReportTimedOutTest(ITestCase& testCase, unsigned int testTimeoutSeconds);
     virtual void ResetTestFailedOneOrMoreChecks();
+    // Runs 'testCase' directly when 'testTimeoutSeconds' is unset (no overhead/behavior change from
+    // before this feature existed). Otherwise runs it on a worker thread and waits with a timeout;
+    // see ReportTimedOutTest() for what happens if it doesn't finish in time.
+    virtual void RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds);
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
     // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
@@ -398,7 +412,8 @@ public:
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
-    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) override;
+    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+        std::optional<unsigned int> testTimeoutSeconds) override;
     virtual void SetLogSuppressed(bool suppressed);
 };
 

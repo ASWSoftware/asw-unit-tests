@@ -73,6 +73,13 @@ void PrintUsage()
     "                      own --partition-index, to run the suite in parallel\n"
     "                      with no coordination between processes. Requires\n"
     "                      --partition-index.\n"
+    "  --test-timeout-seconds <N>\n"
+    "                      Abort the run if any single test does not finish\n"
+    "                      within <N> seconds. The offending test is recorded\n"
+    "                      as failed (with a message explaining why) and no\n"
+    "                      further tests or groups run afterward. There is no\n"
+    "                      default; a hung test runs indefinitely unless this\n"
+    "                      is given.\n"
     "  --color <mode>      One of \"auto\" (default; color only on an\n"
     "                      interactive terminal that supports it, and only\n"
     "                      if the NO_COLOR environment variable isn't set),\n"
@@ -302,6 +309,34 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
 
             options.PartitionCount = *parsed;
             options.HasPartitionCount = true;
+        }
+        else if (arg == "--test-timeout-seconds")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a numeric argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            if (!parsed.has_value() || *parsed == 0)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a positive integer argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            options.TestTimeoutSeconds = *parsed;
+        }
+        else if (arg.rfind("--test-timeout-seconds=", 0) == 0)
+        {
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(std::string(arg.substr(23)));
+            if (!parsed.has_value() || *parsed == 0)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a positive integer argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            options.TestTimeoutSeconds = *parsed;
         }
         else if (arg == "--no-color")
         {

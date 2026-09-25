@@ -117,6 +117,22 @@ public:
     TExceptSkipped(std::string const& method, int line, std::string const& msg);
 };
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTestTimedOut
+//
+// Thrown by TTestGroupBase::Run() when a test's worker thread does not finish
+// within its --test-timeout-seconds allotment, to unwind the run after the
+// abandoned test's own synthetic failure record has already been added to
+// its group's results. Caught by TTestHandler::Run() to stop running further
+// groups; never caught inside TTestGroupBase::Test() itself.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptTestTimedOut : public TTestException
+{
+public:
+    TExceptTestTimedOut(std::string const& msg);
+};
+
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------

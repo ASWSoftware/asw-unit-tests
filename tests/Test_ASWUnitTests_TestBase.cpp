@@ -25,9 +25,12 @@ limitations under the License.
 #include "Test_ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <chrono>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
@@ -447,6 +450,58 @@ void TFixture_OrderRecorder::Test_H()
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SlowTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
+// followed by one that must never run if RunWithTimeout() correctly abandons the hung test and
+// TTestGroupBase::Run() correctly aborts the rest of the group afterward. Used by
+// Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SlowTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_HangsForever();
+    void Test_NeverRuns();
+
+public:
+    bool NeverRunReached = false;
+
+public:
+    TFixture_SlowTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_SlowTest::TFixture_SlowTest()
+    : inherited("Fixture_SlowTest")
+{
+    SetLogSuppressed(true);
+
+    // Registration order matters here (unlike the other fixtures above): the hung test must run
+    // first so the second one is still pending when the timeout fires.
+    RegisterTest(&TFixture_SlowTest::Test_HangsForever, "HangsForever");
+    RegisterTest(&TFixture_SlowTest::Test_NeverRuns, "NeverRuns");
+}
+//---------------------------------------------------------------------------
+void TFixture_SlowTest::Test_HangsForever()
+{
+    for (;;)
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+//---------------------------------------------------------------------------
+void TFixture_SlowTest::Test_NeverRuns()
+{
+    NeverRunReached = true;
+}
+//---------------------------------------------------------------------------
+
 } // namespace
 
 //---------------------------------------------------------------------------
@@ -465,6 +520,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive,
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
+        "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
@@ -507,7 +564,7 @@ void TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive()
     TFixture_NearComparisons fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -530,11 +587,45 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
     TFixture_MixedOutcomes fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
 
     // Assert
     CheckTrue(fixture.ReachedSecondCheck, __func__, __LINE__,
         "a Check failure does not abort the rest of the test, unlike Assert");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()
+{
+    // Arrange
+    TFixture_SlowTest fixture;
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u); // 1 second timeout; the fixture hangs forever.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Assert
+    CheckTrue(timedOutThrown, __func__, __LINE__, "Run() throws TExceptTestTimedOut once the timeout is exceeded");
+    CheckFalse(fixture.NeverRunReached, __func__, __LINE__,
+        "the test registered after the slow one never runs; the group is abandoned, not just that one test");
+
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__,
+        "only a single synthetic record exists, for the abandoned test");
+    CheckEquals(1u, results.FailedCount, __func__, __LINE__, "the abandoned test counts as failed");
+
+    TTestCaseRecord const& record = results.CaseRecords.front();
+    CheckEquals(std::string("HangsForever"), record.TestName, __func__, __LINE__,
+        "the synthetic record names the test that actually timed out");
+    CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
+    CheckTrue(record.Message.find("timeout") != std::string::npos, __func__, __LINE__,
+        "the failure message explains why: it exceeded its timeout");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
@@ -549,7 +640,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         };
 
     // Act
-    fixture.Run(filter, std::nullopt);
+    fixture.Run(filter, std::nullopt, std::nullopt);
 
     // Assert
     std::vector<std::string> sortedExecuted = executedTests;
@@ -569,7 +660,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
     TFixture_MixedOutcomes fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -607,15 +698,15 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder
     // Act
     {
         TFixture_OrderRecorder fixture(unshuffledOrder);
-        fixture.Run(TestFilter(), std::nullopt);
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt);
     }
     {
         TFixture_OrderRecorder fixture(shuffledOrderFirstRun);
-        fixture.Run(TestFilter(), 12345u);
+        fixture.Run(TestFilter(), 12345u, std::nullopt);
     }
     {
         TFixture_OrderRecorder fixture(shuffledOrderSecondRun);
-        fixture.Run(TestFilter(), 12345u);
+        fixture.Run(TestFilter(), 12345u, std::nullopt);
     }
 
     // Assert
@@ -639,7 +730,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
     TFixture_ExceptionExpectations fixture;
 
     // Act
-    fixture.Run(TestFilter(), std::nullopt);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt);
 
     // Assert
     TTestResults const& results = fixture.Results();
@@ -667,12 +758,12 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
     // Act
     {
         TStdOutRedirect redirect;
-        verboseFixture.Run(TestFilter(), std::nullopt);
+        verboseFixture.Run(TestFilter(), std::nullopt, std::nullopt);
         verboseOutput = redirect.Str();
     }
     {
         TStdOutRedirect redirect;
-        suppressedFixture.Run(TestFilter(), std::nullopt);
+        suppressedFixture.Run(TestFilter(), std::nullopt, std::nullopt);
         suppressedOutput = redirect.Str();
     }
 

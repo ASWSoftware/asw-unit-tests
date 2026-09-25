@@ -320,9 +320,14 @@ void TTestHandler::RegisterTestGroups()
     every equally-sized group shuffling identically). The master seed is
     'shuffleSeed' if given, otherwise one is generated and logged so a
     failure caused by shuffled order can be reproduced.
+
+    'testTimeoutSeconds', when given, is passed through to each group's Run(). If a group's Run()
+    throws TExceptTestTimedOut, that group's (now-augmented, see TTestGroupBase::ReportTimedOutTest())
+    results are still merged in exactly like a normal completion, but no further groups are run, and
+    the returned TTestResults has TimedOut set.
 */
 TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription, bool shuffle,
-    std::optional<unsigned int> shuffleSeed)
+    std::optional<unsigned int> shuffleSeed, std::optional<unsigned int> testTimeoutSeconds)
 {
     TTestResults testResults;
     std::vector<ITestGroup*> groupsToRun;
@@ -413,7 +418,16 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         if (resolvedSeed.has_value())
             groupSeed = *resolvedSeed + static_cast<unsigned int>(std::hash<std::string>{}(name));
 
-        testGroup.Run(filter, groupSeed);
+        bool groupTimedOut = false;
+        try
+        {
+            testGroup.Run(filter, groupSeed, testTimeoutSeconds);
+        }
+        catch (TExceptTestTimedOut const&)
+        {
+            groupTimedOut = true;
+        }
+
         TTestResults const& testGroupResults = testGroup.Results();
         Log("Done. " +
             TConsole::Colorize("Succeeded: " + std::to_string(testGroupResults.SuccessCount), TLogKind::Pass) +
@@ -430,6 +444,12 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         // tear down
         Log("[" + GetUTCTimeISO8601() + "] Tearing down group: \"" + name + "\"");
         testGroup.TearDown_Group();
+
+        if (groupTimedOut)
+        {
+            testResults.TimedOut = true;
+            break;
+        }
     }
 
     std::chrono::high_resolution_clock::time_point const end = std::chrono::high_resolution_clock::now();

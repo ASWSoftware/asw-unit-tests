@@ -18,6 +18,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   third-party dependency
 - `--partition-index`/`--partition-count` - splits the suite across separate process invocations (e.g. a CI job
   matrix) for parallel execution, with no in-process threading and no merge step
+- `--test-timeout-seconds` - aborts the run if a single test hangs (e.g. an infinite loop) past a given number of
+  seconds, instead of blocking forever
 
 See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
 See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
@@ -86,6 +88,11 @@ ASWUnitTests [options]
                        job), each with its own --partition-index, to run the suite in
                        parallel with no coordination between processes. Requires
                        --partition-index.
+  --test-timeout-seconds <N>
+                       Abort the run if any single test does not finish within <N> seconds. The
+                       offending test is recorded as failed (with a message explaining why) and no
+                       further tests or groups run afterward. There is no default; a hung test runs
+                       indefinitely unless this is given.
   --color <mode>       One of "auto" (default; color only on an interactive terminal that
                        supports it, and only if the NO_COLOR environment variable isn't set),
                        "always", or "never".
@@ -138,6 +145,19 @@ DevOps, CircleCI) already merge multiple JUnit XML files from parallel jobs nati
 Combine `--partition-index`/`--partition-count` with `--list` to preview which tests land in a given partition, the
 same way `--list` can preview `--filter`.
 
+`--test-timeout-seconds` guards against a single test hanging (e.g. an infinite loop) forever. There is no
+default; without it, a hung test blocks the run indefinitely. When given, each test runs on its own worker thread
+while the main thread waits with that timeout; a test that finishes normally (whether it passes, fails, or throws)
+is completely unaffected. A test that doesn't finish in time is recorded as failed, with a message naming it and
+the timeout that was exceeded, and the run stops there: no further tests or groups run, and the process exits with
+a dedicated exit code (`5`) distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the
+report still gets written, covering every test that completed before the timeout, plus the timed-out test's own
+synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped, since there is no
+safe, portable way to interrupt a thread that may be stuck in an infinite loop; if a test finishes only moments
+after being abandoned rather than truly hanging forever, its outcome may be recorded inconsistently, since nothing
+synchronizes it with the timeout-handling thread at that point. In practice this only matters for a "barely"
+timed-out test, not a genuinely hung one, and the process exits immediately afterward regardless.
+
 Pass/fail/skip status text is colorized when writing to an interactive terminal that supports ANSI escape codes.
 Output redirected to a file or pipe, or a non-interactive CI log, automatically gets plain text with no escape
 codes, unless `--color=always` forces it (e.g. for a CI system that supports ANSI in its own log viewer).
@@ -153,7 +173,8 @@ sets both the console's `Initializing...` line and the report's `<testsuites nam
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
 tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,
-`4` invalid command line arguments. Skipped tests never affect the exit code.
+`4` invalid command line arguments, `5` a test exceeded `--test-timeout-seconds` and the run was aborted. Skipped
+tests never affect the exit code.
 
 ## Registering Tests
 
@@ -360,6 +381,15 @@ target_include_directories(MyTests PRIVATE
     ${ASWUNITTESTS_SOURCE_DIR}
     tests
 )
+```
+
+`--test-timeout-seconds` uses `std::thread`/`std::future`, which needs an explicit link against a threading
+library on Linux and some MinGW-w64 distributions (a no-op on MSVC and toolchains that need no extra linker
+flag). Add it the same way this repository's own `cmake\CMakeLists.txt` does:
+
+```cmake
+find_package(Threads REQUIRED)
+target_link_libraries(MyTests PRIVATE Threads::Threads)
 ```
 
 ### RAD Studio / Visual Studio / other IDE projects

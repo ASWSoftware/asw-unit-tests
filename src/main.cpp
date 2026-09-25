@@ -83,8 +83,10 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
         return ExitCode_Success;
     }
 
-    TTestResults const testResults = tester.Run(filter, filterDescription, options.Shuffle, options.ShuffleSeed);
-    int const returnCode = (testResults.FailedCount > 0) ? ExitCode_TestsFailed : ExitCode_Success;
+    TTestResults const testResults = tester.Run(filter, filterDescription, options.Shuffle, options.ShuffleSeed,
+        options.TestTimeoutSeconds);
+    int const returnCode = testResults.TimedOut ? ExitCode_TestTimedOut :
+            (testResults.FailedCount > 0) ? ExitCode_TestsFailed : ExitCode_Success;
 
     if (!options.JunitReportPath.empty())
     {
@@ -160,6 +162,14 @@ int main(int argc, char* argv[])
     }
 
     PauseIfRequested(options.PauseOnExit);
+
+    if (returnCode == ExitCode_TestTimedOut)
+    {
+        // A test's worker thread may still be stuck (see TTestGroupBase::RunWithTimeout()) and was
+        // deliberately abandoned rather than joined. Skip static destructors/atexit handlers, which
+        // could otherwise race with whatever that thread eventually does, and exit immediately.
+        std::_Exit(returnCode);
+    }
 
     return returnCode;
 }

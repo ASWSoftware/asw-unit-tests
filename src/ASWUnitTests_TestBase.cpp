@@ -27,10 +27,13 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <future>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <sstream>
+#include <thread>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
@@ -600,6 +603,35 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
     RegisterTest(testCase);
 }
 //---------------------------------------------------------------------------
+/*
+    TTestGroupBase::ReportTimedOutTest
+
+    Called by RunWithTimeout() when a test's worker thread does not finish within its allotted
+    timeout. The synthetic failure record is added directly (not via Test()'s own finish() lambda,
+    which only that thread should touch) so this group's Results() ends up exactly like any other
+    completed run: safe for TTestHandler::Run() to merge and for --report-junit to write out.
+*/
+void TTestGroupBase::ReportTimedOutTest(ITestCase& testCase, unsigned int testTimeoutSeconds)
+{
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const detail = "Test exceeded its " + std::to_string(testTimeoutSeconds) +
+        " second timeout and was abandoned.";
+    std::string const tag = "***Test failed";
+    std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
+
+    m_Results.FailedCount++;
+    m_Results.Messages.push_back(plainMsg);
+    m_Results.CaseRecords.push_back(TTestCaseRecord{
+            m_Name, testCase.GetName(), static_cast<double>(testTimeoutSeconds), TTestOutcome::Fail, detail });
+
+    Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+    Log("!!TIMEOUT!!: \"" + testFullName + "\" exceeded " + std::to_string(testTimeoutSeconds) +
+        " second(s); abandoning the remaining run.");
+
+    throw TExceptTestTimedOut("Test \"" + testFullName + "\" timed out after " +
+        std::to_string(testTimeoutSeconds) + " second(s).");
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::ResetTestFailedOneOrMoreChecks()
 {
     m_TestFailedCheck = false;
@@ -615,8 +647,13 @@ TTestResults const& TTestGroupBase::Results() const
 
     'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
     TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
+
+    'testTimeoutSeconds', when set, aborts the run (see RunWithTimeout()/ReportTimedOutTest()) if any
+    single test does not finish within that many seconds. TExceptTestTimedOut propagates out of this
+    method in that case, skipping any tests after the one that timed out.
 */
-void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed)
+void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+    std::optional<unsigned int> testTimeoutSeconds)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
 
@@ -637,8 +674,57 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
         if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
             continue;
 
-        Test(testCase);
+        RunWithTimeout(testCase, testTimeoutSeconds);
     }
+}
+//---------------------------------------------------------------------------
+/*
+    TTestGroupBase::RunWithTimeout
+
+    With no 'testTimeoutSeconds', calls Test(testCase) directly: no thread, no overhead.
+
+    Otherwise, runs Test(testCase) on a worker thread and waits on it with a timeout. The worker
+    thread is the only one that ever touches 'testCase' or this group's members while it's running,
+    so there's no data race with the waiting thread here. If it finishes in time, whatever it threw
+    (if anything) is rethrown by future.get(), preserving Test()'s normal exception propagation
+    exactly as if it had run directly. If it times out, the worker thread is detached (never joined:
+    it may be stuck forever, and there is no safe, portable way to force a thread to unwind) and
+    ReportTimedOutTest() records the failure and throws to abort the rest of the run.
+*/
+void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds)
+{
+    if (!testTimeoutSeconds.has_value())
+    {
+        Test(testCase);
+        return;
+    }
+
+    // Held by shared_ptr, not a plain local, because a detached thread (below) may still be running well after this
+    // function has returned or thrown, and would otherwise write to a promise whose stack storage no longer exists.
+    std::shared_ptr<std::promise<void> > done = std::make_shared<std::promise<void> >();
+    std::future<void> future = done->get_future();
+
+    std::thread worker([this, &testCase, done]()
+            {
+        try
+        {
+            Test(testCase);
+            done->set_value();
+        }
+        catch (...)
+        {
+            done->set_exception(std::current_exception());
+        }
+            });
+
+    if (future.wait_for(std::chrono::seconds(*testTimeoutSeconds)) == std::future_status::timeout)
+    {
+        worker.detach();
+        ReportTimedOutTest(testCase, *testTimeoutSeconds);
+    }
+
+    worker.join();
+    future.get();
 }
 //---------------------------------------------------------------------------
 /*
@@ -916,7 +1002,8 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 TTestResults::TTestResults()
     : FailedCount(0),
       SkippedCount(0),
-      SuccessCount(0)
+      SuccessCount(0),
+      TimedOut(false)
 {
 }
 //---------------------------------------------------------------------------

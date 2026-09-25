@@ -29,6 +29,12 @@ target_include_directories(ASWUnitTests PRIVATE
     ../toTest
 )
 
+# --test-timeout-seconds (ASWUnitTests_TestBase.cpp) uses std::thread/std::future, which needs an
+# explicit link against a threading library on Linux and some MinGW-w64 distributions; a no-op on
+# MSVC and toolchains where threading support needs no extra linker flag.
+find_package(Threads REQUIRED)
+target_link_libraries(ASWUnitTests PRIVATE Threads::Threads)
+
 if(MSVC)
     target_compile_options(ASWUnitTests PRIVATE /W4 /Zc:__cplusplus)
 else()
