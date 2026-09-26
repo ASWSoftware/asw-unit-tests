@@ -48,6 +48,16 @@ if(WIN32)
     target_link_libraries(ASWUnitTests PRIVATE rpcrt4)
 endif()
 
+if(MINGW)
+    # Statically link the MinGW runtime (libgcc/libstdc++/libwinpthread) so the executable doesn't
+    # depend on those DLLs being on PATH at runtime. Without this, running the built exe on a
+    # machine (or CI runner) where MinGW's bin directory isn't on PATH fails to even launch: Windows'
+    # loader can't resolve the missing DLL, and tools built on POSIX conventions - Git Bash included
+    # - report that as a bare "command not found" (exit code 127) rather than anything mentioning a
+    # missing DLL, which is exactly what GitHub Actions' Windows (MinGW) CI job hit.
+    target_link_options(ASWUnitTests PRIVATE -static-libgcc -static-libstdc++ -static)
+endif()
+
 set_target_properties(ASWUnitTests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )

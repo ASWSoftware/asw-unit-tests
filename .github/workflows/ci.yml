@@ -78,7 +78,22 @@ jobs:
 
       - name: Build
         shell: bash
-        run: cmake --build build ${{ matrix.build_args }}
+        run: |
+          cmake --build build ${{ matrix.build_args }}
+          if [ $? -ne 0 ]; then
+            echo "Build failed!"
+            exit 1
+          fi
+
+      - name: Verify executable exists
+        shell: bash
+        run: |
+          if [ ! -f "${{ matrix.exe_path }}" ]; then
+            echo "ERROR: Executable not found at ${{ matrix.exe_path }}"
+            echo "Contents of build directory:"
+            find build -type f -name "*.exe" 2>/dev/null || echo "No .exe files found"
+            exit 1
+          fi
 
       - name: Run self-tests
         shell: bash
