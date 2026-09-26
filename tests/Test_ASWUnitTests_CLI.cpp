@@ -42,6 +42,7 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
 {
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter, "BuildTestFilter_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition, "BuildTestFilter_Partition");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes, "ParseArguments_CatchCrashes");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Color, "ParseArguments_Color");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Filter, "ParseArguments_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_HelpVersionList, "ParseArguments_HelpVersionList");
@@ -50,6 +51,7 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Pause, "ParseArguments_Pause");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_ReportAndProjectName, "ParseArguments_ReportAndProjectName");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle, "ParseArguments_Shuffle");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout, "ParseArguments_TestTimeout");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseColorMode, "ParseColorMode");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Invalid, "ParseUnsignedInt_Invalid");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Valid, "ParseUnsignedInt_Valid");
@@ -168,6 +170,21 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
     CheckEquals(allNames.size(), matchedByEither, __func__, __LINE__, "the two partitions cover every test exactly once");
     CheckTrue(description1.find("partition 1 of 2") != std::string::npos, __func__, __LINE__, "partition 1 description");
     CheckTrue(description2.find("partition 2 of 2") != std::string::npos, __func__, __LINE__, "partition 2 description");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes()
+{
+    // Arrange
+    TCLIOptions optionsDefault;
+    TCLIOptions optionsCatchCrashes;
+
+    // Act
+    ParseArgs({ "ASWUnitTests" }, optionsDefault);
+    ParseArgs({ "ASWUnitTests", "--catch-crashes" }, optionsCatchCrashes);
+
+    // Assert
+    CheckFalse(optionsDefault.CatchCrashes, __func__, __LINE__, "CatchCrashes defaults to false");
+    CheckTrue(optionsCatchCrashes.CatchCrashes, __func__, __LINE__, "--catch-crashes sets CatchCrashes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseArguments_Color()
@@ -333,6 +350,33 @@ void TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle()
 
     CheckTrue(resultBadSeed.has_value() && *resultBadSeed == ExitCode_InvalidArguments,
         __func__, __LINE__, "--shuffle-seed with a non-numeric argument is rejected");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout()
+{
+    // Arrange
+    TCLIOptions optionsSpace;
+    TCLIOptions optionsEquals;
+    TCLIOptions optionsBare;
+    TCLIOptions optionsZero;
+    TCLIOptions optionsNonNumeric;
+
+    // Act
+    ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "5" }, optionsSpace);
+    ParseArgs({ "ASWUnitTests", "--test-timeout-seconds=5" }, optionsEquals);
+    std::optional<int> const resultZero = ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "0" }, optionsZero);
+    std::optional<int> const resultNonNumeric =
+        ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "abc" }, optionsNonNumeric);
+
+    // Assert
+    CheckFalse(optionsBare.TestTimeoutSeconds.has_value(), __func__, __LINE__, "no default when the flag is absent");
+    CheckTrue(optionsSpace.TestTimeoutSeconds == 5u, __func__, __LINE__, "--test-timeout-seconds <N> value");
+    CheckTrue(optionsEquals.TestTimeoutSeconds == 5u, __func__, __LINE__, "--test-timeout-seconds=<N> value");
+
+    CheckTrue(resultZero.has_value() && *resultZero == ExitCode_InvalidArguments,
+        __func__, __LINE__, "--test-timeout-seconds 0 is rejected, since it can't ever let a test finish");
+    CheckTrue(resultNonNumeric.has_value() && *resultNonNumeric == ExitCode_InvalidArguments,
+        __func__, __LINE__, "--test-timeout-seconds with a non-numeric argument is rejected");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseColorMode()

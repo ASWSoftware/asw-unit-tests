@@ -81,9 +81,11 @@ public:
     typedef std::vector<std::string> MsgList;
 
 public:
+    bool Crashed; // Set when a test crashed severely enough (see TCrashGuard::Run()) to abort the run.
     unsigned int FailedCount;
     unsigned int SkippedCount;
     unsigned int SuccessCount;
+    bool TimedOut;
     MsgList Messages;
     std::vector<TTestCaseRecord> CaseRecords;
 
@@ -172,7 +174,12 @@ public:
     virtual TestCallbackList& GetTestCallbackList() = 0;
     virtual std::string const& GetTestGroupName() const = 0;
     virtual TTestResults const& Results() const = 0;
-    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) = 0;
+    // Throws a TExceptAbortRun (TExceptTestTimedOut or TExceptTestCrashed) if a test doesn't finish
+    // within 'testTimeoutSeconds' (when given) or crashes severely enough for 'catchCrashes' to
+    // decide the run shouldn't continue, after recording a synthetic failure for the offending test
+    // in this group's own Results() either way.
+    virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+        std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) = 0;
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -244,7 +251,28 @@ protected:
         }
     }
 
+    // Called when TCrashGuard::Run() (see ASWUnitTests_CrashGuard.h) catches a native crash while
+    // running 'testCase' for --catch-crashes. Records a synthetic failed outcome for the crashed
+    // test, naming 'description', exactly like any other failure. Throws TExceptTestCrashed only
+    // when 'abortRun' is set (see TCrashGuard::Run() for when that is); otherwise returns normally,
+    // so the run continues with the next test.
+    virtual void ReportCrashedTest(ITestCase& testCase, std::string const& description, bool abortRun);
+    // Called when a test's worker thread does not finish within 'testTimeoutSeconds'. Records a
+    // synthetic failed outcome for the abandoned test (so it flows into the normal results/JUnit
+    // report exactly like any other failure) and throws TExceptTestTimedOut. The worker thread
+    // itself is never joined; there is no safe way to stop a thread that may be stuck in an
+    // infinite loop, so it is abandoned.
+    virtual void ReportTimedOutTest(ITestCase& testCase, unsigned int testTimeoutSeconds);
     virtual void ResetTestFailedOneOrMoreChecks();
+    // Runs 'testCase' directly when 'catchCrashes' is false (no overhead/behavior change from before
+    // this feature existed). Otherwise runs it through TCrashGuard::Run(); see ReportCrashedTest()
+    // for what happens if that catches something.
+    virtual void RunCatchingCrashes(ITestCase& testCase, bool catchCrashes);
+    // Runs 'testCase' (via RunCatchingCrashes(), so 'catchCrashes' still applies either way) directly
+    // when 'testTimeoutSeconds' is unset (no overhead/behavior change from before that feature
+    // existed). Otherwise runs it on a worker thread and waits with a timeout; see
+    // ReportTimedOutTest() for what happens if it doesn't finish in time.
+    virtual void RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes);
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
     // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
@@ -398,7 +426,8 @@ public:
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
-    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed) override;
+    void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+        std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) override;
     virtual void SetLogSuppressed(bool suppressed);
 };
 

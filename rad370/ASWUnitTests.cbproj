@@ -160,6 +160,10 @@
             <DependentOn>..\src\ASWUnitTests_Console.h</DependentOn>
             <BuildOrder>5</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_CrashGuard.cpp">
+            <DependentOn>..\src\ASWUnitTests_CrashGuard.h</DependentOn>
+            <BuildOrder>21</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Exception.cpp">
             <DependentOn>..\src\ASWUnitTests_Exception.h</DependentOn>
             <BuildOrder>6</BuildOrder>
@@ -206,6 +210,10 @@
         <CppCompile Include="..\tests\Test_ASWUnitTests_Console.cpp">
             <DependentOn>..\tests\Test_ASWUnitTests_Console.h</DependentOn>
             <BuildOrder>15</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_CrashGuard.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_CrashGuard.h</DependentOn>
+            <BuildOrder>22</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\tests\Test_ASWUnitTests_Handler.cpp">
             <DependentOn>..\tests\Test_ASWUnitTests_Handler.h</DependentOn>

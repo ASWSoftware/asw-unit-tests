@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_CLI.h
+Test_ASWUnitTests_CrashGuard.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 Anthony S. West
@@ -19,14 +19,9 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_CLIH
-#define Test_ASWUnitTests_CLIH
+#ifndef Test_ASWUnitTests_CrashGuardH
+#define Test_ASWUnitTests_CrashGuardH
 //---------------------------------------------------------------------------
-#include <optional>
-#include <string>
-#include <vector>
-//---------------------------------------------------------------------------
-#include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 
@@ -34,38 +29,37 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_CLI
+// TTest_ASWUnitTests_CrashGuard
+//
+// Exercises TCrashGuard::Run() directly: a deliberate access violation (both
+// shallow and 20 stack frames deep - see
+// Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort()'s comment for why both
+// matter), an integer divide by zero, and a genuine stack overflow (via a
+// recursive function shaped so the compiler can't turn it into a loop under
+// optimization - see Test_Run_StackOverflow_CaughtAndAbortsRun()'s comment,
+// and the commit that added it for the -O2/-O3 verification across all four
+// Windows compilers this project targets before this was trusted enough to
+// commit). If TCrashGuard::Run() ever regresses into not catching one of
+// these, the corresponding test hangs rather than failing normally; this is
+// exactly the scenario --test-timeout-seconds (see the CI workflow) exists
+// to contain.
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_CLI : public TTestGroupBase
+class TTest_ASWUnitTests_CrashGuard : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
-private:
-    // Builds a real argv-shaped array from 'args' (owned locally, so ParseArguments's
-    // char* argv[] never points at temporary or literal storage) and parses it.
-    std::optional<int> ParseArgs(std::vector<std::string> args, TCLIOptions& options);
-
 private: // Test methods
-    void Test_BuildTestFilter_Filter();
-    void Test_BuildTestFilter_Partition();
-    void Test_ParseArguments_CatchCrashes();
-    void Test_ParseArguments_Color();
-    void Test_ParseArguments_Filter();
-    void Test_ParseArguments_HelpVersionList();
-    void Test_ParseArguments_InvalidOption();
-    void Test_ParseArguments_PartitionValidation();
-    void Test_ParseArguments_Pause();
-    void Test_ParseArguments_ReportAndProjectName();
-    void Test_ParseArguments_Shuffle();
-    void Test_ParseArguments_TestTimeout();
-    void Test_ParseColorMode();
-    void Test_ParseUnsignedInt_Invalid();
-    void Test_ParseUnsignedInt_Valid();
+    void Test_Run_AccessViolation_CaughtAndDoesNotAbort();
+    void Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort();
+    void Test_Run_DivideByZero_Caught();
+    void Test_Run_NormalCompletion_ReturnsNotCrashed();
+    void Test_Run_NormalException_PropagatesUnaffected();
+    void Test_Run_StackOverflow_CaughtAndAbortsRun();
 
 public:
-    TTest_ASWUnitTests_CLI();
-    ~TTest_ASWUnitTests_CLI() override;
+    TTest_ASWUnitTests_CrashGuard();
+    ~TTest_ASWUnitTests_CrashGuard() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -76,4 +70,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_CLIH
+#endif // #ifndef Test_ASWUnitTests_CrashGuardH

@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel a superseded run on the same branch/PR instead of letting it finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    # Safety net: a hung/looping test should fail the job quickly instead of
+    # burning the runner's full time allotment. The framework has no
+    # in-process per-test timeout of its own yet; this is a coarse stand-in
+    # for CI specifically.
+    timeout-minutes: 3
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows (MSVC)
+            os: windows-latest
+            generator: ""
+            build_args: "--config Release"
+            exe_path: build/bin/Release/ASWUnitTests.exe
+          - name: Windows (MinGW)
+            os: windows-latest
+            generator: "MinGW Makefiles"
+            build_args: ""
+            exe_path: build/bin/ASWUnitTests.exe
+          - name: Linux (GCC)
+            os: ubuntu-latest
+            generator: ""
+            build_args: ""
+            exe_path: build/bin/ASWUnitTests
+            cc: gcc
+            cxx: g++
+          - name: Linux (Clang)
+            os: ubuntu-latest
+            generator: ""
+            build_args: ""
+            exe_path: build/bin/ASWUnitTests
+            cc: clang
+            cxx: clang++
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MinGW
+        if: matrix.generator == 'MinGW Makefiles'
+        uses: egor-tensin/setup-mingw@v3
+        with:
+          platform: x64
+
+      - name: Configure
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.cc }}" ]; then
+            export CC="${{ matrix.cc }}"
+            export CXX="${{ matrix.cxx }}"
+          fi
+          if [ -n "${{ matrix.generator }}" ]; then
+            cmake -S cmake -B build -G "${{ matrix.generator }}" -DCMAKE_BUILD_TYPE=Release
+          else
+            cmake -S cmake -B build -DCMAKE_BUILD_TYPE=Release
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          cmake --build build ${{ matrix.build_args }}
+          if [ $? -ne 0 ]; then
+            echo "Build failed!"
+            exit 1
+          fi
+
+      - name: Verify executable exists
+        shell: bash
+        run: |
+          if [ ! -f "${{ matrix.exe_path }}" ]; then
+            echo "ERROR: Executable not found at ${{ matrix.exe_path }}"
+            echo "Contents of build directory:"
+            find build -type f -name "*.exe" 2>/dev/null || echo "No .exe files found"
+            exit 1
+          fi
+
+      - name: Run self-tests
+        shell: bash
+        # --test-timeout-seconds and --catch-crashes are both defense-in-depth safety nets here: if
+        # a test ever regresses into a genuine hang or a native crash (rather than failing
+        # normally), this turns that into a clean, reported failure instead of relying solely on
+        # the job's own timeout-minutes, or an opaque crashed job, to eventually notice.
+        run: >-
+          ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI" --report-junit junit-results.xml
+          --test-timeout-seconds 60 --catch-crashes
+
+      - name: Report test results
+        # Runs even if the tests above failed, so a failure still shows up as
+        # annotations instead of only as a red step in the raw log. Also a
+        # wiring smoke test for --report-junit itself: unit tests already
+        # cover TJUnitReportWriter directly, but not that main.cpp actually
+        # calls it when the flag is passed.
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: "Test Results - ${{ matrix.name }}"
+          path: junit-results.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Run self-tests (partitioned)
+        # Wiring smoke test for --partition-index/--partition-count: the
+        # partition math itself is already unit-tested directly, but this
+        # confirms main.cpp actually wires the flags through and that running
+        # every partition still adds up to a full, passing suite.
+        shell: bash
+        run: |
+          ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI-Partition1" --partition-index 1 --partition-count 2
+          ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI-Partition2" --partition-index 2 --partition-count 2

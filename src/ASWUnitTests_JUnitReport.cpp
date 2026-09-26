@@ -52,7 +52,17 @@ std::string FormatUtcTimestamp()
 {
     std::chrono::system_clock::time_point const now = std::chrono::system_clock::now();
     std::time_t const nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+    // std::gmtime() is flagged by MSVC in favor of gmtime_s(), which is Windows-only and has a
+    // different signature than POSIX's gmtime_r(), so there's no single portable replacement.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     std::tm const utcTm = *std::gmtime(&nowTimeT);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     std::ostringstream oss;
     oss << std::put_time(&utcTm, "%Y-%m-%dT%H:%M:%SZ");
