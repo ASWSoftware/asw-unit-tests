@@ -41,6 +41,22 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   (`sigaltstack()`/`SA_ONSTACK`), since the default handler would otherwise
   run on the same, already-exhausted stack that just overflowed and have
   nowhere to run; verified on Linux via CLion/SSH.
+- Opt-in support for RAD Studio RTL exceptions (`System::Sysutils::Exception`
+  and its subclasses, shared by VCL and FMX), enabled by defining
+  `ASWUNITTESTS_RTL_EXCEPTIONS` in a C++Builder project built with `bcc32c` or
+  `bcc64x` (any other compiler is a compile error). `SetExceptionExpected<T>`
+  accepts RTL exception classes, matched polymorphically, with the optional
+  message substring checked against `Message`. Failure details and unhandled
+  RTL exceptions are reported as `ClassName: Message`, and an unhandled one
+  exits with code `2` instead of `3` ("Unknown"). Under
+  `--test-timeout-seconds`, an unexpected RTL exception crosses back from the
+  worker thread as a `TExceptRTLException` (a `std::runtime_error` that keeps
+  the original class in `RTLClass()`), since `std::exception_ptr` can't carry
+  an RTL exception past its handler; verified on `bcc64x`, where it
+  terminated the process.
+- `vcl/console/rad370/`, a VCL console RAD Studio project with its own build
+  scripts, defining `ASWUNITTESTS_RTL_EXCEPTIONS` and running the full
+  self-test suite plus the RTL-specific tests in `vcl/tests/`.
 
 ### Fixed
 

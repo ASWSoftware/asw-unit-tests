@@ -34,7 +34,10 @@ limitations under the License.
 #include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -206,9 +209,16 @@ protected:
     std::string m_ExceptionExpectedText;
     std::string m_ExpectedExceptionMessage;
     std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::function<bool (System::Sysutils::Exception&)> m_ExpectedRTLExceptionTypeChecker;
+#endif
     std::string m_Name;
     TTestResults m_Results;
     TestCallbackList m_TestCallbacks;
+
+    // True when the current test's exception expectation (see SetExceptionExpected<TException>()) also
+    // requires a specific exception type, rather than accepting any thrown exception.
+    virtual bool ExceptionTypeExpected() const;
 
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
@@ -276,16 +286,30 @@ protected:
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
     // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
+    // With ASWUNITTESTS_RTL_EXCEPTIONS enabled (see ASWUnitTests_Exception.h), 'TException' may also be an RTL
+    // exception class (System::Sysutils::Exception or a subclass), whose Message is checked instead of what().
     template <typename TException>
     void SetExceptionExpected(std::string const& method, int line, std::string const& msg,
         std::string const& expectedMessage = std::string())
     {
         SetExceptionExpected(true, method, line, msg);
         m_ExpectedExceptionMessage = expectedMessage;
-        m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
-            {
-                return dynamic_cast<TException const*>(&ex) != nullptr;
-            };
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        if constexpr (std::is_base_of_v<System::Sysutils::Exception, TException>)
+        {
+            m_ExpectedRTLExceptionTypeChecker = [](System::Sysutils::Exception& ex)
+                {
+                    return dynamic_cast<TException*>(&ex) != nullptr;
+                };
+        }
+        else
+#endif
+        {
+            m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
+                {
+                    return dynamic_cast<TException const*>(&ex) != nullptr;
+                };
+        }
     }
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& expected,

@@ -23,11 +23,35 @@ limitations under the License.
 #define ASWUnitTests_ExceptionH
 //---------------------------------------------------------------------------
 #include <exception>
+#include <stdexcept>
 #include <string>
+//---------------------------------------------------------------------------
+// Opt-in support for RAD Studio RTL exceptions (System::Sysutils::Exception and
+// its subclasses, shared by VCL and FMX), which don't derive from std::exception.
+// A C++Builder Clang project that links the RTL can opt-in by defining
+// ASWUNITTESTS_RTL_EXCEPTIONS; code elsewhere tests the derived
+// ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED instead, keeping the check in one place.
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS)
+#  if !(defined(__BORLANDC__) && defined(__clang__))
+#    error "ASWUNITTESTS_RTL_EXCEPTIONS requires RAD Studio's Clang-based compilers (bcc32c/bcc64x)"
+#  endif
+#  define ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED 1
+#  include <System.SysUtils.hpp>
+#endif
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+// Returns "ClassName: Message" for 'ex' (e.g. "EConvertError: 'abc' is not a
+// valid integer value"), converted to UTF-8 so non-ASCII text survives.
+std::string DescribeRTLException(System::Sysutils::Exception& ex);
+// Returns just 'ex.Message', converted to UTF-8.
+std::string RTLExceptionMessage(System::Sysutils::Exception& ex);
+#endif
+
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TTestException
@@ -167,6 +191,33 @@ class TExceptTestCrashed : public TExceptAbortRun
 public:
     TExceptTestCrashed(std::string const& msg);
 };
+
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TExceptRTLException
+//
+// Stands in for an RTL exception that must outlive its own catch handler,
+// which the RTL exception object itself can't do: std::exception_ptr can't
+// carry one past its handler (see TTestGroupBase::RunWithTimeout(), which
+// throws this in its place). what() is the DescribeRTLException() text, and
+// RTLClass() is the original exception's class, so a caller can still check
+// its type, e.g. RTLClass()->InheritsFrom(__classid(EConvertError)). A class
+// reference is static metadata, so it stays valid after the original
+// exception object is freed.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptRTLException : public std::runtime_error
+{
+private:
+    System::TClass m_RTLClass;
+
+public:
+    explicit TExceptRTLException(System::Sysutils::Exception& ex);
+
+    System::TClass RTLClass() const noexcept;
+};
+
+#endif
 
 } // namespace ASWUnitTests
 

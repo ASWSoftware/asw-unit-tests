@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Console.h"
+#include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
@@ -156,6 +157,13 @@ int main(int argc, char* argv[])
         std::cout << "\nTerminating app. Unhandled exception: " << ex.what() << std::endl;
         returnCode = ExitCode_UnhandledException;
     }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        std::cout << "\nTerminating app. Unhandled exception: " << DescribeRTLException(ex) << std::endl;
+        returnCode = ExitCode_UnhandledException;
+    }
+#endif
     catch (...)
     {
         std::cout << "\nTerminating app. Unhandled exception: Unknown" << std::endl;

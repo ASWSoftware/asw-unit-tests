@@ -562,6 +562,16 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
     }
 }
 //---------------------------------------------------------------------------
+bool TTestGroupBase::ExceptionTypeExpected() const
+{
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (m_ExpectedRTLExceptionTypeChecker != nullptr)
+        return true;
+#endif
+
+    return m_ExpectedExceptionTypeChecker != nullptr;
+}
+//---------------------------------------------------------------------------
 TTestGroupBase::TestCallbackList& TTestGroupBase::GetTestCallbackList()
 {
     return m_TestCallbacks;
@@ -754,9 +764,11 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
     only one that ever touches 'testCase' or this group's members while it's running, so there's no
     data race with the waiting thread here. If it finishes in time, whatever it threw (if anything)
     is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
-    directly. If it times out, the worker thread is detached (never joined: it may be stuck forever,
-    and there is no safe, portable way to force a thread to unwind) and ReportTimedOutTest() records
-    the failure and throws to abort the rest of the run.
+    directly. The one exception, with ASWUNITTESTS_RTL_EXCEPTIONS enabled: an RTL exception arrives
+    as a TExceptRTLException carrying its description and class (see the worker's catch). If it
+    times out, the worker thread is detached (never joined: it may be stuck forever, and there is no
+    safe, portable way to force a thread to unwind) and ReportTimedOutTest() records the failure and
+    throws to abort the rest of the run.
 */
 void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds,
     bool catchCrashes)
@@ -779,6 +791,15 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
             RunCatchingCrashes(testCase, catchCrashes);
             done->set_value();
         }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        catch (System::Sysutils::Exception& ex)
+        {
+            // An RTL exception can't be carried by std::exception_ptr past its own handler: rethrowing it
+            // later, even on the same thread, terminates the process (verified on bcc64x). Hand over a
+            // TExceptRTLException instead, which keeps its description and class.
+            done->set_exception(std::make_exception_ptr(TExceptRTLException(ex)));
+        }
+#endif
         catch (...)
         {
             done->set_exception(std::current_exception());
@@ -806,6 +827,9 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
     m_ExpectedExceptionMessage.clear();
     m_ExpectedExceptionTypeChecker = nullptr;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    m_ExpectedRTLExceptionTypeChecker = nullptr;
+#endif
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetLogSuppressed(bool suppressed)
@@ -913,6 +937,33 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 FormatDurationMs(testStart) + ")");
         };
 
+    // Scores an exception caught while one was expected. 'typeMatches' is whether it satisfies the requested
+    // type (true when no specific type was requested), 'message' is the text checked for the expected substring,
+    // and 'description' is how the exception is shown in a failure detail.
+    auto finishExpectedException = [&](bool typeMatches, std::string const& message, std::string const& description)
+        {
+            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
+                (message.find(m_ExpectedExceptionMessage) != std::string::npos);
+
+            if (typeMatches && messageMatches)
+            {
+                m_Results.SuccessCount++;
+                finish(TTestOutcome::Pass, "passed", std::string());
+                return;
+            }
+
+            m_Results.FailedCount++;
+
+            std::string detail;
+            if (!typeMatches)
+                detail = "expected exception type was not thrown (caught a different exception): " + description;
+            else
+                detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage + "\" but caught: " +
+                    description;
+
+            finish(TTestOutcome::Fail, "failed", detail);
+        };
+
     try
     {
         // Reset for test
@@ -999,29 +1050,10 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             // A type/message check is only requested via the templated SetExceptionExpected<TException>()
             // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
-            bool const typeMatches = (m_ExpectedExceptionTypeChecker == nullptr) || m_ExpectedExceptionTypeChecker(ex);
-            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
-                (std::string(ex.what()).find(m_ExpectedExceptionMessage) != std::string::npos);
-
-            if (typeMatches && messageMatches)
-            {
-                m_Results.SuccessCount++;
-                finish(TTestOutcome::Pass, "passed", std::string());
-            }
-            else
-            {
-                m_Results.FailedCount++;
-
-                std::string detail;
-                if (!typeMatches)
-                    detail = "expected exception type was not thrown (caught a different exception): " +
-                        std::string(ex.what());
-                else
-                    detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
-                        "\" but caught: " + std::string(ex.what());
-
-                finish(TTestOutcome::Fail, "failed", detail);
-            }
+            // A requested RTL exception type (see ExceptionTypeExpected()) never matches a std::exception.
+            bool const typeMatches = (m_ExpectedExceptionTypeChecker != nullptr) ?
+                    m_ExpectedExceptionTypeChecker(ex) : !ExceptionTypeExpected();
+            finishExpectedException(typeMatches, ex.what(), ex.what());
         }
         else
         {
@@ -1029,17 +1061,39 @@ void TTestGroupBase::Test(ITestCase& testCase)
             throw; // Unexpected failure
         }
     }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        if (m_ExceptionExpected)
+        {
+            // Mirrors the std::exception case above: a requested std::exception type never matches here.
+            bool const typeMatches = (m_ExpectedRTLExceptionTypeChecker != nullptr) ?
+                    m_ExpectedRTLExceptionTypeChecker(ex) : !ExceptionTypeExpected();
+            finishExpectedException(typeMatches, RTLExceptionMessage(ex), DescribeRTLException(ex));
+        }
+        else
+        {
+            m_Results.FailedCount++;
+            throw; // Unexpected failure
+        }
+    }
+#endif
     catch (...)
     {
         if (m_ExceptionExpected)
         {
-            if (m_ExpectedExceptionTypeChecker != nullptr)
+            if (ExceptionTypeExpected())
             {
-                // A specific type was requested, but what was thrown isn't a std::exception, so it can't be
-                // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
+                // A specific type was requested, but what was thrown isn't an exception class this framework
+                // can inspect to confirm the type (or message) matched. Treat that as a failure, not a pass.
                 m_Results.FailedCount++;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+                finish(TTestOutcome::Fail, "failed", "expected a specific exception type, but an object that is "
+                    "neither a std::exception nor an RTL Exception was thrown instead.");
+#else
                 finish(TTestOutcome::Fail, "failed",
                     "expected a specific exception type, but a non-std::exception object was thrown instead.");
+#endif
             }
             else
             {

@@ -24,9 +24,43 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
+#include <cstddef>
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+namespace
+{
+
+std::string ToUTF8(System::UnicodeString const& text);
+
+//---------------------------------------------------------------------------
+std::string ToUTF8(System::UnicodeString const& text)
+{
+    System::UTF8String const utf8(text);
+    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
+}
+//---------------------------------------------------------------------------
+
+} // namespace
+
+//---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+std::string DescribeRTLException(System::Sysutils::Exception& ex)
+{
+    return ToUTF8(ex.ClassName()) + ": " + RTLExceptionMessage(ex);
+}
+//---------------------------------------------------------------------------
+std::string RTLExceptionMessage(System::Sysutils::Exception& ex)
+{
+    return ToUTF8(ex.Message);
+}
+//---------------------------------------------------------------------------
+#endif
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TTestException
@@ -193,5 +227,25 @@ TExceptTestCrashed::TExceptTestCrashed(std::string const& msg)
 {
 }
 //---------------------------------------------------------------------------
+
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TExceptRTLException
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptRTLException::TExceptRTLException(System::Sysutils::Exception& ex)
+    : std::runtime_error(DescribeRTLException(ex)),
+      m_RTLClass(ex.ClassType())
+{
+}
+//---------------------------------------------------------------------------
+System::TClass TExceptRTLException::RTLClass() const noexcept
+{
+    return m_RTLClass;
+}
+//---------------------------------------------------------------------------
+#endif
 
 } // namespace ASWUnitTests
