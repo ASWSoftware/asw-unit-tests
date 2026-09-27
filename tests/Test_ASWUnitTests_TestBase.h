@@ -48,6 +48,8 @@ private: // Test methods
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
+    void Test_Run_LogsEachCheckFailureOnce();
+    void Test_Run_RecordsCheckFailuresInFailedTestDetail();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();

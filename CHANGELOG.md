@@ -64,6 +64,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   swapped (a failed `CheckTrue()` reported "Expected false but was true", and
   vice versa).
 
+- A test that failed only through `Check*` calls recorded an empty failure
+  detail, so its `--report-junit` entry was `<failure message="">` with no
+  explanation. Its record now carries each of its `Check*` failures (followed
+  by any `Assert*` failure after them). Console output is unchanged, since
+  those failures are still logged as they happen.
+
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the
   underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit

@@ -206,6 +206,9 @@ protected:
     bool m_ExceptionExpected;
     bool m_LogSuppressed;
     bool m_TestFailedCheck;
+    // The current test's Check* failures, without the log line's "  **" prefix; see Test() for how a failed
+    // test's record uses them.
+    std::vector<std::string> m_CheckFailureMessages;
     std::string m_ExceptionExpectedText;
     std::string m_ExpectedExceptionMessage;
     std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;

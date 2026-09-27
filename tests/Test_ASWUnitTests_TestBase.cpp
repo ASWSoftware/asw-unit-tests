@@ -40,10 +40,36 @@ namespace
 
 using namespace ASWUnitTests;
 
+size_t CountOccurrences(std::string const& text, std::string const& needle);
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
 bool NameEndsWith(std::string const& name, std::string const& suffix);
 
 //---------------------------------------------------------------------------
+// Number of non-overlapping occurrences of 'needle' in 'text'.
+size_t CountOccurrences(std::string const& text, std::string const& needle)
+{
+    size_t count = 0;
 
+    for (size_t pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos + needle.size()))
+        ++count;
+
+    return count;
+}
+
+//---------------------------------------------------------------------------
+// The record for 'testName' in 'results', or nullptr if there isn't one.
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
+{
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (record.TestName == testName)
+            return &record;
+    }
+
+    return nullptr;
+}
+
+//---------------------------------------------------------------------------
 // True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
 // "..._Fails") documents its expected outcome, and the outer verifying test can check every
 // registered test generically instead of hand-maintaining a separate expected-outcome table.
@@ -210,7 +236,8 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
 // TTestGroupBase can produce, plus one that fails twice in a row to prove a Check failure doesn't
-// abort the rest of the test the way an Assert failure does. Constructed and run directly by
+// abort the rest of the test the way an Assert failure does, and one whose Check failure is
+// followed by an Assert failure, so both end up in its record's detail. Constructed and run directly by
 // TTest_ASWUnitTests_TestBase's own test methods below, so its deliberate failures/skip only ever
 // affect this fixture's own Results() - never the real, self-registered suite running it.
 /////////////////////////////////////////////////////////////////////////////
@@ -223,6 +250,7 @@ private:
     void Test_ContinuesAfterCheckFailure();
     void Test_FailViaAssert();
     void Test_FailViaCheck();
+    void Test_FailViaCheckThenAssert();
     void Test_Pass();
     void Test_Skip();
 
@@ -245,6 +273,7 @@ TFixture_MixedOutcomes::TFixture_MixedOutcomes(bool suppressLog)
     RegisterTest(&TFixture_MixedOutcomes::Test_ContinuesAfterCheckFailure, "ContinuesAfterCheckFailure");
     RegisterTest(&TFixture_MixedOutcomes::Test_FailViaAssert, "FailViaAssert");
     RegisterTest(&TFixture_MixedOutcomes::Test_FailViaCheck, "FailViaCheck");
+    RegisterTest(&TFixture_MixedOutcomes::Test_FailViaCheckThenAssert, "FailViaCheckThenAssert");
     RegisterTest(&TFixture_MixedOutcomes::Test_Pass, "Pass");
     RegisterTest(&TFixture_MixedOutcomes::Test_Skip, "Skip");
 }
@@ -264,6 +293,12 @@ void TFixture_MixedOutcomes::Test_FailViaAssert()
 void TFixture_MixedOutcomes::Test_FailViaCheck()
 {
     CheckEquals(1, 2, __func__, __LINE__, "deliberate failure, fixture test");
+}
+//---------------------------------------------------------------------------
+void TFixture_MixedOutcomes::Test_FailViaCheckThenAssert()
+{
+    CheckEquals(1, 2, __func__, __LINE__, "deliberate Check failure before an Assert, fixture test");
+    AssertEquals(3, 4, __func__, __LINE__, "deliberate Assert failure after a Check, fixture test");
 }
 //---------------------------------------------------------------------------
 void TFixture_MixedOutcomes::Test_Pass()
@@ -590,6 +625,9 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
+        "Run_RecordsCheckFailuresInFailedTestDetail");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
@@ -769,6 +807,73 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
         "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, so the console output can be inspected.
+    std::string output;
+
+    // Act
+    {
+        TStdOutRedirect redirect;
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        output = redirect.Str();
+    }
+
+    // Assert
+    // A failed test's record carries its Check* failures, but each one was already logged as it happened, so
+    // the "***Test failed" line must not repeat them.
+    CheckEquals(static_cast<size_t>(1), CountOccurrences(output, "Check failed for: \"Test_FailViaCheck\""),
+        __func__, __LINE__, "FailViaCheck's Check failure is logged exactly once");
+    CheckEquals(static_cast<size_t>(1), CountOccurrences(output, "Check failed for: \"Test_FailViaCheckThenAssert\""),
+        __func__, __LINE__, "FailViaCheckThenAssert's Check failure is logged exactly once");
+    CheckEquals(static_cast<size_t>(2),
+        CountOccurrences(output, "Check failed for: \"Test_ContinuesAfterCheckFailure\""), __func__, __LINE__,
+        "each of ContinuesAfterCheckFailure's two Check failures is logged exactly once");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    TTestCaseRecord const* const failViaCheck = FindRecord(results, "FailViaCheck");
+    TTestCaseRecord const* const continuesAfterCheck = FindRecord(results, "ContinuesAfterCheckFailure");
+    TTestCaseRecord const* const checkThenAssert = FindRecord(results, "FailViaCheckThenAssert");
+    TTestCaseRecord const* const failViaAssert = FindRecord(results, "FailViaAssert");
+    TTestCaseRecord const* const pass = FindRecord(results, "Pass");
+
+    AssertTrue(failViaCheck != nullptr && continuesAfterCheck != nullptr && checkThenAssert != nullptr &&
+        failViaAssert != nullptr && pass != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckEquals(static_cast<size_t>(0), failViaCheck->Message.find("Check failed for: \"Test_FailViaCheck\""),
+        __func__, __LINE__, "a Check-only failure's detail is its Check failure, not empty");
+    CheckEquals(std::string::npos, failViaCheck->Message.find('\n'), __func__, __LINE__,
+        "one Check failure is one line, with no other test's Check failures carried over");
+
+    CheckEquals(static_cast<size_t>(2),
+        CountOccurrences(continuesAfterCheck->Message, "Check failed for: \"Test_ContinuesAfterCheckFailure\""),
+        __func__, __LINE__, "both Check failures are in the detail");
+    CheckTrue(continuesAfterCheck->Message.find('\n') != std::string::npos, __func__, __LINE__,
+        "multiple Check failures are separated by newlines");
+
+    size_t const checkPos = checkThenAssert->Message.find("deliberate Check failure before an Assert");
+    size_t const assertPos = checkThenAssert->Message.find("deliberate Assert failure after a Check");
+    CheckTrue(checkPos != std::string::npos && assertPos != std::string::npos, __func__, __LINE__,
+        "a Check failure followed by an Assert failure records both");
+    CheckTrue(checkPos < assertPos, __func__, __LINE__, "in the order they happened");
+
+    CheckFalse(failViaAssert->Message.empty(), __func__, __LINE__, "an Assert failure still records its message");
+    CheckEquals(std::string::npos, failViaAssert->Message.find("Check failed for"), __func__, __LINE__,
+        "a test with no Check failures gets none in its detail");
+    CheckTrue(pass->Message.empty(), __func__, __LINE__, "a passing test's detail stays empty");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
 {
     // Arrange
@@ -781,10 +886,10 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
     TTestResults const& results = fixture.Results();
 
     CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "only the trivially-passing test succeeded");
-    CheckEquals(3u, results.FailedCount, __func__, __LINE__,
-        "the Check-failing, Assert-failing, and continues-after-Check tests are all counted as failed");
+    CheckEquals(4u, results.FailedCount, __func__, __LINE__,
+        "the Check-failing, Assert-failing, Check-then-Assert, and continues-after-Check tests are all counted as failed");
     CheckEquals(1u, results.SkippedCount, __func__, __LINE__, "the skipped test is counted separately from failures");
-    CheckEquals(static_cast<size_t>(5), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

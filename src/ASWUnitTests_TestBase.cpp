@@ -682,6 +682,7 @@ void TTestGroupBase::ReportTimedOutTest(ITestCase& testCase, unsigned int testTi
 void TTestGroupBase::ResetTestFailedOneOrMoreChecks()
 {
     m_TestFailedCheck = false;
+    m_CheckFailureMessages.clear();
 }
 //---------------------------------------------------------------------------
 TTestResults const& TTestGroupBase::Results() const
@@ -841,7 +842,10 @@ void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std
 {
     m_TestFailedCheck = true;
 
-    std::string finalMsg = "  **Check failed for: \"" + method + "\" (" + std::to_string(line) + "): " + msg;
+    std::string const checkFailure = "Check failed for: \"" + method + "\" (" + std::to_string(line) + "): " + msg;
+    m_CheckFailureMessages.push_back(checkFailure);
+
+    std::string finalMsg = "  **" + checkFailure;
     m_Results.Messages.push_back(finalMsg);
     Log(finalMsg);
 }
@@ -912,9 +916,22 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
     // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
     // for the console, never in the stored message/record), and logs the "Finished test" timing line.
-    // 'detailMessage' is the failure/skip detail text, or empty for a pass.
+    // 'detailMessage' is the failure/skip detail text, or empty for a pass. A failed test's record also
+    // gets any Check* failures it collected, ahead of 'detailMessage', since those were only logged as
+    // they happened; the logged line omits them to avoid printing each one twice.
     auto finish = [&](TTestOutcome outcome, char const* status, std::string const& detailMessage)
         {
+            std::string recordDetail = detailMessage;
+
+            if (outcome == TTestOutcome::Fail && !m_CheckFailureMessages.empty())
+            {
+                std::string checkFailures;
+                for (std::string const& checkFailure : m_CheckFailureMessages)
+                    checkFailures += (checkFailures.empty() ? std::string() : std::string("\n")) + checkFailure;
+
+                recordDetail = detailMessage.empty() ? checkFailures : (checkFailures + "\n" + detailMessage);
+            }
+
             TLogKind const kind = (outcome == TTestOutcome::Fail) ? TLogKind::Fail :
                     (outcome == TTestOutcome::Skip) ? TLogKind::Skip : TLogKind::Pass;
 
@@ -931,7 +948,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             double const durationSeconds = std::chrono::duration<double>(
                 std::chrono::high_resolution_clock::now() - testStart).count();
             m_Results.CaseRecords.push_back(
-                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, detailMessage });
+                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, recordDetail });
 
             Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
                 FormatDurationMs(testStart) + ")");
