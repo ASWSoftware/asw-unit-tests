@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{35D3758D-9662-4988-A6BA-2BB91AA41124}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="ASWUnitTests_VCL_GUI.cbproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\..\console\rad370\ASWUnitTests_VCL_Console.cbproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="ASWUnitTests_VCL_GUI">
+        <MSBuild Projects="ASWUnitTests_VCL_GUI.cbproj"/>
+    </Target>
+    <Target Name="ASWUnitTests_VCL_GUI:Clean">
+        <MSBuild Projects="ASWUnitTests_VCL_GUI.cbproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ASWUnitTests_VCL_GUI:Make">
+        <MSBuild Projects="ASWUnitTests_VCL_GUI.cbproj" Targets="Make"/>
+    </Target>
+    <Target Name="ASWUnitTests_VCL_Console">
+        <MSBuild Projects="..\..\console\rad370\ASWUnitTests_VCL_Console.cbproj"/>
+    </Target>
+    <Target Name="ASWUnitTests_VCL_Console:Clean">
+        <MSBuild Projects="..\..\console\rad370\ASWUnitTests_VCL_Console.cbproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ASWUnitTests_VCL_Console:Make">
+        <MSBuild Projects="..\..\console\rad370\ASWUnitTests_VCL_Console.cbproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="ASWUnitTests_VCL_GUI;ASWUnitTests_VCL_Console"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="ASWUnitTests_VCL_GUI:Clean;ASWUnitTests_VCL_Console:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="ASWUnitTests_VCL_GUI:Make;ASWUnitTests_VCL_Console:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
