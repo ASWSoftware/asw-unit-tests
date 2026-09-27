@@ -74,6 +74,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   set up with `SetExceptionExpected()`, so the test was reported as passed.
   It now fails, with the `Check*` failure in its detail.
 
+- A failed `Assert*` counted as the expected exception while one was expected
+  with `SetExceptionExpected()`, so the test was reported as passed. With the
+  templated `SetExceptionExpected<T>()`, the requested type wasn't even
+  checked. A failed `Assert*` now always fails the test.
+
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the
   underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit

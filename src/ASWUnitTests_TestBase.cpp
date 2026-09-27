@@ -1062,15 +1062,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
     }
     catch (TTestException const& ex)
     {
-        if (m_ExceptionExpected)
-        {
-            finishPassUnlessChecksFailed();
-        }
-        else
-        {
-            m_Results.FailedCount++;
-            finish(TTestOutcome::Fail, "failed", ex.what());
-        }
+        // This framework's own failure signal (an Assert* failure, or TExceptExpected when an expected exception
+        // never came), never the exception a test is waiting for, so it fails the test even while an exception
+        // is expected, without checking the type or message the test asked for.
+        m_Results.FailedCount++;
+        finish(TTestOutcome::Fail, "failed", ex.what());
     }
     catch (std::exception const& ex)
     {
