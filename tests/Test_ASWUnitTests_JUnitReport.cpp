@@ -68,6 +68,7 @@ TTest_ASWUnitTests_JUnitReport::TTest_ASWUnitTests_JUnitReport()
       m_GroupBaseTempDir(std::filesystem::temp_directory_path() /
           ("ASWUnitTests_JUnitReport_Tests_" + std::to_string(GetCurrentProcessIdPortable())))
 {
+    RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_BuildXML_CountsAndEscapes, "BuildXML_CountsAndEscapes");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_PlainTextUnchanged, "EscapeXml_PlainTextUnchanged");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_SpecialCharacters, "EscapeXml_SpecialCharacters");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport, "Write_ProducesReadableReport");
@@ -105,6 +106,34 @@ void TTest_ASWUnitTests_JUnitReport::TearDown_Test(ITestCase& testCase)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_JUnitReport::Test_BuildXML_CountsAndEscapes()
+{
+    // Arrange
+    std::vector<TJUnitTestCase> const testCases =
+    {
+        { "GroupA", "TestPass", 0.25, TJUnitOutcome::Pass, "" },
+        { "GroupA", "TestFail", 0.5, TJUnitOutcome::Fail, "expected <1> & \"2\"" },
+        { "GroupB", "TestSkip", 0.0, TJUnitOutcome::Skip, "not implemented yet" },
+    };
+
+    // Act
+    std::string const xml = TJUnitReportWriter::BuildXML("My<Project>", testCases);
+
+    // Assert
+    CheckTrue(xml.rfind("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 0) == 0, __func__, __LINE__,
+        "starts with the XML declaration");
+    CheckTrue(xml.find("<testsuites name=\"My&lt;Project&gt;\" tests=\"3\" failures=\"1\" skipped=\"1\" "
+        "time=\"0.750000\">") != std::string::npos, __func__, __LINE__, "root element's name and totals");
+    CheckTrue(xml.find("<testsuite name=\"GroupA\" tests=\"2\" failures=\"1\" skipped=\"0\" time=\"0.750000\"") !=
+        std::string::npos, __func__, __LINE__, "GroupA's counts");
+    CheckTrue(xml.find("<testsuite name=\"GroupB\" tests=\"1\" failures=\"0\" skipped=\"1\" time=\"0.000000\"") !=
+        std::string::npos, __func__, __LINE__, "GroupB's counts");
+    CheckTrue(xml.find("<failure message=\"expected &lt;1&gt; &amp; &quot;2&quot;\">") != std::string::npos,
+        __func__, __LINE__, "failure message escaped");
+    CheckTrue(xml.size() >= 14 && xml.compare(xml.size() - 14, 14, "</testsuites>\n") == 0, __func__, __LINE__,
+        "ends with the closing root element");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_PlainTextUnchanged()
 {
