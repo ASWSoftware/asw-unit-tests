@@ -13,9 +13,9 @@ namespace ASWUnitTests
 {
 
 inline constexpr unsigned int VersionMajor = 0;
-inline constexpr unsigned int VersionMinor = 26;
-inline constexpr unsigned int VersionPatch = 6;
-inline constexpr char Version[] = "0.26.6";
+inline constexpr unsigned int VersionMinor = 42;
+inline constexpr unsigned int VersionPatch = 0;
+inline constexpr char Version[] = "0.42.0";
 
 } // namespace ASWUnitTests
 
