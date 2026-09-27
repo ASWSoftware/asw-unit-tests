@@ -70,13 +70,17 @@ struct TJUnitTestCase
 class TJUnitReportWriter
 {
 public:
+    // The report's XML, UTF-8 encoded, as Write() writes it. 'testCases' must already be grouped
+    // contiguously by GroupName (as a full test run naturally produces them); each contiguous run
+    // of matching GroupName becomes one <testsuite>, in the order first encountered. For a caller
+    // that writes the file itself, e.g. to a path std::ofstream can't open from a std::string.
+    static std::string BuildXML(std::string const& suitesName, std::vector<TJUnitTestCase> const& testCases);
+
     // Escapes '&', '<', '>', '"', and '\'' for safe inclusion in XML text or attribute values.
     static std::string EscapeXml(std::string const& text);
 
-    // Writes the report to 'filePath'. 'testCases' must already be grouped contiguously by
-    // GroupName (as a full test run naturally produces them); each contiguous run of matching
-    // GroupName becomes one <testsuite>, in the order first encountered. Returns false if
-    // 'filePath' could not be opened for writing.
+    // Writes the report BuildXML() builds to 'filePath'. Returns false if 'filePath' could not be
+    // opened for writing.
     static bool Write(std::string const& filePath, std::string const& suitesName,
         std::vector<TJUnitTestCase> const& testCases);
 };

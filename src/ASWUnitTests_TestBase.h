@@ -34,7 +34,10 @@ limitations under the License.
 #include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -84,6 +87,7 @@ public:
     bool Crashed; // Set when a test crashed severely enough (see TCrashGuard::Run()) to abort the run.
     unsigned int FailedCount;
     unsigned int SkippedCount;
+    bool Stopped; // Set when ITestRunObserver::StopRequested() ended the run early.
     unsigned int SuccessCount;
     bool TimedOut;
     MsgList Messages;
@@ -106,6 +110,37 @@ public:
 // pattern itself is matched.
 /////////////////////////////////////////////////////////////////////////////
 typedef std::function<bool (std::string const& fullTestName)> TestFilter;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// ITestRunObserver
+//
+// Optional hooks for following a test run as it happens, e.g. a GUI runner
+// updating its display after each test. Set with
+// TTestHandler::SetRunObserver(). With none set, nothing changes: output
+// goes to std::cout as usual.
+//
+// Threading: OnTestStarted(), OnTestFinished(), and StopRequested() are
+// always called on the thread that called TTestHandler::Run(). OnLog() is
+// too, except under --test-timeout-seconds, where a test runs on a worker
+// thread and its own log output arrives from there; an implementation that
+// isn't thread-safe must handle that (e.g. by buffering under a mutex).
+/////////////////////////////////////////////////////////////////////////////
+class ITestRunObserver
+{
+public:
+    virtual ~ITestRunObserver() = default;
+
+    // Receives the text that would otherwise be written to std::cout, including any line break.
+    virtual void OnLog(std::string const& text) = 0;
+    // Called once for every test that records an outcome, including the failure recorded for a test that
+    // timed out or crashed. Not called for a test whose unexpected exception escapes TTestHandler::Run().
+    virtual void OnTestFinished(TTestCaseRecord const& record) = 0;
+    virtual void OnTestStarted(std::string const& groupName, std::string const& testName) = 0;
+    // Checked before each test and each group. Returning true ends the run there, with the returned
+    // TTestResults::Stopped set; a test that's already running is never interrupted.
+    virtual bool StopRequested() = 0;
+};
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -180,6 +215,11 @@ public:
     // in this group's own Results() either way.
     virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
         std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) = 0;
+    // Called by TTestHandler::SetRunObserver() (nullptr to clear); see ITestRunObserver. The default ignores it,
+    // so an ITestGroup implementation that doesn't support an observer still works, just without its events.
+    virtual void SetRunObserver(ITestRunObserver* /*observer*/)
+    {
+    }
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -203,12 +243,23 @@ protected:
     bool m_ExceptionExpected;
     bool m_LogSuppressed;
     bool m_TestFailedCheck;
+    // The current test's Check* failures, without the log line's "  **" prefix; see Test() for how a failed
+    // test's record uses them.
+    std::vector<std::string> m_CheckFailureMessages;
     std::string m_ExceptionExpectedText;
     std::string m_ExpectedExceptionMessage;
     std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::function<bool (System::Sysutils::Exception&)> m_ExpectedRTLExceptionTypeChecker;
+#endif
     std::string m_Name;
     TTestResults m_Results;
+    ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
     TestCallbackList m_TestCallbacks;
+
+    // True when the current test's exception expectation (see SetExceptionExpected<TException>()) also
+    // requires a specific exception type, rather than accepting any thrown exception.
+    virtual bool ExceptionTypeExpected() const;
 
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
@@ -276,16 +327,30 @@ protected:
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
     // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
     // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
+    // With ASWUNITTESTS_RTL_EXCEPTIONS enabled (see ASWUnitTests_Exception.h), 'TException' may also be an RTL
+    // exception class (System::Sysutils::Exception or a subclass), whose Message is checked instead of what().
     template <typename TException>
     void SetExceptionExpected(std::string const& method, int line, std::string const& msg,
         std::string const& expectedMessage = std::string())
     {
         SetExceptionExpected(true, method, line, msg);
         m_ExpectedExceptionMessage = expectedMessage;
-        m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
-            {
-                return dynamic_cast<TException const*>(&ex) != nullptr;
-            };
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        if constexpr (std::is_base_of_v<System::Sysutils::Exception, TException>)
+        {
+            m_ExpectedRTLExceptionTypeChecker = [](System::Sysutils::Exception& ex)
+                {
+                    return dynamic_cast<TException*>(&ex) != nullptr;
+                };
+        }
+        else
+#endif
+        {
+            m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
+                {
+                    return dynamic_cast<TException const*>(&ex) != nullptr;
+                };
+        }
     }
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& expected,
@@ -429,6 +494,7 @@ public:
     void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
         std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) override;
     virtual void SetLogSuppressed(bool suppressed);
+    void SetRunObserver(ITestRunObserver* observer) override;
 };
 
 } // namespace ASWUnitTests

@@ -55,6 +55,20 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// TTestId
+//
+// Identifies one registered test by its group and test names, kept separate
+// rather than joined into a "GroupName.TestName" full name, since a group
+// name may itself contain '.'. Returned by TTestHandler::GetTests().
+/////////////////////////////////////////////////////////////////////////////
+struct TTestId
+{
+    std::string GroupName;
+    std::string TestName;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTestHandler
 //
 // Handles the registration running of tests
@@ -66,6 +80,7 @@ private:
 
 private:
     std::string m_ProjectName;
+    ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
     ITestGroups m_TestGroups;
 
 private:
@@ -83,6 +98,7 @@ public:
 
     std::vector<std::string> GetAllTestFullNames();
     std::string const& GetProjectName() const;
+    std::vector<TTestId> GetTests();
     void Initialize(std::string const& projectName = "ASWUnitTests");
     void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
@@ -90,6 +106,10 @@ public:
     TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string(),
         bool shuffle = false, std::optional<unsigned int> shuffleSeed = std::nullopt,
         std::optional<unsigned int> testTimeoutSeconds = std::nullopt, bool catchCrashes = false);
+    // Sets (or, with nullptr, clears) the observer that receives this handler's and every test group's log
+    // output and per-test events; see ITestRunObserver. Not owned: it must outlive its use here. Can be called
+    // before Initialize(), so Initialize()'s own output reaches the observer too.
+    void SetRunObserver(ITestRunObserver* observer);
 };
 
 } // namespace ASWUnitTests

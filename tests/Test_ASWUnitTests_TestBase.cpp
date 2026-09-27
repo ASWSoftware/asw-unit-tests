@@ -26,6 +26,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <chrono>
+#include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -40,10 +42,36 @@ namespace
 
 using namespace ASWUnitTests;
 
+size_t CountOccurrences(std::string const& text, std::string const& needle);
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
 bool NameEndsWith(std::string const& name, std::string const& suffix);
 
 //---------------------------------------------------------------------------
+// Number of non-overlapping occurrences of 'needle' in 'text'.
+size_t CountOccurrences(std::string const& text, std::string const& needle)
+{
+    size_t count = 0;
 
+    for (size_t pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos + needle.size()))
+        ++count;
+
+    return count;
+}
+
+//---------------------------------------------------------------------------
+// The record for 'testName' in 'results', or nullptr if there isn't one.
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
+{
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (record.TestName == testName)
+            return &record;
+    }
+
+    return nullptr;
+}
+
+//---------------------------------------------------------------------------
 // True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
 // "..._Fails") documents its expected outcome, and the outer verifying test can check every
 // registered test generically instead of hand-maintaining a separate expected-outcome table.
@@ -51,6 +79,71 @@ bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TRecordingObserver
+//
+// An ITestRunObserver that records everything it's told, for the Run_*RunObserver* tests below to
+// inspect. Events are recorded as "started:<test>" and "finished:<test>" strings, in order. Every
+// event except OnLog() must arrive on the thread that constructed this observer (the one calling
+// Run()), which EventsOnConstructingThread tracks; OnLog() may legitimately arrive from a test's
+// worker thread under a timeout, so it's recorded under a lock instead.
+/////////////////////////////////////////////////////////////////////////////
+class TRecordingObserver : public ITestRunObserver
+{
+private:
+    std::mutex m_LogMutex;
+    std::string m_LogText;
+    std::thread::id const m_ConstructingThread;
+
+public:
+    std::vector<std::string> Events;
+    bool EventsOnConstructingThread = true;
+    std::vector<TTestCaseRecord> FinishedRecords;
+    size_t StopAfterFinishedCount = std::numeric_limits<size_t>::max();
+    size_t StopRequestedCalls = 0;
+
+public:
+    TRecordingObserver()
+        : m_ConstructingThread(std::this_thread::get_id())
+    {
+    }
+
+    std::string LogText()
+    {
+        std::lock_guard<std::mutex> lock(m_LogMutex);
+        return m_LogText;
+    }
+
+    void OnLog(std::string const& text) override
+    {
+        std::lock_guard<std::mutex> lock(m_LogMutex);
+        m_LogText += text;
+    }
+
+    void OnTestFinished(TTestCaseRecord const& record) override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        Events.push_back("finished:" + record.TestName);
+        FinishedRecords.push_back(record);
+    }
+
+    void OnTestStarted(std::string const& /*groupName*/, std::string const& testName) override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        Events.push_back("started:" + testName);
+    }
+
+    bool StopRequested() override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        ++StopRequestedCalls;
+        return FinishedRecords.size() >= StopAfterFinishedCount;
+    }
+};
 
 //---------------------------------------------------------------------------
 
@@ -95,7 +188,9 @@ public:
 // SetExceptionExpected()/Test() branch: no throw, a generic expectation satisfied by either a
 // std::exception or a non-std::exception throw, and a specific-type expectation crossed with an
 // exact type match, a polymorphic base-type match, a wrong sibling type, a non-std::exception
-// throw, and a message substring that's present or absent. Every test name ends with "_Passes" or
+// throw, and a message substring that's present or absent; plus an Assert* failure while a generic
+// or specific exception is expected, and an earlier Check* failure followed by the expected
+// exception, on each path that would otherwise pass. Every test name ends with "_Passes" or
 // "_Fails", read generically by Test_SetExceptionExpected_MatchesTypeAndMessage below via
 // NameEndsWith() rather than a hand-maintained table.
 /////////////////////////////////////////////////////////////////////////////
@@ -105,9 +200,15 @@ private:
     typedef TTestGroupBase inherited;
 
 private:
+    void Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails();
+    void Test_CheckFailedThenGenericExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails();
     void Test_ExceptionExpectedButNoneThrown_Fails();
+    void Test_GenericExceptionExpected_AssertFails_Fails();
     void Test_GenericExceptionExpected_NonStdExceptionThrown_Passes();
     void Test_GenericExceptionExpected_StdExceptionThrown_Passes();
+    void Test_SpecificTypeExpected_AssertFails_Fails();
     void Test_SpecificTypeExpected_ExactTypeThrown_Passes();
     void Test_SpecificTypeExpected_MessageSubstringAbsent_Fails();
     void Test_SpecificTypeExpected_MessageSubstringPresent_Passes();
@@ -128,12 +229,24 @@ TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
 {
     SetLogSuppressed(true);
 
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails,
+        "CheckFailedThenAssertFailedWhileExceptionExpected_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenGenericExpectedExceptionThrown_Fails,
+        "CheckFailedThenGenericExpectedExceptionThrown_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails,
+        "CheckFailedThenNonStdExpectedExceptionThrown_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails,
+        "CheckFailedThenSpecificExpectedExceptionThrown_Fails");
     RegisterTest(&TFixture_ExceptionExpectations::Test_ExceptionExpectedButNoneThrown_Fails,
         "ExceptionExpectedButNoneThrown_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_GenericExceptionExpected_AssertFails_Fails,
+        "GenericExceptionExpected_AssertFails_Fails");
     RegisterTest(&TFixture_ExceptionExpectations::Test_GenericExceptionExpected_NonStdExceptionThrown_Passes,
         "GenericExceptionExpected_NonStdExceptionThrown_Passes");
     RegisterTest(&TFixture_ExceptionExpectations::Test_GenericExceptionExpected_StdExceptionThrown_Passes,
         "GenericExceptionExpected_StdExceptionThrown_Passes");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_SpecificTypeExpected_AssertFails_Fails,
+        "SpecificTypeExpected_AssertFails_Fails");
     RegisterTest(&TFixture_ExceptionExpectations::Test_SpecificTypeExpected_ExactTypeThrown_Passes,
         "SpecificTypeExpected_ExactTypeThrown_Passes");
     RegisterTest(&TFixture_ExceptionExpectations::Test_SpecificTypeExpected_MessageSubstringAbsent_Fails,
@@ -148,10 +261,49 @@ TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
         "SpecificTypeExpected_WrongSiblingTypeThrown_Fails");
 }
 //---------------------------------------------------------------------------
+// The next four each fail a Check* and then let an exception arrive while one is expected. A std::exception
+// matching a generic or a specific expectation, and a non-std::exception object, are each a way Test() can
+// otherwise reach a pass, and the earlier Check* failure must still fail the test on every one of them. An
+// Assert* failure never counts as the expected exception; that case checks both failures reach the record.
+void TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check and a failed Assert");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    AssertTrue(false, __func__, __LINE__, "deliberate Assert failure while an exception is expected");
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenGenericExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw std::runtime_error("the expected exception");
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw 42; // Not derived from std::exception at all.
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected<TFixtureSpecificError>(__func__, __LINE__, "specific expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw TFixtureSpecificError("the expected exception");
+}
+//---------------------------------------------------------------------------
 void TFixture_ExceptionExpectations::Test_ExceptionExpectedButNoneThrown_Fails()
 {
     SetExceptionExpected<TFixtureSpecificError>(__func__, __LINE__, "expected an exception that never comes");
     // No throw here: Test() should fail this once control returns without one.
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_GenericExceptionExpected_AssertFails_Fails()
+{
+    // An Assert* failure is a test failure, never the exception a test is waiting for.
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Assert");
+    AssertTrue(false, __func__, __LINE__, "deliberate Assert failure while an exception is expected");
 }
 //---------------------------------------------------------------------------
 void TFixture_ExceptionExpectations::Test_GenericExceptionExpected_NonStdExceptionThrown_Passes()
@@ -164,6 +316,13 @@ void TFixture_ExceptionExpectations::Test_GenericExceptionExpected_StdExceptionT
 {
     SetExceptionExpected(true, __func__, __LINE__, "generic expectation, any std::exception");
     throw std::runtime_error("whatever");
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_AssertFails_Fails()
+{
+    // Used to pass without the requested type ever being checked.
+    SetExceptionExpected<TFixtureSpecificError>(__func__, __LINE__, "specific expectation, then a failed Assert");
+    AssertEquals(1, 2, __func__, __LINE__, "deliberate Assert failure while an exception is expected");
 }
 //---------------------------------------------------------------------------
 void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_ExactTypeThrown_Passes()
@@ -210,7 +369,8 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
 // TTestGroupBase can produce, plus one that fails twice in a row to prove a Check failure doesn't
-// abort the rest of the test the way an Assert failure does. Constructed and run directly by
+// abort the rest of the test the way an Assert failure does, and one whose Check failure is
+// followed by an Assert failure, so both end up in its record's detail. Constructed and run directly by
 // TTest_ASWUnitTests_TestBase's own test methods below, so its deliberate failures/skip only ever
 // affect this fixture's own Results() - never the real, self-registered suite running it.
 /////////////////////////////////////////////////////////////////////////////
@@ -223,6 +383,7 @@ private:
     void Test_ContinuesAfterCheckFailure();
     void Test_FailViaAssert();
     void Test_FailViaCheck();
+    void Test_FailViaCheckThenAssert();
     void Test_Pass();
     void Test_Skip();
 
@@ -245,6 +406,7 @@ TFixture_MixedOutcomes::TFixture_MixedOutcomes(bool suppressLog)
     RegisterTest(&TFixture_MixedOutcomes::Test_ContinuesAfterCheckFailure, "ContinuesAfterCheckFailure");
     RegisterTest(&TFixture_MixedOutcomes::Test_FailViaAssert, "FailViaAssert");
     RegisterTest(&TFixture_MixedOutcomes::Test_FailViaCheck, "FailViaCheck");
+    RegisterTest(&TFixture_MixedOutcomes::Test_FailViaCheckThenAssert, "FailViaCheckThenAssert");
     RegisterTest(&TFixture_MixedOutcomes::Test_Pass, "Pass");
     RegisterTest(&TFixture_MixedOutcomes::Test_Skip, "Skip");
 }
@@ -264,6 +426,12 @@ void TFixture_MixedOutcomes::Test_FailViaAssert()
 void TFixture_MixedOutcomes::Test_FailViaCheck()
 {
     CheckEquals(1, 2, __func__, __LINE__, "deliberate failure, fixture test");
+}
+//---------------------------------------------------------------------------
+void TFixture_MixedOutcomes::Test_FailViaCheckThenAssert()
+{
+    CheckEquals(1, 2, __func__, __LINE__, "deliberate Check failure before an Assert, fixture test");
+    AssertEquals(3, 4, __func__, __LINE__, "deliberate Assert failure after a Check, fixture test");
 }
 //---------------------------------------------------------------------------
 void TFixture_MixedOutcomes::Test_Pass()
@@ -590,10 +758,26 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
+        "Run_RecordsCheckFailuresInFailedTestDetail");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver,
+        "Run_ReportsEachTestToRunObserver");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout,
+        "Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver,
+        "Run_ReportsTimedOutTestToRunObserver");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns, "Run_ResetsResultsBetweenRuns");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests,
+        "Run_StopsWhenRunObserverRequests");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded,
+        "SetExceptionExpected_AssertFailureStillFailsAndIsRecorded");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
+        "SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage,
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
@@ -769,6 +953,73 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
         "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, so the console output can be inspected.
+    std::string output;
+
+    // Act
+    {
+        TStdOutRedirect redirect;
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        output = redirect.Str();
+    }
+
+    // Assert
+    // A failed test's record carries its Check* failures, but each one was already logged as it happened, so
+    // the "***Test failed" line must not repeat them.
+    CheckEquals(static_cast<size_t>(1), CountOccurrences(output, "Check failed for: \"Test_FailViaCheck\""),
+        __func__, __LINE__, "FailViaCheck's Check failure is logged exactly once");
+    CheckEquals(static_cast<size_t>(1), CountOccurrences(output, "Check failed for: \"Test_FailViaCheckThenAssert\""),
+        __func__, __LINE__, "FailViaCheckThenAssert's Check failure is logged exactly once");
+    CheckEquals(static_cast<size_t>(2),
+        CountOccurrences(output, "Check failed for: \"Test_ContinuesAfterCheckFailure\""), __func__, __LINE__,
+        "each of ContinuesAfterCheckFailure's two Check failures is logged exactly once");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    TTestCaseRecord const* const failViaCheck = FindRecord(results, "FailViaCheck");
+    TTestCaseRecord const* const continuesAfterCheck = FindRecord(results, "ContinuesAfterCheckFailure");
+    TTestCaseRecord const* const checkThenAssert = FindRecord(results, "FailViaCheckThenAssert");
+    TTestCaseRecord const* const failViaAssert = FindRecord(results, "FailViaAssert");
+    TTestCaseRecord const* const pass = FindRecord(results, "Pass");
+
+    AssertTrue(failViaCheck != nullptr && continuesAfterCheck != nullptr && checkThenAssert != nullptr &&
+        failViaAssert != nullptr && pass != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckEquals(static_cast<size_t>(0), failViaCheck->Message.find("Check failed for: \"Test_FailViaCheck\""),
+        __func__, __LINE__, "a Check-only failure's detail is its Check failure, not empty");
+    CheckEquals(std::string::npos, failViaCheck->Message.find('\n'), __func__, __LINE__,
+        "one Check failure is one line, with no other test's Check failures carried over");
+
+    CheckEquals(static_cast<size_t>(2),
+        CountOccurrences(continuesAfterCheck->Message, "Check failed for: \"Test_ContinuesAfterCheckFailure\""),
+        __func__, __LINE__, "both Check failures are in the detail");
+    CheckTrue(continuesAfterCheck->Message.find('\n') != std::string::npos, __func__, __LINE__,
+        "multiple Check failures are separated by newlines");
+
+    size_t const checkPos = checkThenAssert->Message.find("deliberate Check failure before an Assert");
+    size_t const assertPos = checkThenAssert->Message.find("deliberate Assert failure after a Check");
+    CheckTrue(checkPos != std::string::npos && assertPos != std::string::npos, __func__, __LINE__,
+        "a Check failure followed by an Assert failure records both");
+    CheckTrue(checkPos < assertPos, __func__, __LINE__, "in the order they happened");
+
+    CheckFalse(failViaAssert->Message.empty(), __func__, __LINE__, "an Assert failure still records its message");
+    CheckEquals(std::string::npos, failViaAssert->Message.find("Check failed for"), __func__, __LINE__,
+        "a test with no Check failures gets none in its detail");
+    CheckTrue(pass->Message.empty(), __func__, __LINE__, "a passing test's detail stays empty");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
 {
     // Arrange
@@ -781,10 +1032,10 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
     TTestResults const& results = fixture.Results();
 
     CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "only the trivially-passing test succeeded");
-    CheckEquals(3u, results.FailedCount, __func__, __LINE__,
-        "the Check-failing, Assert-failing, and continues-after-Check tests are all counted as failed");
+    CheckEquals(4u, results.FailedCount, __func__, __LINE__,
+        "the Check-failing, Assert-failing, Check-then-Assert, and continues-after-Check tests are all counted as failed");
     CheckEquals(1u, results.SkippedCount, __func__, __LINE__, "the skipped test is counted separately from failures");
-    CheckEquals(static_cast<size_t>(5), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
@@ -801,6 +1052,116 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " recorded as Fail");
         }
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, so where the log output goes can be checked.
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    std::string consoleOutput;
+
+    // Act
+    {
+        TStdOutRedirect redirect;
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        consoleOutput = redirect.Str();
+    }
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    AssertEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "the fixture ran all 6 tests");
+    AssertEquals(results.CaseRecords.size() * 2, observer.Events.size(), __func__, __LINE__,
+        "one start and one finish event per test");
+
+    for (size_t i = 0; i < results.CaseRecords.size(); ++i)
+    {
+        TTestCaseRecord const& record = results.CaseRecords[i];
+        CheckEquals("started:" + record.TestName, observer.Events[i * 2], __func__, __LINE__,
+            "each test's start comes before its finish, in run order");
+        CheckEquals("finished:" + record.TestName, observer.Events[i * 2 + 1], __func__, __LINE__,
+            "and its finish comes before the next test starts");
+        CheckTrue(observer.FinishedRecords[i].Outcome == record.Outcome, __func__, __LINE__,
+            record.TestName + ": the finish event carries the test's recorded outcome");
+        CheckEquals(record.Message, observer.FinishedRecords[i].Message, __func__, __LINE__,
+            record.TestName + ": and its recorded detail");
+    }
+
+    CheckTrue(observer.LogText().find("Running test: Fixture_MixedOutcomes.Pass") != std::string::npos, __func__,
+        __LINE__, "the group's log output goes to the observer");
+    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "and none of it goes to std::cout");
+    CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout()
+{
+    // Arrange
+    // A timeout runs each test on a worker thread, but a GUI observer needs its events on the thread that
+    // called Run(), so they're raised there regardless.
+    TFixture_MixedOutcomes fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, false); // Only long enough never to fire.
+
+    // Assert
+    CheckEquals(static_cast<size_t>(6), observer.FinishedRecords.size(), __func__, __LINE__, "every test reported");
+    CheckTrue(observer.EventsOnConstructingThread, __func__, __LINE__,
+        "OnTestStarted/OnTestFinished/StopRequested all arrived on the calling thread");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver()
+{
+    // Arrange
+    TFixture_SlowTest fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // 1 second timeout; the fixture hangs forever.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Assert
+    AssertTrue(timedOutThrown, __func__, __LINE__, "the run was aborted by the timeout");
+    CheckEquals(static_cast<size_t>(2), observer.Events.size(), __func__, __LINE__,
+        "the hung test started and finished; the test after it never started");
+    AssertEquals(static_cast<size_t>(1), observer.FinishedRecords.size(), __func__, __LINE__,
+        "the timed-out test is reported even though an exception ended the run");
+    CheckEquals(std::string("HangsForever"), observer.FinishedRecords.front().TestName, __func__, __LINE__,
+        "the report names the test that timed out");
+    CheckTrue(observer.FinishedRecords.front().Outcome == TTestOutcome::Fail, __func__, __LINE__,
+        "and records it as failed");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+    TTestResults const firstRun = fixture.Results();
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& secondRun = fixture.Results();
+    CheckEquals(firstRun.SuccessCount, secondRun.SuccessCount, __func__, __LINE__,
+        "the second run's pass count is its own, not added to the first run's");
+    CheckEquals(firstRun.FailedCount, secondRun.FailedCount, __func__, __LINE__, "same for failures");
+    CheckEquals(firstRun.SkippedCount, secondRun.SkippedCount, __func__, __LINE__, "same for skips");
+    CheckEquals(firstRun.Messages.size(), secondRun.Messages.size(), __func__, __LINE__,
+        "the second run's messages don't include the first run's");
+    CheckEquals(firstRun.CaseRecords.size(), secondRun.CaseRecords.size(), __func__, __LINE__,
+        "one record per test, not one per test per run");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder()
@@ -839,6 +1200,84 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder
         "shuffling reorders tests without dropping or duplicating any of them");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+    TRecordingObserver observer;
+    observer.StopAfterFinishedCount = 2;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckTrue(results.Stopped, __func__, __LINE__, "the results say the run was stopped");
+    CheckEquals(static_cast<size_t>(2), results.CaseRecords.size(), __func__, __LINE__,
+        "only the tests that finished before the stop request were run");
+    CheckEquals(static_cast<size_t>(4), observer.Events.size(), __func__, __LINE__,
+        "and no further test was even started");
+    CheckEquals(static_cast<size_t>(3), observer.StopRequestedCalls, __func__, __LINE__,
+        "the observer was asked before each test, up to and including the one that stopped the run");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded()
+{
+    // Arrange
+    TFixture_ExceptionExpectations fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    // Test_SetExceptionExpected_MatchesTypeAndMessage already checks these tests fail; this checks the Assert*
+    // failure itself is what's recorded, as it would be with no exception expected.
+    size_t assertFailedTests = 0;
+
+    for (TTestCaseRecord const& record : fixture.Results().CaseRecords)
+    {
+        if (!NameEndsWith(record.TestName, "_AssertFails_Fails"))
+            continue;
+
+        ++assertFailedTests;
+        CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
+        CheckTrue(record.Message.find("deliberate Assert failure while an exception is expected") != std::string::npos,
+            __func__, __LINE__, record.TestName + "'s record carries its Assert failure");
+    }
+
+    CheckEquals(static_cast<size_t>(2), assertFailedTests, __func__, __LINE__,
+        "both Assert-while-exception-expected tests ran");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded()
+{
+    // Arrange
+    TFixture_ExceptionExpectations fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    // Test_SetExceptionExpected_MatchesTypeAndMessage already checks these tests fail; this checks why is
+    // recorded, since the logged "***Test failed" line for a Check-only failure has no detail of its own.
+    size_t checkFailedTests = 0;
+
+    for (TTestCaseRecord const& record : fixture.Results().CaseRecords)
+    {
+        if (record.TestName.rfind("CheckFailedThen", 0) != 0)
+            continue;
+
+        ++checkFailedTests;
+        CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
+        CheckTrue(record.Message.find("deliberate Check failure before the expected exception") != std::string::npos,
+            __func__, __LINE__, record.TestName + "'s record carries its Check failure");
+    }
+
+    CheckEquals(static_cast<size_t>(4), checkFailedTests, __func__, __LINE__,
+        "all four Check-then-expected-exception tests ran");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage()
 {
     // Arrange
@@ -849,7 +1288,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(9), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(15), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

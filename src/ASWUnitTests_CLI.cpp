@@ -528,4 +528,43 @@ std::optional<unsigned int> TCLIParser::ParseUnsignedInt(std::string const& text
 }
 //---------------------------------------------------------------------------
 
+
+// /////// Shared runner helpers ///////////////////////
+
+//---------------------------------------------------------------------------
+int ExitCodeForResults(TTestResults const& results)
+{
+    if (results.TimedOut)
+        return ExitCode_TestTimedOut;
+
+    if (results.Crashed)
+        return ExitCode_TestCrashed;
+
+    if (results.FailedCount > 0 || results.Stopped)
+        return ExitCode_TestsFailed;
+
+    return ExitCode_Success;
+}
+//---------------------------------------------------------------------------
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records)
+{
+    std::vector<TJUnitTestCase> testCases;
+    testCases.reserve(records.size());
+
+    for (TTestCaseRecord const& record : records)
+    {
+        TJUnitOutcome outcome = TJUnitOutcome::Pass;
+        if (record.Outcome == TTestOutcome::Fail)
+            outcome = TJUnitOutcome::Fail;
+        else if (record.Outcome == TTestOutcome::Skip)
+            outcome = TJUnitOutcome::Skip;
+
+        testCases.push_back(
+            TJUnitTestCase{ record.GroupName, record.TestName, record.DurationSeconds, outcome, record.Message });
+    }
+
+    return testCases;
+}
+//---------------------------------------------------------------------------
+
 } // namespace ASWUnitTests

@@ -41,8 +41,79 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   (`sigaltstack()`/`SA_ONSTACK`), since the default handler would otherwise
   run on the same, already-exhausted stack that just overflowed and have
   nowhere to run; verified on Linux via CLion/SSH.
+- Opt-in support for RAD Studio RTL exceptions (`System::Sysutils::Exception`
+  and its subclasses, shared by VCL and FMX), enabled by defining
+  `ASWUNITTESTS_RTL_EXCEPTIONS` in a C++Builder project built with `bcc32c` or
+  `bcc64x` (any other compiler is a compile error). `SetExceptionExpected<T>`
+  accepts RTL exception classes, matched polymorphically, with the optional
+  message substring checked against `Message`. Failure details and unhandled
+  RTL exceptions are reported as `ClassName: Message`, and an unhandled one
+  exits with code `2` instead of `3` ("Unknown"). Under
+  `--test-timeout-seconds`, an unexpected RTL exception crosses back from the
+  worker thread as a `TExceptRTLException` (a `std::runtime_error` that keeps
+  the original class in `RTLClass()`), since `std::exception_ptr` can't carry
+  an RTL exception past its handler; verified on `bcc64x`, where it
+  terminated the process.
+- `vcl/console/rad370/`, a VCL console RAD Studio project with its own build
+  scripts, defining `ASWUNITTESTS_RTL_EXCEPTIONS` and running the full
+  self-test suite plus the RTL-specific tests in `vcl/tests/`.
+- `ITestRunObserver`, set with `TTestHandler::SetRunObserver()`, for
+  following a run as it happens (e.g. from a GUI runner): it receives the log
+  output that would otherwise go to `std::cout`, a start and finish event for
+  each test, and can stop the run between tests. Its events arrive on the
+  thread that called `Run()`, even under `--test-timeout-seconds`. Without
+  one, nothing changes.
+- `TTestHandler::GetTests()`, listing every registered test as a `TTestId`
+  (its group and test names, kept separate since a group name may contain
+  `.`), e.g. for a runner to show the tests before running them.
+- `ExitCodeForResults()` and `ToJUnitTestCases()` in `ASWUnitTests_CLI`,
+  moved out of `main.cpp` so the console and GUI runners share them. A run
+  stopped early through `ITestRunObserver` exits with `1`.
+- `vcl/gui/rad370/`, a VCL GUI runner (with its own build scripts, sources in
+  `vcl/gui/src/`, and a project group opening it with the VCL console
+  project), running the same tests as the console runner. It shows every test
+  in a check box tree with a colored status dot, a detail pane for the
+  selected test or group, a Failures & Skips list, and the run's colored log.
+  Its toolbar runs the checked tests (F9), reruns failures, stops a run after
+  the current test, checks or unchecks every shown test, copies the details,
+  and filters the tree with `--filter`-style wildcards; its main menu has the
+  same commands, plus File > Export JUnit Report, saving the latest run's
+  results as the report `--report-junit` writes, and the command line help
+  and version. It remembers its window size, position, and panel sizes
+  between sessions (per executable, in `%APPDATA%\ASWUnitTests`), with
+  View > Reset Layout to restore the defaults, and GUI-only
+  `--layout-ignore` and `--layout-reset` options to skip or delete the saved
+  layout. It takes the console runner's command line options (`--filter`
+  and partitions choose the initially checked tests, and `--filter` also
+  fills in the filter box), plus GUI-only `--run`, running the checked tests
+  on startup, and `--exit`, closing afterward with the console runner's exit
+  code. Tests run on the main thread, so they can create VCL forms and
+  controls.
+- `TJUnitReportWriter::BuildXML()`, returning the report's XML as a string
+  for a caller that writes the file itself (as the GUI runner does, since
+  `Write()`'s `std::ofstream` can't open a path with characters outside the
+  Windows code page from a `std::string`).
 
 ### Fixed
+
+- `CheckTrue()` and `CheckFalse()` failure messages had their expectations
+  swapped (a failed `CheckTrue()` reported "Expected false but was true", and
+  vice versa).
+
+- A test that failed only through `Check*` calls recorded an empty failure
+  detail, so its `--report-junit` entry was `<failure message="">` with no
+  explanation. Its record now carries each of its `Check*` failures (followed
+  by any `Assert*` failure after them). Console output is unchanged, since
+  those failures are still logged as they happen.
+
+- A `Check*` failure was ignored if the test then threw the exception it had
+  set up with `SetExceptionExpected()`, so the test was reported as passed.
+  It now fails, with the `Check*` failure in its detail.
+
+- A failed `Assert*` counted as the expected exception while one was expected
+  with `SetExceptionExpected()`, so the test was reported as passed. With the
+  templated `SetExceptionExpected<T>()`, the requested type wasn't even
+  checked. A failed `Assert*` now always fails the test.
 
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the

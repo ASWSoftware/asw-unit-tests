@@ -106,41 +106,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
-std::string TJUnitReportWriter::EscapeXml(std::string const& text)
-{
-    std::string result;
-    result.reserve(text.size());
-
-    for (char ch : text)
-    {
-        switch (ch)
-        {
-            case '&':
-                result += "&amp;";
-                break;
-            case '<':
-                result += "&lt;";
-                break;
-            case '>':
-                result += "&gt;";
-                break;
-            case '"':
-                result += "&quot;";
-                break;
-            case '\'':
-                result += "&apos;";
-                break;
-            default:
-                result += ch;
-                break;
-        }
-    }
-
-    return result;
-}
-//---------------------------------------------------------------------------
-bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& suitesName,
-    std::vector<TJUnitTestCase> const& testCases)
+std::string TJUnitReportWriter::BuildXML(std::string const& suitesName, std::vector<TJUnitTestCase> const& testCases)
 {
     std::string const timestamp = FormatUtcTimestamp();
     std::ostringstream body;
@@ -185,15 +151,59 @@ bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& s
         totalTime += suiteTime;
     }
 
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    xml << "<testsuites name=\"" << EscapeXml(suitesName) << "\" tests=\"" << totalTests << "\" failures=\""
+    << totalFailures << "\" skipped=\"" << totalSkipped << "\" time=\"" << FormatSeconds(totalTime) << "\">\n";
+    xml << body.str();
+    xml << "</testsuites>\n";
+
+    return xml.str();
+}
+//---------------------------------------------------------------------------
+std::string TJUnitReportWriter::EscapeXml(std::string const& text)
+{
+    std::string result;
+    result.reserve(text.size());
+
+    for (char ch : text)
+    {
+        switch (ch)
+        {
+            case '&':
+                result += "&amp;";
+                break;
+            case '<':
+                result += "&lt;";
+                break;
+            case '>':
+                result += "&gt;";
+                break;
+            case '"':
+                result += "&quot;";
+                break;
+            case '\'':
+                result += "&apos;";
+                break;
+            default:
+                result += ch;
+                break;
+        }
+    }
+
+    return result;
+}
+//---------------------------------------------------------------------------
+bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& suitesName,
+    std::vector<TJUnitTestCase> const& testCases)
+{
+    std::string const xml = BuildXML(suitesName, testCases);
+
     std::ofstream file(filePath, std::ios::out | std::ios::trunc);
     if (!file.is_open())
         return false;
 
-    file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    file << "<testsuites name=\"" << EscapeXml(suitesName) << "\" tests=\"" << totalTests << "\" failures=\""
-    << totalFailures << "\" skipped=\"" << totalSkipped << "\" time=\"" << FormatSeconds(totalTime) << "\">\n";
-    file << body.str();
-    file << "</testsuites>\n";
+    file << xml;
 
     return file.good();
 }
