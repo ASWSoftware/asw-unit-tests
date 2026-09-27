@@ -27,9 +27,11 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <optional>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Handler.h"
+#include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 
@@ -103,6 +105,16 @@ public:
     // returns std::nullopt if 'text' isn't a valid unsigned integer or overflows unsigned int.
     static std::optional<unsigned int> ParseUnsignedInt(std::string const& text);
 };
+
+//---------------------------------------------------------------------------
+
+// The exit code for a completed TTestHandler::Run(): ExitCode_TestTimedOut or ExitCode_TestCrashed if the run
+// was aborted for that reason, otherwise ExitCode_TestsFailed if any test failed or the run was stopped early
+// (see ITestRunObserver::StopRequested()), otherwise ExitCode_Success.
+int ExitCodeForResults(TTestResults const& results);
+
+// Converts a run's records into the test cases a --report-junit report is written from.
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records);
 
 } // namespace ASWUnitTests
 

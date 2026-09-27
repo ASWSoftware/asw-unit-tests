@@ -43,7 +43,6 @@ namespace
 void ApplyColorOptions(TCLIOptions const& options);
 void PauseIfRequested(bool pauseOnExit);
 int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const& filter, std::string const& filterDescription);
-std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records);
 
 //---------------------------------------------------------------------------
 void ApplyColorOptions(TCLIOptions const& options)
@@ -86,9 +85,7 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
 
     TTestResults const testResults = tester.Run(filter, filterDescription, options.Shuffle, options.ShuffleSeed,
         options.TestTimeoutSeconds, options.CatchCrashes);
-    int const returnCode = testResults.TimedOut ? ExitCode_TestTimedOut :
-            testResults.Crashed ? ExitCode_TestCrashed :
-                (testResults.FailedCount > 0) ? ExitCode_TestsFailed : ExitCode_Success;
+    int const returnCode = ExitCodeForResults(testResults);
 
     if (!options.JunitReportPath.empty())
     {
@@ -100,27 +97,6 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
     }
 
     return returnCode;
-}
-
-//---------------------------------------------------------------------------
-std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records)
-{
-    std::vector<TJUnitTestCase> testCases;
-    testCases.reserve(records.size());
-
-    for (TTestCaseRecord const& record : records)
-    {
-        TJUnitOutcome outcome = TJUnitOutcome::Pass;
-        if (record.Outcome == TTestOutcome::Fail)
-            outcome = TJUnitOutcome::Fail;
-        else if (record.Outcome == TTestOutcome::Skip)
-            outcome = TJUnitOutcome::Skip;
-
-        testCases.push_back(TJUnitTestCase{ record.GroupName, record.TestName, record.DurationSeconds, outcome,
-                                            record.Message });
-    }
-
-    return testCases;
 }
 
 //---------------------------------------------------------------------------
