@@ -107,6 +107,8 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
     : inherited("ASWUnitTests_Handler_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
+        "GetTests_MatchesGetAllTestFullNames");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
         "SetRunObserver_ReceivesInitializeAndRunOutput");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups, "SetRunObserver_StopsBetweenGroups");
@@ -138,6 +140,38 @@ void TTest_ASWUnitTests_Handler::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
+{
+    // Arrange
+    TTestHandler handler;
+    {
+        TStdOutRedirect const suppressOutput; // Initialize() logs its own version/registration banner.
+        handler.Initialize("Test_GetTests_MatchesGetAllTestFullNames");
+    }
+
+    // Act
+    std::vector<TTestId> const tests = handler.GetTests();
+    std::vector<std::string> const fullNames = handler.GetAllTestFullNames();
+
+    // Assert
+    AssertEquals(fullNames.size(), tests.size(), __func__, __LINE__, "one entry per registered test in each");
+    CheckFalse(tests.empty(), __func__, __LINE__, "the real, self-registered suite is listed");
+
+    bool foundThisTest = false;
+
+    for (size_t i = 0; i < tests.size(); ++i)
+    {
+        CheckEquals(fullNames[i], tests[i].GroupName + "." + tests[i].TestName, __func__, __LINE__,
+            "same tests, in the same canonical order, just with group and test names kept separate");
+
+        if (tests[i].GroupName == "ASWUnitTests_Handler_Tests" &&
+            tests[i].TestName == "GetTests_MatchesGetAllTestFullNames")
+            foundThisTest = true;
+    }
+
+    CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput()
 {

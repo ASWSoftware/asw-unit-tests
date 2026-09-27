@@ -37,6 +37,7 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_GetTests_MatchesGetAllTestFullNames();
     void Test_SetRunObserver_ReceivesInitializeAndRunOutput();
     void Test_SetRunObserver_StopsBetweenGroups();
     void Test_WildcardMatch_CaseSensitivity();

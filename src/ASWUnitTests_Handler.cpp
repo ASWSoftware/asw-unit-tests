@@ -68,6 +68,31 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
 {
     std::vector<std::string> fullNames;
 
+    for (TTestId const& test : GetTests())
+        fullNames.push_back(test.GroupName + "." + test.TestName);
+
+    return fullNames;
+}
+//---------------------------------------------------------------------------
+std::string const& TTestHandler::GetProjectName() const
+{
+    return m_ProjectName;
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::GetTests
+
+    Returns every registered test's group and test names, in the same canonical
+    (unshuffled) order as GetAllTestFullNames(), for a caller that needs them
+    separately (e.g. to build a group/test tree) rather than as one full name,
+    which can't be split reliably if a group name contains '.'.
+
+    Requires Initialize() to have already been called.
+*/
+std::vector<TTestId> TTestHandler::GetTests()
+{
+    std::vector<TTestId> tests;
+
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
@@ -77,16 +102,11 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
              testIt != testGroup.GetTestCallbackList().end(); testIt++)
         {
             ITestCase& testCase = *testIt->get();
-            fullNames.push_back(groupName + "." + testCase.GetName());
+            tests.push_back(TTestId{ groupName, testCase.GetName() });
         }
     }
 
-    return fullNames;
-}
-//---------------------------------------------------------------------------
-std::string const& TTestHandler::GetProjectName() const
-{
-    return m_ProjectName;
+    return tests;
 }
 //---------------------------------------------------------------------------
 std::string TTestHandler::GetUTCTimeISO8601()

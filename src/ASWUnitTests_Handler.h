@@ -55,6 +55,20 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// TTestId
+//
+// Identifies one registered test by its group and test names, kept separate
+// rather than joined into a "GroupName.TestName" full name, since a group
+// name may itself contain '.'. Returned by TTestHandler::GetTests().
+/////////////////////////////////////////////////////////////////////////////
+struct TTestId
+{
+    std::string GroupName;
+    std::string TestName;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTestHandler
 //
 // Handles the registration running of tests
@@ -84,6 +98,7 @@ public:
 
     std::vector<std::string> GetAllTestFullNames();
     std::string const& GetProjectName() const;
+    std::vector<TTestId> GetTests();
     void Initialize(std::string const& projectName = "ASWUnitTests");
     void ListTests(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string());
     void Log(std::string const& msg);
