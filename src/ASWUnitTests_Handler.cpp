@@ -48,6 +48,7 @@ namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
 TTestHandler::TTestHandler()
+    : m_RunObserver(nullptr)
 {
 }
 //---------------------------------------------------------------------------
@@ -268,11 +269,23 @@ void TTestHandler::ListTests(TestFilter const& filter, std::string const& filter
 //---------------------------------------------------------------------------
 void TTestHandler::Log(std::string const& msg)
 {
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg + "\n");
+        return;
+    }
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
 void TTestHandler::LogAppend(std::string const& msg)
 {
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg);
+        return;
+    }
+
     std::cout << msg;
 }
 //---------------------------------------------------------------------------
@@ -310,7 +323,10 @@ void TTestHandler::RegisterTestGroups()
         });
 
     for (TOrderedGroup& orderedGroup : orderedGroups)
+    {
+        orderedGroup.Group->SetRunObserver(m_RunObserver);
         m_TestGroups.push_back(std::move(orderedGroup.Group));
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -335,6 +351,11 @@ void TTestHandler::RegisterTestGroups()
     (now-augmented, see TTestGroupBase::ReportTimedOutTest()/ReportCrashedTest()) results are still
     merged in exactly like a normal completion, but no further groups are run, and the returned
     TTestResults has TimedOut or Crashed set accordingly.
+
+    With an ITestRunObserver set (see SetRunObserver()), StopRequested() is checked before each group
+    (and, by each group's Run(), before each test). Once it returns true, no further tests or groups
+    run, a group that was part-way through is still torn down and merged in, and the returned
+    TTestResults has Stopped set.
 */
 TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription, bool shuffle,
     std::optional<unsigned int> shuffleSeed, std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
@@ -415,6 +436,12 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
                 ++nTestsInGroup;
         }
 
+        if (m_RunObserver != nullptr && m_RunObserver->StopRequested())
+        {
+            testResults.Stopped = true;
+            break;
+        }
+
         // set up
         Log("--------------------------------------------------------------------------------");
         Log("[" + GetUTCTimeISO8601() + "] Setting up group " + std::to_string(++groupNum) + " of " +
@@ -466,11 +493,20 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
             testResults.Crashed = groupCrashed;
             break;
         }
+
+        if (testGroupResults.Stopped)
+        {
+            testResults.Stopped = true;
+            break;
+        }
     }
 
     std::chrono::high_resolution_clock::time_point const end = std::chrono::high_resolution_clock::now();
 
     Log("--------------------------------------------------------------------------------");
+
+    if (testResults.Stopped)
+        Log("Run stopped on request before every test ran.");
 
     Log("\n[" + GetUTCTimeISO8601() + "] Tests done: Totals: " +
         TConsole::Colorize("succeeded: " + std::to_string(testResults.SuccessCount), TLogKind::Pass) + ", " +
@@ -497,6 +533,14 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     Log(ss.str());
 
     return testResults;
+}
+//---------------------------------------------------------------------------
+void TTestHandler::SetRunObserver(ITestRunObserver* observer)
+{
+    m_RunObserver = observer;
+
+    for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
+        (*it)->SetRunObserver(observer);
 }
 //---------------------------------------------------------------------------
 

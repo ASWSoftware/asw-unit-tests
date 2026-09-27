@@ -57,6 +57,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 - `vcl/console/rad370/`, a VCL console RAD Studio project with its own build
   scripts, defining `ASWUNITTESTS_RTL_EXCEPTIONS` and running the full
   self-test suite plus the RTL-specific tests in `vcl/tests/`.
+- `ITestRunObserver`, set with `TTestHandler::SetRunObserver()`, for
+  following a run as it happens (e.g. from a GUI runner): it receives the log
+  output that would otherwise go to `std::cout`, a start and finish event for
+  each test, and can stop the run between tests. Its events arrive on the
+  thread that called `Run()`, even under `--test-timeout-seconds`. Without
+  one, nothing changes.
 
 ### Fixed
 

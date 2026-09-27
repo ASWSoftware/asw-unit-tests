@@ -26,6 +26,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <chrono>
+#include <limits>
+#include <mutex>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -77,6 +79,71 @@ bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TRecordingObserver
+//
+// An ITestRunObserver that records everything it's told, for the Run_*RunObserver* tests below to
+// inspect. Events are recorded as "started:<test>" and "finished:<test>" strings, in order. Every
+// event except OnLog() must arrive on the thread that constructed this observer (the one calling
+// Run()), which EventsOnConstructingThread tracks; OnLog() may legitimately arrive from a test's
+// worker thread under a timeout, so it's recorded under a lock instead.
+/////////////////////////////////////////////////////////////////////////////
+class TRecordingObserver : public ITestRunObserver
+{
+private:
+    std::mutex m_LogMutex;
+    std::string m_LogText;
+    std::thread::id const m_ConstructingThread;
+
+public:
+    std::vector<std::string> Events;
+    bool EventsOnConstructingThread = true;
+    std::vector<TTestCaseRecord> FinishedRecords;
+    size_t StopAfterFinishedCount = std::numeric_limits<size_t>::max();
+    size_t StopRequestedCalls = 0;
+
+public:
+    TRecordingObserver()
+        : m_ConstructingThread(std::this_thread::get_id())
+    {
+    }
+
+    std::string LogText()
+    {
+        std::lock_guard<std::mutex> lock(m_LogMutex);
+        return m_LogText;
+    }
+
+    void OnLog(std::string const& text) override
+    {
+        std::lock_guard<std::mutex> lock(m_LogMutex);
+        m_LogText += text;
+    }
+
+    void OnTestFinished(TTestCaseRecord const& record) override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        Events.push_back("finished:" + record.TestName);
+        FinishedRecords.push_back(record);
+    }
+
+    void OnTestStarted(std::string const& /*groupName*/, std::string const& testName) override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        Events.push_back("started:" + testName);
+    }
+
+    bool StopRequested() override
+    {
+        EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
+        ++StopRequestedCalls;
+        return FinishedRecords.size() >= StopAfterFinishedCount;
+    }
+};
 
 //---------------------------------------------------------------------------
 
@@ -696,9 +763,17 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_RecordsCheckFailuresInFailedTestDetail");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver,
+        "Run_ReportsEachTestToRunObserver");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout,
+        "Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver,
+        "Run_ReportsTimedOutTestToRunObserver");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns, "Run_ResetsResultsBetweenRuns");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests,
+        "Run_StopsWhenRunObserverRequests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded,
         "SetExceptionExpected_AssertFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
@@ -979,6 +1054,94 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
     }
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, so where the log output goes can be checked.
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    std::string consoleOutput;
+
+    // Act
+    {
+        TStdOutRedirect redirect;
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        consoleOutput = redirect.Str();
+    }
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    AssertEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "the fixture ran all 6 tests");
+    AssertEquals(results.CaseRecords.size() * 2, observer.Events.size(), __func__, __LINE__,
+        "one start and one finish event per test");
+
+    for (size_t i = 0; i < results.CaseRecords.size(); ++i)
+    {
+        TTestCaseRecord const& record = results.CaseRecords[i];
+        CheckEquals("started:" + record.TestName, observer.Events[i * 2], __func__, __LINE__,
+            "each test's start comes before its finish, in run order");
+        CheckEquals("finished:" + record.TestName, observer.Events[i * 2 + 1], __func__, __LINE__,
+            "and its finish comes before the next test starts");
+        CheckTrue(observer.FinishedRecords[i].Outcome == record.Outcome, __func__, __LINE__,
+            record.TestName + ": the finish event carries the test's recorded outcome");
+        CheckEquals(record.Message, observer.FinishedRecords[i].Message, __func__, __LINE__,
+            record.TestName + ": and its recorded detail");
+    }
+
+    CheckTrue(observer.LogText().find("Running test: Fixture_MixedOutcomes.Pass") != std::string::npos, __func__,
+        __LINE__, "the group's log output goes to the observer");
+    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "and none of it goes to std::cout");
+    CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout()
+{
+    // Arrange
+    // A timeout runs each test on a worker thread, but a GUI observer needs its events on the thread that
+    // called Run(), so they're raised there regardless.
+    TFixture_MixedOutcomes fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, false); // Only long enough never to fire.
+
+    // Assert
+    CheckEquals(static_cast<size_t>(6), observer.FinishedRecords.size(), __func__, __LINE__, "every test reported");
+    CheckTrue(observer.EventsOnConstructingThread, __func__, __LINE__,
+        "OnTestStarted/OnTestFinished/StopRequested all arrived on the calling thread");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver()
+{
+    // Arrange
+    TFixture_SlowTest fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // 1 second timeout; the fixture hangs forever.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Assert
+    AssertTrue(timedOutThrown, __func__, __LINE__, "the run was aborted by the timeout");
+    CheckEquals(static_cast<size_t>(2), observer.Events.size(), __func__, __LINE__,
+        "the hung test started and finished; the test after it never started");
+    AssertEquals(static_cast<size_t>(1), observer.FinishedRecords.size(), __func__, __LINE__,
+        "the timed-out test is reported even though an exception ended the run");
+    CheckEquals(std::string("HangsForever"), observer.FinishedRecords.front().TestName, __func__, __LINE__,
+        "the report names the test that timed out");
+    CheckTrue(observer.FinishedRecords.front().Outcome == TTestOutcome::Fail, __func__, __LINE__,
+        "and records it as failed");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns()
 {
     // Arrange
@@ -1035,6 +1198,28 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder
     std::sort(sortedShuffled.begin(), sortedShuffled.end());
     CheckTrue(sortedUnshuffled == sortedShuffled, __func__, __LINE__,
         "shuffling reorders tests without dropping or duplicating any of them");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+    TRecordingObserver observer;
+    observer.StopAfterFinishedCount = 2;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckTrue(results.Stopped, __func__, __LINE__, "the results say the run was stopped");
+    CheckEquals(static_cast<size_t>(2), results.CaseRecords.size(), __func__, __LINE__,
+        "only the tests that finished before the stop request were run");
+    CheckEquals(static_cast<size_t>(4), observer.Events.size(), __func__, __LINE__,
+        "and no further test was even started");
+    CheckEquals(static_cast<size_t>(3), observer.StopRequestedCalls, __func__, __LINE__,
+        "the observer was asked before each test, up to and including the one that stopped the run");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded()

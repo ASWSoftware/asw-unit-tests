@@ -103,7 +103,8 @@ TTestGroupBase::TTestGroupBase(std::string const& name)
     : m_ExceptionExpected(false),
       m_LogSuppressed(false),
       m_TestFailedCheck(false),
-      m_Name(name)
+      m_Name(name),
+      m_RunObserver(nullptr)
 {
 }
 //---------------------------------------------------------------------------
@@ -587,6 +588,12 @@ void TTestGroupBase::Log(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg + "\n");
+        return;
+    }
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
@@ -594,6 +601,12 @@ void TTestGroupBase::LogAppend(std::string const& msg)
 {
     if (m_LogSuppressed)
         return;
+
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg);
+        return;
+    }
 
     std::cout << msg;
 }
@@ -703,6 +716,13 @@ TTestResults const& TTestGroupBase::Results() const
     single test does not finish within that many seconds. 'catchCrashes' additionally protects each
     test against a native crash (see RunCatchingCrashes()/ReportCrashedTest()). Either can throw a
     TExceptAbortRun out of this method, skipping any tests after the one that triggered it.
+
+    With an ITestRunObserver set (see SetRunObserver()), each test is bracketed by OnTestStarted()/
+    OnTestFinished() here, around RunWithTimeout() rather than inside Test(), so they're called on this
+    thread even when the test itself runs on a worker thread. OnTestFinished() is still called for a
+    test whose outcome was recorded before an exception left this method (e.g. a timed-out test's
+    synthetic failure). StopRequested() is checked before each test; if it returns true, the remaining
+    tests are skipped and Results().Stopped is set.
 */
 void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
     std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
@@ -728,7 +748,39 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
         if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
             continue;
 
-        RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
+        if (m_RunObserver == nullptr)
+        {
+            RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
+            continue;
+        }
+
+        if (m_RunObserver->StopRequested())
+        {
+            m_Results.Stopped = true;
+            break;
+        }
+
+        // Reports this test's record, if it recorded one (a test whose unexpected exception propagates doesn't).
+        size_t const recordsBefore = m_Results.CaseRecords.size();
+        auto notifyFinished = [&]()
+            {
+                if (m_Results.CaseRecords.size() > recordsBefore)
+                    m_RunObserver->OnTestFinished(m_Results.CaseRecords.back());
+            };
+
+        m_RunObserver->OnTestStarted(m_Name, testCase.GetName());
+
+        try
+        {
+            RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
+        }
+        catch (...)
+        {
+            notifyFinished();
+            throw;
+        }
+
+        notifyFinished();
     }
 }
 //---------------------------------------------------------------------------
@@ -841,6 +893,11 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
 void TTestGroupBase::SetLogSuppressed(bool suppressed)
 {
     m_LogSuppressed = suppressed;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::SetRunObserver(ITestRunObserver* observer)
+{
+    m_RunObserver = observer;
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
@@ -1148,6 +1205,7 @@ TTestResults::TTestResults()
     : Crashed(false),
       FailedCount(0),
       SkippedCount(0),
+      Stopped(false),
       SuccessCount(0),
       TimedOut(false)
 {

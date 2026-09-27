@@ -51,8 +51,12 @@ private: // Test methods
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
+    void Test_Run_ReportsEachTestToRunObserver();
+    void Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout();
+    void Test_Run_ReportsTimedOutTestToRunObserver();
     void Test_Run_ResetsResultsBetweenRuns();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
+    void Test_Run_StopsWhenRunObserverRequests();
     void Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();

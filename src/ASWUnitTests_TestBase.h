@@ -87,6 +87,7 @@ public:
     bool Crashed; // Set when a test crashed severely enough (see TCrashGuard::Run()) to abort the run.
     unsigned int FailedCount;
     unsigned int SkippedCount;
+    bool Stopped; // Set when ITestRunObserver::StopRequested() ended the run early.
     unsigned int SuccessCount;
     bool TimedOut;
     MsgList Messages;
@@ -109,6 +110,37 @@ public:
 // pattern itself is matched.
 /////////////////////////////////////////////////////////////////////////////
 typedef std::function<bool (std::string const& fullTestName)> TestFilter;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// ITestRunObserver
+//
+// Optional hooks for following a test run as it happens, e.g. a GUI runner
+// updating its display after each test. Set with
+// TTestHandler::SetRunObserver(). With none set, nothing changes: output
+// goes to std::cout as usual.
+//
+// Threading: OnTestStarted(), OnTestFinished(), and StopRequested() are
+// always called on the thread that called TTestHandler::Run(). OnLog() is
+// too, except under --test-timeout-seconds, where a test runs on a worker
+// thread and its own log output arrives from there; an implementation that
+// isn't thread-safe must handle that (e.g. by buffering under a mutex).
+/////////////////////////////////////////////////////////////////////////////
+class ITestRunObserver
+{
+public:
+    virtual ~ITestRunObserver() = default;
+
+    // Receives the text that would otherwise be written to std::cout, including any line break.
+    virtual void OnLog(std::string const& text) = 0;
+    // Called once for every test that records an outcome, including the failure recorded for a test that
+    // timed out or crashed. Not called for a test whose unexpected exception escapes TTestHandler::Run().
+    virtual void OnTestFinished(TTestCaseRecord const& record) = 0;
+    virtual void OnTestStarted(std::string const& groupName, std::string const& testName) = 0;
+    // Checked before each test and each group. Returning true ends the run there, with the returned
+    // TTestResults::Stopped set; a test that's already running is never interrupted.
+    virtual bool StopRequested() = 0;
+};
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -183,6 +215,11 @@ public:
     // in this group's own Results() either way.
     virtual void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
         std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) = 0;
+    // Called by TTestHandler::SetRunObserver() (nullptr to clear); see ITestRunObserver. The default ignores it,
+    // so an ITestGroup implementation that doesn't support an observer still works, just without its events.
+    virtual void SetRunObserver(ITestRunObserver* /*observer*/)
+    {
+    }
     virtual void SetUp_Group() = 0;
     virtual void TearDown_Group() = 0;
 };
@@ -217,6 +254,7 @@ protected:
 #endif
     std::string m_Name;
     TTestResults m_Results;
+    ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
     TestCallbackList m_TestCallbacks;
 
     // True when the current test's exception expectation (see SetExceptionExpected<TException>()) also
@@ -456,6 +494,7 @@ public:
     void Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
         std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) override;
     virtual void SetLogSuppressed(bool suppressed);
+    void SetRunObserver(ITestRunObserver* observer) override;
 };
 
 } // namespace ASWUnitTests

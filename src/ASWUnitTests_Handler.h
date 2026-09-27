@@ -66,6 +66,7 @@ private:
 
 private:
     std::string m_ProjectName;
+    ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
     ITestGroups m_TestGroups;
 
 private:
@@ -90,6 +91,10 @@ public:
     TTestResults Run(TestFilter const& filter = TestFilter(), std::string const& filterDescription = std::string(),
         bool shuffle = false, std::optional<unsigned int> shuffleSeed = std::nullopt,
         std::optional<unsigned int> testTimeoutSeconds = std::nullopt, bool catchCrashes = false);
+    // Sets (or, with nullptr, clears) the observer that receives this handler's and every test group's log
+    // output and per-test events; see ITestRunObserver. Not owned: it must outlive its use here. Can be called
+    // before Initialize(), so Initialize()'s own output reaches the observer too.
+    void SetRunObserver(ITestRunObserver* observer);
 };
 
 } // namespace ASWUnitTests
