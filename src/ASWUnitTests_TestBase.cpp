@@ -416,7 +416,7 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
 {
     if (testVal)
     {
-        std::string expectedMsg = "Expected true but was false: \"" + msg + "\"";
+        std::string expectedMsg = "Expected false but was true: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
 }
@@ -557,7 +557,7 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
 {
     if (!testVal)
     {
-        std::string expectedMsg = "Expected false but was true: \"" + msg + "\"";
+        std::string expectedMsg = "Expected true but was false: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
 }

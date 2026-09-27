@@ -44,6 +44,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Fixed
 
+- `CheckTrue()` and `CheckFalse()` failure messages had their expectations
+  swapped (a failed `CheckTrue()` reported "Expected false but was true", and
+  vice versa).
+
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the
   underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit
