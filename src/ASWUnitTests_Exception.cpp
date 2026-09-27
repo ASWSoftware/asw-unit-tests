@@ -24,9 +24,43 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
+#include <cstddef>
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+namespace
+{
+
+std::string ToUTF8(System::UnicodeString const& text);
+
+//---------------------------------------------------------------------------
+std::string ToUTF8(System::UnicodeString const& text)
+{
+    System::UTF8String const utf8(text);
+    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
+}
+//---------------------------------------------------------------------------
+
+} // namespace
+
+//---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+std::string DescribeRTLException(System::Sysutils::Exception& ex)
+{
+    return ToUTF8(ex.ClassName()) + ": " + RTLExceptionMessage(ex);
+}
+//---------------------------------------------------------------------------
+std::string RTLExceptionMessage(System::Sysutils::Exception& ex)
+{
+    return ToUTF8(ex.Message);
+}
+//---------------------------------------------------------------------------
+#endif
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TTestException
@@ -157,5 +191,61 @@ TExceptSkipped::TExceptSkipped(std::string const& method, int line, std::string 
     m_Message = "Test skipped: " + method + " (" + std::to_string(line) + "): " + msg;
 }
 //---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptAbortRun
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptAbortRun::TExceptAbortRun(std::string const& msg)
+{
+    m_Message = msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTestTimedOut
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptTestTimedOut::TExceptTestTimedOut(std::string const& msg)
+    : TExceptAbortRun(msg)
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTestCrashed
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptTestCrashed::TExceptTestCrashed(std::string const& msg)
+    : TExceptAbortRun(msg)
+{
+}
+//---------------------------------------------------------------------------
+
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TExceptRTLException
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptRTLException::TExceptRTLException(System::Sysutils::Exception& ex)
+    : std::runtime_error(DescribeRTLException(ex)),
+      m_RTLClass(ex.ClassType())
+{
+}
+//---------------------------------------------------------------------------
+System::TClass TExceptRTLException::RTLClass() const noexcept
+{
+    return m_RTLClass;
+}
+//---------------------------------------------------------------------------
+#endif
 
 } // namespace ASWUnitTests

@@ -24,6 +24,9 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_CLI.h"
 //---------------------------------------------------------------------------
+#include <string>
+#include <vector>
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
@@ -42,6 +45,8 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
 {
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter, "BuildTestFilter_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition, "BuildTestFilter_Partition");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ExitCodeForResults_MapsEachOutcome, "ExitCodeForResults_MapsEachOutcome");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes, "ParseArguments_CatchCrashes");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Color, "ParseArguments_Color");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Filter, "ParseArguments_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_HelpVersionList, "ParseArguments_HelpVersionList");
@@ -50,9 +55,11 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Pause, "ParseArguments_Pause");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_ReportAndProjectName, "ParseArguments_ReportAndProjectName");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle, "ParseArguments_Shuffle");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout, "ParseArguments_TestTimeout");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseColorMode, "ParseColorMode");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Invalid, "ParseUnsignedInt_Invalid");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Valid, "ParseUnsignedInt_Valid");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ToJUnitTestCases_CopiesEachRecord, "ToJUnitTestCases_CopiesEachRecord");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_CLI::~TTest_ASWUnitTests_CLI()
@@ -168,6 +175,50 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
     CheckEquals(allNames.size(), matchedByEither, __func__, __LINE__, "the two partitions cover every test exactly once");
     CheckTrue(description1.find("partition 1 of 2") != std::string::npos, __func__, __LINE__, "partition 1 description");
     CheckTrue(description2.find("partition 2 of 2") != std::string::npos, __func__, __LINE__, "partition 2 description");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ExitCodeForResults_MapsEachOutcome()
+{
+    // Arrange
+    TTestResults passed;
+    passed.SuccessCount = 3;
+    passed.SkippedCount = 1;
+
+    TTestResults failed = passed;
+    failed.FailedCount = 1;
+
+    TTestResults stopped = passed;
+    stopped.Stopped = true;
+
+    TTestResults timedOut = failed;
+    timedOut.TimedOut = true;
+
+    TTestResults crashed = failed;
+    crashed.Crashed = true;
+
+    // Act, Assert
+    CheckEquals(ExitCode_Success, ExitCodeForResults(passed), __func__, __LINE__, "passes and skips only: success");
+    CheckEquals(ExitCode_TestsFailed, ExitCodeForResults(failed), __func__, __LINE__, "any failure: tests failed");
+    CheckEquals(ExitCode_TestsFailed, ExitCodeForResults(stopped), __func__, __LINE__,
+        "stopped early: tests failed, since not every test ran");
+    CheckEquals(ExitCode_TestTimedOut, ExitCodeForResults(timedOut), __func__, __LINE__,
+        "a timeout outranks the failure it recorded");
+    CheckEquals(ExitCode_TestCrashed, ExitCodeForResults(crashed), __func__, __LINE__, "so does a crash");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes()
+{
+    // Arrange
+    TCLIOptions optionsDefault;
+    TCLIOptions optionsCatchCrashes;
+
+    // Act
+    ParseArgs({ "ASWUnitTests" }, optionsDefault);
+    ParseArgs({ "ASWUnitTests", "--catch-crashes" }, optionsCatchCrashes);
+
+    // Assert
+    CheckFalse(optionsDefault.CatchCrashes, __func__, __LINE__, "CatchCrashes defaults to false");
+    CheckTrue(optionsCatchCrashes.CatchCrashes, __func__, __LINE__, "--catch-crashes sets CatchCrashes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseArguments_Color()
@@ -335,6 +386,33 @@ void TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle()
         __func__, __LINE__, "--shuffle-seed with a non-numeric argument is rejected");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout()
+{
+    // Arrange
+    TCLIOptions optionsSpace;
+    TCLIOptions optionsEquals;
+    TCLIOptions optionsBare;
+    TCLIOptions optionsZero;
+    TCLIOptions optionsNonNumeric;
+
+    // Act
+    ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "5" }, optionsSpace);
+    ParseArgs({ "ASWUnitTests", "--test-timeout-seconds=5" }, optionsEquals);
+    std::optional<int> const resultZero = ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "0" }, optionsZero);
+    std::optional<int> const resultNonNumeric =
+        ParseArgs({ "ASWUnitTests", "--test-timeout-seconds", "abc" }, optionsNonNumeric);
+
+    // Assert
+    CheckFalse(optionsBare.TestTimeoutSeconds.has_value(), __func__, __LINE__, "no default when the flag is absent");
+    CheckTrue(optionsSpace.TestTimeoutSeconds == 5u, __func__, __LINE__, "--test-timeout-seconds <N> value");
+    CheckTrue(optionsEquals.TestTimeoutSeconds == 5u, __func__, __LINE__, "--test-timeout-seconds=<N> value");
+
+    CheckTrue(resultZero.has_value() && *resultZero == ExitCode_InvalidArguments,
+        __func__, __LINE__, "--test-timeout-seconds 0 is rejected, since it can't ever let a test finish");
+    CheckTrue(resultNonNumeric.has_value() && *resultNonNumeric == ExitCode_InvalidArguments,
+        __func__, __LINE__, "--test-timeout-seconds with a non-numeric argument is rejected");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseColorMode()
 {
     // Act & Assert
@@ -362,6 +440,29 @@ void TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Valid()
     CheckTrue(TCLIParser::ParseUnsignedInt("0") == 0u, __func__, __LINE__, "zero");
     CheckTrue(TCLIParser::ParseUnsignedInt("123") == 123u, __func__, __LINE__, "ordinary value");
     CheckTrue(TCLIParser::ParseUnsignedInt("4294967295") == 4294967295u, __func__, __LINE__, "exactly UINT_MAX");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ToJUnitTestCases_CopiesEachRecord()
+{
+    // Arrange
+    std::vector<TTestCaseRecord> const records{
+        { "Group", "Passes", 0.5, TTestOutcome::Pass, "" },
+        { "Group", "Fails", 0.25, TTestOutcome::Fail, "Check failed for: x" },
+        { "Other", "Skips", 0.0, TTestOutcome::Skip, "not on this platform" } };
+
+    // Act
+    std::vector<TJUnitTestCase> const testCases = ToJUnitTestCases(records);
+
+    // Assert
+    AssertEquals(static_cast<size_t>(3), testCases.size(), __func__, __LINE__, "one test case per record");
+
+    CheckTrue(testCases[0].Outcome == TJUnitOutcome::Pass, __func__, __LINE__, "Pass becomes Pass");
+    CheckTrue(testCases[1].Outcome == TJUnitOutcome::Fail, __func__, __LINE__, "Fail becomes Fail");
+    CheckTrue(testCases[2].Outcome == TJUnitOutcome::Skip, __func__, __LINE__, "Skip becomes Skip");
+    CheckEquals(std::string("Other"), testCases[2].GroupName, __func__, __LINE__, "the group name is kept");
+    CheckEquals(std::string("Fails"), testCases[1].TestName, __func__, __LINE__, "and the test name");
+    CheckEquals(std::string("Check failed for: x"), testCases[1].Message, __func__, __LINE__, "and the detail");
+    CheckNear(0.5, testCases[0].DurationSeconds, 1e-12, __func__, __LINE__, "and the duration");
 }
 //---------------------------------------------------------------------------
 

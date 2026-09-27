@@ -48,6 +48,7 @@ namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
 TTestHandler::TTestHandler()
+    : m_RunObserver(nullptr)
 {
 }
 //---------------------------------------------------------------------------
@@ -67,6 +68,31 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
 {
     std::vector<std::string> fullNames;
 
+    for (TTestId const& test : GetTests())
+        fullNames.push_back(test.GroupName + "." + test.TestName);
+
+    return fullNames;
+}
+//---------------------------------------------------------------------------
+std::string const& TTestHandler::GetProjectName() const
+{
+    return m_ProjectName;
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::GetTests
+
+    Returns every registered test's group and test names, in the same canonical
+    (unshuffled) order as GetAllTestFullNames(), for a caller that needs them
+    separately (e.g. to build a group/test tree) rather than as one full name,
+    which can't be split reliably if a group name contains '.'.
+
+    Requires Initialize() to have already been called.
+*/
+std::vector<TTestId> TTestHandler::GetTests()
+{
+    std::vector<TTestId> tests;
+
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
@@ -76,16 +102,11 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
              testIt != testGroup.GetTestCallbackList().end(); testIt++)
         {
             ITestCase& testCase = *testIt->get();
-            fullNames.push_back(groupName + "." + testCase.GetName());
+            tests.push_back(TTestId{ groupName, testCase.GetName() });
         }
     }
 
-    return fullNames;
-}
-//---------------------------------------------------------------------------
-std::string const& TTestHandler::GetProjectName() const
-{
-    return m_ProjectName;
+    return tests;
 }
 //---------------------------------------------------------------------------
 std::string TTestHandler::GetUTCTimeISO8601()
@@ -98,7 +119,16 @@ std::string TTestHandler::GetUTCTimeISO8601()
     auto milliSecs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
     // Convert to UTC time structure
+    // std::gmtime() is flagged by MSVC in favor of gmtime_s(), which is Windows-only and has a
+    // different signature than POSIX's gmtime_r(), so there's no single portable replacement.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     std::tm utc_tm = *std::gmtime(&now_time_t);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     // Format the time into a string
     std::ostringstream oss;
@@ -259,11 +289,23 @@ void TTestHandler::ListTests(TestFilter const& filter, std::string const& filter
 //---------------------------------------------------------------------------
 void TTestHandler::Log(std::string const& msg)
 {
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg + "\n");
+        return;
+    }
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
 void TTestHandler::LogAppend(std::string const& msg)
 {
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg);
+        return;
+    }
+
     std::cout << msg;
 }
 //---------------------------------------------------------------------------
@@ -301,7 +343,10 @@ void TTestHandler::RegisterTestGroups()
         });
 
     for (TOrderedGroup& orderedGroup : orderedGroups)
+    {
+        orderedGroup.Group->SetRunObserver(m_RunObserver);
         m_TestGroups.push_back(std::move(orderedGroup.Group));
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -320,9 +365,20 @@ void TTestHandler::RegisterTestGroups()
     every equally-sized group shuffling identically). The master seed is
     'shuffleSeed' if given, otherwise one is generated and logged so a
     failure caused by shuffled order can be reproduced.
+
+    'testTimeoutSeconds' and 'catchCrashes' are both passed through to each group's Run(). If a
+    group's Run() throws a TExceptAbortRun (TExceptTestTimedOut or TExceptTestCrashed), that group's
+    (now-augmented, see TTestGroupBase::ReportTimedOutTest()/ReportCrashedTest()) results are still
+    merged in exactly like a normal completion, but no further groups are run, and the returned
+    TTestResults has TimedOut or Crashed set accordingly.
+
+    With an ITestRunObserver set (see SetRunObserver()), StopRequested() is checked before each group
+    (and, by each group's Run(), before each test). Once it returns true, no further tests or groups
+    run, a group that was part-way through is still torn down and merged in, and the returned
+    TTestResults has Stopped set.
 */
 TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filterDescription, bool shuffle,
-    std::optional<unsigned int> shuffleSeed)
+    std::optional<unsigned int> shuffleSeed, std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
 {
     TTestResults testResults;
     std::vector<ITestGroup*> groupsToRun;
@@ -400,6 +456,12 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
                 ++nTestsInGroup;
         }
 
+        if (m_RunObserver != nullptr && m_RunObserver->StopRequested())
+        {
+            testResults.Stopped = true;
+            break;
+        }
+
         // set up
         Log("--------------------------------------------------------------------------------");
         Log("[" + GetUTCTimeISO8601() + "] Setting up group " + std::to_string(++groupNum) + " of " +
@@ -413,7 +475,21 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         if (resolvedSeed.has_value())
             groupSeed = *resolvedSeed + static_cast<unsigned int>(std::hash<std::string>{}(name));
 
-        testGroup.Run(filter, groupSeed);
+        bool groupTimedOut = false;
+        bool groupCrashed = false;
+        try
+        {
+            testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
+        }
+        catch (TExceptTestTimedOut const&)
+        {
+            groupTimedOut = true;
+        }
+        catch (TExceptTestCrashed const&)
+        {
+            groupCrashed = true;
+        }
+
         TTestResults const& testGroupResults = testGroup.Results();
         Log("Done. " +
             TConsole::Colorize("Succeeded: " + std::to_string(testGroupResults.SuccessCount), TLogKind::Pass) +
@@ -430,11 +506,27 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         // tear down
         Log("[" + GetUTCTimeISO8601() + "] Tearing down group: \"" + name + "\"");
         testGroup.TearDown_Group();
+
+        if (groupTimedOut || groupCrashed)
+        {
+            testResults.TimedOut = groupTimedOut;
+            testResults.Crashed = groupCrashed;
+            break;
+        }
+
+        if (testGroupResults.Stopped)
+        {
+            testResults.Stopped = true;
+            break;
+        }
     }
 
     std::chrono::high_resolution_clock::time_point const end = std::chrono::high_resolution_clock::now();
 
     Log("--------------------------------------------------------------------------------");
+
+    if (testResults.Stopped)
+        Log("Run stopped on request before every test ran.");
 
     Log("\n[" + GetUTCTimeISO8601() + "] Tests done: Totals: " +
         TConsole::Colorize("succeeded: " + std::to_string(testResults.SuccessCount), TLogKind::Pass) + ", " +
@@ -461,6 +553,14 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     Log(ss.str());
 
     return testResults;
+}
+//---------------------------------------------------------------------------
+void TTestHandler::SetRunObserver(ITestRunObserver* observer)
+{
+    m_RunObserver = observer;
+
+    for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
+        (*it)->SetRunObserver(observer);
 }
 //---------------------------------------------------------------------------
 

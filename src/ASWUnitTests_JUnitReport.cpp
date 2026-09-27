@@ -52,7 +52,17 @@ std::string FormatUtcTimestamp()
 {
     std::chrono::system_clock::time_point const now = std::chrono::system_clock::now();
     std::time_t const nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+    // std::gmtime() is flagged by MSVC in favor of gmtime_s(), which is Windows-only and has a
+    // different signature than POSIX's gmtime_r(), so there's no single portable replacement.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     std::tm const utcTm = *std::gmtime(&nowTimeT);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
     std::ostringstream oss;
     oss << std::put_time(&utcTm, "%Y-%m-%dT%H:%M:%SZ");
@@ -96,41 +106,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
-std::string TJUnitReportWriter::EscapeXml(std::string const& text)
-{
-    std::string result;
-    result.reserve(text.size());
-
-    for (char ch : text)
-    {
-        switch (ch)
-        {
-            case '&':
-                result += "&amp;";
-                break;
-            case '<':
-                result += "&lt;";
-                break;
-            case '>':
-                result += "&gt;";
-                break;
-            case '"':
-                result += "&quot;";
-                break;
-            case '\'':
-                result += "&apos;";
-                break;
-            default:
-                result += ch;
-                break;
-        }
-    }
-
-    return result;
-}
-//---------------------------------------------------------------------------
-bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& suitesName,
-    std::vector<TJUnitTestCase> const& testCases)
+std::string TJUnitReportWriter::BuildXML(std::string const& suitesName, std::vector<TJUnitTestCase> const& testCases)
 {
     std::string const timestamp = FormatUtcTimestamp();
     std::ostringstream body;
@@ -175,15 +151,59 @@ bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& s
         totalTime += suiteTime;
     }
 
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    xml << "<testsuites name=\"" << EscapeXml(suitesName) << "\" tests=\"" << totalTests << "\" failures=\""
+    << totalFailures << "\" skipped=\"" << totalSkipped << "\" time=\"" << FormatSeconds(totalTime) << "\">\n";
+    xml << body.str();
+    xml << "</testsuites>\n";
+
+    return xml.str();
+}
+//---------------------------------------------------------------------------
+std::string TJUnitReportWriter::EscapeXml(std::string const& text)
+{
+    std::string result;
+    result.reserve(text.size());
+
+    for (char ch : text)
+    {
+        switch (ch)
+        {
+            case '&':
+                result += "&amp;";
+                break;
+            case '<':
+                result += "&lt;";
+                break;
+            case '>':
+                result += "&gt;";
+                break;
+            case '"':
+                result += "&quot;";
+                break;
+            case '\'':
+                result += "&apos;";
+                break;
+            default:
+                result += ch;
+                break;
+        }
+    }
+
+    return result;
+}
+//---------------------------------------------------------------------------
+bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& suitesName,
+    std::vector<TJUnitTestCase> const& testCases)
+{
+    std::string const xml = BuildXML(suitesName, testCases);
+
     std::ofstream file(filePath, std::ios::out | std::ios::trunc);
     if (!file.is_open())
         return false;
 
-    file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    file << "<testsuites name=\"" << EscapeXml(suitesName) << "\" tests=\"" << totalTests << "\" failures=\""
-    << totalFailures << "\" skipped=\"" << totalSkipped << "\" time=\"" << FormatSeconds(totalTime) << "\">\n";
-    file << body.str();
-    file << "</testsuites>\n";
+    file << xml;
 
     return file.good();
 }

@@ -14,6 +14,7 @@ add_executable(ASWUnitTests
     ../tests/Test_ASWTools_String.cpp
     ../tests/Test_ASWUnitTests_CLI.cpp
     ../tests/Test_ASWUnitTests_Console.cpp
+    ../tests/Test_ASWUnitTests_CrashGuard.cpp
     ../tests/Test_ASWUnitTests_Handler.cpp
     ../tests/Test_ASWUnitTests_JUnitReport.cpp
     ../tests/Test_ASWUnitTests_StdOutRedirect.cpp
@@ -29,6 +30,12 @@ target_include_directories(ASWUnitTests PRIVATE
     ../toTest
 )
 
+# --test-timeout-seconds (ASWUnitTests_TestBase.cpp) uses std::thread/std::future, which needs an
+# explicit link against a threading library on Linux and some MinGW-w64 distributions; a no-op on
+# MSVC and toolchains where threading support needs no extra linker flag.
+find_package(Threads REQUIRED)
+target_link_libraries(ASWUnitTests PRIVATE Threads::Threads)
+
 if(MSVC)
     target_compile_options(ASWUnitTests PRIVATE /W4 /Zc:__cplusplus)
 else()
@@ -39,6 +46,16 @@ if(WIN32)
     # toTest/ASWTools_String.cpp uses the Win32 UUID/RPC string APIs. MSVC picks up
     # rpcrt4.lib via a #pragma comment, but MinGW/Clang need it linked explicitly.
     target_link_libraries(ASWUnitTests PRIVATE rpcrt4)
+endif()
+
+if(MINGW)
+    # Statically link the MinGW runtime (libgcc/libstdc++/libwinpthread) so the executable doesn't
+    # depend on those DLLs being on PATH at runtime. Without this, running the built exe on a
+    # machine (or CI runner) where MinGW's bin directory isn't on PATH fails to even launch: Windows'
+    # loader can't resolve the missing DLL, and tools built on POSIX conventions - Git Bash included
+    # - report that as a bare "command not found" (exit code 127) rather than anything mentioning a
+    # missing DLL, which is exactly what GitHub Actions' Windows (MinGW) CI job hit.
+    target_link_options(ASWUnitTests PRIVATE -static-libgcc -static-libstdc++ -static)
 endif()
 
 set_target_properties(ASWUnitTests PROPERTIES

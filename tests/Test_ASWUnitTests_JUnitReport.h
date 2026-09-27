@@ -43,6 +43,7 @@ private:
     std::filesystem::path m_TestTempDir; // Set per-test, in SetUp_Test().
 
 private: // Test methods
+    void Test_BuildXML_CountsAndEscapes();
     void Test_EscapeXml_PlainTextUnchanged();
     void Test_EscapeXml_SpecialCharacters();
     void Test_Write_ProducesReadableReport();

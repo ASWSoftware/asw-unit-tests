@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake rad370 src tests toTest) do (
+for %%D in (build cmake rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -33,6 +33,8 @@ for %%D in (build cmake rad370 src tests toTest) do (
     )
 )
 
+call :CopyFile "CHANGELOG.md" "CHANGELOG.md"
+if errorlevel 1 exit /b 1
 call :CopyFile "LICENSE" "LICENSE"
 if errorlevel 1 exit /b 1
 call :CopyFile "README.md" "README.md"
@@ -47,6 +49,10 @@ call :CopyFile "rad370\Build_Win64x_Debug.bat" "rad370\Build_Win64x_Debug.bat"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win64x_Release.bat" "rad370\Build_Win64x_Release.bat"
 if errorlevel 1 exit /b 1
+call :CopyFile "rad370\Build_Win32_Debug.bat" "rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "rad370\Build_Win32_Release.bat" "rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.cpp" "src\ASWUnitTests_CLI.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.h" "src\ASWUnitTests_CLI.h"
@@ -54,6 +60,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Console.cpp" "src\ASWUnitTests_Console.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Console.h" "src\ASWUnitTests_Console.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_CrashGuard.cpp" "src\ASWUnitTests_CrashGuard.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_CrashGuard.h" "src\ASWUnitTests_CrashGuard.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Exception.cpp" "src\ASWUnitTests_Exception.cpp"
 if errorlevel 1 exit /b 1
@@ -103,6 +113,10 @@ call :CopyFile "tests\Test_ASWUnitTests_Console.cpp" "tests\Test_ASWUnitTests_Co
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_Console.h" "tests\Test_ASWUnitTests_Console.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_CrashGuard.cpp" "tests\Test_ASWUnitTests_CrashGuard.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_CrashGuard.h" "tests\Test_ASWUnitTests_CrashGuard.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_Handler.cpp" "tests\Test_ASWUnitTests_Handler.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_Handler.h" "tests\Test_ASWUnitTests_Handler.h"
@@ -130,6 +144,88 @@ if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_String.cpp" "toTest\ASWTools_String.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_String.h" "toTest\ASWTools_String.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\ASWUnitTests_VCL_Console.cbproj" "vcl\console\rad370\ASWUnitTests_VCL_Console.cbproj"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\ASWUnitTests_VCL_ConsolePCH1.h" "vcl\console\rad370\ASWUnitTests_VCL_ConsolePCH1.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\Build_Win64x_Debug.bat" "vcl\console\rad370\Build_Win64x_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\Build_Win64x_Release.bat" "vcl\console\rad370\Build_Win64x_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\Build_Win32_Debug.bat" "vcl\console\rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\console\rad370\Build_Win32_Release.bat" "vcl\console\rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj" "vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj" "vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp" "vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\ASWUnitTests_VCL_GUIPCH1.h" "vcl\gui\rad370\ASWUnitTests_VCL_GUIPCH1.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\Build_Win64x_Debug.bat" "vcl\gui\rad370\Build_Win64x_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\Build_Win64x_Release.bat" "vcl\gui\rad370\Build_Win64x_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\Build_Win32_Debug.bat" "vcl\gui\rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\rad370\Build_Win32_Release.bat" "vcl\gui\rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_CommandLine.cpp" "vcl\gui\src\ASWUnitTests_GUI_CommandLine.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_CommandLine.h" "vcl\gui\src\ASWUnitTests_GUI_CommandLine.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Layout.cpp" "vcl\gui\src\ASWUnitTests_GUI_Layout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Layout.h" "vcl\gui\src\ASWUnitTests_GUI_Layout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.cpp" "vcl\gui\src\ASWUnitTests_GUI_MainForm.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.dfm" "vcl\gui\src\ASWUnitTests_GUI_MainForm.dfm"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.h" "vcl\gui\src\ASWUnitTests_GUI_MainForm.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.cpp" "vcl\gui\src\ASWUnitTests_GUI_RunObserver.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h" "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.cpp" "vcl\gui\src\ASWUnitTests_GUI_Strings.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.h" "vcl\gui\src\ASWUnitTests_GUI_Strings.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TestList.cpp" "vcl\gui\src\ASWUnitTests_GUI_TestList.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TestList.h" "vcl\gui\src\ASWUnitTests_GUI_TestList.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TextDialog.cpp" "vcl\gui\src\ASWUnitTests_GUI_TextDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TextDialog.h" "vcl\gui\src\ASWUnitTests_GUI_TextDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.cpp" "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.h" "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.h" "vcl\tests\Test_ASWUnitTests_GUI_Layout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.h" "vcl\tests\Test_ASWUnitTests_GUI_Strings.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_TestList.cpp" "vcl\tests\Test_ASWUnitTests_GUI_TestList.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_TestList.h" "vcl\tests\Test_ASWUnitTests_GUI_TestList.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLExceptions.cpp" "vcl\tests\Test_ASWUnitTests_RTLExceptions.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLExceptions.h" "vcl\tests\Test_ASWUnitTests_RTLExceptions.h"
 if errorlevel 1 exit /b 1
 
 echo Deployment completed successfully.

@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Console.h"
+#include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
@@ -42,7 +43,6 @@ namespace
 void ApplyColorOptions(TCLIOptions const& options);
 void PauseIfRequested(bool pauseOnExit);
 int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const& filter, std::string const& filterDescription);
-std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records);
 
 //---------------------------------------------------------------------------
 void ApplyColorOptions(TCLIOptions const& options)
@@ -83,8 +83,9 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
         return ExitCode_Success;
     }
 
-    TTestResults const testResults = tester.Run(filter, filterDescription, options.Shuffle, options.ShuffleSeed);
-    int const returnCode = (testResults.FailedCount > 0) ? ExitCode_TestsFailed : ExitCode_Success;
+    TTestResults const testResults = tester.Run(filter, filterDescription, options.Shuffle, options.ShuffleSeed,
+        options.TestTimeoutSeconds, options.CatchCrashes);
+    int const returnCode = ExitCodeForResults(testResults);
 
     if (!options.JunitReportPath.empty())
     {
@@ -96,27 +97,6 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
     }
 
     return returnCode;
-}
-
-//---------------------------------------------------------------------------
-std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records)
-{
-    std::vector<TJUnitTestCase> testCases;
-    testCases.reserve(records.size());
-
-    for (TTestCaseRecord const& record : records)
-    {
-        TJUnitOutcome outcome = TJUnitOutcome::Pass;
-        if (record.Outcome == TTestOutcome::Fail)
-            outcome = TJUnitOutcome::Fail;
-        else if (record.Outcome == TTestOutcome::Skip)
-            outcome = TJUnitOutcome::Skip;
-
-        testCases.push_back(TJUnitTestCase{ record.GroupName, record.TestName, record.DurationSeconds, outcome,
-                                            record.Message });
-    }
-
-    return testCases;
 }
 
 //---------------------------------------------------------------------------
@@ -153,6 +133,13 @@ int main(int argc, char* argv[])
         std::cout << "\nTerminating app. Unhandled exception: " << ex.what() << std::endl;
         returnCode = ExitCode_UnhandledException;
     }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        std::cout << "\nTerminating app. Unhandled exception: " << DescribeRTLException(ex) << std::endl;
+        returnCode = ExitCode_UnhandledException;
+    }
+#endif
     catch (...)
     {
         std::cout << "\nTerminating app. Unhandled exception: Unknown" << std::endl;
@@ -160,6 +147,23 @@ int main(int argc, char* argv[])
     }
 
     PauseIfRequested(options.PauseOnExit);
+
+    if (returnCode == ExitCode_TestTimedOut)
+    {
+        // A test's worker thread may still be stuck (see TTestGroupBase::RunWithTimeout()) and was
+        // deliberately abandoned rather than joined. Skip static destructors/atexit handlers, which
+        // could otherwise race with whatever that thread eventually does, and exit immediately.
+        std::_Exit(returnCode);
+    }
+
+    if (returnCode == ExitCode_TestCrashed)
+    {
+        // The crash that got us here (a stack overflow, or a POSIX SIGSEGV that might have been one -
+        // see TCrashGuard::Run()) may have left global/static state corrupted. Skip static
+        // destructors/atexit handlers, which could misbehave against that corrupted state, and exit
+        // immediately rather than trust them to run cleanly.
+        std::_Exit(returnCode);
+    }
 
     return returnCode;
 }

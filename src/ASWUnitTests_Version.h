@@ -12,10 +12,10 @@ Single source for the ASWUnitTests semantic version.
 namespace ASWUnitTests
 {
 
-inline constexpr unsigned int VersionMajor = 0;
-inline constexpr unsigned int VersionMinor = 26;
-inline constexpr unsigned int VersionPatch = 5;
-inline constexpr char Version[] = "0.26.5";
+inline constexpr unsigned int VersionMajor = 1;
+inline constexpr unsigned int VersionMinor = 0;
+inline constexpr unsigned int VersionPatch = 0;
+inline constexpr char Version[] = "1.0.0";
 
 } // namespace ASWUnitTests
 

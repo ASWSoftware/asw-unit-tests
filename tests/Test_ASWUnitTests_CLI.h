@@ -49,6 +49,8 @@ private:
 private: // Test methods
     void Test_BuildTestFilter_Filter();
     void Test_BuildTestFilter_Partition();
+    void Test_ExitCodeForResults_MapsEachOutcome();
+    void Test_ParseArguments_CatchCrashes();
     void Test_ParseArguments_Color();
     void Test_ParseArguments_Filter();
     void Test_ParseArguments_HelpVersionList();
@@ -57,9 +59,11 @@ private: // Test methods
     void Test_ParseArguments_Pause();
     void Test_ParseArguments_ReportAndProjectName();
     void Test_ParseArguments_Shuffle();
+    void Test_ParseArguments_TestTimeout();
     void Test_ParseColorMode();
     void Test_ParseUnsignedInt_Invalid();
     void Test_ParseUnsignedInt_Valid();
+    void Test_ToJUnitTestCases_CopiesEachRecord();
 
 public:
     TTest_ASWUnitTests_CLI();

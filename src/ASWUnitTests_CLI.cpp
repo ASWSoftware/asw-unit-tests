@@ -73,6 +73,24 @@ void PrintUsage()
     "                      own --partition-index, to run the suite in parallel\n"
     "                      with no coordination between processes. Requires\n"
     "                      --partition-index.\n"
+    "  --test-timeout-seconds <N>\n"
+    "                      Abort the run if any single test does not finish\n"
+    "                      within <N> seconds. The offending test is recorded\n"
+    "                      as failed (with a message explaining why) and no\n"
+    "                      further tests or groups run afterward. There is no\n"
+    "                      default; a hung test runs indefinitely unless this\n"
+    "                      is given.\n"
+    "  --catch-crashes     Catch a native crash (e.g. an access violation or\n"
+    "                      segmentation fault) in a test and record it as\n"
+    "                      failed instead of letting it take down the whole\n"
+    "                      process. Most crash types let the run continue with\n"
+    "                      the next test; a few (a stack overflow on Windows,\n"
+    "                      or any segmentation fault on POSIX, which can't be\n"
+    "                      cheaply told apart from a stack overflow there)\n"
+    "                      abort the run afterward instead, the same way\n"
+    "                      --test-timeout-seconds does. Never attempts to\n"
+    "                      catch SIGABRT. Off by default; a crash terminates\n"
+    "                      the process as usual unless this is given.\n"
     "  --color <mode>      One of \"auto\" (default; color only on an\n"
     "                      interactive terminal that supports it, and only\n"
     "                      if the NO_COLOR environment variable isn't set),\n"
@@ -303,6 +321,38 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
             options.PartitionCount = *parsed;
             options.HasPartitionCount = true;
         }
+        else if (arg == "--test-timeout-seconds")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a numeric argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            if (!parsed.has_value() || *parsed == 0)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a positive integer argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            options.TestTimeoutSeconds = *parsed;
+        }
+        else if (arg.rfind("--test-timeout-seconds=", 0) == 0)
+        {
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(std::string(arg.substr(23)));
+            if (!parsed.has_value() || *parsed == 0)
+            {
+                std::cout << "Error: --test-timeout-seconds requires a positive integer argument.\n";
+                return ExitCode_InvalidArguments;
+            }
+
+            options.TestTimeoutSeconds = *parsed;
+        }
+        else if (arg == "--catch-crashes")
+        {
+            options.CatchCrashes = true;
+        }
         else if (arg == "--no-color")
         {
             options.ColorMode = TColorMode::Never;
@@ -475,6 +525,45 @@ std::optional<unsigned int> TCLIParser::ParseUnsignedInt(std::string const& text
     {
         return std::nullopt;
     }
+}
+//---------------------------------------------------------------------------
+
+
+// /////// Shared runner helpers ///////////////////////
+
+//---------------------------------------------------------------------------
+int ExitCodeForResults(TTestResults const& results)
+{
+    if (results.TimedOut)
+        return ExitCode_TestTimedOut;
+
+    if (results.Crashed)
+        return ExitCode_TestCrashed;
+
+    if (results.FailedCount > 0 || results.Stopped)
+        return ExitCode_TestsFailed;
+
+    return ExitCode_Success;
+}
+//---------------------------------------------------------------------------
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records)
+{
+    std::vector<TJUnitTestCase> testCases;
+    testCases.reserve(records.size());
+
+    for (TTestCaseRecord const& record : records)
+    {
+        TJUnitOutcome outcome = TJUnitOutcome::Pass;
+        if (record.Outcome == TTestOutcome::Fail)
+            outcome = TJUnitOutcome::Fail;
+        else if (record.Outcome == TTestOutcome::Skip)
+            outcome = TJUnitOutcome::Skip;
+
+        testCases.push_back(
+            TJUnitTestCase{ record.GroupName, record.TestName, record.DurationSeconds, outcome, record.Message });
+    }
+
+    return testCases;
 }
 //---------------------------------------------------------------------------
 

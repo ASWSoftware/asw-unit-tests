@@ -121,7 +121,17 @@ bool EnableWindowsAnsiSupport()
 //---------------------------------------------------------------------------
 bool EnvVarIsSet(char const* name)
 {
+    // std::getenv() is flagged by MSVC in favor of _dupenv_s(), which is Windows-only and would need
+    // its own portability boundary for no real benefit here: this only reads a single value to check
+    // whether it's set, never writes through the returned pointer.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4996)
+#endif
     char const* value = std::getenv(name);
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
     return value != nullptr && value[0] != '\0';
 }
 //---------------------------------------------------------------------------
@@ -143,7 +153,11 @@ TConsoleColor GetColorFor(TLogKind kind)
 //---------------------------------------------------------------------------
 bool IsStdoutTTY()
 {
-#if defined(_WIN32)
+#if defined(__BORLANDC__) && defined(_WIN32) && !defined(_WIN64)
+    // RAD Studio's 32-bit compiler (bcc32c) declares the POSIX-style name in <io.h>, not the
+    // underscore-prefixed one MSVC/MinGW and RAD Studio's own 64-bit compiler use.
+    return isatty(_fileno(stdout)) != 0;
+#elif defined(_WIN32)
     return _isatty(_fileno(stdout)) != 0;
 #else
     return isatty(fileno(stdout)) != 0;

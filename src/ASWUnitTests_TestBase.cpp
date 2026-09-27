@@ -27,12 +27,16 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <future>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <sstream>
+#include <thread>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
+#include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
 
@@ -99,7 +103,8 @@ TTestGroupBase::TTestGroupBase(std::string const& name)
     : m_ExceptionExpected(false),
       m_LogSuppressed(false),
       m_TestFailedCheck(false),
-      m_Name(name)
+      m_Name(name),
+      m_RunObserver(nullptr)
 {
 }
 //---------------------------------------------------------------------------
@@ -412,7 +417,7 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
 {
     if (testVal)
     {
-        std::string expectedMsg = "Expected true but was false: \"" + msg + "\"";
+        std::string expectedMsg = "Expected false but was true: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
 }
@@ -553,9 +558,19 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
 {
     if (!testVal)
     {
-        std::string expectedMsg = "Expected false but was true: \"" + msg + "\"";
+        std::string expectedMsg = "Expected true but was false: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
+}
+//---------------------------------------------------------------------------
+bool TTestGroupBase::ExceptionTypeExpected() const
+{
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (m_ExpectedRTLExceptionTypeChecker != nullptr)
+        return true;
+#endif
+
+    return m_ExpectedExceptionTypeChecker != nullptr;
 }
 //---------------------------------------------------------------------------
 TTestGroupBase::TestCallbackList& TTestGroupBase::GetTestCallbackList()
@@ -573,6 +588,12 @@ void TTestGroupBase::Log(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg + "\n");
+        return;
+    }
+
     std::cout << msg << std::endl;
 }
 //---------------------------------------------------------------------------
@@ -580,6 +601,12 @@ void TTestGroupBase::LogAppend(std::string const& msg)
 {
     if (m_LogSuppressed)
         return;
+
+    if (m_RunObserver != nullptr)
+    {
+        m_RunObserver->OnLog(msg);
+        return;
+    }
 
     std::cout << msg;
 }
@@ -600,9 +627,75 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
     RegisterTest(testCase);
 }
 //---------------------------------------------------------------------------
+/*
+    TTestGroupBase::ReportCrashedTest
+
+    Called by RunCatchingCrashes() when TCrashGuard::Run() catches a native crash while running
+    'testCase'. The synthetic failure record is added directly (not via Test()'s own finish() lambda,
+    for the same reason ReportTimedOutTest() below does the same) so this group's Results() ends up
+    exactly like any other completed run: safe for TTestHandler::Run() to merge and for
+    --report-junit to write out.
+
+    Throws TExceptTestCrashed only when 'abortRun' is set (see TCrashGuard::Run() for when that is);
+    otherwise returns normally; RunWithTimeout()'s loop in Run() simply continues to the next test.
+*/
+void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& description, bool abortRun)
+{
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const detail = "Test crashed: " + description + ".";
+    std::string const tag = "***Test failed";
+    std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
+
+    m_Results.FailedCount++;
+    m_Results.Messages.push_back(plainMsg);
+    m_Results.CaseRecords.push_back(
+        TTestCaseRecord{ m_Name, testCase.GetName(), 0.0, TTestOutcome::Fail, detail });
+
+    Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+
+    if (abortRun)
+    {
+        Log("!!CRASH!!: \"" + testFullName + "\" crashed in a way that isn't safe to continue past (" +
+            description + "); abandoning the remaining run.");
+        throw TExceptTestCrashed("Test \"" + testFullName + "\" crashed: " + description + ".");
+    }
+
+    Log("!!CRASH!!: \"" + testFullName + "\" crashed (" + description + "); continuing with the next test.");
+}
+//---------------------------------------------------------------------------
+/*
+    TTestGroupBase::ReportTimedOutTest
+
+    Called by RunWithTimeout() when a test's worker thread does not finish within its allotted
+    timeout. The synthetic failure record is added directly (not via Test()'s own finish() lambda,
+    which only that thread should touch) so this group's Results() ends up exactly like any other
+    completed run: safe for TTestHandler::Run() to merge and for --report-junit to write out.
+*/
+void TTestGroupBase::ReportTimedOutTest(ITestCase& testCase, unsigned int testTimeoutSeconds)
+{
+    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const detail = "Test exceeded its " + std::to_string(testTimeoutSeconds) +
+        " second timeout and was abandoned.";
+    std::string const tag = "***Test failed";
+    std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
+
+    m_Results.FailedCount++;
+    m_Results.Messages.push_back(plainMsg);
+    m_Results.CaseRecords.push_back(TTestCaseRecord{
+            m_Name, testCase.GetName(), static_cast<double>(testTimeoutSeconds), TTestOutcome::Fail, detail });
+
+    Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+    Log("!!TIMEOUT!!: \"" + testFullName + "\" exceeded " + std::to_string(testTimeoutSeconds) +
+        " second(s); abandoning the remaining run.");
+
+    throw TExceptTestTimedOut("Test \"" + testFullName + "\" timed out after " +
+        std::to_string(testTimeoutSeconds) + " second(s).");
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::ResetTestFailedOneOrMoreChecks()
 {
     m_TestFailedCheck = false;
+    m_CheckFailureMessages.clear();
 }
 //---------------------------------------------------------------------------
 TTestResults const& TTestGroupBase::Results() const
@@ -613,12 +706,30 @@ TTestResults const& TTestGroupBase::Results() const
 /*
     TTestGroupBase::Run
 
+    Starts from empty Results(), so running the same group again (e.g. repeated runs in the VCL GUI
+    runner) reports only this run's outcomes rather than adding them to the previous run's.
+
     'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
     TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
+
+    'testTimeoutSeconds', when set, aborts the run (see RunWithTimeout()/ReportTimedOutTest()) if any
+    single test does not finish within that many seconds. 'catchCrashes' additionally protects each
+    test against a native crash (see RunCatchingCrashes()/ReportCrashedTest()). Either can throw a
+    TExceptAbortRun out of this method, skipping any tests after the one that triggered it.
+
+    With an ITestRunObserver set (see SetRunObserver()), each test is bracketed by OnTestStarted()/
+    OnTestFinished() here, around RunWithTimeout() rather than inside Test(), so they're called on this
+    thread even when the test itself runs on a worker thread. OnTestFinished() is still called for a
+    test whose outcome was recorded before an exception left this method (e.g. a timed-out test's
+    synthetic failure). StopRequested() is checked before each test; if it returns true, the remaining
+    tests are skipped and Results().Stopped is set.
 */
-void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed)
+void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> shuffleSeed,
+    std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
+
+    m_Results = TTestResults();
 
     std::vector<size_t> order(m_TestCallbacks.size());
     for (size_t i = 0; i < order.size(); ++i)
@@ -637,8 +748,130 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
         if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
             continue;
 
-        Test(testCase);
+        if (m_RunObserver == nullptr)
+        {
+            RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
+            continue;
+        }
+
+        if (m_RunObserver->StopRequested())
+        {
+            m_Results.Stopped = true;
+            break;
+        }
+
+        // Reports this test's record, if it recorded one (a test whose unexpected exception propagates doesn't).
+        size_t const recordsBefore = m_Results.CaseRecords.size();
+        auto notifyFinished = [&]()
+            {
+                if (m_Results.CaseRecords.size() > recordsBefore)
+                    m_RunObserver->OnTestFinished(m_Results.CaseRecords.back());
+            };
+
+        m_RunObserver->OnTestStarted(m_Name, testCase.GetName());
+
+        try
+        {
+            RunWithTimeout(testCase, testTimeoutSeconds, catchCrashes);
+        }
+        catch (...)
+        {
+            notifyFinished();
+            throw;
+        }
+
+        notifyFinished();
     }
+}
+//---------------------------------------------------------------------------
+/*
+    TTestGroupBase::RunCatchingCrashes
+
+    With 'catchCrashes' false, calls Test(testCase) directly: no guard, no overhead.
+
+    Otherwise, runs Test(testCase) through TCrashGuard::Run() (see ASWUnitTests_CrashGuard.h). A
+    normal completion, including via an ordinary C++ exception, passes through unaffected. A caught
+    crash is handed to ReportCrashedTest(), which either records it as a failure and returns (the
+    common case: the next test still runs) or additionally throws to abort the rest of the run, for
+    the specific crash types TCrashGuard::Run() considers too severe to continue past.
+*/
+void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
+{
+    if (!catchCrashes)
+    {
+        Test(testCase);
+        return;
+    }
+
+    TCrashGuardResult const result = TCrashGuard::Run([this, &testCase]()
+        {
+            Test(testCase);
+        });
+
+    if (result.Crashed)
+        ReportCrashedTest(testCase, result.Description, result.ShouldAbortRun);
+}
+//---------------------------------------------------------------------------
+/*
+    TTestGroupBase::RunWithTimeout
+
+    With no 'testTimeoutSeconds', calls RunCatchingCrashes(testCase, catchCrashes) directly: no
+    thread, no overhead beyond whatever that call itself adds.
+
+    Otherwise, runs it on a worker thread and waits on it with a timeout. The worker thread is the
+    only one that ever touches 'testCase' or this group's members while it's running, so there's no
+    data race with the waiting thread here. If it finishes in time, whatever it threw (if anything)
+    is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
+    directly. The one exception, with ASWUNITTESTS_RTL_EXCEPTIONS enabled: an RTL exception arrives
+    as a TExceptRTLException carrying its description and class (see the worker's catch). If it
+    times out, the worker thread is detached (never joined: it may be stuck forever, and there is no
+    safe, portable way to force a thread to unwind) and ReportTimedOutTest() records the failure and
+    throws to abort the rest of the run.
+*/
+void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds,
+    bool catchCrashes)
+{
+    if (!testTimeoutSeconds.has_value())
+    {
+        RunCatchingCrashes(testCase, catchCrashes);
+        return;
+    }
+
+    // Held by shared_ptr, not a plain local, because a detached thread (below) may still be running well after this
+    // function has returned or thrown, and would otherwise write to a promise whose stack storage no longer exists.
+    std::shared_ptr<std::promise<void> > done = std::make_shared<std::promise<void> >();
+    std::future<void> future = done->get_future();
+
+    std::thread worker([this, &testCase, done, catchCrashes]()
+            {
+        try
+        {
+            RunCatchingCrashes(testCase, catchCrashes);
+            done->set_value();
+        }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        catch (System::Sysutils::Exception& ex)
+        {
+            // An RTL exception can't be carried by std::exception_ptr past its own handler: rethrowing it
+            // later, even on the same thread, terminates the process (verified on bcc64x). Hand over a
+            // TExceptRTLException instead, which keeps its description and class.
+            done->set_exception(std::make_exception_ptr(TExceptRTLException(ex)));
+        }
+#endif
+        catch (...)
+        {
+            done->set_exception(std::current_exception());
+        }
+            });
+
+    if (future.wait_for(std::chrono::seconds(*testTimeoutSeconds)) == std::future_status::timeout)
+    {
+        worker.detach();
+        ReportTimedOutTest(testCase, *testTimeoutSeconds);
+    }
+
+    worker.join();
+    future.get();
 }
 //---------------------------------------------------------------------------
 /*
@@ -652,6 +885,9 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
     m_ExpectedExceptionMessage.clear();
     m_ExpectedExceptionTypeChecker = nullptr;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    m_ExpectedRTLExceptionTypeChecker = nullptr;
+#endif
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetLogSuppressed(bool suppressed)
@@ -659,11 +895,19 @@ void TTestGroupBase::SetLogSuppressed(bool suppressed)
     m_LogSuppressed = suppressed;
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::SetRunObserver(ITestRunObserver* observer)
+{
+    m_RunObserver = observer;
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
 {
     m_TestFailedCheck = true;
 
-    std::string finalMsg = "  **Check failed for: \"" + method + "\" (" + std::to_string(line) + "): " + msg;
+    std::string const checkFailure = "Check failed for: \"" + method + "\" (" + std::to_string(line) + "): " + msg;
+    m_CheckFailureMessages.push_back(checkFailure);
+
+    std::string finalMsg = "  **" + checkFailure;
     m_Results.Messages.push_back(finalMsg);
     Log(finalMsg);
 }
@@ -734,9 +978,22 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
     // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
     // for the console, never in the stored message/record), and logs the "Finished test" timing line.
-    // 'detailMessage' is the failure/skip detail text, or empty for a pass.
+    // 'detailMessage' is the failure/skip detail text, or empty for a pass. A failed test's record also
+    // gets any Check* failures it collected, ahead of 'detailMessage', since those were only logged as
+    // they happened; the logged line omits them to avoid printing each one twice.
     auto finish = [&](TTestOutcome outcome, char const* status, std::string const& detailMessage)
         {
+            std::string recordDetail = detailMessage;
+
+            if (outcome == TTestOutcome::Fail && !m_CheckFailureMessages.empty())
+            {
+                std::string checkFailures;
+                for (std::string const& checkFailure : m_CheckFailureMessages)
+                    checkFailures += (checkFailures.empty() ? std::string() : std::string("\n")) + checkFailure;
+
+                recordDetail = detailMessage.empty() ? checkFailures : (checkFailures + "\n" + detailMessage);
+            }
+
             TLogKind const kind = (outcome == TTestOutcome::Fail) ? TLogKind::Fail :
                     (outcome == TTestOutcome::Skip) ? TLogKind::Skip : TLogKind::Pass;
 
@@ -753,10 +1010,53 @@ void TTestGroupBase::Test(ITestCase& testCase)
             double const durationSeconds = std::chrono::duration<double>(
                 std::chrono::high_resolution_clock::now() - testStart).count();
             m_Results.CaseRecords.push_back(
-                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, detailMessage });
+                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, recordDetail });
 
             Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
                 FormatDurationMs(testStart) + ")");
+        };
+
+    // Scores an exception caught while one was expected. 'typeMatches' is whether it satisfies the requested
+    // type (true when no specific type was requested), 'message' is the text checked for the expected substring,
+    // and 'description' is how the exception is shown in a failure detail.
+    // Records a pass, unless a Check* failure earlier in the test means it failed after all, even if everything
+    // after that (including an expected exception arriving) went as intended. Every path that would otherwise
+    // pass the test goes through here, so none of them can overlook an earlier Check* failure.
+    auto finishPassUnlessChecksFailed = [&]()
+        {
+            if (TestFailedOneOrMoreChecks())
+            {
+                // The record gets the Check* failures themselves; see finish().
+                m_Results.FailedCount++;
+                finish(TTestOutcome::Fail, "failed", std::string());
+                return;
+            }
+
+            m_Results.SuccessCount++;
+            finish(TTestOutcome::Pass, "passed", std::string());
+        };
+
+    auto finishExpectedException = [&](bool typeMatches, std::string const& message, std::string const& description)
+        {
+            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
+                (message.find(m_ExpectedExceptionMessage) != std::string::npos);
+
+            if (typeMatches && messageMatches)
+            {
+                finishPassUnlessChecksFailed();
+                return;
+            }
+
+            m_Results.FailedCount++;
+
+            std::string detail;
+            if (!typeMatches)
+                detail = "expected exception type was not thrown (caught a different exception): " + description;
+            else
+                detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage + "\" but caught: " +
+                    description;
+
+            finish(TTestOutcome::Fail, "failed", detail);
         };
 
     try
@@ -810,16 +1110,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             throw TExceptExpected(m_ExceptionExpectedText);
         }
 
-        if (TestFailedOneOrMoreChecks())
-        {
-            m_Results.FailedCount++;
-            finish(TTestOutcome::Fail, "failed", std::string());
-            return;
-        }
-
-        // Test passed
-        m_Results.SuccessCount++;
-        finish(TTestOutcome::Pass, "passed", std::string());
+        finishPassUnlessChecksFailed();
     }
     catch (TExceptSkipped const& ex)
     {
@@ -828,16 +1119,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
     }
     catch (TTestException const& ex)
     {
-        if (m_ExceptionExpected)
-        {
-            m_Results.SuccessCount++;
-            finish(TTestOutcome::Pass, "passed", std::string());
-        }
-        else
-        {
-            m_Results.FailedCount++;
-            finish(TTestOutcome::Fail, "failed", ex.what());
-        }
+        // This framework's own failure signal (an Assert* failure, or TExceptExpected when an expected exception
+        // never came), never the exception a test is waiting for, so it fails the test even while an exception
+        // is expected, without checking the type or message the test asked for.
+        m_Results.FailedCount++;
+        finish(TTestOutcome::Fail, "failed", ex.what());
     }
     catch (std::exception const& ex)
     {
@@ -845,29 +1131,10 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             // A type/message check is only requested via the templated SetExceptionExpected<TException>()
             // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
-            bool const typeMatches = (m_ExpectedExceptionTypeChecker == nullptr) || m_ExpectedExceptionTypeChecker(ex);
-            bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
-                (std::string(ex.what()).find(m_ExpectedExceptionMessage) != std::string::npos);
-
-            if (typeMatches && messageMatches)
-            {
-                m_Results.SuccessCount++;
-                finish(TTestOutcome::Pass, "passed", std::string());
-            }
-            else
-            {
-                m_Results.FailedCount++;
-
-                std::string detail;
-                if (!typeMatches)
-                    detail = "expected exception type was not thrown (caught a different exception): " +
-                        std::string(ex.what());
-                else
-                    detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
-                        "\" but caught: " + std::string(ex.what());
-
-                finish(TTestOutcome::Fail, "failed", detail);
-            }
+            // A requested RTL exception type (see ExceptionTypeExpected()) never matches a std::exception.
+            bool const typeMatches = (m_ExpectedExceptionTypeChecker != nullptr) ?
+                    m_ExpectedExceptionTypeChecker(ex) : !ExceptionTypeExpected();
+            finishExpectedException(typeMatches, ex.what(), ex.what());
         }
         else
         {
@@ -875,22 +1142,43 @@ void TTestGroupBase::Test(ITestCase& testCase)
             throw; // Unexpected failure
         }
     }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        if (m_ExceptionExpected)
+        {
+            // Mirrors the std::exception case above: a requested std::exception type never matches here.
+            bool const typeMatches = (m_ExpectedRTLExceptionTypeChecker != nullptr) ?
+                    m_ExpectedRTLExceptionTypeChecker(ex) : !ExceptionTypeExpected();
+            finishExpectedException(typeMatches, RTLExceptionMessage(ex), DescribeRTLException(ex));
+        }
+        else
+        {
+            m_Results.FailedCount++;
+            throw; // Unexpected failure
+        }
+    }
+#endif
     catch (...)
     {
         if (m_ExceptionExpected)
         {
-            if (m_ExpectedExceptionTypeChecker != nullptr)
+            if (ExceptionTypeExpected())
             {
-                // A specific type was requested, but what was thrown isn't a std::exception, so it can't be
-                // inspected to confirm the type (or message) matched. Treat that as a failure, not a pass.
+                // A specific type was requested, but what was thrown isn't an exception class this framework
+                // can inspect to confirm the type (or message) matched. Treat that as a failure, not a pass.
                 m_Results.FailedCount++;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+                finish(TTestOutcome::Fail, "failed", "expected a specific exception type, but an object that is "
+                    "neither a std::exception nor an RTL Exception was thrown instead.");
+#else
                 finish(TTestOutcome::Fail, "failed",
                     "expected a specific exception type, but a non-std::exception object was thrown instead.");
+#endif
             }
             else
             {
-                m_Results.SuccessCount++;
-                finish(TTestOutcome::Pass, "passed", std::string());
+                finishPassUnlessChecksFailed();
             }
         }
         else
@@ -914,9 +1202,12 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 
 //---------------------------------------------------------------------------
 TTestResults::TTestResults()
-    : FailedCount(0),
+    : Crashed(false),
+      FailedCount(0),
       SkippedCount(0),
-      SuccessCount(0)
+      Stopped(false),
+      SuccessCount(0),
+      TimedOut(false)
 {
 }
 //---------------------------------------------------------------------------

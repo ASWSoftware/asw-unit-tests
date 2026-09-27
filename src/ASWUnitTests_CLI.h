@@ -27,9 +27,11 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <optional>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Handler.h"
+#include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 
@@ -42,6 +44,8 @@ constexpr int ExitCode_TestsFailed = 1;
 constexpr int ExitCode_UnhandledException = 2;
 constexpr int ExitCode_UnhandledExceptionUnknown = 3;
 constexpr int ExitCode_InvalidArguments = 4;
+constexpr int ExitCode_TestTimedOut = 5;
+constexpr int ExitCode_TestCrashed = 6;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -62,6 +66,8 @@ struct TCLIOptions
     bool HasPartitionCount = false;
     unsigned int PartitionIndex = 0;
     unsigned int PartitionCount = 0;
+    std::optional<unsigned int> TestTimeoutSeconds;
+    bool CatchCrashes = false;
     TColorMode ColorMode = TColorMode::Auto;
     std::optional<TConsoleColor> ColorPass;
     std::optional<TConsoleColor> ColorFail;
@@ -99,6 +105,16 @@ public:
     // returns std::nullopt if 'text' isn't a valid unsigned integer or overflows unsigned int.
     static std::optional<unsigned int> ParseUnsignedInt(std::string const& text);
 };
+
+//---------------------------------------------------------------------------
+
+// The exit code for a completed TTestHandler::Run(): ExitCode_TestTimedOut or ExitCode_TestCrashed if the run
+// was aborted for that reason, otherwise ExitCode_TestsFailed if any test failed or the run was stopped early
+// (see ITestRunObserver::StopRequested()), otherwise ExitCode_Success.
+int ExitCodeForResults(TTestResults const& results);
+
+// Converts a run's records into the test cases a --report-junit report is written from.
+std::vector<TJUnitTestCase> ToJUnitTestCases(std::vector<TTestCaseRecord> const& records);
 
 } // namespace ASWUnitTests
 
