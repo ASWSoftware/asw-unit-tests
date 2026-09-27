@@ -63,6 +63,36 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   each test, and can stop the run between tests. Its events arrive on the
   thread that called `Run()`, even under `--test-timeout-seconds`. Without
   one, nothing changes.
+- `TTestHandler::GetTests()`, listing every registered test as a `TTestId`
+  (its group and test names, kept separate since a group name may contain
+  `.`), e.g. for a runner to show the tests before running them.
+- `ExitCodeForResults()` and `ToJUnitTestCases()` in `ASWUnitTests_CLI`,
+  moved out of `main.cpp` so the console and GUI runners share them. A run
+  stopped early through `ITestRunObserver` exits with `1`.
+- `vcl/gui/rad370/`, a VCL GUI runner (with its own build scripts, sources in
+  `vcl/gui/src/`, and a project group opening it with the VCL console
+  project), running the same tests as the console runner. It shows every test
+  in a check box tree with a colored status dot, a detail pane for the
+  selected test or group, a Failures & Skips list, and the run's colored log.
+  Its toolbar runs the checked tests (F9), reruns failures, stops a run after
+  the current test, checks or unchecks every shown test, copies the details,
+  and filters the tree with `--filter`-style wildcards; its main menu has the
+  same commands, plus File > Export JUnit Report, saving the latest run's
+  results as the report `--report-junit` writes, and the command line help
+  and version. It remembers its window size, position, and panel sizes
+  between sessions (per executable, in `%APPDATA%\ASWUnitTests`), with
+  View > Reset Layout to restore the defaults, and GUI-only
+  `--layout-ignore` and `--layout-reset` options to skip or delete the saved
+  layout. It takes the console runner's command line options (`--filter`
+  and partitions choose the initially checked tests, and `--filter` also
+  fills in the filter box), plus GUI-only `--run`, running the checked tests
+  on startup, and `--exit`, closing afterward with the console runner's exit
+  code. Tests run on the main thread, so they can create VCL forms and
+  controls.
+- `TJUnitReportWriter::BuildXML()`, returning the report's XML as a string
+  for a caller that writes the file itself (as the GUI runner does, since
+  `Write()`'s `std::ofstream` can't open a path with characters outside the
+  Windows code page from a `std::string`).
 
 ### Fixed
 

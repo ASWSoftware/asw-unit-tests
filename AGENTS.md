@@ -12,6 +12,7 @@ ASWUnitTests is a lightweight C++ console unit-testing framework.
 - `tests/` contains unit tests for the example code.
 - `toTest/` contains example code under test.
 - `rad370/` contains the RAD Studio 13.1 project and Windows build scripts.
+- `vcl/` contains RAD Studio projects that link the VCL and define `ASWUNITTESTS_RTL_EXCEPTIONS`, exercising the framework's opt-in RTL exception support: `vcl/console/rad370/` is a VCL console project (with its own build scripts) that runs the full self-test suite plus the RTL-specific and GUI unit tests in `vcl/tests/`. `vcl/gui/rad370/` is the VCL GUI runner project (with its own build scripts, and a project group that also opens the console project), built from the sources in `vcl/gui/src/`. The console project also compiles the GUI's non-form units, so their tests run without the GUI.
 - `README.md` contains usage and integration examples.
 - `.uncrustify.cfg` and `.githooks/` define the repository formatting workflow.
 
@@ -62,6 +63,8 @@ For other environments, use the repository's CMake configuration when present or
 - Run the unit-test executable.
 - Check compiler warnings and errors.
 - Validate both Windows-specific and portable paths when the change touches platform code.
+- When the change touches code guarded by `ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED`, or the exception handling around it, also build and run the VCL console project (`vcl/console/rad370/Build_Win64x_Debug.bat` and the Win32 script), since no other build compiles that code.
+- When the change touches `vcl/gui/src/`, or framework code the GUI runner uses (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
 
 ## Formatting and Review
 

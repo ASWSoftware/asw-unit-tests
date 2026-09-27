@@ -6,25 +6,58 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 
 # Features
 
-- `Check` prefix methods for `assert` sections of unit tests that aren't intended to throw (e.g. CheckTrue())
-- `Assert` prefix methods for `assert` sections of unit tests that should throw right away (e.g. AssertTrue())
-- `SetExceptionExpected()` - support for expected exceptions, with an optional exception-type and message check
-- `CheckNear()`/`AssertNear()` - tolerance-based `float`/`double` comparison
-- `Skip()` - aborts a test and reports it as skipped, unconditionally or after a runtime check, without removing
-  its registration
-- `RegisterTestCases()` - registers one test case per row of data for parameterized/data-driven tests, instead of
-  hand-writing a loop or duplicating near-identical test methods
-- `JUnit Report` - writes a JUnit-style XML test report, recognized natively by most CI systems, with no
-  third-party dependency
-- `--partition-index`/`--partition-count` - splits the suite across separate process invocations (e.g. a CI job
-  matrix) for parallel execution, with no in-process threading and no merge step
-- `--test-timeout-seconds` - aborts the run if a single test hangs (e.g. an infinite loop) past a given number of
-  seconds, instead of blocking forever
-- `--catch-crashes` - catches a native crash (e.g. an access violation or segmentation fault) in a test and
-  records it as failed instead of letting it take down the whole process
+## Writing Tests
 
-See `ASWUnitTests_TestBase.h` for basic list of supported `Check/Assert` methods.
-See the example unit test `Test_ASWTools_String.cpp` in `tests` folder for how to use `SetExceptionExpected()`.
+- **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
+  editing any framework file.
+- **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, and `Near`/`NotNear`.
+- **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
+  and `double` values within a tolerance.
+- **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** - `SetExceptionExpected()`, with an
+  optional check of the exception's type and message.
+- **[Parameterized tests](#parameterized-tests)** - `RegisterTestCases()` registers one named test case per row of
+  data.
+- **[Skipping tests](#skipping-a-test)** - `Skip()` reports a test as skipped, unconditionally or after a runtime
+  check.
+- **Setup and teardown hooks** - `SetUp_Group()`/`TearDown_Group()` run around each group, and
+  `SetUp_Test()`/`TearDown_Test()` around each test.
+
+## Running Tests
+
+- **Filtering and listing** - `--filter` selects tests by wildcard pattern; `--list` previews the matches without
+  running them.
+- **Shuffled order** - `--shuffle` randomizes the run order to expose hidden coupling between tests;
+  `--shuffle-seed` reproduces a given order.
+- **Parallel partitions** - `--partition-index`/`--partition-count` split the suite across separate processes,
+  e.g. a CI job matrix.
+- **Hang protection** - `--test-timeout-seconds` aborts the run if a single test doesn't finish in time, instead of
+  blocking forever.
+- **Crash protection** - `--catch-crashes` records a native crash (e.g. an access violation) as a failed test
+  instead of losing the whole process.
+- **[VCL GUI runner](#vcl-gui-runner)** - A RAD Studio VCL app that runs the same tests, with a checkbox tree to
+  choose them, live pass/fail/skip status, and each failure's details and log.
+
+## Reporting
+
+- **JUnit XML report** - `--report-junit` writes a report that most CI systems read natively.
+- **Colored console output** - Configurable pass/fail/skip colors, with automatic terminal detection and `NO_COLOR`
+  support.
+- **Per-test timing** - Every test logs its duration, making slow tests easy to spot.
+- **[Meaningful exit codes](#command-line-options)** - Distinguish failed tests, unhandled exceptions, invalid
+  arguments, timeouts, and crashes.
+
+## Platforms and Integration
+
+- **Portable** - Windows and Linux, with MSVC, MinGW, GCC, Clang, and RAD Studio's Clang-based compilers. Requires
+  C++17 or later, with no third-party dependencies.
+- **[Drop-in submodule](#submodule-integration)** - Add the repository as a git submodule and build its `src`
+  folder alongside your own tests, with `ASWUnitTests_Sources.cmake` for CMake projects.
+- **[RAD Studio RTL exceptions](#rad-studio-rtl-exceptions-vclfmx)** - Opt-in support for VCL/FMX `Exception`
+  classes such as `EConvertError` via `ASWUNITTESTS_RTL_EXCEPTIONS`.
+
+For the full list of `Check`/`Assert` methods, see `src/ASWUnitTests_TestBase.h`. For working examples, see the
+`tests` folder, e.g. `tests/Test_ASWTools_String.cpp` for `SetExceptionExpected()`.
 
 # Donations:
 
@@ -214,11 +247,86 @@ group, with `<failure>`/`<skipped>` elements carrying the same detail message sh
 sets both the console's `Initializing...` line and the report's `<testsuites name="...">` attribute.
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
-tests failed, `2` an unhandled `std::exception` escaped a test, `3` an unhandled non-`std::exception` escaped a test,
+tests failed, `2` an unhandled `std::exception` (or, with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx)
+enabled, an RTL `Exception`) escaped a test, `3` an unhandled exception of any other type escaped a test,
 `4` invalid command line arguments, `5` a test exceeded `--test-timeout-seconds` and the run was aborted, `6` a test
 crashed severely enough (with `--catch-crashes` given) that the run was aborted. A crash caught by
 `--catch-crashes` that didn't force an abort is just an ordinary test failure (exit code `1`), not `6`. Skipped
 tests never affect the exit code.
+
+## VCL GUI Runner
+
+`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj` builds a RAD Studio VCL application that runs the same tests as the
+console runner, in a window for choosing tests and reading their results. It runs this repository's full self-test
+suite, and its `Build_*.bat` scripts write the executable to `vcl\gui\rad370\<Platform>\<Config>`.
+`vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj` opens it together with the VCL console project.
+
+The window shows:
+
+- **Test tree** - Every registered test under its group, with a check box to choose what runs (all are checked at
+  first) and a colored dot for its status: gray not run, blue running, green passed, red failed, amber skipped. A
+  group's check box and dot summarize its tests.
+- **Detail pane** - The selected test's result, duration, failure or skip detail, and its own log output, or how many
+  of a selected group's tests have each status.
+- **Failures & Skips** - Every failed or skipped test in the latest run. Double-click one to select it in the tree.
+- **Log** - The run's full output, with failures in red and skips in amber.
+- **Progress and status bars** - Progress (red once anything fails), counts, elapsed time, and the run's status.
+
+The toolbar, whose commands are also in the Run and Tests menus:
+
+- **Run Selected** (F9) runs the checked tests, and **Run Failed** reruns the latest run's failures.
+- **Stop** ends the run after the current test. Closing the window during a run does the same, then closes.
+- **Select All** and **Select None** check or uncheck every shown test.
+- **Copy Details** (Ctrl+Shift+C) copies the detail pane to the clipboard.
+- **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, ignoring case, with the same
+  `*` and `?` wildcards as `--filter`. While it hides tests, checking them and Run Selected only apply to the shown
+  ones, and hidden tests keep their check marks.
+
+**File > Export JUnit Report** saves the latest run's results as the same JUnit XML report `--report-junit` writes,
+for when `--report-junit` wasn't given, or to keep a copy. The Help menu shows the command line options (the same
+text as `--help`) and the framework version.
+
+When the window closes, it saves its size, position, maximized state, and panel sizes to
+`%APPDATA%\ASWUnitTests\<exe name>.ini`, and restores them the next time it opens. A position on a monitor that's no
+longer connected is ignored. An `--exit` run doesn't save the layout. **View > Reset Layout** restores the default
+layout right away; `--layout-ignore` and `--layout-reset` (below) control this from the command line.
+
+Tests run on the main (VCL) thread, so a test can create forms and controls. `--test-timeout-seconds` runs each test
+on a worker thread instead, so it can't be combined with tests like that; the log says so when it's given.
+
+The GUI takes the same [command line options](#command-line-options) as the console runner, with these differences:
+
+- `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, and `--filter`'s
+  pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
+  unchecked, since the box ignores case and matches anywhere in the name).
+- `--project-name` is also shown in the window's caption.
+- `--report-junit` writes the report after every run, including Run Failed.
+- `--list`, `--pause`, and the color options are ignored, with a note in the log.
+- `--help`, `--version`, and argument errors are shown in a dialog, and the GUI then exits without opening.
+- `--run` (GUI-only) runs the checked tests as soon as the window opens.
+- `--exit` (GUI-only, requires `--run`) closes the window when that run finishes, and exits with the same code the
+  console runner would; a run ended with Stop exits with `1`. Without `--exit`, the GUI always exits with `0`.
+- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, so the window opens with the defaults
+  and the saved layout is left as it is.
+- `--layout-reset` (GUI-only) deletes the saved window layout and opens with the defaults, which is a way to
+  recover if a saved layout ever causes a problem. The layout is saved again when the window closes.
+
+A GUI process doesn't make a Windows command prompt wait for it, so a script that needs `--exit`'s exit code should
+start it with `start /wait` (or its own language's equivalent):
+
+```
+start /wait ASWUnitTests_VCL_GUI.exe --filter "*String*" --run --exit --report-junit results.xml
+echo %ERRORLEVEL%
+```
+
+To run your own tests in the GUI, create a RAD Studio VCL application that defines `ASWUNITTESTS_RTL_EXCEPTIONS`, and
+add to it: the framework's `src` files except `main.cpp`; the files in `vcl\gui\src`, including
+`ASWUnitTests_GUI_MainForm.dfm`; your own test modules; and a `WinMain()` modeled on
+`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line and starts the main form.
+
+The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with `TTestHandler::SetRunObserver()`.
+An observer receives the log output that would otherwise go to `std::cout`, is told as each test starts and finishes,
+and can stop a run between tests, so it can drive other kinds of runners too.
 
 ## Registering Tests
 
@@ -266,9 +374,59 @@ int32_t i = TStrTool::StrToInt32(invalid);
 ```
 
 If the wrong exception type is thrown, or its message doesn't contain the given substring, the test fails with a
-message showing what was actually caught. This only works for exceptions deriving from `std::exception`. A thrown
-object that doesn't can't be inspected, so a type/message expectation against it fails with an explanatory message
-rather than silently passing.
+message showing what was actually caught. This only works for exceptions deriving from `std::exception`, or from
+RAD Studio's RTL `Exception` class when [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled. A
+thrown object that doesn't can't be inspected, so a type/message expectation against it fails with an explanatory
+message rather than silently passing.
+
+An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails the test rather
+than counting as the expected exception, and so does a failed `Check*` earlier in the test, even if the expected
+exception then arrives.
+
+### RAD Studio RTL Exceptions (VCL/FMX)
+
+RAD Studio's RTL exceptions (`System::Sysutils::Exception` and its subclasses, such as `EConvertError`) are shared by
+VCL and FMX, and don't derive from `std::exception`. By default, only the generic `SetExceptionExpected(true, ...)`
+matches one, and one that escapes a test unexpectedly is reported as `Unhandled exception: Unknown`.
+
+A C++Builder project that links the RTL can opt in by defining `ASWUNITTESTS_RTL_EXCEPTIONS` in its project options
+(Building > C++ Shared Options > Conditional defines). This requires RAD Studio's Clang-based compilers
+(`bcc32c`/`bcc64x`). Defining it for any other compiler is a compile error, so a misconfigured build fails loudly
+instead of silently dropping the feature. Nothing changes for builds that don't define it.
+
+With it enabled, the templated `SetExceptionExpected<TException>()` also accepts RTL exception classes, matched
+polymorphically the same way (so `Exception` matches any RTL exception). The optional message substring is checked
+against the exception's `Message`, converted to UTF-8:
+
+```
+SetExceptionExpected<EConvertError>(__func__, __LINE__, "StrToInt invalid", "not a valid integer");
+StrToInt(L"abc");
+```
+
+A requested RTL type never matches a `std::exception`, and a requested `std::exception` type never matches an RTL
+exception. Failure details and unhandled exceptions show RTL exceptions as `ClassName: Message` (e.g.
+`EConvertError: 'abc' is not a valid integer value`), and an unhandled one exits with code `2`, like an unhandled
+`std::exception`.
+
+`--test-timeout-seconds` runs each test on a worker thread. Expected exceptions work exactly the same there, because
+they're caught and checked on that thread. An *unexpected* RTL exception has to cross back to the main thread, which
+`std::exception_ptr` can't do for RTL exceptions (rethrowing one after its handler has exited terminates the
+process). It therefore arrives as a `TExceptRTLException`, a `std::runtime_error` whose `what()` is the same
+`ClassName: Message` text, so the console output and exit code are unchanged. Code that calls a group's `Run()`
+directly with a timeout can still check the original type through `RTLClass()`:
+
+```
+catch (TExceptRTLException const& ex)
+{
+    if (ex.RTLClass()->InheritsFrom(__classid(EConvertError)))
+        ...
+}
+```
+
+`vcl\console\rad370\ASWUnitTests_VCL_Console.cbproj` is a working reference setup: a VCL console project that defines
+`ASWUNITTESTS_RTL_EXCEPTIONS` and runs this repository's full self-test suite plus the RTL-specific and GUI unit
+tests in `vcl\tests`. It has its own `Build_*.bat` scripts, and writes its executable to
+`vcl\console\rad370\<Platform>\<Config>`. The [VCL GUI runner](#vcl-gui-runner) is set up the same way.
 
 ### Comparing Floating-Point Values
 
@@ -389,17 +547,19 @@ with something more meaningful than its index (e.g. `"HexSingleToByte[A]"`), whi
 
 ## Submodule Integration
 
-This repository's own `cmake\CMakeLists.txt` and `rad370\ASWUnitTests.cbproj` only build *this* repo's own example
-tests and `toTest` code for its own development and CI. Don't use them from a consuming project, and don't modify
-them. Doing either means your changes live inside the submodule and get lost or conflict the next time you update
-it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference its `src`
-files from your own project's build file, alongside your own test modules:
+This repository's own `cmake\CMakeLists.txt`, `rad370\ASWUnitTests.cbproj`, and the RAD Studio projects under `vcl`
+only build *this* repo's own example tests and `toTest` code for its own development and CI. Don't use them from a
+consuming project, and don't modify them. Doing either means your changes live inside the submodule and get lost or
+conflict the next time you update it. Instead, add ASWUnitTests as a git submodule (e.g. into
+`third_party\asw-unit-tests`) and reference its `src` files from your own project's build file, alongside your own
+test modules:
 
 ```
 my-project/
 +-- third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
 |   +-- src/                      <- framework core (never touched)
-|   `-- cmake/, rad370/, tests/, toTest/   <- this framework's own example build, unused by you
+|   +-- vcl/gui/src/              <- VCL GUI runner, if you use it (never touched)
+|   `-- cmake/, rad370/, tests/, toTest/, other vcl/ folders   <- this framework's own example build, unused by you
 +-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
 `-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo
 ```
@@ -440,6 +600,10 @@ target_link_libraries(MyTests PRIVATE Threads::Threads)
 
 Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own project, plus
 your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after updating the submodule.
+
+For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to enable
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx). To run your tests in the
+[VCL GUI runner](#vcl-gui-runner) instead of a console, see that section for the files it needs.
 
 # Coding Standards
 
