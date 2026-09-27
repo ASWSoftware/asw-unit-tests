@@ -674,6 +674,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_RecordsCheckFailuresInFailedTestDetail");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns, "Run_ResetsResultsBetweenRuns");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
@@ -952,6 +953,28 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " recorded as Fail");
         }
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture;
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+    TTestResults const firstRun = fixture.Results();
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& secondRun = fixture.Results();
+    CheckEquals(firstRun.SuccessCount, secondRun.SuccessCount, __func__, __LINE__,
+        "the second run's pass count is its own, not added to the first run's");
+    CheckEquals(firstRun.FailedCount, secondRun.FailedCount, __func__, __LINE__, "same for failures");
+    CheckEquals(firstRun.SkippedCount, secondRun.SkippedCount, __func__, __LINE__, "same for skips");
+    CheckEquals(firstRun.Messages.size(), secondRun.Messages.size(), __func__, __LINE__,
+        "the second run's messages don't include the first run's");
+    CheckEquals(firstRun.CaseRecords.size(), secondRun.CaseRecords.size(), __func__, __LINE__,
+        "one record per test, not one per test per run");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder()

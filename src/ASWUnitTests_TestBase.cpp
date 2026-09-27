@@ -693,6 +693,9 @@ TTestResults const& TTestGroupBase::Results() const
 /*
     TTestGroupBase::Run
 
+    Starts from empty Results(), so running the same group again (e.g. repeated runs in the VCL GUI
+    runner) reports only this run's outcomes rather than adding them to the previous run's.
+
     'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
     TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
 
@@ -705,6 +708,8 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
     std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes)
 {
     //Test(std::bind(&TTestGroup_ASWTools_Version_Tests::Test_SetVersion, this, std::placeholders::_1));
+
+    m_Results = TTestResults();
 
     std::vector<size_t> order(m_TestCallbacks.size());
     for (size_t i = 0; i < order.size(); ++i)
