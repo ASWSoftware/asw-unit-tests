@@ -10,6 +10,8 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-27
+
 ### Added
 
 - CONTRIBUTING.md, documenting the contribution workflow, branch and commit
@@ -94,27 +96,32 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `Write()`'s `std::ofstream` can't open a path with characters outside the
   Windows code page from a `std::string`).
 
+### Changed
+
+- `TTestGroupBase::Run()` starts from empty `Results()`, so running the same
+  group again (e.g. repeated runs in the VCL GUI runner) reports only that
+  run's outcomes instead of adding them to the previous run's.
+- MSVC warnings in the framework sources cleaned up, or suppressed where
+  intentional, so a project building them at a high warning level stays
+  clean.
+
 ### Fixed
 
 - `CheckTrue()` and `CheckFalse()` failure messages had their expectations
   swapped (a failed `CheckTrue()` reported "Expected false but was true", and
   vice versa).
-
 - A test that failed only through `Check*` calls recorded an empty failure
   detail, so its `--report-junit` entry was `<failure message="">` with no
   explanation. Its record now carries each of its `Check*` failures (followed
   by any `Assert*` failure after them). Console output is unchanged, since
   those failures are still logged as they happen.
-
 - A `Check*` failure was ignored if the test then threw the exception it had
   set up with `SetExceptionExpected()`, so the test was reported as passed.
   It now fails, with the `Check*` failure in its detail.
-
 - A failed `Assert*` counted as the expected exception while one was expected
   with `SetExceptionExpected()`, so the test was reported as passed. With the
   templated `SetExceptionExpected<T>()`, the requested type wasn't even
   checked. A failed `Assert*` now always fails the test.
-
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the
   underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit
@@ -197,7 +204,8 @@ framework at this point (test group registration, `Check`/`Assert` methods,
 RAD Studio and CMake build support, etc.) is treated as the baseline and is not
 itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.5...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.5...v1.0.0
 [0.26.5]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.3...v0.26.5
 [0.26.3]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.1...v0.26.3
 [0.26.1]: https://github.com/ASWSoftware/asw-unit-tests/releases/tag/v0.26.1
