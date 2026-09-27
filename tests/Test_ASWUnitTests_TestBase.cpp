@@ -121,7 +121,8 @@ public:
 // SetExceptionExpected()/Test() branch: no throw, a generic expectation satisfied by either a
 // std::exception or a non-std::exception throw, and a specific-type expectation crossed with an
 // exact type match, a polymorphic base-type match, a wrong sibling type, a non-std::exception
-// throw, and a message substring that's present or absent. Every test name ends with "_Passes" or
+// throw, and a message substring that's present or absent; plus an earlier Check* failure followed
+// by the expected exception, on each path that would otherwise pass. Every test name ends with "_Passes" or
 // "_Fails", read generically by Test_SetExceptionExpected_MatchesTypeAndMessage below via
 // NameEndsWith() rather than a hand-maintained table.
 /////////////////////////////////////////////////////////////////////////////
@@ -131,6 +132,10 @@ private:
     typedef TTestGroupBase inherited;
 
 private:
+    void Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails();
+    void Test_CheckFailedThenGenericExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails();
     void Test_ExceptionExpectedButNoneThrown_Fails();
     void Test_GenericExceptionExpected_NonStdExceptionThrown_Passes();
     void Test_GenericExceptionExpected_StdExceptionThrown_Passes();
@@ -154,6 +159,14 @@ TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
 {
     SetLogSuppressed(true);
 
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails,
+        "CheckFailedThenAssertFailedWhileExceptionExpected_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenGenericExpectedExceptionThrown_Fails,
+        "CheckFailedThenGenericExpectedExceptionThrown_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails,
+        "CheckFailedThenNonStdExpectedExceptionThrown_Fails");
+    RegisterTest(&TFixture_ExceptionExpectations::Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails,
+        "CheckFailedThenSpecificExpectedExceptionThrown_Fails");
     RegisterTest(&TFixture_ExceptionExpectations::Test_ExceptionExpectedButNoneThrown_Fails,
         "ExceptionExpectedButNoneThrown_Fails");
     RegisterTest(&TFixture_ExceptionExpectations::Test_GenericExceptionExpected_NonStdExceptionThrown_Passes,
@@ -172,6 +185,37 @@ TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
         "SpecificTypeExpected_PolymorphicBaseTypeThrown_Passes");
     RegisterTest(&TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeThrown_Fails,
         "SpecificTypeExpected_WrongSiblingTypeThrown_Fails");
+}
+//---------------------------------------------------------------------------
+// The next four cover each way Test() can reach a pass after an expected exception arrives: a TTestException
+// (here, an Assert* failure), a std::exception matching a generic or a specific expectation, and a
+// non-std::exception object. An earlier Check* failure must still fail the test on every one of them.
+void TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check and a failed Assert");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    AssertTrue(false, __func__, __LINE__, "deliberate Assert failure, satisfying the generic expectation");
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenGenericExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw std::runtime_error("the expected exception");
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw 42; // Not derived from std::exception at all.
+}
+//---------------------------------------------------------------------------
+void TFixture_ExceptionExpectations::Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails()
+{
+    SetExceptionExpected<TFixtureSpecificError>(__func__, __LINE__, "specific expectation, then a failed Check");
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the expected exception");
+    throw TFixtureSpecificError("the expected exception");
 }
 //---------------------------------------------------------------------------
 void TFixture_ExceptionExpectations::Test_ExceptionExpectedButNoneThrown_Fails()
@@ -632,6 +676,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_RecordsOutcomeCountsAndCaseRecords");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
+        "SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage,
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
@@ -944,6 +990,34 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder
         "shuffling reorders tests without dropping or duplicating any of them");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded()
+{
+    // Arrange
+    TFixture_ExceptionExpectations fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    // Test_SetExceptionExpected_MatchesTypeAndMessage already checks these tests fail; this checks why is
+    // recorded, since the logged "***Test failed" line for a Check-only failure has no detail of its own.
+    size_t checkFailedTests = 0;
+
+    for (TTestCaseRecord const& record : fixture.Results().CaseRecords)
+    {
+        if (record.TestName.rfind("CheckFailedThen", 0) != 0)
+            continue;
+
+        ++checkFailedTests;
+        CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
+        CheckTrue(record.Message.find("deliberate Check failure before the expected exception") != std::string::npos,
+            __func__, __LINE__, record.TestName + "'s record carries its Check failure");
+    }
+
+    CheckEquals(static_cast<size_t>(4), checkFailedTests, __func__, __LINE__,
+        "all four Check-then-expected-exception tests ran");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage()
 {
     // Arrange
@@ -954,7 +1028,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(9), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

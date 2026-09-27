@@ -957,6 +957,23 @@ void TTestGroupBase::Test(ITestCase& testCase)
     // Scores an exception caught while one was expected. 'typeMatches' is whether it satisfies the requested
     // type (true when no specific type was requested), 'message' is the text checked for the expected substring,
     // and 'description' is how the exception is shown in a failure detail.
+    // Records a pass, unless a Check* failure earlier in the test means it failed after all, even if everything
+    // after that (including an expected exception arriving) went as intended. Every path that would otherwise
+    // pass the test goes through here, so none of them can overlook an earlier Check* failure.
+    auto finishPassUnlessChecksFailed = [&]()
+        {
+            if (TestFailedOneOrMoreChecks())
+            {
+                // The record gets the Check* failures themselves; see finish().
+                m_Results.FailedCount++;
+                finish(TTestOutcome::Fail, "failed", std::string());
+                return;
+            }
+
+            m_Results.SuccessCount++;
+            finish(TTestOutcome::Pass, "passed", std::string());
+        };
+
     auto finishExpectedException = [&](bool typeMatches, std::string const& message, std::string const& description)
         {
             bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
@@ -964,8 +981,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
 
             if (typeMatches && messageMatches)
             {
-                m_Results.SuccessCount++;
-                finish(TTestOutcome::Pass, "passed", std::string());
+                finishPassUnlessChecksFailed();
                 return;
             }
 
@@ -1032,16 +1048,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             throw TExceptExpected(m_ExceptionExpectedText);
         }
 
-        if (TestFailedOneOrMoreChecks())
-        {
-            m_Results.FailedCount++;
-            finish(TTestOutcome::Fail, "failed", std::string());
-            return;
-        }
-
-        // Test passed
-        m_Results.SuccessCount++;
-        finish(TTestOutcome::Pass, "passed", std::string());
+        finishPassUnlessChecksFailed();
     }
     catch (TExceptSkipped const& ex)
     {
@@ -1052,8 +1059,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
     {
         if (m_ExceptionExpected)
         {
-            m_Results.SuccessCount++;
-            finish(TTestOutcome::Pass, "passed", std::string());
+            finishPassUnlessChecksFailed();
         }
         else
         {
@@ -1114,8 +1120,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             }
             else
             {
-                m_Results.SuccessCount++;
-                finish(TTestOutcome::Pass, "passed", std::string());
+                finishPassUnlessChecksFailed();
             }
         }
         else

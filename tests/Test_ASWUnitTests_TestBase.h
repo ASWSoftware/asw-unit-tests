@@ -52,6 +52,7 @@ private: // Test methods
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
+    void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
 

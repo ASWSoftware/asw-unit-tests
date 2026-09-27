@@ -70,6 +70,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   by any `Assert*` failure after them). Console output is unchanged, since
   those failures are still logged as they happen.
 
+- A `Check*` failure was ignored if the test then threw the exception it had
+  set up with `SetExceptionExpected()`, so the test was reported as passed.
+  It now fails, with the `Check*` failure in its detail.
+
 - `IsStdoutTTY()` compile error on RAD Studio's 32-bit compiler (`bcc32c`),
   which declares the POSIX-style `isatty()` in `<io.h>` rather than the
   underscore-prefixed `_isatty()` MSVC, MinGW, and RAD Studio's own 64-bit
