@@ -10,6 +10,13 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Fixed
+
+- CI test-results reporting failing for pull requests from forks, whose
+  read-only token can't create check runs. Each CI job now shows its JUnit
+  report on the run's summary page instead, which needs no write permission,
+  and also uploads it as an artifact.
+
 ## [1.0.0] - 2026-09-27
 
 ### Added
