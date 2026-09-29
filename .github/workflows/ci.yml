@@ -11,10 +11,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only on purpose: a pull request from a fork gets a read-only token
+# anyway, so nothing here needs to write (the test report goes to each job's
+# summary page, which needs no permission).
 permissions:
   contents: read
-  actions: read
-  checks: write
 
 jobs:
   build-and-test:
@@ -55,7 +56,7 @@ jobs:
             cxx: clang++
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up MinGW
         if: matrix.generator == 'MinGW Makefiles'
@@ -96,6 +97,7 @@ jobs:
           fi
 
       - name: Run self-tests
+        id: tests
         shell: bash
         # --test-timeout-seconds and --catch-crashes are both defense-in-depth safety nets here: if
         # a test ever regresses into a genuine hang or a native crash (rather than failing
@@ -105,19 +107,31 @@ jobs:
           ./${{ matrix.exe_path }} --project-name "ASWUnitTests-CI" --report-junit junit-results.xml
           --test-timeout-seconds 60 --catch-crashes
 
-      - name: Report test results
-        # Runs even if the tests above failed, so a failure still shows up as
-        # annotations instead of only as a red step in the raw log. Also a
-        # wiring smoke test for --report-junit itself: unit tests already
-        # cover TJUnitReportWriter directly, but not that main.cpp actually
-        # calls it when the flag is passed.
-        if: always()
-        uses: dorny/test-reporter@v1
+      - name: Test results summary
+        # Runs whenever the tests ran, pass or fail, so failures show up in
+        # the report too. In this mode the reporter only writes this job's
+        # summary page and makes no GitHub API calls, so it also works for
+        # pull requests from forks, whose token is read-only. Also a wiring
+        # smoke test for --report-junit itself: unit tests already cover
+        # TJUnitReportWriter directly, but not that main.cpp actually calls
+        # it when the flag is passed, so a missing or unreadable report after
+        # the tests ran fails this step.
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        uses: dorny/test-reporter@v3
         with:
-          name: "Test Results - ${{ matrix.name }}"
+          name: Test Results - ${{ matrix.name }}
           path: junit-results.xml
           reporter: java-junit
-          fail-on-error: true
+          use-actions-summary: true
+
+      - name: Upload test results
+        # Keeps the JUnit report as a downloadable artifact of the run.
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.name }}
+          path: junit-results.xml
+          if-no-files-found: error
 
       - name: Run self-tests (partitioned)
         # Wiring smoke test for --partition-index/--partition-count: the
