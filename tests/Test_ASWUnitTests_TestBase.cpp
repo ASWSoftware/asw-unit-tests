@@ -27,6 +27,7 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
@@ -1170,6 +1171,221 @@ void TFixture_SlowTest::Test_NeverRuns()
 //---------------------------------------------------------------------------
 
 
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SourceLocations
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling each std::source_location
+// overload. Each "_Fails"/"_Skips" test records the line of its call in ExpectedLines, so
+// Test_SourceLocation_ReportsCallerFunctionAndLine below can check the failure names that test's
+// function and line. "_Passes" tests check that arguments forward to the same overloads as the
+// method/line form (C strings, mixed integers, exception expectations). CheckIsEven() is a custom
+// helper of the kind a test author might write, passing its caller's location through.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SourceLocations : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void CheckIsEven(int value, std::source_location loc = std::source_location::current());
+
+    void Test_AssertEquals_CStrings_Passes();
+    void Test_AssertEquals_Fails();
+    void Test_AssertFalse_Fails();
+    void Test_AssertNear_Fails();
+    void Test_AssertNotEquals_Fails();
+    void Test_AssertNotNear_Fails();
+    void Test_AssertTrue_Fails();
+    void Test_CheckEquals_Fails();
+    void Test_CheckEquals_MixedIntegers_Passes();
+    void Test_CheckFalse_Fails();
+    void Test_CheckNear_Fails();
+    void Test_CheckNear_Passes();
+    void Test_CheckNotEquals_Fails();
+    void Test_CheckNotNear_Fails();
+    void Test_CheckTrue_Fails();
+    void Test_CheckTrue_ThroughHelper_Fails();
+    void Test_SetExceptionExpected_Bool_NoneThrown_Fails();
+    void Test_SetExceptionExpected_Bool_Passes();
+    void Test_SetExceptionExpected_Type_NoneThrown_Fails();
+    void Test_SetExceptionExpected_TypeAndMessage_Passes();
+    void Test_Skip_Skips();
+
+public:
+    std::map<std::string, int> ExpectedLines; // Test name to the line of its failing/skipping call.
+
+    TFixture_SourceLocations();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_SourceLocations::TFixture_SourceLocations()
+    : inherited("Fixture_SourceLocations")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_Fails, "CheckTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails, "CheckTrue_ThroughHelper_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails,
+        "SetExceptionExpected_Bool_NoneThrown_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_Passes,
+        "SetExceptionExpected_Bool_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Type_NoneThrown_Fails,
+        "SetExceptionExpected_Type_NoneThrown_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_TypeAndMessage_Passes,
+        "SetExceptionExpected_TypeAndMessage_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_Skip_Skips, "Skip_Skips");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::CheckIsEven(int value, std::source_location loc)
+{
+    CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes()
+{
+    char const buffer[] = "abc";
+    AssertEquals("abc", buffer, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEquals_Fails()
+{
+    ExpectedLines["AssertEquals_Fails"] = __LINE__ + 1;
+    AssertEquals(1, 2, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertFalse_Fails()
+{
+    ExpectedLines["AssertFalse_Fails"] = __LINE__ + 1;
+    AssertFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNear_Fails()
+{
+    ExpectedLines["AssertNear_Fails"] = __LINE__ + 1;
+    AssertNear(1.0, 2.0, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEquals_Fails()
+{
+    ExpectedLines["AssertNotEquals_Fails"] = __LINE__ + 1;
+    AssertNotEquals(std::string("abc"), std::string("abc"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotNear_Fails()
+{
+    ExpectedLines["AssertNotNear_Fails"] = __LINE__ + 1;
+    AssertNotNear(1.0f, 1.25f, 0.5f, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertTrue_Fails()
+{
+    ExpectedLines["AssertTrue_Fails"] = __LINE__ + 1;
+    AssertTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEquals_Fails()
+{
+    ExpectedLines["CheckEquals_Fails"] = __LINE__ + 1;
+    CheckEquals(std::string("abc"), std::string("xyz"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes()
+{
+    CheckEquals(5, int64_t{ 5 }, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckFalse_Fails()
+{
+    ExpectedLines["CheckFalse_Fails"] = __LINE__ + 1;
+    CheckFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNear_Fails()
+{
+    ExpectedLines["CheckNear_Fails"] = __LINE__ + 1;
+    CheckNear(1.0, 2.0, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNear_Passes()
+{
+    CheckNear(1.0f, 1.25f, 0.5f, "within tolerance");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEquals_Fails()
+{
+    ExpectedLines["CheckNotEquals_Fails"] = __LINE__ + 1;
+    CheckNotEquals(5, 5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotNear_Fails()
+{
+    ExpectedLines["CheckNotNear_Fails"] = __LINE__ + 1;
+    CheckNotNear(1.0, 1.25, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckTrue_Fails()
+{
+    ExpectedLines["CheckTrue_Fails"] = __LINE__ + 1;
+    CheckTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails()
+{
+    ExpectedLines["CheckTrue_ThroughHelper_Fails"] = __LINE__ + 1;
+    CheckIsEven(3);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails()
+{
+    ExpectedLines["SetExceptionExpected_Bool_NoneThrown_Fails"] = __LINE__ + 1;
+    SetExceptionExpected(true, "deliberately nothing thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Bool_Passes()
+{
+    SetExceptionExpected(true, "any exception");
+    throw std::runtime_error("boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Type_NoneThrown_Fails()
+{
+    ExpectedLines["SetExceptionExpected_Type_NoneThrown_Fails"] = __LINE__ + 1;
+    SetExceptionExpected<std::invalid_argument>("deliberately nothing thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_TypeAndMessage_Passes()
+{
+    SetExceptionExpected<std::invalid_argument>("matching type and message", "boom");
+    throw std::invalid_argument("boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_Skip_Skips()
+{
+    ExpectedLines["Skip_Skips"] = __LINE__ + 1;
+    Skip("deliberate skip");
+}
+//---------------------------------------------------------------------------
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+
+
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_CrashingTest
 //
@@ -1286,6 +1502,10 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
         "SetLogSuppressed_SilencesFixtureOutput");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLine,
+        "SourceLocation_ReportsCallerFunctionAndLine");
+#endif
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_TestBase::~TTest_ASWUnitTests_TestBase()
@@ -1922,6 +2142,52 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
         "SetLogSuppressed(true) silences the fixture's own Log()/LogAppend()");
 }
 //---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLine()
+{
+    // Arrange
+    TFixture_SourceLocations fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(21), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            continue;
+        }
+
+        if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else if (NameEndsWith(record.TestName, "_Skips"))
+            CheckTrue(record.Outcome == TTestOutcome::Skip, __func__, __LINE__, record.TestName + " should skip");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes, _Fails or _Skips");
+
+        // function_name() is compiler-specific (e.g. "void NS::TClass::Test_X()" on GCC), but always contains the
+        // function's own name.
+        auto const expectedLine = fixture.ExpectedLines.find(record.TestName);
+        AssertTrue(expectedLine != fixture.ExpectedLines.end(), __func__, __LINE__,
+            record.TestName + " recorded the line of its call");
+        CheckTrue(record.Message.find("Test_" + record.TestName) != std::string::npos, __func__, __LINE__,
+            record.TestName + " reports its own function: " + record.Message);
+        CheckTrue(record.Message.find("(" + std::to_string(expectedLine->second) + ")") != std::string::npos,
+            __func__, __LINE__, record.TestName + " reports the line of its call: " + record.Message);
+    }
+
+    TTestCaseRecord const* const throughHelper = FindRecord(results, "CheckTrue_ThroughHelper_Fails");
+    AssertTrue(throughHelper != nullptr, __func__, __LINE__, "the helper test's record exists");
+    CheckTrue(throughHelper->Message.find("CheckIsEven") == std::string::npos, __func__, __LINE__,
+        "a helper that passes its caller's location through isn't itself reported");
+}
+//---------------------------------------------------------------------------
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 
 } // namespace ASWUnitTests
 

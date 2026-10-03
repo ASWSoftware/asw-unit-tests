@@ -66,8 +66,9 @@ bool NameEndsWith(std::string const& name, std::string const& suffix)
 // with an exact match (thrown from C++ and raised from Delphi RTL code), a polymorphic base-type match, a
 // wrong sibling type, a message substring that's present, absent, non-ASCII, or only in the class name,
 // a std::exception, and a non-exception throw; plus a std::exception type expected but an RTL exception
-// thrown, and an earlier Check* failure followed by the expected RTL exception. Every test name ends with
-// "_Passes" or "_Fails", read generically by CheckFixtureOutcomes().
+// thrown, and an earlier Check* failure followed by the expected RTL exception; plus, where supported, the
+// std::source_location form of SetExceptionExpected(). Every test name ends with "_Passes" or "_Fails",
+// read generically by CheckFixtureOutcomes().
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_RTLExceptionExpectations : public TTestGroupBase
 {
@@ -86,6 +87,10 @@ private:
     void Test_RTLTypeExpected_NonExceptionThrown_Fails();
     void Test_RTLTypeExpected_PolymorphicBaseTypeThrown_Passes();
     void Test_RTLTypeExpected_RaisedFromDelphiCode_Passes();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_RTLTypeExpected_SourceLocation_MessageSubstringPresent_Passes();
+    void Test_RTLTypeExpected_SourceLocation_WrongSiblingTypeThrown_Fails();
+#endif
     void Test_RTLTypeExpected_StdExceptionThrown_Fails();
     void Test_RTLTypeExpected_WrongSiblingTypeThrown_Fails();
     void Test_StdTypeExpected_RTLExceptionThrown_Fails();
@@ -125,6 +130,12 @@ TFixture_RTLExceptionExpectations::TFixture_RTLExceptionExpectations()
         "RTLTypeExpected_PolymorphicBaseTypeThrown_Passes");
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_RaisedFromDelphiCode_Passes,
         "RTLTypeExpected_RaisedFromDelphiCode_Passes");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_SourceLocation_MessageSubstringPresent_Passes,
+        "RTLTypeExpected_SourceLocation_MessageSubstringPresent_Passes");
+    RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_SourceLocation_WrongSiblingTypeThrown_Fails,
+        "RTLTypeExpected_SourceLocation_WrongSiblingTypeThrown_Fails");
+#endif
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_StdExceptionThrown_Fails,
         "RTLTypeExpected_StdExceptionThrown_Fails");
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_WrongSiblingTypeThrown_Fails,
@@ -207,6 +218,20 @@ void TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_RaisedFromDelphiCod
     static_cast<void>(System::Sysutils::StrToInt(L"not a number"));
 }
 //---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_SourceLocation_MessageSubstringPresent_Passes()
+{
+    SetExceptionExpected<System::Sysutils::EConvertError>("message must contain 'needle'", "needle");
+    throw System::Sysutils::EConvertError(L"hay needle stack");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_SourceLocation_WrongSiblingTypeThrown_Fails()
+{
+    SetExceptionExpected<System::Sysutils::EConvertError>("wrong sibling type thrown");
+    throw System::Sysutils::EArgumentException(L"boom");
+}
+//---------------------------------------------------------------------------
+#endif
 void TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_StdExceptionThrown_Fails()
 {
     SetExceptionExpected<System::Sysutils::EConvertError>(__func__, __LINE__, "RTL type expected, std type thrown");
@@ -317,7 +342,12 @@ void TTest_ASWUnitTests_RTLExceptions::CheckFixtureOutcomes(std::optional<unsign
     fixture.Run(TestFilter(), std::nullopt, testTimeoutSeconds, catchCrashes);
 
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(14), results.CaseRecords.size(), method, line, "one record per registered test");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    size_t const expectedCount = 16;
+#else
+    size_t const expectedCount = 14;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), method, line, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

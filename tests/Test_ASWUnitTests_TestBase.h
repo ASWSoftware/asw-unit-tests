@@ -64,6 +64,9 @@ private: // Test methods
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_SourceLocation_ReportsCallerFunctionAndLine();
+#endif
 
 public:
     TTest_ASWUnitTests_TestBase();

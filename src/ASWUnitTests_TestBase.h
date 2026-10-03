@@ -36,7 +36,21 @@ limitations under the License.
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
+
+// std::source_location (C++20) is used where the compiler and library support it, which RAD Studio's 32-bit
+// compilers (C++17) don't; code elsewhere tests the derived ASWUNITTESTS_SOURCE_LOCATION_ENABLED. The feature-test
+// macro is checked rather than __has_include(<source_location>), since bcc32c has that header but can't compile it.
+#if defined(__has_include)
+#  if __has_include(<version>)
+#    include <version>
+#  endif
+#endif
+#if defined(__cpp_lib_source_location)
+#  define ASWUNITTESTS_SOURCE_LOCATION_ENABLED 1
+#  include <source_location>
+#endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
@@ -572,6 +586,101 @@ protected: // Assertion/Check methods - Boolean
     virtual void AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg);
+
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+protected: // Assertion/Check methods - std::source_location
+    // Each takes a location (by default, the caller's) in place of a method and line, and forwards to the
+    // method/line overload with loc.function_name() and loc.line().
+    template <typename TExpected, typename TActual>
+    void AssertEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void AssertNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void AssertNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    void AssertTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+
+    template <typename TExpected, typename TActual>
+    void CheckEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void CheckNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void CheckNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    void CheckTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+
+    void SetExceptionExpected(bool expected, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        SetExceptionExpected(expected, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TException>
+    void SetExceptionExpected(std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        SetExceptionExpected<TException>(loc.function_name(), static_cast<int>(loc.line()), msg, expectedMessage);
+    }
+    void Skip(std::string const& reason, std::source_location loc = std::source_location::current())
+    {
+        Skip(loc.function_name(), static_cast<int>(loc.line()), reason);
+    }
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 
 public:
     TTestGroupBase(std::string const& name);

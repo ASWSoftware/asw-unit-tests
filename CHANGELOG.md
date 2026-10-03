@@ -12,6 +12,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- `std::source_location` overloads of every `Check*`/`Assert*` method,
+  `Skip()`, and `SetExceptionExpected()`, taking the caller's location by
+  default instead of a method and line, so a call no longer needs
+  `__func__, __LINE__`. Requires C++20, so they're unavailable with RAD
+  Studio's 32-bit compilers; `ASWUNITTESTS_SOURCE_LOCATION_ENABLED` is defined
+  when they're available. The method and line overloads are unchanged.
 - `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` overloads
   for any two integer types other than `bool`, compared by value. A call
   mixing integer types (e.g. `int` and `int64_t`), or using one that matches

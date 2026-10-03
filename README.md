@@ -12,6 +12,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
   immediately. Covers `Equals`/`NotEquals`, `True`/`False`, and `Near`/`NotNear`.
+- **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
+  report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
   and `double` values within a tolerance.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** - `SetExceptionExpected()`, with an
@@ -427,6 +429,42 @@ catch (TExceptRTLException const& ex)
 `ASWUNITTESTS_RTL_EXCEPTIONS` and runs this repository's full self-test suite plus the RTL-specific and GUI unit
 tests in `vcl\tests`. It has its own `Build_*.bat` scripts, and writes its executable to
 `vcl\console\rad370\<Platform>\<Config>`. The [VCL GUI runner](#vcl-gui-runner) is set up the same way.
+
+### Omitting the Method and Line (C++20)
+
+Every `Check*`/`Assert*` method, `Skip()`, and both forms of `SetExceptionExpected()` also have an overload without
+the method and line arguments. It takes an optional `std::source_location` as its last argument instead, which
+defaults to the caller's location:
+
+```
+CheckEquals(5, total, "int and int64_t");
+Skip("Windows-only feature");
+SetExceptionExpected<std::invalid_argument>("StrToInt32 invalid", "signed 32-bit int");
+```
+
+Failure messages then show `std::source_location::function_name()` as the method. Unlike `__func__`, its text is up
+to the compiler, and is typically the full signature, e.g. `void TTest_TMyClassToTest::Test_Something()` on GCC and
+Clang, or `void __cdecl TTest_TMyClassToTest::Test_Something(void)` on MSVC. The method and line overloads remain,
+for a bare or custom name.
+
+A helper that makes its own checks can take a location and pass it on, so its failures report the helper's caller
+rather than the helper itself:
+
+```
+// In the class declaration
+void CheckIsEven(int value, std::source_location loc = std::source_location::current());
+
+// In the .cpp
+void TTest_TMyClassToTest::CheckIsEven(int value, std::source_location loc)
+{
+    CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+```
+
+These overloads need C++20's `std::source_location`, so they're only declared when `ASWUnitTests_TestBase.h` finds it
+supported, which it signals by defining `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`. RAD Studio's 32-bit compilers only
+support C++17, so they don't have these overloads. Tests that also need to build there should keep the method and
+line form, or check `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`.
 
 ### Comparing C Strings
 
