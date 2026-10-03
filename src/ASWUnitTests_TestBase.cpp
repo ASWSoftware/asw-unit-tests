@@ -390,7 +390,11 @@ void TTestGroupBase::CheckEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
     if (expected != actual)
-        SetTestFailedCheck(method, line, std::to_string(expected), std::to_string(actual), msg);
+    {
+        std::string expectedStr = (expected ? "true" : "false");
+        std::string actualStr = (actual ? "true" : "false");
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckEquals(

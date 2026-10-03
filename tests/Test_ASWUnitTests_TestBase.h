@@ -47,6 +47,7 @@ private: // Test methods
     void Test_Check_ContinuesButAssert_Aborts();
     void Test_Equals_ComparesCStringsByContent();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
+    void Test_Equals_ShowsBoolValuesAsTrueOrFalse();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();

@@ -26,6 +26,8 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `Equals` check always passed and a `NotEquals` check always failed, whatever
   the text. New `char const*` and `wchar_t const*` overloads compare by
   content. A test that used to pass this way may now correctly fail.
+- A failed `CheckEquals` of two `bool` values showing them as `1`/`0`. It now
+  shows `true`/`false`, the same as `AssertEquals` and the `NotEquals` methods.
 - CI test-results reporting failing for pull requests from forks, whose
   read-only token can't create check runs. Each CI job now shows its JUnit
   report on the run's summary page instead, which needs no write permission,

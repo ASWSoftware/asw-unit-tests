@@ -148,6 +148,66 @@ public:
 //---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_BoolComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test
+// per bool overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), so
+// Test_Equals_ShowsBoolValuesAsTrueOrFalse below can check that every failure message shows the
+// values as "true"/"false" rather than "1"/"0".
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_BoolComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_Different_Fails();
+    void Test_AssertNotEquals_Same_Fails();
+    void Test_CheckEquals_Different_Fails();
+    void Test_CheckNotEquals_Same_Fails();
+
+public:
+    TFixture_BoolComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_BoolComparisons::TFixture_BoolComparisons()
+    : inherited("Fixture_BoolComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_BoolComparisons::Test_AssertEquals_Different_Fails, "AssertEquals_Different_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_AssertNotEquals_Same_Fails, "AssertNotEquals_Same_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_CheckEquals_Different_Fails, "CheckEquals_Different_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_CheckNotEquals_Same_Fails, "CheckNotEquals_Same_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_AssertEquals_Different_Fails()
+{
+    AssertEquals(true, false, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_AssertNotEquals_Same_Fails()
+{
+    AssertNotEquals(true, true, __func__, __LINE__, "same value");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_CheckEquals_Different_Fails()
+{
+    CheckEquals(true, false, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_CheckNotEquals_Same_Fails()
+{
+    CheckNotEquals(true, true, __func__, __LINE__, "same value");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_CStringComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the C string overloads of
@@ -1194,6 +1254,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
         "Equals_ComparesMixedIntegerTypesByValue");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
+        "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
@@ -1348,6 +1410,33 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
         __LINE__, "a failure shows both values as they are, without wrapping either");
     CheckTrue(uint64Max->Message.find("Expected \"-1\" but was \"18446744073709551615\"") != std::string::npos,
         __func__, __LINE__, "a failure beyond int64_t's range shows both values as they are");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
+{
+    // Arrange
+    TFixture_BoolComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEquals_Different_Fails");
+    TTestCaseRecord const* const assertNotEquals = FindRecord(results, "AssertNotEquals_Same_Fails");
+    TTestCaseRecord const* const checkEquals = FindRecord(results, "CheckEquals_Different_Fails");
+    TTestCaseRecord const* const checkNotEquals = FindRecord(results, "CheckNotEquals_Same_Fails");
+    AssertTrue(assertEquals != nullptr && assertNotEquals != nullptr && checkEquals != nullptr &&
+        checkNotEquals != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckTrue(assertEquals->Message.find("\"true\" but was \"false\"") != std::string::npos, __func__, __LINE__,
+        "AssertEquals shows bools as true/false");
+    CheckTrue(assertNotEquals->Message.find("Value: \"true\"") != std::string::npos, __func__, __LINE__,
+        "AssertNotEquals shows bools as true/false");
+    CheckTrue(checkEquals->Message.find("Expected \"true\" but was \"false\"") != std::string::npos, __func__,
+        __LINE__, "CheckEquals shows bools as true/false");
+    CheckTrue(checkNotEquals->Message.find("Both values equal: \"true\"") != std::string::npos, __func__, __LINE__,
+        "CheckNotEquals shows bools as true/false");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()
