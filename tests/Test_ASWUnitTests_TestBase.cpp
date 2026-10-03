@@ -622,6 +622,188 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_IntegerComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
+// of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), for two integer types that no
+// fixed-width overload matches exactly. Without those overloads, most of these calls don't compile
+// (ambiguous). The "NegativeAndUnsignedMax" tests catch a comparison that lets -1 wrap around to an
+// unsigned maximum, and the "Int64Max" tests check the int64_t/uint64_t boundary. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_IntegerComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_IntAndInt64Different_Fails();
+    void Test_AssertEquals_IntAndInt64Equal_Passes();
+    void Test_AssertNotEquals_IntAndInt64Equal_Fails();
+    void Test_AssertNotEquals_NegativeAndUnsignedMax_Passes();
+    void Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails();
+    void Test_CheckEquals_Int64MaxAndUint64_Passes();
+    void Test_CheckEquals_IntAndInt64Different_Fails();
+    void Test_CheckEquals_IntAndInt64Equal_Passes();
+    void Test_CheckEquals_IntAndShort_Passes();
+    void Test_CheckEquals_IntAndUnsigned_Passes();
+    void Test_CheckEquals_LongAndLong_Passes();
+    void Test_CheckEquals_LongLongAndLongLong_Passes();
+    void Test_CheckEquals_NegativeAndUint64Max_Fails();
+    void Test_CheckEquals_NegativeAndUnsignedMax_Fails();
+    void Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes();
+    void Test_CheckNotEquals_IntAndInt64Equal_Fails();
+    void Test_CheckNotEquals_NegativeAndUint64Max_Passes();
+    void Test_CheckNotEquals_NegativeAndUnsignedMax_Passes();
+
+public:
+    TFixture_IntegerComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_IntegerComparisons::TFixture_IntegerComparisons()
+    : inherited("Fixture_IntegerComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Different_Fails,
+        "AssertEquals_IntAndInt64Different_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Equal_Passes,
+        "AssertEquals_IntAndInt64Equal_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertNotEquals_IntAndInt64Equal_Fails,
+        "AssertNotEquals_IntAndInt64Equal_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertNotEquals_NegativeAndUnsignedMax_Passes,
+        "AssertNotEquals_NegativeAndUnsignedMax_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails,
+        "CheckEquals_AboveInt64MaxAndInt64Max_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_Int64MaxAndUint64_Passes,
+        "CheckEquals_Int64MaxAndUint64_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Different_Fails,
+        "CheckEquals_IntAndInt64Different_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Equal_Passes,
+        "CheckEquals_IntAndInt64Equal_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndShort_Passes, "CheckEquals_IntAndShort_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndUnsigned_Passes,
+        "CheckEquals_IntAndUnsigned_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_LongAndLong_Passes, "CheckEquals_LongAndLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_LongLongAndLongLong_Passes,
+        "CheckEquals_LongLongAndLongLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUint64Max_Fails,
+        "CheckEquals_NegativeAndUint64Max_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUnsignedMax_Fails,
+        "CheckEquals_NegativeAndUnsignedMax_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes,
+        "CheckEquals_UnsignedLongAndUnsignedLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_IntAndInt64Equal_Fails,
+        "CheckNotEquals_IntAndInt64Equal_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUint64Max_Passes,
+        "CheckNotEquals_NegativeAndUint64Max_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Passes,
+        "CheckNotEquals_NegativeAndUnsignedMax_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Different_Fails()
+{
+    AssertEquals(5, int64_t{ 6 }, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Equal_Passes()
+{
+    AssertEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertNotEquals_IntAndInt64Equal_Fails()
+{
+    AssertNotEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertNotEquals_NegativeAndUnsignedMax_Passes()
+{
+    AssertNotEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails()
+{
+    uint64_t const aboveInt64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1;
+    CheckEquals(aboveInt64Max, std::numeric_limits<int64_t>::max(), __func__, __LINE__, "differ by one");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_Int64MaxAndUint64_Passes()
+{
+    uint64_t const int64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    CheckEquals(std::numeric_limits<int64_t>::max(), int64Max, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Different_Fails()
+{
+    CheckEquals(5, int64_t{ 6 }, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Equal_Passes()
+{
+    CheckEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndShort_Passes()
+{
+    short const value = 5;
+    CheckEquals(5, value, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndUnsigned_Passes()
+{
+    CheckEquals(3, 3u, __func__, __LINE__, "same value, different signedness");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_LongAndLong_Passes()
+{
+    long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "long matches no fixed-width overload on Windows");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_LongLongAndLongLong_Passes()
+{
+    long long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "long long matches no fixed-width overload on Linux");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUint64Max_Fails()
+{
+    CheckEquals(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUnsignedMax_Fails()
+{
+    CheckEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes()
+{
+    unsigned long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "unsigned long matches no fixed-width overload on Windows");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_IntAndInt64Equal_Fails()
+{
+    CheckNotEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUint64Max_Passes()
+{
+    CheckNotEquals(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Passes()
+{
+    CheckNotEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_MixedOutcomes
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
@@ -1010,6 +1192,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
+        "Equals_ComparesMixedIntegerTypesByValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
@@ -1132,6 +1316,38 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
         "an Assert failure shows a null C string as (null)");
     CheckTrue(checkNull->Message.find("Expected \"(null)\" but was \"\"") != std::string::npos, __func__, __LINE__,
         "a Check failure shows a null C string as (null), distinct from an empty one");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
+{
+    // Arrange
+    TFixture_IntegerComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(18), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const unsignedMax = FindRecord(results, "CheckEquals_NegativeAndUnsignedMax_Fails");
+    TTestCaseRecord const* const uint64Max = FindRecord(results, "CheckEquals_NegativeAndUint64Max_Fails");
+    AssertTrue(unsignedMax != nullptr && uint64Max != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckTrue(unsignedMax->Message.find("Expected \"-1\" but was \"4294967295\"") != std::string::npos, __func__,
+        __LINE__, "a failure shows both values as they are, without wrapping either");
+    CheckTrue(uint64Max->Message.find("Expected \"-1\" but was \"18446744073709551615\"") != std::string::npos,
+        __func__, __LINE__, "a failure beyond int64_t's range shows both values as they are");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()

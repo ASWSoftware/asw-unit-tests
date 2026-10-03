@@ -31,6 +31,7 @@ limitations under the License.
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -239,6 +240,35 @@ class TTestGroupBase : public ITestGroup
 private:
     typedef ITestGroup inherited;
 
+    // Calls 'compare' with 'expected' and 'actual' as two int64_t when both fit, otherwise as two uint64_t when
+    // neither is negative, otherwise (one negative, the other above INT64_MAX) as two decimal strings, so neither
+    // value wraps around. Used by the integer template overloads of the Equals/NotEquals methods.
+    template <typename TExpected, typename TActual, typename TCompare>
+    static void ForwardIntegerComparison(TExpected expected, TActual actual, TCompare compare)
+    {
+        auto const fitsInInt64 = [](auto value)
+            {
+                if constexpr (std::is_signed<decltype(value)>::value)
+                    return true;
+                else
+                    return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+            };
+        auto const isNonNegative = [](auto value)
+            {
+                if constexpr (std::is_signed<decltype(value)>::value)
+                    return value >= 0;
+                else
+                    return true;
+            };
+
+        if (fitsInInt64(expected) && fitsInInt64(actual))
+            compare(static_cast<int64_t>(expected), static_cast<int64_t>(actual));
+        else if (isNonNegative(expected) && isNonNegative(actual))
+            compare(static_cast<uint64_t>(expected), static_cast<uint64_t>(actual));
+        else
+            compare(std::to_string(expected), std::to_string(actual));
+    }
+
 protected:
     bool m_ExceptionExpected;
     bool m_LogSuppressed;
@@ -391,6 +421,21 @@ protected: // Assertion/Check methods - Equals
         std::string const& msg);
     void AssertEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
         std::string const& msg);
+    // Any two integer types except bool that no overload above matches exactly (e.g. int and int64_t), compared
+    // by value.
+    template <typename TExpected, typename TActual>
+    using TEnableIfIntegers = typename std::enable_if<std::is_integral<TExpected>::value &&
+        std::is_integral<TActual>::value && !std::is_same<TExpected, bool>::value &&
+        !std::is_same<TActual, bool>::value, int>::type;
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void AssertEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                AssertEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
 
     virtual void CheckEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -418,6 +463,15 @@ protected: // Assertion/Check methods - Equals
         std::string const& msg);
     void CheckEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void CheckEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                CheckEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
 
 protected: // Assertion/Check methods - Not Equals
     virtual void AssertNotEquals(
@@ -446,6 +500,15 @@ protected: // Assertion/Check methods - Not Equals
         std::string const& msg);
     void AssertNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                AssertNotEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
 
     virtual void CheckNotEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -473,6 +536,15 @@ protected: // Assertion/Check methods - Not Equals
         std::string const& msg);
     void CheckNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                CheckNotEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
 
 protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
     virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,

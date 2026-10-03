@@ -10,6 +10,15 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` overloads
+  for any two integer types other than `bool`, compared by value. A call
+  mixing integer types (e.g. `int` and `int64_t`), or using one that matches
+  none of the fixed-width overloads (e.g. `long` on Windows, `long long` on
+  Linux), used to be an ambiguous-overload compile error. A negative value
+  never equals an unsigned one, unlike with the built-in `==`.
+
 ### Fixed
 
 - `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` comparing two

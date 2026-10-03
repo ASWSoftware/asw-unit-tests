@@ -439,6 +439,21 @@ char const buffer[] = "abc";
 CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
 ```
 
+### Comparing Integers of Different Types
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` accept any two integer types, not just a matching
+pair of fixed-width ones, so there's no need for a suffix or cast like `0LL` to pick an overload. This includes
+`long` and `unsigned long` (e.g. `DWORD`) on Windows, and `long long` on Linux, which match none of the fixed-width
+types there. The values are compared as numbers, so `-1` never equals an unsigned value, unlike with the built-in `==`:
+
+```
+int64_t total = 5;
+CheckEquals(5, total, __func__, __LINE__, "int and int64_t");
+CheckEquals(-1, 4294967295u, __func__, __LINE__, "fails, where -1 == 4294967295u is true");
+```
+
+`bool` is the exception: comparing a `bool` with an integer remains a compile error, since it's usually a mistake.
+
 ### Comparing Floating-Point Values
 
 There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals`. Exact equality comparison of
