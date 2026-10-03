@@ -12,6 +12,13 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- Version macros in `ASWUnitTests_Version.h`: `ASWUNITTESTS_VERSION_MAJOR`,
+  `ASWUNITTESTS_VERSION_MINOR`, `ASWUNITTESTS_VERSION_PATCH`,
+  `ASWUNITTESTS_VERSION_PRERELEASE` (empty on a release, e.g. `dev.1` between
+  releases) and `ASWUNITTESTS_VERSION_STRING` (e.g. `1.1.0-dev.1`), usable in
+  `#if`, plus a matching `ASWUnitTests::VersionPreRelease` constant. The
+  existing `VersionMajor`, `VersionMinor`, `VersionPatch` and `Version`
+  constants now come from the macros.
 - `std::source_location` overloads of every `Check*`/`Assert*` method,
   `Skip()`, and `SetExceptionExpected()`, taking the caller's location by
   default instead of a method and line, so a call no longer needs
@@ -24,6 +31,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   none of the fixed-width overloads (e.g. `long` on Windows, `long long` on
   Linux), used to be an ambiguous-overload compile error. A negative value
   never equals an unsigned one, unlike with the built-in `==`.
+
+### Changed
+
+- Development builds between releases are versioned with a SemVer pre-release
+  (e.g. `1.1.0-dev.1`), which sorts before the release it leads up to.
 
 ### Fixed
 

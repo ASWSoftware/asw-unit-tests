@@ -231,6 +231,10 @@
             <DependentOn>..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>18</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Version.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Version.h</DependentOn>
+            <BuildOrder>23</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\toTest\ASWTools_Random.h</DependentOn>
             <BuildOrder>3</BuildOrder>

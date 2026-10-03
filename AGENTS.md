@@ -66,6 +66,15 @@ For other environments, use the repository's CMake configuration when present or
 - When the change touches code guarded by `ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED`, or the exception handling around it, also build and run the VCL console project (`vcl/console/rad370/Build_Win64x_Debug.bat` and the Win32 script), since no other build compiles that code.
 - When the change touches `vcl/gui/src/`, or framework code the GUI runner uses (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
 
+## Changelog
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and Semantic Versioning.
+
+- Record each notable change under `## [Unreleased]`, in the matching `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, or `### Security` section.
+- Describe the effect on someone using the framework, not the commit. For a breaking change, say what existing code must change.
+- The version lives only in `src/ASWUnitTests_Version.h` (the `ASWUNITTESTS_VERSION_*` macros; the constants and `TTestHandler::GetVersionStr()` come from them). `main` carries only release versions, with an empty `ASWUNITTESTS_VERSION_PRERELEASE`. Between releases, `develop` carries the next planned version with a pre-release such as `dev.1` (e.g. `1.1.0-dev.1` after `1.0.0`), which sorts before that release; bump its number only to tell dev builds apart, and never bump the patch number on `develop`. A unit test checks that `ASWUNITTESTS_VERSION_STRING` matches the parts.
+- When preparing a release, set the release version in `src/ASWUnitTests_Version.h` (empty pre-release; the number develop forecast may change, e.g. to a patch release or the next major), rename `[Unreleased]` to `[x.y.z] - YYYY-MM-DD`, start a new empty `[Unreleased]`, and update the compare links at the bottom of the file. After merging the release into `develop`, move `develop` to the next minor version with pre-release `dev.1`.
+
 ## Formatting and Review
 
 Use the repository's `.uncrustify.cfg` configuration. The README documents how to enable the local Git hook with:

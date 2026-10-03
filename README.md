@@ -96,9 +96,23 @@ cmake --build build --config Release
 The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. The RAD Studio
 project writes its final executable to the same `build/bin/<Config>` directory.
 
-The executable uses semantic versioning for its `--version` output. Update `src/ASWUnitTests_Version.h` when preparing a
-release. The CMake project does not need a separate version declaration because it currently builds the test executable
-directly rather than packaging or installing it.
+The CMake project does not need a separate version declaration (see [Versions](#versions)) because it currently builds
+the test executable directly rather than packaging or installing it.
+
+## Versions
+
+ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the VCL GUI's caption.
+Releases are tagged on `main` (e.g. `v1.0.0`). Between releases, the `develop` branch carries the next planned version
+with a pre-release, e.g. `1.1.0-dev.1`, which comes before `1.1.0`. `src/ASWUnitTests_Version.h` has the version as
+macros, for code that supports several ASWUnitTests versions, and as constants in the `ASWUnitTests` namespace:
+
+```
+#include "ASWUnitTests_Version.h"
+
+#if ASWUNITTESTS_VERSION_MAJOR > 1 || (ASWUNITTESTS_VERSION_MAJOR == 1 && ASWUNITTESTS_VERSION_MINOR >= 1)
+    // Uses something added in 1.1 (also present in 1.1.0-dev.N builds)
+#endif
+```
 
 ## Command Line Options
 
