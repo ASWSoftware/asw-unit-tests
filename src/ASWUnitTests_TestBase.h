@@ -387,6 +387,10 @@ protected: // Assertion/Check methods - Equals
         int line, std::string const& msg);
     virtual void AssertEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void AssertEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -410,6 +414,10 @@ protected: // Assertion/Check methods - Equals
         int line, std::string const& msg);
     virtual void CheckEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void CheckEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Not Equals
     virtual void AssertNotEquals(
@@ -434,6 +442,10 @@ protected: // Assertion/Check methods - Not Equals
         int line, std::string const& msg);
     virtual void AssertNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -457,6 +469,10 @@ protected: // Assertion/Check methods - Not Equals
         int line, std::string const& msg);
     virtual void CheckNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
     virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,

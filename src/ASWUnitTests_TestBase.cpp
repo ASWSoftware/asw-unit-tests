@@ -43,6 +43,23 @@ limitations under the License.
 namespace
 {
 
+// Returns 'str' for display in a failure message, or "(null)" when it's nullptr.
+std::string CStringDisplayText(char const* str)
+{
+    return (str != nullptr) ? std::string(str) : std::string("(null)");
+}
+
+// Returns 'str' as a string, or an empty one when it's nullptr.
+std::string CStringOrEmpty(char const* str)
+{
+    return (str != nullptr) ? std::string(str) : std::string();
+}
+
+std::wstring CStringOrEmpty(wchar_t const* str)
+{
+    return (str != nullptr) ? std::wstring(str) : std::wstring();
+}
+
 std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
 {
     double const elapsedMs = std::chrono::duration<double, std::milli>(
@@ -189,6 +206,24 @@ void TTestGroupBase::AssertEquals(std::wstring const& expected, std::wstring con
         throw TExceptEquals(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEquals(
+    char const* expected, char const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        throw TExceptEquals(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg);
+
+    AssertEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEquals(
+    wchar_t const* expected, wchar_t const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        throw TExceptEquals(method, line, msg);
+
+    AssertEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (testVal)
@@ -301,6 +336,24 @@ void TTestGroupBase::AssertNotEquals(std::wstring const& expected, std::wstring 
         throw TExceptNotEquals(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEquals(
+    char const* expected, char const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    AssertNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEquals(
+    wchar_t const* expected, wchar_t const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    AssertNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -411,6 +464,31 @@ void TTestGroupBase::CheckEquals(std::wstring const& expected, std::wstring cons
         std::string expectedMsg = "Expected same values: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEquals(
+    char const* expected, char const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+    {
+        SetTestFailedCheck(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg);
+        return;
+    }
+
+    CheckEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEquals(
+    wchar_t const* expected, wchar_t const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+    {
+        std::string expectedMsg = "Expected same values: \"" + msg + "\"";
+        SetTestFailedCheck(method, line, expectedMsg);
+        return;
+    }
+
+    CheckEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg)
@@ -526,6 +604,24 @@ void TTestGroupBase::CheckNotEquals(std::wstring const& expected, std::wstring c
 {
     if (expected == actual)
         SetTestFailedCheckNotEquals(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEquals(
+    char const* expected, char const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    CheckNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEquals(
+    wchar_t const* expected, wchar_t const* actual, std::string const& method, int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    CheckNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(

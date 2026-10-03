@@ -428,6 +428,17 @@ catch (TExceptRTLException const& ex)
 tests in `vcl\tests`. It has its own `Build_*.bat` scripts, and writes its executable to
 `vcl\console\rad370\<Platform>\<Config>`. The [VCL GUI runner](#vcl-gui-runner) is set up the same way.
 
+### Comparing C Strings
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare two C strings (`char const*` or
+`wchar_t const*`, including string literals and character arrays) by content, the same as `std::string` and
+`std::wstring`. A null pointer only matches another null pointer, never a string, not even an empty one:
+
+```
+char const buffer[] = "abc";
+CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
+```
+
 ### Comparing Floating-Point Values
 
 There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals`. Exact equality comparison of

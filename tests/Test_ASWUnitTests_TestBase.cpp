@@ -148,6 +148,263 @@ public:
 //---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_CStringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the C string overloads of
+// AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), narrow and wide. Without those
+// overloads, two C strings convert to bool and match the bool overload, so the "DifferentLiterals"
+// tests pass/fail the wrong way round. The "SameContentDifferentBuffers" tests compare a literal with
+// a separate array holding the same text, so they fail if the pointers are compared instead of the
+// content (two identical literals may share one address). Test names self-document expected outcome
+// via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_CStringComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_DifferentLiterals_Fails();
+    void Test_AssertEquals_NullAndNonNull_Fails();
+    void Test_AssertEquals_SameContentDifferentBuffers_Passes();
+    void Test_AssertEquals_Wide_DifferentLiterals_Fails();
+    void Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_AssertNotEquals_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_AssertNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails();
+    void Test_CheckEquals_BothNull_Passes();
+    void Test_CheckEquals_DifferentLiterals_Fails();
+    void Test_CheckEquals_EmptyAndNull_Fails();
+    void Test_CheckEquals_NullAndEmpty_Fails();
+    void Test_CheckEquals_SameContentDifferentBuffers_Passes();
+    void Test_CheckEquals_Wide_BothNull_Passes();
+    void Test_CheckEquals_Wide_DifferentLiterals_Fails();
+    void Test_CheckEquals_Wide_NullAndEmpty_Fails();
+    void Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_CheckNotEquals_BothNull_Fails();
+    void Test_CheckNotEquals_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_CheckNotEquals_Wide_BothNull_Fails();
+    void Test_CheckNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_Wide_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails();
+
+public:
+    TFixture_CStringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_CStringComparisons::TFixture_CStringComparisons()
+    : inherited("Fixture_CStringComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_DifferentLiterals_Fails,
+        "AssertEquals_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_NullAndNonNull_Fails,
+        "AssertEquals_NullAndNonNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_SameContentDifferentBuffers_Passes,
+        "AssertEquals_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_Wide_DifferentLiterals_Fails,
+        "AssertEquals_Wide_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes,
+        "AssertEquals_Wide_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_DifferentLiterals_Passes,
+        "AssertNotEquals_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_SameContentDifferentBuffers_Fails,
+        "AssertNotEquals_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_Wide_DifferentLiterals_Passes,
+        "AssertNotEquals_Wide_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails,
+        "AssertNotEquals_Wide_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_BothNull_Passes, "CheckEquals_BothNull_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_DifferentLiterals_Fails,
+        "CheckEquals_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_EmptyAndNull_Fails, "CheckEquals_EmptyAndNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_NullAndEmpty_Fails, "CheckEquals_NullAndEmpty_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_SameContentDifferentBuffers_Passes,
+        "CheckEquals_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_BothNull_Passes,
+        "CheckEquals_Wide_BothNull_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_DifferentLiterals_Fails,
+        "CheckEquals_Wide_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_NullAndEmpty_Fails,
+        "CheckEquals_Wide_NullAndEmpty_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes,
+        "CheckEquals_Wide_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_BothNull_Fails, "CheckNotEquals_BothNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_DifferentLiterals_Passes,
+        "CheckNotEquals_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_NullAndEmpty_Passes,
+        "CheckNotEquals_NullAndEmpty_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_SameContentDifferentBuffers_Fails,
+        "CheckNotEquals_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_BothNull_Fails,
+        "CheckNotEquals_Wide_BothNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_DifferentLiterals_Passes,
+        "CheckNotEquals_Wide_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_NullAndEmpty_Passes,
+        "CheckNotEquals_Wide_NullAndEmpty_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails,
+        "CheckNotEquals_Wide_SameContentDifferentBuffers_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_DifferentLiterals_Fails()
+{
+    AssertEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_NullAndNonNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    AssertEquals("abc", nullStr, __func__, __LINE__, "null never matches a non-null string");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_SameContentDifferentBuffers_Passes()
+{
+    char const buffer[] = "abc";
+    AssertEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_Wide_DifferentLiterals_Fails()
+{
+    AssertEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes()
+{
+    wchar_t const buffer[] = L"abc";
+    AssertEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_DifferentLiterals_Passes()
+{
+    AssertNotEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_SameContentDifferentBuffers_Fails()
+{
+    char const buffer[] = "abc";
+    AssertNotEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_Wide_DifferentLiterals_Passes()
+{
+    AssertNotEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails()
+{
+    wchar_t const buffer[] = L"abc";
+    AssertNotEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_BothNull_Passes()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals(nullStr, nullStr, __func__, __LINE__, "two nulls match");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_DifferentLiterals_Fails()
+{
+    CheckEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_EmptyAndNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals("", nullStr, __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_NullAndEmpty_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals(nullStr, "", __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_SameContentDifferentBuffers_Passes()
+{
+    char const buffer[] = "abc";
+    CheckEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_BothNull_Passes()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, nullStr, __func__, __LINE__, "two nulls match");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_DifferentLiterals_Fails()
+{
+    CheckEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_NullAndEmpty_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, L"", __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes()
+{
+    wchar_t const buffer[] = L"abc";
+    CheckEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_BothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_DifferentLiterals_Passes()
+{
+    CheckNotEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_NullAndEmpty_Passes()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, "", __func__, __LINE__, "null differs from a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_SameContentDifferentBuffers_Fails()
+{
+    char const buffer[] = "abc";
+    CheckNotEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_BothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_DifferentLiterals_Passes()
+{
+    CheckNotEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_NullAndEmpty_Passes()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, L"", __func__, __LINE__, "null differs from a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails()
+{
+    wchar_t const buffer[] = L"abc";
+    CheckNotEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixtureSpecificError
 //
 // Unrelated (sibling) exception type for TFixture_ExceptionExpectations
@@ -752,6 +1009,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive,
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
@@ -842,6 +1100,38 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
     // Assert
     CheckTrue(fixture.ReachedSecondCheck, __func__, __LINE__,
         "a Check failure does not abort the rest of the test, unlike Assert");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
+{
+    // Arrange
+    TFixture_CStringComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(26), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertNull = FindRecord(results, "AssertEquals_NullAndNonNull_Fails");
+    TTestCaseRecord const* const checkNull = FindRecord(results, "CheckEquals_NullAndEmpty_Fails");
+    AssertTrue(assertNull != nullptr && checkNull != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckTrue(assertNull->Message.find("\"(null)\"") != std::string::npos, __func__, __LINE__,
+        "an Assert failure shows a null C string as (null)");
+    CheckTrue(checkNull->Message.find("Expected \"(null)\" but was \"\"") != std::string::npos, __func__, __LINE__,
+        "a Check failure shows a null C string as (null), distinct from an empty one");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()
