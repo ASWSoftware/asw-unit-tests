@@ -11,8 +11,9 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains`, plus
-  case-insensitive `IC` variants of the string `Equals`/`NotEquals` and `Contains`/`NotContains` methods.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, `Contains`/`NotContains`, and
+  `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus case-insensitive `IC` variants of the string
+  `Equals`/`NotEquals` and `Contains`/`NotContains` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -572,6 +573,23 @@ CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
 
 Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a sensible
 tolerance depends heavily on the magnitude and accumulated error of the values involved.
+
+### Comparing Greater Than and Less Than
+
+`CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and `CheckLessThanOrEqual`, and their `Assert`
+versions, compare a value with a bound. The value comes first, then the bound, read as "value >= bound". That's the
+other way round from `CheckEquals`, whose expected value comes first. Unlike `CheckTrue(count >= 1, ...)`, a failure
+shows both:
+
+```
+CheckGreaterThanOrEqual(count, 1, __func__, __LINE__, "at least one item");
+// Check failed for: "Test_Items" (42): Expected 0 to be >= 1. at least one item
+```
+
+They accept any two integer or floating-point types except `bool`. Two integers are compared by value, like
+[`CheckEquals`](#comparing-integers-of-different-types) does, so `-1` is less than any unsigned value. When either
+value is floating point, both are compared as their common type, as the built-in operators do, and a NaN fails every
+check.
 
 ### Skipping a Test
 

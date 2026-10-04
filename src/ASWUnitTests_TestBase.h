@@ -27,6 +27,7 @@ limitations under the License.
 #ifndef ASWUnitTests_TestBaseH
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -254,33 +255,132 @@ class TTestGroupBase : public ITestGroup
 private:
     typedef ITestGroup inherited;
 
+    // The relation an ordering method (e.g. CheckGreaterThan()) checks 'value' has to 'bound'.
+    enum class TOrdering
+    {
+        GreaterThan,
+        GreaterThanOrEqual,
+        LessThan,
+        LessThanOrEqual
+    };
+
+    // Used by the Assert ordering methods: throws TExceptOrdering unless 'value' has relation 'ordering' to 'bound'.
+    template <typename TValue, typename TBound>
+    void AssertOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (!OrderingHolds(CompareForOrdering(value, bound), ordering))
+        {
+            std::pair<std::string, std::string> const texts = FormatOrderingValues(value, bound);
+            throw TExceptOrdering(method, line, texts.first, OrderingSymbol(ordering), texts.second, msg);
+        }
+    }
+
+    // Used by the Check ordering methods: records a failure unless 'value' has relation 'ordering' to 'bound'.
+    template <typename TValue, typename TBound>
+    void CheckOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (!OrderingHolds(CompareForOrdering(value, bound), ordering))
+        {
+            std::pair<std::string, std::string> const texts = FormatOrderingValues(value, bound);
+            SetTestFailedCheck(method, line, "Expected " + texts.first + " to be " + OrderingSymbol(ordering) + " " +
+                texts.second + ". " + msg);
+        }
+    }
+
+    // Returns a negative number, zero or a positive number when 'value' is less than, equal to or greater than
+    // 'bound', or nullopt when either is a floating-point NaN. Two integers are compared by value, like
+    // ForwardIntegerComparison(); when one is negative and the other is above INT64_MAX, the negative one is less.
+    // Otherwise both are converted to their common floating-point type, as the built-in operators do.
+    template <typename TValue, typename TBound>
+    static std::optional<int> CompareForOrdering(TValue value, TBound bound)
+    {
+        if constexpr (std::is_floating_point<TValue>::value || std::is_floating_point<TBound>::value)
+        {
+            typedef typename std::common_type<TValue, TBound>::type TCommon;
+            TCommon const commonValue = static_cast<TCommon>(value);
+            TCommon const commonBound = static_cast<TCommon>(bound);
+
+            if (std::isnan(commonValue) || std::isnan(commonBound))
+                return std::nullopt;
+
+            return ThreeWayCompare(commonValue, commonBound);
+        }
+        else
+        {
+            if (FitsInInt64(value) && FitsInInt64(bound))
+                return ThreeWayCompare(static_cast<int64_t>(value), static_cast<int64_t>(bound));
+
+            if (IsNonNegative(value) && IsNonNegative(bound))
+                return ThreeWayCompare(static_cast<uint64_t>(value), static_cast<uint64_t>(bound));
+
+            return IsNonNegative(value) ? 1 : -1;
+        }
+    }
+
+    template <typename TInteger>
+    static bool FitsInInt64(TInteger value)
+    {
+        if constexpr (std::is_signed<TInteger>::value)
+            return true;
+        else
+            return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    }
+
+    // Formats a pair of floating-point values for an ordering failure; see FormatOrderingValues().
+    static std::pair<std::string, std::string> FormatFloatingPointValues(float value, float bound);
+    static std::pair<std::string, std::string> FormatFloatingPointValues(double value, double bound);
+    static std::pair<std::string, std::string> FormatFloatingPointValues(long double value, long double bound);
+
+    // Formats 'value' and 'bound' for an ordering failure. Floating-point values are shown in their common type, with
+    // as many digits as it reliably holds, or all of them when that would make two different values look equal.
+    template <typename TValue, typename TBound>
+    static std::pair<std::string, std::string> FormatOrderingValues(TValue value, TBound bound)
+    {
+        if constexpr (std::is_floating_point<TValue>::value || std::is_floating_point<TBound>::value)
+        {
+            typedef typename std::common_type<TValue, TBound>::type TCommon;
+            return FormatFloatingPointValues(static_cast<TCommon>(value), static_cast<TCommon>(bound));
+        }
+        else
+        {
+            return std::pair<std::string, std::string>(std::to_string(value), std::to_string(bound));
+        }
+    }
+
     // Calls 'compare' with 'expected' and 'actual' as two int64_t when both fit, otherwise as two uint64_t when
     // neither is negative, otherwise (one negative, the other above INT64_MAX) as two decimal strings, so neither
     // value wraps around. Used by the integer template overloads of the Equals/NotEquals methods.
     template <typename TExpected, typename TActual, typename TCompare>
     static void ForwardIntegerComparison(TExpected expected, TActual actual, TCompare compare)
     {
-        auto const fitsInInt64 = [](auto value)
-            {
-                if constexpr (std::is_signed<decltype(value)>::value)
-                    return true;
-                else
-                    return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
-            };
-        auto const isNonNegative = [](auto value)
-            {
-                if constexpr (std::is_signed<decltype(value)>::value)
-                    return value >= 0;
-                else
-                    return true;
-            };
-
-        if (fitsInInt64(expected) && fitsInInt64(actual))
+        if (FitsInInt64(expected) && FitsInInt64(actual))
             compare(static_cast<int64_t>(expected), static_cast<int64_t>(actual));
-        else if (isNonNegative(expected) && isNonNegative(actual))
+        else if (IsNonNegative(expected) && IsNonNegative(actual))
             compare(static_cast<uint64_t>(expected), static_cast<uint64_t>(actual));
         else
             compare(std::to_string(expected), std::to_string(actual));
+    }
+
+    template <typename TInteger>
+    static bool IsNonNegative(TInteger value)
+    {
+        if constexpr (std::is_signed<TInteger>::value)
+            return value >= 0;
+        else
+            return true;
+    }
+
+    // True when 'order' (from CompareForOrdering()) satisfies 'ordering'; never when it's nullopt (a NaN).
+    static bool OrderingHolds(std::optional<int> order, TOrdering ordering);
+    // The operator for 'ordering' in a failure message, e.g. ">=".
+    static char const* OrderingSymbol(TOrdering ordering);
+
+    template <typename T>
+    static int ThreeWayCompare(T a, T b)
+    {
+        return (a < b) ? -1 : ((b < a) ? 1 : 0);
     }
 
 protected:
@@ -648,6 +748,59 @@ protected: // Assertion/Check methods - Contains (substring)
     virtual void CheckNotContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Ordering (value compared with a bound)
+    // Any two integer or floating-point types except bool.
+    template <typename TValue, typename TBound>
+    using TEnableIfOrderable = typename std::enable_if<std::is_arithmetic<TValue>::value &&
+        std::is_arithmetic<TBound>::value && !std::is_same<TValue, bool>::value &&
+        !std::is_same<TBound, bool>::value, int>::type;
+
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertGreaterThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::GreaterThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertGreaterThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::GreaterThanOrEqual, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertLessThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::LessThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertLessThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
+    }
+
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckGreaterThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::GreaterThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckGreaterThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::GreaterThanOrEqual, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckLessThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::LessThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckLessThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
+    }
+
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 protected: // Assertion/Check methods - std::source_location
     // Each takes a location (by default, the caller's) in place of a method and line, and forwards to the
@@ -683,6 +836,34 @@ protected: // Assertion/Check methods - std::source_location
     void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertGreaterThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertGreaterThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertGreaterThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertLessThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertLessThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertLessThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>
     void AssertNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
@@ -762,6 +943,34 @@ protected: // Assertion/Check methods - std::source_location
     void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckGreaterThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckGreaterThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckGreaterThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckLessThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckLessThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckLessThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>
     void CheckNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,

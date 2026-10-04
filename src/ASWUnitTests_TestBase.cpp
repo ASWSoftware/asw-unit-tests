@@ -30,6 +30,8 @@ limitations under the License.
 #include <future>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <locale>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -102,6 +104,33 @@ std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point star
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
     return oss.str();
+}
+
+// Returns 'value' with 'precision' significant digits, in the classic locale so it doesn't depend on the current one.
+template <typename TFloat>
+std::string FormatFloatingPoint(TFloat value, int precision)
+{
+    std::ostringstream oss;
+    oss.imbue(std::locale::classic());
+    oss << std::setprecision(precision) << value;
+    return oss.str();
+}
+
+// Returns 'value' and 'bound' with as many digits as TFloat reliably holds, or with all of them when that would make
+// two different values look equal.
+template <typename TFloat>
+std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat bound)
+{
+    int const digits = std::numeric_limits<TFloat>::digits10;
+    std::pair<std::string, std::string> texts(FormatFloatingPoint(value, digits), FormatFloatingPoint(bound, digits));
+
+    if (texts.first == texts.second && value != bound)
+    {
+        int const allDigits = std::numeric_limits<TFloat>::max_digits10;
+        texts = std::make_pair(FormatFloatingPoint(value, allDigits), FormatFloatingPoint(bound, allDigits));
+    }
+
+    return texts;
 }
 
 } // namespace
@@ -905,6 +934,21 @@ bool TTestGroupBase::ExceptionTypeExpected() const
     return m_ExpectedExceptionTypeChecker != nullptr;
 }
 //---------------------------------------------------------------------------
+std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(float value, float bound)
+{
+    return FormatFloatingPointPair(value, bound);
+}
+//---------------------------------------------------------------------------
+std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(double value, double bound)
+{
+    return FormatFloatingPointPair(value, bound);
+}
+//---------------------------------------------------------------------------
+std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(long double value, long double bound)
+{
+    return FormatFloatingPointPair(value, bound);
+}
+//---------------------------------------------------------------------------
 TTestGroupBase::TestCallbackList& TTestGroupBase::GetTestCallbackList()
 {
     return m_TestCallbacks;
@@ -941,6 +985,41 @@ void TTestGroupBase::LogAppend(std::string const& msg)
     }
 
     std::cout << msg;
+}
+//---------------------------------------------------------------------------
+bool TTestGroupBase::OrderingHolds(std::optional<int> order, TOrdering ordering)
+{
+    if (!order.has_value())
+        return false;
+
+    switch (ordering)
+    {
+        case TOrdering::GreaterThan:
+            return *order > 0;
+        case TOrdering::GreaterThanOrEqual:
+            return *order >= 0;
+        case TOrdering::LessThan:
+            return *order < 0;
+        case TOrdering::LessThanOrEqual:
+        default:
+            return *order <= 0;
+    }
+}
+//---------------------------------------------------------------------------
+char const* TTestGroupBase::OrderingSymbol(TOrdering ordering)
+{
+    switch (ordering)
+    {
+        case TOrdering::GreaterThan:
+            return ">";
+        case TOrdering::GreaterThanOrEqual:
+            return ">=";
+        case TOrdering::LessThan:
+            return "<";
+        case TOrdering::LessThanOrEqual:
+        default:
+            return "<=";
+    }
 }
 //---------------------------------------------------------------------------
 /*

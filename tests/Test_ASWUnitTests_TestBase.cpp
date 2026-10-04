@@ -26,11 +26,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
@@ -1774,6 +1776,320 @@ void TFixture_OrderRecorder::Test_H()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_OrderingComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the GreaterThan/GreaterThanOrEqual/
+// LessThan/LessThanOrEqual methods, each called as (value, bound). The "Negative...Max" and "...MaxAndNegative" tests
+// catch a comparison that lets -1 wrap around to an unsigned maximum (the built-in -1 < 4294967295u is false), the
+// "Uint64Max" ones the case where neither value fits the other's type, and the NaN ones that a NaN fails every check.
+// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_OrderingComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertGreaterThanOrEqual_Equal_Passes();
+    void Test_AssertGreaterThanOrEqual_Less_Fails();
+    void Test_AssertGreaterThan_Equal_Fails();
+    void Test_AssertGreaterThan_Greater_Passes();
+    void Test_AssertLessThanOrEqual_Equal_Passes();
+    void Test_AssertLessThanOrEqual_Greater_Fails();
+    void Test_AssertLessThan_Equal_Fails();
+    void Test_AssertLessThan_Less_Passes();
+    void Test_CheckGreaterThanOrEqual_Equal_Passes();
+    void Test_CheckGreaterThanOrEqual_Greater_Passes();
+    void Test_CheckGreaterThanOrEqual_Less_Fails();
+    void Test_CheckGreaterThanOrEqual_NaN_Fails();
+    void Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes();
+    void Test_CheckGreaterThan_DoubleAndInt_Passes();
+    void Test_CheckGreaterThan_Double_Fails();
+    void Test_CheckGreaterThan_Equal_Fails();
+    void Test_CheckGreaterThan_Float_Fails();
+    void Test_CheckGreaterThan_Greater_Passes();
+    void Test_CheckGreaterThan_Infinity_Passes();
+    void Test_CheckGreaterThan_LongDouble_Fails();
+    void Test_CheckGreaterThan_Less_Fails();
+    void Test_CheckGreaterThan_Uint64MaxAndNegative_Passes();
+    void Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes();
+    void Test_CheckLessThanOrEqual_Equal_Passes();
+    void Test_CheckLessThanOrEqual_Greater_Fails();
+    void Test_CheckLessThanOrEqual_IntAndInt64_Passes();
+    void Test_CheckLessThanOrEqual_Less_Passes();
+    void Test_CheckLessThanOrEqual_NaNBound_Fails();
+    void Test_CheckLessThan_CloseDoubles_Fails();
+    void Test_CheckLessThan_Equal_Fails();
+    void Test_CheckLessThan_Greater_Fails();
+    void Test_CheckLessThan_Less_Passes();
+    void Test_CheckLessThan_NaN_Fails();
+    void Test_CheckLessThan_NegativeAndUint64Max_Passes();
+    void Test_CheckLessThan_NegativeAndUnsignedMax_Passes();
+    void Test_CheckLessThan_Uint64MaxAndNegative_Fails();
+
+public:
+    TFixture_OrderingComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_OrderingComparisons::TFixture_OrderingComparisons()
+    : inherited("Fixture_OrderingComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Equal_Passes,
+        "AssertGreaterThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Less_Fails,
+        "AssertGreaterThanOrEqual_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThan_Equal_Fails, "AssertGreaterThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThan_Greater_Passes,
+        "AssertGreaterThan_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Equal_Passes,
+        "AssertLessThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Greater_Fails,
+        "AssertLessThanOrEqual_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThan_Equal_Fails, "AssertLessThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThan_Less_Passes, "AssertLessThan_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Equal_Passes,
+        "CheckGreaterThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Greater_Passes,
+        "CheckGreaterThanOrEqual_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Less_Fails,
+        "CheckGreaterThanOrEqual_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_NaN_Fails,
+        "CheckGreaterThanOrEqual_NaN_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes,
+        "CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_DoubleAndInt_Passes,
+        "CheckGreaterThan_DoubleAndInt_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Double_Fails, "CheckGreaterThan_Double_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Equal_Fails, "CheckGreaterThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Float_Fails, "CheckGreaterThan_Float_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Greater_Passes,
+        "CheckGreaterThan_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Infinity_Passes,
+        "CheckGreaterThan_Infinity_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_LongDouble_Fails,
+        "CheckGreaterThan_LongDouble_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Less_Fails, "CheckGreaterThan_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Uint64MaxAndNegative_Passes,
+        "CheckGreaterThan_Uint64MaxAndNegative_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes,
+        "CheckGreaterThan_UnsignedMaxAndNegative_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Equal_Passes,
+        "CheckLessThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Greater_Fails,
+        "CheckLessThanOrEqual_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_IntAndInt64_Passes,
+        "CheckLessThanOrEqual_IntAndInt64_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Less_Passes,
+        "CheckLessThanOrEqual_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_NaNBound_Fails,
+        "CheckLessThanOrEqual_NaNBound_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_CloseDoubles_Fails,
+        "CheckLessThan_CloseDoubles_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Equal_Fails, "CheckLessThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Greater_Fails, "CheckLessThan_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Less_Passes, "CheckLessThan_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NaN_Fails, "CheckLessThan_NaN_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUint64Max_Passes,
+        "CheckLessThan_NegativeAndUint64Max_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUnsignedMax_Passes,
+        "CheckLessThan_NegativeAndUnsignedMax_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails,
+        "CheckLessThan_Uint64MaxAndNegative_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Equal_Passes()
+{
+    AssertGreaterThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Less_Fails()
+{
+    AssertGreaterThanOrEqual(1, 2, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThan_Equal_Fails()
+{
+    AssertGreaterThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThan_Greater_Passes()
+{
+    AssertGreaterThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Equal_Passes()
+{
+    AssertLessThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Greater_Fails()
+{
+    AssertLessThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThan_Equal_Fails()
+{
+    AssertLessThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThan_Less_Passes()
+{
+    AssertLessThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Equal_Passes()
+{
+    CheckGreaterThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Greater_Passes()
+{
+    CheckGreaterThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Less_Fails()
+{
+    CheckGreaterThanOrEqual(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_NaN_Fails()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckGreaterThanOrEqual(nan, nan, __func__, __LINE__, "a NaN is never equal, even to itself");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes()
+{
+    uint64_t const aboveInt64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1;
+    CheckGreaterThan(aboveInt64Max, std::numeric_limits<int64_t>::max(), __func__, __LINE__, "greater by one");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_DoubleAndInt_Passes()
+{
+    CheckGreaterThan(0.5, 0, __func__, __LINE__, "the int is compared as a double");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Double_Fails()
+{
+    CheckGreaterThan(0.1, 0.25, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Equal_Fails()
+{
+    CheckGreaterThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Float_Fails()
+{
+    CheckGreaterThan(0.1f, 0.25f, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Greater_Passes()
+{
+    CheckGreaterThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Infinity_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<double>::infinity(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "infinity is greater than any finite value");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_LongDouble_Fails()
+{
+    CheckGreaterThan(1.5L, 2.5L, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Less_Fails()
+{
+    CheckGreaterThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Uint64MaxAndNegative_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<uint64_t>::max(), int64_t{ -1 }, __func__, __LINE__, "-1 must not wrap");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<unsigned int>::max(), -1, __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Equal_Passes()
+{
+    CheckLessThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Greater_Fails()
+{
+    CheckLessThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_IntAndInt64_Passes()
+{
+    CheckLessThanOrEqual(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Less_Passes()
+{
+    CheckLessThanOrEqual(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_NaNBound_Fails()
+{
+    CheckLessThanOrEqual(1.0, std::numeric_limits<double>::quiet_NaN(), __func__, __LINE__, "nothing compares to NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_CloseDoubles_Fails()
+{
+    // The smallest double above 1, which looks like 1 at the usual 15 significant digits.
+    CheckLessThan(std::nextafter(1.0, 2.0), 1.0, __func__, __LINE__, "just greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Equal_Fails()
+{
+    CheckLessThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Greater_Fails()
+{
+    CheckLessThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Less_Passes()
+{
+    CheckLessThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NaN_Fails()
+{
+    CheckLessThan(std::numeric_limits<double>::quiet_NaN(), 1.0, __func__, __LINE__, "NaN compares to nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUint64Max_Passes()
+{
+    CheckLessThan(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUnsignedMax_Passes()
+{
+    CheckLessThan(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails()
+{
+    CheckLessThan(std::numeric_limits<uint64_t>::max(), int64_t{ -1 }, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
@@ -1851,6 +2167,10 @@ private:
     void Test_AssertEquals_CStrings_Passes();
     void Test_AssertEquals_Fails();
     void Test_AssertFalse_Fails();
+    void Test_AssertGreaterThanOrEqual_Passes();
+    void Test_AssertGreaterThan_Fails();
+    void Test_AssertLessThanOrEqual_Passes();
+    void Test_AssertLessThan_Fails();
     void Test_AssertNear_Fails();
     void Test_AssertNotContainsIC_Fails();
     void Test_AssertNotContains_Fails();
@@ -1865,6 +2185,10 @@ private:
     void Test_CheckEquals_Fails();
     void Test_CheckEquals_MixedIntegers_Passes();
     void Test_CheckFalse_Fails();
+    void Test_CheckGreaterThanOrEqual_Passes();
+    void Test_CheckGreaterThan_Fails();
+    void Test_CheckLessThanOrEqual_Passes();
+    void Test_CheckLessThan_Fails();
     void Test_CheckNear_Fails();
     void Test_CheckNear_Passes();
     void Test_CheckNotContainsIC_Fails();
@@ -1901,6 +2225,10 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThanOrEqual_Passes, "AssertGreaterThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThan_Fails, "AssertGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes, "AssertLessThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertLessThan_Fails, "AssertLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
@@ -1915,6 +2243,10 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThanOrEqual_Passes, "CheckGreaterThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThan_Fails, "CheckGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes, "CheckLessThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckLessThan_Fails, "CheckLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContainsIC_Fails, "CheckNotContainsIC_Fails");
@@ -1972,6 +2304,28 @@ void TFixture_SourceLocations::Test_AssertFalse_Fails()
 {
     ExpectedLines["AssertFalse_Fails"] = __LINE__ + 1;
     AssertFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertGreaterThanOrEqual_Passes()
+{
+    AssertGreaterThanOrEqual(4, 4, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertGreaterThan_Fails()
+{
+    ExpectedLines["AssertGreaterThan_Fails"] = __LINE__ + 1;
+    AssertGreaterThan(4, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes()
+{
+    AssertLessThanOrEqual(4, 4, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertLessThan_Fails()
+{
+    ExpectedLines["AssertLessThan_Fails"] = __LINE__ + 1;
+    AssertLessThan(4, 4, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNear_Fails()
@@ -2052,6 +2406,28 @@ void TFixture_SourceLocations::Test_CheckFalse_Fails()
 {
     ExpectedLines["CheckFalse_Fails"] = __LINE__ + 1;
     CheckFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckGreaterThanOrEqual_Passes()
+{
+    CheckGreaterThanOrEqual(2.0, 2, "equal, double and int");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckGreaterThan_Fails()
+{
+    ExpectedLines["CheckGreaterThan_Fails"] = __LINE__ + 1;
+    CheckGreaterThan(4u, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes()
+{
+    CheckLessThanOrEqual(int64_t{ 4 }, 4u, "equal, int64_t and unsigned int");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckLessThan_Fails()
+{
+    ExpectedLines["CheckLessThan_Fails"] = __LINE__ + 1;
+    CheckLessThan(4.0f, 4, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNear_Fails()
@@ -2317,6 +2693,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Equals_ComparesMixedIntegerTypesByValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
         "Equals_ShowsBoolValuesAsTrueOrFalse");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
+        "Ordering_ComparesByValueAndShowsBoth");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
@@ -2664,6 +3042,53 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
         __LINE__, "CheckEquals shows bools as true/false");
     CheckTrue(checkNotEquals->Message.find("Both values equal: \"true\"") != std::string::npos, __func__, __LINE__,
         "CheckNotEquals shows bools as true/false");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
+{
+    // Arrange
+    TFixture_OrderingComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(36), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    std::vector<std::pair<std::string, std::string> > const expectedDetails = {
+        { "AssertGreaterThanOrEqual_Less_Fails", "): Expected 1 to be >= 2. less" },
+        { "CheckGreaterThan_Double_Fails", "): Expected 0.1 to be > 0.25. less" },
+        { "CheckGreaterThan_Equal_Fails", "): Expected 4 to be > 4. equal" },
+        { "CheckGreaterThan_Float_Fails", "): Expected 0.1 to be > 0.25. less" },
+        { "CheckGreaterThan_LongDouble_Fails", "): Expected 1.5 to be > 2.5. less" },
+        { "CheckLessThanOrEqual_Greater_Fails", "): Expected 5 to be <= 4. greater" },
+        { "CheckLessThan_CloseDoubles_Fails", "): Expected 1.0000000000000002 to be < 1. just greater" },
+        { "CheckLessThan_Uint64MaxAndNegative_Fails", "): Expected 18446744073709551615 to be < -1. greater" },
+    };
+
+    for (std::pair<std::string, std::string> const& expected : expectedDetails)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+
+        std::string const prefix = (expected.first.compare(0, 6, "Assert") == 0) ?
+                "Values out of order: Test_" + expected.first + " (" :
+                "Check failed for: \"Test_" + expected.first + "\" (";
+        CheckTrue(record->Message.find(prefix) == 0 && NameEndsWith(record->Message, expected.second), __func__,
+            __LINE__, expected.first + " shows the value and the bound: " + record->Message);
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()
@@ -3160,7 +3585,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(34), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(42), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

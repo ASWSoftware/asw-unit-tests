@@ -195,6 +195,20 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptOrdering
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptOrdering::TExceptOrdering(std::string const& method, int line, std::string const& value,
+    std::string const& relation, std::string const& bound, std::string const& msg)
+{
+    m_Message = "Values out of order: " + method + " (" + std::to_string(line) + "): Expected " + value + " to be " +
+        relation + " " + bound + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptTrue
 /////////////////////////////////////////////////////////////////////////////
 

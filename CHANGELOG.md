@@ -12,6 +12,14 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and
+  `CheckLessThanOrEqual`, with matching `Assert` methods, taking the value
+  first and then the bound (e.g. `CheckGreaterThanOrEqual(count, 1, ...)`
+  checks `count >= 1`). Unlike `CheckTrue(count >= 1, ...)`, a failure shows
+  both, e.g. `Expected 0 to be >= 1`. They accept any two integer or
+  floating-point types except `bool`. Integers are compared by value, so `-1`
+  is less than any unsigned value, unlike with the built-in `<`, and a NaN
+  fails every check.
 - `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC`,
   which compare two `std::string` or `std::wstring` values ignoring the case
   of the ASCII letters `A`-`Z` only, like the `ContainsIC` methods. A failure
