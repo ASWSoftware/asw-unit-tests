@@ -161,6 +161,9 @@ private: // User declarations
     // By index into m_TestList.GroupNames(); nullptr while hidden. Read through GroupNode(), which rebuilds it
     // when the tree's window has been recreated.
     std::vector<TTreeNode*> m_GroupNodes;
+    // Set when the command line doesn't choose the tests itself (no --run, --filter, or partition options), so
+    // the saved test selection is restored at start and saved again at close.
+    bool m_KeepSelection;
     // The exit code the console runner would have returned for the latest run; see ExitCode().
     int m_LastRunExitCode;
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
@@ -202,6 +205,8 @@ private:
     TTreeNode* GroupNode(size_t groupIndex);
     // Restores the layout SaveLayout() saved, if any; see the definition.
     void LoadLayout();
+    // Restores the test selection SaveSelection() saved, if any, noting what it restored in the log.
+    void LoadSelection();
     void OnTestFinished(ASWUnitTests::TTestCaseRecord const& record, std::string const& testLog);
     void OnTestStarted(std::string const& groupName, std::string const& testName);
     // Refills m_GroupNodes and m_TestNodes from the tree's nodes, by the index each one holds in its Data.
@@ -217,6 +222,8 @@ private:
     void RunTests(ASWUnitTests::TestFilter const& filter, std::string const& filterDescription);
     // Saves the window's layout for the next start, ignoring any error.
     void SaveLayout();
+    // Saves which tests are checked and shown for the next start, ignoring any error.
+    void SaveSelection();
     void SetRunning(bool running);
     void SyncTreeChecks();
     // The test's tree node, or nullptr while it's hidden.

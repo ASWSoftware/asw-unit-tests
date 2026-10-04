@@ -308,13 +308,26 @@ When the window closes, it saves its size, position, maximized state, and panel 
 longer connected is ignored. An `--exit` run doesn't save the layout. **View > Reset Layout** restores the default
 layout right away; `--layout-ignore` and `--layout-reset` (below) control this from the command line.
 
+The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`, as long as the
+command line doesn't choose them itself (no `--run`, `--filter`, or partition options). What it saves is what Run
+Selected would run, the checked tests that are shown; the filter box itself starts empty. Since tests come and go
+between sessions, it adapts:
+
+- A test that's been removed is skipped.
+- A new test (or a renamed one, which looks the same) is checked if its group was entirely checked, and otherwise
+  isn't. A test in a new group is checked only if every test was.
+- If none of the checked tests still exist, every test is checked instead.
+
+The log notes what was restored. So **Select Failed**, closing the window, fixing the code, and reopening it leaves
+just those tests checked for Run Selected.
+
 Tests run on the main (VCL) thread, so a test can create forms and controls. `--test-timeout-seconds` runs each test
 on a worker thread instead, so it can't be combined with tests like that; the log says so when it's given.
 
 The GUI takes the same [command line options](#command-line-options) as the console runner, with these differences:
 
-- `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, and `--filter`'s
-  pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
+- `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, instead of the
+  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
   unchecked, since the box ignores case and matches anywhere in the name).
 - `--project-name` is also shown in the window's caption.
 - `--report-junit` writes the report after every run, including Run Failed.

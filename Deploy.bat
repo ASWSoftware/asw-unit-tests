@@ -191,6 +191,10 @@ call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.cpp" "vcl\gui\src\ASWUn
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h" "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp" "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.h" "vcl\gui\src\ASWUnitTests_GUI_Selection.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.cpp" "vcl\gui\src\ASWUnitTests_GUI_Strings.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.h" "vcl\gui\src\ASWUnitTests_GUI_Strings.h"
@@ -214,6 +218,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.h" "vcl\tests\Test_ASWUnitTests_GUI_Selection.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp"
 if errorlevel 1 exit /b 1

@@ -12,6 +12,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- VCL GUI runner: the checked tests are saved when the window closes and
+  restored when it next opens, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
+  unless the command line chooses the tests itself (`--run`, `--filter`, or
+  partition options). New tests are checked if their group was entirely
+  checked, removed tests are skipped, and the log notes what was restored.
 - VCL GUI runner: **Select Failed** (Tests menu and toolbar), which checks only
   the shown tests that failed in the latest run, so they can be rerun with Run
   Selected.
