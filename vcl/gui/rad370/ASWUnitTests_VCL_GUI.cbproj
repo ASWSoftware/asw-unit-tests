@@ -222,6 +222,10 @@
             <DependentOn>..\..\..\src\ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>15</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\src\ASWUnitTests_Utils.cpp">
+            <DependentOn>..\..\..\src\ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>37</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\src\ASWUnitTests_Version.cpp">
             <DependentOn>..\..\..\src\ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>16</BuildOrder>

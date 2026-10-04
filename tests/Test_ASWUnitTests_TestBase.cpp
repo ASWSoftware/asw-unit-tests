@@ -75,7 +75,8 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 //---------------------------------------------------------------------------
 // True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
 // "..._Fails") documents its expected outcome, and the outer verifying test can check every
-// registered test generically instead of hand-maintaining a separate expected-outcome table.
+// registered test generically instead of hand-maintaining a separate expected-outcome table. Also
+// used to check the end of a failure message.
 bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
@@ -461,6 +462,204 @@ void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentB
 {
     wchar_t const buffer[] = L"abc";
     CheckNotEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContains()/CheckContains()/
+// AssertNotContains()/CheckNotContains(), narrow and wide. "Wide_NonASCII" checks that a wide failure shows
+// its text as UTF-8. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContains_Absent_Fails();
+    void Test_AssertContains_Present_Passes();
+    void Test_AssertContains_Wide_Absent_Fails();
+    void Test_AssertContains_Wide_Present_Passes();
+    void Test_AssertNotContains_Absent_Passes();
+    void Test_AssertNotContains_Present_Fails();
+    void Test_AssertNotContains_Wide_Absent_Passes();
+    void Test_AssertNotContains_Wide_Present_Fails();
+    void Test_CheckContains_Absent_Fails();
+    void Test_CheckContains_DifferentCase_Fails();
+    void Test_CheckContains_EmptySubstring_Passes();
+    void Test_CheckContains_Present_Passes();
+    void Test_CheckContains_SubstringLongerThanText_Fails();
+    void Test_CheckContains_Wide_Absent_Fails();
+    void Test_CheckContains_Wide_NonASCII_Fails();
+    void Test_CheckContains_Wide_Present_Passes();
+    void Test_CheckNotContains_Absent_Passes();
+    void Test_CheckNotContains_EmptySubstring_Fails();
+    void Test_CheckNotContains_Present_Fails();
+    void Test_CheckNotContains_Wide_Absent_Passes();
+    void Test_CheckNotContains_Wide_Present_Fails();
+
+public:
+    TFixture_ContainsComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ContainsComparisons::TFixture_ContainsComparisons()
+    : inherited("Fixture_ContainsComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Absent_Fails, "AssertContains_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Present_Passes, "AssertContains_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Wide_Absent_Fails,
+        "AssertContains_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Wide_Present_Passes,
+        "AssertContains_Wide_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Absent_Passes,
+        "AssertNotContains_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Present_Fails,
+        "AssertNotContains_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Absent_Passes,
+        "AssertNotContains_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Present_Fails,
+        "AssertNotContains_Wide_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Absent_Fails, "CheckContains_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_DifferentCase_Fails,
+        "CheckContains_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_EmptySubstring_Passes,
+        "CheckContains_EmptySubstring_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Present_Passes, "CheckContains_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_SubstringLongerThanText_Fails,
+        "CheckContains_SubstringLongerThanText_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_Absent_Fails,
+        "CheckContains_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_NonASCII_Fails,
+        "CheckContains_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_Present_Passes,
+        "CheckContains_Wide_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Absent_Passes,
+        "CheckNotContains_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_EmptySubstring_Fails,
+        "CheckNotContains_EmptySubstring_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Present_Fails,
+        "CheckNotContains_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Absent_Passes,
+        "CheckNotContains_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails,
+        "CheckNotContains_Wide_Present_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Absent_Fails()
+{
+    AssertContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Present_Passes()
+{
+    AssertContains(std::string("hello world"), "lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Wide_Absent_Fails()
+{
+    AssertContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Wide_Present_Passes()
+{
+    AssertContains(std::wstring(L"hello world"), L"lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Absent_Passes()
+{
+    AssertNotContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Present_Fails()
+{
+    AssertNotContains(std::string("hello world"), "world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Absent_Passes()
+{
+    AssertNotContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Present_Fails()
+{
+    AssertNotContains(std::wstring(L"hello world"), L"world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Absent_Fails()
+{
+    CheckContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_DifferentCase_Fails()
+{
+    CheckContains(std::string("hello world"), "World", __func__, __LINE__, "the comparison is case-sensitive");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_EmptySubstring_Passes()
+{
+    CheckContains(std::string("hello world"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Present_Passes()
+{
+    CheckContains(std::string("hello world"), "hello world", __func__, __LINE__, "the whole text is a substring");
+    CheckContains(std::string("hello world"), "lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_SubstringLongerThanText_Fails()
+{
+    CheckContains(std::string("hello"), "hello world", __func__, __LINE__, "the text contains the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_Absent_Fails()
+{
+    CheckContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_NonASCII_Fails()
+{
+    // "cafe" with an e-acute, a space, and U+1F600 (a surrogate pair where wchar_t is 16 bits), then u-umlaut.
+    CheckContains(std::wstring(L"caf" L"\x00E9" L" \U0001F600"), L"\x00FC", __func__, __LINE__, "not present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_Present_Passes()
+{
+    CheckContains(std::wstring(L"hello world"), L"lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Absent_Passes()
+{
+    CheckNotContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_EmptySubstring_Fails()
+{
+    CheckNotContains(std::string("hello world"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Present_Fails()
+{
+    CheckNotContains(std::string("hello world"), "world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Absent_Passes()
+{
+    CheckNotContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails()
+{
+    CheckNotContains(std::wstring(L"hello world"), L"world", __func__, __LINE__, "substring present");
 }
 //---------------------------------------------------------------------------
 
@@ -1179,7 +1378,7 @@ void TFixture_SlowTest::Test_NeverRuns()
 // overload. Each "_Fails"/"_Skips" test records the line of its call in ExpectedLines, so
 // Test_SourceLocation_ReportsCallerFunctionAndLine below can check the failure names that test's
 // function and line. "_Passes" tests check that arguments forward to the same overloads as the
-// method/line form (C strings, mixed integers, exception expectations). CheckIsEven() is a custom
+// method/line form (C strings, mixed integers, wide substrings, exception expectations). CheckIsEven() is a custom
 // helper of the kind a test author might write, passing its caller's location through.
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_SourceLocations : public TTestGroupBase
@@ -1190,18 +1389,23 @@ private:
 private:
     void CheckIsEven(int value, std::source_location loc = std::source_location::current());
 
+    void Test_AssertContains_Fails();
     void Test_AssertEquals_CStrings_Passes();
     void Test_AssertEquals_Fails();
     void Test_AssertFalse_Fails();
     void Test_AssertNear_Fails();
+    void Test_AssertNotContains_Fails();
     void Test_AssertNotEquals_Fails();
     void Test_AssertNotNear_Fails();
     void Test_AssertTrue_Fails();
+    void Test_CheckContains_Fails();
+    void Test_CheckContains_Wide_Passes();
     void Test_CheckEquals_Fails();
     void Test_CheckEquals_MixedIntegers_Passes();
     void Test_CheckFalse_Fails();
     void Test_CheckNear_Fails();
     void Test_CheckNear_Passes();
+    void Test_CheckNotContains_Fails();
     void Test_CheckNotEquals_Fails();
     void Test_CheckNotNear_Fails();
     void Test_CheckTrue_Fails();
@@ -1227,18 +1431,23 @@ TFixture_SourceLocations::TFixture_SourceLocations()
 {
     SetLogSuppressed(true);
 
+    RegisterTest(&TFixture_SourceLocations::Test_AssertContains_Fails, "AssertContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Fails, "CheckContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Wide_Passes, "CheckContains_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_Fails, "CheckTrue_Fails");
@@ -1257,6 +1466,12 @@ TFixture_SourceLocations::TFixture_SourceLocations()
 void TFixture_SourceLocations::CheckIsEven(int value, std::source_location loc)
 {
     CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertContains_Fails()
+{
+    ExpectedLines["AssertContains_Fails"] = __LINE__ + 1;
+    AssertContains(std::string("abc"), "x", "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes()
@@ -1283,6 +1498,12 @@ void TFixture_SourceLocations::Test_AssertNear_Fails()
     AssertNear(1.0, 2.0, 0.5, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotContains_Fails()
+{
+    ExpectedLines["AssertNotContains_Fails"] = __LINE__ + 1;
+    AssertNotContains(std::string("abc"), "b", "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotEquals_Fails()
 {
     ExpectedLines["AssertNotEquals_Fails"] = __LINE__ + 1;
@@ -1299,6 +1520,17 @@ void TFixture_SourceLocations::Test_AssertTrue_Fails()
 {
     ExpectedLines["AssertTrue_Fails"] = __LINE__ + 1;
     AssertTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContains_Fails()
+{
+    ExpectedLines["CheckContains_Fails"] = __LINE__ + 1;
+    CheckContains(std::string("abc"), "x", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContains_Wide_Passes()
+{
+    CheckContains(std::wstring(L"abc"), L"b", "wide substring present");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckEquals_Fails()
@@ -1327,6 +1559,12 @@ void TFixture_SourceLocations::Test_CheckNear_Fails()
 void TFixture_SourceLocations::Test_CheckNear_Passes()
 {
     CheckNear(1.0f, 1.25f, 0.5f, "within tolerance");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotContains_Fails()
+{
+    ExpectedLines["CheckNotContains_Fails"] = __LINE__ + 1;
+    CheckNotContains(std::string("abc"), "b", "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotEquals_Fails()
@@ -1467,6 +1705,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive,
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring, "Contains_ShowsTextAndSubstring");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
         "Equals_ComparesMixedIntegerTypesByValue");
@@ -1566,6 +1805,58 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
     // Assert
     CheckTrue(fixture.ReachedSecondCheck, __func__, __LINE__,
         "a Check failure does not abort the rest of the test, unlike Assert");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
+{
+    // Arrange
+    TFixture_ContainsComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(21), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContains_Absent_Fails");
+    TTestCaseRecord const* const assertNotContains = FindRecord(results, "AssertNotContains_Wide_Present_Fails");
+    TTestCaseRecord const* const checkContains = FindRecord(results, "CheckContains_Absent_Fails");
+    TTestCaseRecord const* const checkNonASCII = FindRecord(results, "CheckContains_Wide_NonASCII_Fails");
+    TTestCaseRecord const* const checkNotContains = FindRecord(results, "CheckNotContains_Present_Fails");
+    AssertTrue(assertContains != nullptr && assertNotContains != nullptr && checkContains != nullptr &&
+        checkNonASCII != nullptr && checkNotContains != nullptr, __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    std::string const containsDetail = "): Expected \"hello world\" to contain \"xyz\". substring absent";
+    std::string const notContainsDetail = "): Expected \"hello world\" not to contain \"world\". substring present";
+    // "cafe" with an e-acute, a space and U+1F600, then u-umlaut, as UTF-8.
+    std::string const nonASCIIDetail = "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to contain \"\xC3\xBC\". not present";
+
+    CheckTrue(assertContains->Message.find("Substring not found: Test_AssertContains_Absent_Fails (") == 0 &&
+        NameEndsWith(assertContains->Message, containsDetail), __func__, __LINE__,
+        "AssertContains shows the text and substring: " + assertContains->Message);
+    CheckTrue(assertNotContains->Message.find("Substring found: Test_AssertNotContains_Wide_Present_Fails (") == 0 &&
+        NameEndsWith(assertNotContains->Message, notContainsDetail), __func__, __LINE__,
+        "AssertNotContains shows the wide text and substring: " + assertNotContains->Message);
+    CheckTrue(checkContains->Message.find("Check failed for: \"Test_CheckContains_Absent_Fails\" (") == 0 &&
+        NameEndsWith(checkContains->Message, containsDetail), __func__, __LINE__,
+        "CheckContains shows the text and substring: " + checkContains->Message);
+    CheckTrue(checkNotContains->Message.find("Check failed for: \"Test_CheckNotContains_Present_Fails\" (") == 0 &&
+        NameEndsWith(checkNotContains->Message, notContainsDetail), __func__, __LINE__,
+        "CheckNotContains shows the text and substring: " + checkNotContains->Message);
+    CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
+        "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
@@ -2153,7 +2444,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(21), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(26), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

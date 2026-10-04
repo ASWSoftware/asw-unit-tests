@@ -38,6 +38,7 @@ limitations under the License.
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -123,6 +124,20 @@ TTestGroupBase::TTestGroupBase(std::string const& name)
       m_Name(name),
       m_RunObserver(nullptr)
 {
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContains(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) == std::string::npos)
+        throw TExceptContains(method, line, text, substring, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContains(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) == std::wstring::npos)
+        throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEquals(
@@ -256,6 +271,20 @@ void TTestGroupBase::AssertNear(
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContains(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) != std::string::npos)
+        throw TExceptNotContains(method, line, text, substring, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContains(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) != std::wstring::npos)
+        throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -384,6 +413,23 @@ void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int lin
 {
     if (!testVal)
         throw TExceptFalse(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContains(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) == std::string::npos)
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" to contain \"" + substring + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContains(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) == std::wstring::npos)
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" to contain \"" + WideToUTF8(substring) + "\". " + msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckEquals(
@@ -527,6 +573,23 @@ void TTestGroupBase::CheckNear(
         std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
         std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
         SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContains(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) != std::string::npos)
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" not to contain \"" + substring + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContains(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (text.find(substring) != std::wstring::npos)
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" not to contain \"" + WideToUTF8(substring) + "\". " + msg);
     }
 }
 //---------------------------------------------------------------------------

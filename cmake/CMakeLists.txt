@@ -19,6 +19,7 @@ add_executable(ASWUnitTests
     ../tests/Test_ASWUnitTests_JUnitReport.cpp
     ../tests/Test_ASWUnitTests_StdOutRedirect.cpp
     ../tests/Test_ASWUnitTests_TestBase.cpp
+    ../tests/Test_ASWUnitTests_Utils.cpp
     ../tests/Test_ASWUnitTests_Version.cpp
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp

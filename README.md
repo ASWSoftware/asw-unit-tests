@@ -11,7 +11,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, and `Near`/`NotNear`.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains`.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -504,6 +504,21 @@ line form, or check `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`.
 char const buffer[] = "abc";
 CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
 ```
+
+### Checking for a Substring
+
+`CheckContains`/`AssertContains` pass when a `std::string` or `std::wstring` contains a given substring, and
+`CheckNotContains`/`AssertNotContains` pass when it doesn't. The text comes first, then the substring. Unlike
+`CheckTrue(text.find(substring) != std::string::npos, ...)`, a failure shows both:
+
+```
+std::string const log = "Connected to server";
+CheckContains(log, "timeout", __func__, __LINE__, "logs the timeout");
+// Check failed for: "Test_Connect" (42): Expected "Connected to server" to contain "timeout". logs the timeout
+```
+
+The comparison is case-sensitive, and every string contains the empty string. A failure shows `std::wstring` text
+converted to UTF-8.
 
 ### Comparing Integers of Different Types
 

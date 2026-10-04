@@ -182,6 +182,10 @@
             <DependentOn>..\..\..\src\ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>9</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\src\ASWUnitTests_Utils.cpp">
+            <DependentOn>..\..\..\src\ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>36</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\src\ASWUnitTests_Version.cpp">
             <DependentOn>..\..\..\src\ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>10</BuildOrder>
@@ -224,6 +228,10 @@
         <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_TestBase.cpp">
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>19</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_Utils.cpp">
+            <DependentOn>..\..\..\tests\Test_ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>37</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_Version.cpp">
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_Version.h</DependentOn>

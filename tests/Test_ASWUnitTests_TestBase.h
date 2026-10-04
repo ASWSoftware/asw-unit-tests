@@ -45,6 +45,7 @@ private:
 private: // Test methods
     void Test_CheckNear_ToleranceBoundaryIsInclusive();
     void Test_Check_ContinuesButAssert_Aborts();
+    void Test_Contains_ShowsTextAndSubstring();
     void Test_Equals_ComparesCStringsByContent();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
     void Test_Equals_ShowsBoolValuesAsTrueOrFalse();

@@ -96,6 +96,20 @@ TExceptExpected::TExceptExpected(std::string const& msg)
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptContains
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptContains::TExceptContains(std::string const& method, int line, std::string const& text,
+    std::string const& substring, std::string const& msg)
+{
+    m_Message = "Substring not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" to contain \"" + substring + "\". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptEquals
 /////////////////////////////////////////////////////////////////////////////
 
@@ -132,6 +146,20 @@ TExceptFalse::TExceptFalse(std::string const& msg)
 TExceptFalse::TExceptFalse(std::string const& method, int line, std::string const& msg)
 {
     m_Message = "Expected false but was true: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotContains
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotContains::TExceptNotContains(std::string const& method, int line, std::string const& text,
+    std::string const& substring, std::string const& msg)
+{
+    m_Message = "Substring found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" not to contain \"" + substring + "\". " + msg;
 }
 //---------------------------------------------------------------------------
 

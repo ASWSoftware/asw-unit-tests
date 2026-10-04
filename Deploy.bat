@@ -91,6 +91,10 @@ call :CopyFile "src\ASWUnitTests_TestBase.cpp" "src\ASWUnitTests_TestBase.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_TestBase.h" "src\ASWUnitTests_TestBase.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Utils.cpp" "src\ASWUnitTests_Utils.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "src\ASWUnitTests_Utils.h" "src\ASWUnitTests_Utils.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Version.cpp" "src\ASWUnitTests_Version.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_Version.h" "src\ASWUnitTests_Version.h"
@@ -132,6 +136,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_TestBase.cpp" "tests\Test_ASWUnitTests_TestBase.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_TestBase.h" "tests\Test_ASWUnitTests_TestBase.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Utils.cpp" "tests\Test_ASWUnitTests_Utils.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Utils.h" "tests\Test_ASWUnitTests_Utils.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.cpp" "toTest\ASWTools_Common.cpp"
 if errorlevel 1 exit /b 1

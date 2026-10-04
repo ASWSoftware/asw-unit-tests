@@ -587,10 +587,38 @@ protected: // Assertion/Check methods - Boolean
     virtual void CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Contains (substring)
+    virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 protected: // Assertion/Check methods - std::source_location
     // Each takes a location (by default, the caller's) in place of a method and line, and forwards to the
     // method/line overload with loc.function_name() and loc.line().
+    template <typename TText, typename TSubstring>
+    void AssertContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void AssertEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -608,6 +636,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>
     void AssertNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
@@ -628,6 +663,13 @@ protected: // Assertion/Check methods - std::source_location
         AssertTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
     }
 
+    template <typename TText, typename TSubstring>
+    void CheckContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void CheckEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -645,6 +687,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void CheckNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>
     void CheckNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
