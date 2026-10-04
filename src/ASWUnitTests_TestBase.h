@@ -451,6 +451,11 @@ protected: // Assertion/Check methods - Equals
             });
     }
 
+    virtual void AssertEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
+
     virtual void CheckEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
     virtual void CheckEquals(
@@ -486,6 +491,11 @@ protected: // Assertion/Check methods - Equals
                 CheckEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+
+    virtual void CheckEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
 
 protected: // Assertion/Check methods - Not Equals
     virtual void AssertNotEquals(
@@ -524,6 +534,11 @@ protected: // Assertion/Check methods - Not Equals
             });
     }
 
+    virtual void AssertNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEqualsIC(std::wstring const& expected, std::wstring const& actual,
+        std::string const& method, int line, std::string const& msg);
+
     virtual void CheckNotEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
     virtual void CheckNotEquals(
@@ -559,6 +574,11 @@ protected: // Assertion/Check methods - Not Equals
                 CheckNotEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+
+    virtual void CheckNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
 
 protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
     virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,
@@ -653,6 +673,13 @@ protected: // Assertion/Check methods - std::source_location
         AssertEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TExpected, typename TActual>
+    void AssertEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -683,6 +710,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         AssertNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertNotEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>
@@ -718,6 +752,13 @@ protected: // Assertion/Check methods - std::source_location
         CheckEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TExpected, typename TActual>
+    void CheckEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -748,6 +789,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         CheckNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckNotEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>

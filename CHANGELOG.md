@@ -12,6 +12,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC`,
+  which compare two `std::string` or `std::wstring` values ignoring the case
+  of the ASCII letters `A`-`Z` only, like the `ContainsIC` methods. A failure
+  shows both values, with wide text converted to UTF-8.
 - `CheckContains`/`AssertContains` and `CheckNotContains`/`AssertNotContains`,
   for `std::string` and `std::wstring`, taking the text first and then the
   substring. Unlike `CheckTrue(text.find(substring) != std::string::npos, ...)`,

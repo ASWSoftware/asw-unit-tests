@@ -11,8 +11,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains` (plus
-  `ContainsIC`/`NotContainsIC`, ignoring case).
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains`, plus
+  case-insensitive `IC` variants of the string `Equals`/`NotEquals` and `Contains`/`NotContains` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -506,6 +506,21 @@ char const buffer[] = "abc";
 CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
 ```
 
+### Comparing Strings, Ignoring Case
+
+`CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC` compare two `std::string` or
+`std::wstring` values like `CheckEquals`/`CheckNotEquals`, but ignoring case. A failure shows both values, with wide
+text converted to UTF-8:
+
+```
+CheckEqualsIC("Content-Type", headerName, __func__, __LINE__, "header names ignore case");
+```
+
+Only the ASCII letters `A`-`Z` and `a`-`z` are matched regardless of case, so the result is the same on every platform
+and in every locale, and the bytes of a multi-byte UTF-8 character are never changed. Other letters, such as an
+accented capital and small E, still have to match exactly. The [substring checks](#checking-for-a-substring) ignore
+case the same way.
+
 ### Checking for a Substring
 
 `CheckContains`/`AssertContains` pass when a `std::string` or `std::wstring` contains a given substring, and
@@ -521,10 +536,8 @@ CheckContains(log, "timeout", __func__, __LINE__, "logs the timeout");
 The comparison is case-sensitive, and every string contains the empty string. A failure shows `std::wstring` text
 converted to UTF-8.
 
-`CheckContainsIC`/`AssertContainsIC` and `CheckNotContainsIC`/`AssertNotContainsIC` do the same, ignoring case. Only
-the ASCII letters `A`-`Z` and `a`-`z` are matched regardless of case, so the result is the same on every platform and
-in every locale, and the bytes of a multi-byte UTF-8 character are never changed. Other letters, such as an accented
-capital and small E, still have to match exactly:
+`CheckContainsIC`/`AssertContainsIC` and `CheckNotContainsIC`/`AssertNotContainsIC` do the same, ignoring the case
+of ASCII letters only, the same way as [`CheckEqualsIC`](#comparing-strings-ignoring-case):
 
 ```
 CheckContainsIC(log, "CONNECTED", __func__, __LINE__, "passes");

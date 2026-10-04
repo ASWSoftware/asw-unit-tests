@@ -61,26 +61,37 @@ std::wstring CStringOrEmpty(wchar_t const* str)
     return (str != nullptr) ? std::wstring(str) : std::wstring();
 }
 
-// True if 'text' contains 'substring', ignoring the case of the ASCII letters A-Z only, so the result doesn't depend
-// on the platform or the current locale (and a multi-byte UTF-8 sequence is never changed).
-template <typename TString>
-bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
+// True if 'a' and 'b' are the same character, ignoring the case of the ASCII letters A-Z only, so the result doesn't
+// depend on the platform or the current locale (and a byte of a multi-byte UTF-8 sequence is never changed).
+template <typename TChar>
+bool CharEqualsIgnoringASCIICase(TChar a, TChar b)
 {
-    auto const toLower = [](auto character)
+    auto const toLower = [](TChar character)
         {
             if (character >= 'A' && character <= 'Z')
-                return static_cast<decltype(character)>(character - 'A' + 'a');
+                return static_cast<TChar>(character - 'A' + 'a');
 
             return character;
         };
-    auto const equalIgnoringCase = [&toLower](auto textChar, auto substringChar)
-        {
-            return toLower(textChar) == toLower(substringChar);
-        };
 
+    return toLower(a) == toLower(b);
+}
+
+// True if 'text' contains 'substring', comparing characters with CharEqualsIgnoringASCIICase().
+template <typename TString>
+bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
+{
     // std::search finds an empty substring at the start, which is the end of an empty text.
-    return substring.empty() ||
-        (std::search(text.begin(), text.end(), substring.begin(), substring.end(), equalIgnoringCase) != text.end());
+    return substring.empty() || (std::search(text.begin(), text.end(), substring.begin(), substring.end(),
+        CharEqualsIgnoringASCIICase<typename TString::value_type>) != text.end());
+}
+
+// True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
+template <typename TString>
+bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
+{
+    return a.size() == b.size() &&
+        std::equal(a.begin(), a.end(), b.begin(), CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
 std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
@@ -275,6 +286,20 @@ void TTestGroupBase::AssertEquals(
     AssertEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEqualsIC(std::string const& expected, std::string const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EqualsIgnoringASCIICase(expected, actual))
+        throw TExceptEquals(method, line, expected, actual, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEqualsIC(std::wstring const& expected, std::wstring const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EqualsIgnoringASCIICase(expected, actual))
+        throw TExceptEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (testVal)
@@ -431,6 +456,20 @@ void TTestGroupBase::AssertNotEquals(
         return;
 
     AssertNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEqualsIC(std::string const& expected, std::string const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EqualsIgnoringASCIICase(expected, actual))
+        throw TExceptNotEquals(method, line, expected, actual, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEqualsIC(std::wstring const& expected, std::wstring const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EqualsIgnoringASCIICase(expected, actual))
+        throw TExceptNotEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
@@ -611,6 +650,26 @@ void TTestGroupBase::CheckEquals(
     CheckEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckEqualsIC(std::string const& expected, std::string const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EqualsIgnoringASCIICase(expected, actual))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + expected + "\" but was \"" + actual + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEqualsIC(std::wstring const& expected, std::wstring const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EqualsIgnoringASCIICase(expected, actual))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(expected) + "\" but was \"" +
+            WideToUTF8(actual) + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (testVal)
@@ -779,6 +838,26 @@ void TTestGroupBase::CheckNotEquals(
         return;
 
     CheckNotEquals(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEqualsIC(std::string const& expected, std::string const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EqualsIgnoringASCIICase(expected, actual))
+    {
+        SetTestFailedCheck(method, line,
+            "Both values equal: \"" + expected + "\" and \"" + actual + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEqualsIC(std::wstring const& expected, std::wstring const& actual,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EqualsIgnoringASCIICase(expected, actual))
+    {
+        SetTestFailedCheck(method, line, "Both values equal: \"" + WideToUTF8(expected) + "\" and \"" +
+            WideToUTF8(actual) + "\" (ignoring case). " + msg);
+    }
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(

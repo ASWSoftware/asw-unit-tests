@@ -124,11 +124,11 @@ TExceptEquals::TExceptEquals(std::string const& method, int line, std::string co
     m_Message = "Values not equal: " + method + " (" + std::to_string(line) + "): " + msg;
 }
 //---------------------------------------------------------------------------
-TExceptEquals::TExceptEquals(
-    std::string const& method, int line, std::string const& expected, std::string const& actual, std::string const& msg)
+TExceptEquals::TExceptEquals(std::string const& method, int line, std::string const& expected,
+    std::string const& actual, std::string const& msg, bool ignoreCase)
 {
     m_Message = "Values not equal: " + method + " (" + std::to_string(line) + "): Expected: \"" + expected +
-        "\" but was \"" + actual + "\". " + msg;
+        "\" but was \"" + actual + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -183,6 +183,13 @@ TExceptNotEquals::TExceptNotEquals(
     std::string const& method, int line, std::string const& value, std::string const& msg)
 {
     m_Message = "Values are equal: " + method + " (" + std::to_string(line) + "): Value: \"" + value + "\". " + msg;
+}
+//---------------------------------------------------------------------------
+TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::string const& value,
+    std::string const& otherValue, std::string const& msg, bool ignoreCase)
+{
+    m_Message = "Values are equal: " + method + " (" + std::to_string(line) + "): Values: \"" + value + "\" and \"" +
+        otherValue + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
 }
 //---------------------------------------------------------------------------
 

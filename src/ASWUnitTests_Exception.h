@@ -90,7 +90,7 @@ public:
     TExceptEquals(std::string const& msg);
     TExceptEquals(std::string const& method, int line, std::string const& msg);
     TExceptEquals(std::string const& method, int line, std::string const& expected, std::string const& actual,
-        std::string const& msg);
+        std::string const& msg, bool ignoreCase = false);
 };
 
 
@@ -103,6 +103,8 @@ public:
     TExceptNotEquals(std::string const& msg);
     TExceptNotEquals(std::string const& method, int line, std::string const& msg);
     TExceptNotEquals(std::string const& method, int line, std::string const& value, std::string const& msg);
+    TExceptNotEquals(std::string const& method, int line, std::string const& value, std::string const& otherValue,
+        std::string const& msg, bool ignoreCase = false);
 };
 
 
