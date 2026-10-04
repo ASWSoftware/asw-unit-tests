@@ -121,7 +121,7 @@ void TTest_ASWUnitTests_JUnitReport::Test_BuildXML_CountsAndEscapes()
     std::string const xml = TJUnitReportWriter::BuildXML("My<Project>", testCases);
 
     // Assert
-    CheckTrue(xml.rfind("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 0) == 0, __func__, __LINE__,
+    CheckStartsWith(xml, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", __func__, __LINE__,
         "starts with the XML declaration");
     CheckContains(xml, "<testsuites name=\"My&lt;Project&gt;\" tests=\"3\" failures=\"1\" skipped=\"1\" "
         "time=\"0.750000\">", __func__, __LINE__, "root element's name and totals");
@@ -131,8 +131,7 @@ void TTest_ASWUnitTests_JUnitReport::Test_BuildXML_CountsAndEscapes()
         __func__, __LINE__, "GroupB's counts");
     CheckContains(xml, "<failure message=\"expected &lt;1&gt; &amp; &quot;2&quot;\">", __func__, __LINE__,
         "failure message escaped");
-    CheckTrue(xml.size() >= 14 && xml.compare(xml.size() - 14, 14, "</testsuites>\n") == 0, __func__, __LINE__,
-        "ends with the closing root element");
+    CheckEndsWith(xml, "</testsuites>\n", __func__, __LINE__, "ends with the closing root element");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_PlainTextUnchanged()

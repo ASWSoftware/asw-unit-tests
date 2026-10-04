@@ -207,7 +207,7 @@ void TTest_ASWUnitTests_GUI_Selection::Test_FormatGUISelection_RoundTripsThrough
     std::vector<TGUISavedTest> const parsed = ParseGUISelection(text);
 
     // Assert
-    CheckEquals(0, text.find("; "), __func__, __LINE__, "starts with a comment describing the file");
+    CheckStartsWith(text, "; ", __func__, __LINE__, "starts with a comment describing the file");
     AssertEquals(tests.size(), parsed.size(), __func__, __LINE__, "every test read back");
 
     for (size_t i = 0; i < tests.size(); ++i)

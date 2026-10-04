@@ -216,7 +216,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesAFinishedTest()
     std::string const text = list.DetailText(1);
 
     // Assert
-    CheckEquals(static_cast<size_t>(0), text.find("Alpha.Two\n"), __func__, __LINE__, "it starts with the full name");
+    CheckStartsWith(text, "Alpha.Two\n", __func__, __LINE__, "it starts with the full name");
     CheckContains(text, "Result: Failed (0.412 ms)", __func__, __LINE__,
         "then the status and duration in milliseconds");
     CheckContains(text, "\nCheck failed for: needle\n", __func__, __LINE__, "then the failure detail");

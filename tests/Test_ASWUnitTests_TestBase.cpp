@@ -4185,26 +4185,28 @@ void TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly()
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
     // text and substring are shown as given, not case-folded.
-    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
-        {
-            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
-        };
     std::string const containsDetail =
         "): Expected \"Hello World\" to contain \"xyz\" (ignoring case). substring absent";
     std::string const notContainsDetail =
         "): Expected \"Hello World\" not to contain \"WORLD\" (ignoring case). case differs";
 
-    CheckTrue(messageMatches(*assertContains, "Substring not found: Test_AssertContainsIC_Absent_Fails (",
-        containsDetail), __func__, __LINE__,
-        "AssertContainsIC shows the text and substring: " + assertContains->Message);
-    CheckTrue(messageMatches(*assertNotContains, "Substring found: Test_AssertNotContainsIC_Wide_DifferentCase_Fails (",
-        notContainsDetail), __func__, __LINE__,
-        "AssertNotContainsIC shows the wide text and substring: " + assertNotContains->Message);
-    CheckTrue(messageMatches(*checkContains, "Check failed for: \"Test_CheckContainsIC_Absent_Fails\" (",
-        containsDetail), __func__, __LINE__, "CheckContainsIC shows the text and substring: " + checkContains->Message);
-    CheckTrue(messageMatches(*checkNotContains, "Check failed for: \"Test_CheckNotContainsIC_DifferentCase_Fails\" (",
-        notContainsDetail), __func__, __LINE__,
-        "CheckNotContainsIC shows the text and substring: " + checkNotContains->Message);
+    CheckStartsWith(assertContains->Message, "Substring not found: Test_AssertContainsIC_Absent_Fails (", __func__,
+        __LINE__, "AssertContainsIC names the failure and test");
+    CheckEndsWith(assertContains->Message, containsDetail, __func__, __LINE__,
+        "AssertContainsIC shows the text and substring");
+    CheckStartsWith(assertNotContains->Message,
+        "Substring found: Test_AssertNotContainsIC_Wide_DifferentCase_Fails (", __func__, __LINE__,
+        "AssertNotContainsIC names the failure and test");
+    CheckEndsWith(assertNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "AssertNotContainsIC shows the wide text and substring");
+    CheckStartsWith(checkContains->Message, "Check failed for: \"Test_CheckContainsIC_Absent_Fails\" (", __func__,
+        __LINE__, "CheckContainsIC names the test");
+    CheckEndsWith(checkContains->Message, containsDetail, __func__, __LINE__,
+        "CheckContainsIC shows the text and substring");
+    CheckStartsWith(checkNotContains->Message, "Check failed for: \"Test_CheckNotContainsIC_DifferentCase_Fails\" (",
+        __func__, __LINE__, "CheckNotContainsIC names the test");
+    CheckEndsWith(checkNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "CheckNotContainsIC shows the text and substring");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
@@ -4243,20 +4245,23 @@ void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
     // "cafe" with an e-acute, a space and U+1F600, then u-umlaut, as UTF-8.
     std::string const nonASCIIDetail = "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to contain \"\xC3\xBC\". not present";
 
-    CheckTrue(assertContains->Message.find("Substring not found: Test_AssertContains_Absent_Fails (") == 0 &&
-        NameEndsWith(assertContains->Message, containsDetail), __func__, __LINE__,
-        "AssertContains shows the text and substring: " + assertContains->Message);
-    CheckTrue(assertNotContains->Message.find("Substring found: Test_AssertNotContains_Wide_Present_Fails (") == 0 &&
-        NameEndsWith(assertNotContains->Message, notContainsDetail), __func__, __LINE__,
-        "AssertNotContains shows the wide text and substring: " + assertNotContains->Message);
-    CheckTrue(checkContains->Message.find("Check failed for: \"Test_CheckContains_Absent_Fails\" (") == 0 &&
-        NameEndsWith(checkContains->Message, containsDetail), __func__, __LINE__,
-        "CheckContains shows the text and substring: " + checkContains->Message);
-    CheckTrue(checkNotContains->Message.find("Check failed for: \"Test_CheckNotContains_Present_Fails\" (") == 0 &&
-        NameEndsWith(checkNotContains->Message, notContainsDetail), __func__, __LINE__,
-        "CheckNotContains shows the text and substring: " + checkNotContains->Message);
-    CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
-        "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
+    CheckStartsWith(assertContains->Message, "Substring not found: Test_AssertContains_Absent_Fails (", __func__,
+        __LINE__, "AssertContains names the failure and test");
+    CheckEndsWith(assertContains->Message, containsDetail, __func__, __LINE__,
+        "AssertContains shows the text and substring");
+    CheckStartsWith(assertNotContains->Message, "Substring found: Test_AssertNotContains_Wide_Present_Fails (",
+        __func__, __LINE__, "AssertNotContains names the failure and test");
+    CheckEndsWith(assertNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "AssertNotContains shows the wide text and substring");
+    CheckStartsWith(checkContains->Message, "Check failed for: \"Test_CheckContains_Absent_Fails\" (", __func__,
+        __LINE__, "CheckContains names the test");
+    CheckEndsWith(checkContains->Message, containsDetail, __func__, __LINE__,
+        "CheckContains shows the text and substring");
+    CheckStartsWith(checkNotContains->Message, "Check failed for: \"Test_CheckNotContains_Present_Fails\" (", __func__,
+        __LINE__, "CheckNotContains names the test");
+    CheckEndsWith(checkNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "CheckNotContains shows the text and substring");
+    CheckEndsWith(checkNonASCII->Message, nonASCIIDetail, __func__, __LINE__, "a wide failure shows its text as UTF-8");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly()
@@ -4438,26 +4443,29 @@ void TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly()
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
     // values are shown as given, not case-folded, and wide ones as UTF-8.
-    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
-        {
-            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
-        };
-
-    CheckTrue(messageMatches(*assertEquals, "Values not equal: Test_AssertEqualsIC_DifferentText_Fails (",
-        "): Expected: \"Hello\" but was \"Help\" (ignoring case). different text"), __func__, __LINE__,
-        "AssertEqualsIC shows both values: " + assertEquals->Message);
-    CheckTrue(messageMatches(*assertNotEquals, "Values are equal: Test_AssertNotEqualsIC_Wide_DifferentCase_Fails (",
-        "): Values: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs"), __func__, __LINE__,
-        "AssertNotEqualsIC shows both wide values: " + assertNotEquals->Message);
-    CheckTrue(messageMatches(*checkEquals, "Check failed for: \"Test_CheckEqualsIC_DifferentText_Fails\" (",
-        "): Expected \"Hello\" but was \"Help\" (ignoring case). different text"), __func__, __LINE__,
-        "CheckEqualsIC shows both values: " + checkEquals->Message);
-    CheckTrue(messageMatches(*checkNonASCII, "Check failed for: \"Test_CheckEqualsIC_Wide_NonASCII_Fails\" (",
-        "): Expected \"caf\xC3\x89\" but was \"caf\xC3\xA9\" (ignoring case). only A-Z are case-folded"), __func__,
-        __LINE__, "CheckEqualsIC shows wide values as UTF-8: " + checkNonASCII->Message);
-    CheckTrue(messageMatches(*checkNotEquals, "Check failed for: \"Test_CheckNotEqualsIC_DifferentCase_Fails\" (",
-        "): Both values equal: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs"), __func__,
-        __LINE__, "CheckNotEqualsIC shows both values: " + checkNotEquals->Message);
+    CheckStartsWith(assertEquals->Message, "Values not equal: Test_AssertEqualsIC_DifferentText_Fails (", __func__,
+        __LINE__, "AssertEqualsIC names the failure and test");
+    CheckEndsWith(assertEquals->Message, "): Expected: \"Hello\" but was \"Help\" (ignoring case). different text",
+        __func__, __LINE__, "AssertEqualsIC shows both values");
+    CheckStartsWith(assertNotEquals->Message, "Values are equal: Test_AssertNotEqualsIC_Wide_DifferentCase_Fails (",
+        __func__, __LINE__, "AssertNotEqualsIC names the failure and test");
+    CheckEndsWith(assertNotEquals->Message,
+        "): Values: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs", __func__, __LINE__,
+        "AssertNotEqualsIC shows both wide values");
+    CheckStartsWith(checkEquals->Message, "Check failed for: \"Test_CheckEqualsIC_DifferentText_Fails\" (", __func__,
+        __LINE__, "CheckEqualsIC names the test");
+    CheckEndsWith(checkEquals->Message, "): Expected \"Hello\" but was \"Help\" (ignoring case). different text",
+        __func__, __LINE__, "CheckEqualsIC shows both values");
+    CheckStartsWith(checkNonASCII->Message, "Check failed for: \"Test_CheckEqualsIC_Wide_NonASCII_Fails\" (",
+        __func__, __LINE__, "CheckEqualsIC names the test");
+    CheckEndsWith(checkNonASCII->Message,
+        "): Expected \"caf\xC3\x89\" but was \"caf\xC3\xA9\" (ignoring case). only A-Z are case-folded", __func__,
+        __LINE__, "CheckEqualsIC shows wide values as UTF-8");
+    CheckStartsWith(checkNotEquals->Message, "Check failed for: \"Test_CheckNotEqualsIC_DifferentCase_Fails\" (",
+        __func__, __LINE__, "CheckNotEqualsIC names the test");
+    CheckEndsWith(checkNotEquals->Message,
+        "): Both values equal: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs", __func__, __LINE__,
+        "CheckNotEqualsIC shows both values");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
@@ -4594,8 +4602,8 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
         else if (expected.first.compare(0, 15, "AssertNotEquals") == 0)
             prefix = "Values are equal: Test_" + expected.first + " (";
 
-        CheckTrue(record->Message.find(prefix) == 0 && NameEndsWith(record->Message, expected.second), __func__,
-            __LINE__, expected.first + " shows the values: " + record->Message);
+        CheckStartsWith(record->Message, prefix, __func__, __LINE__, expected.first + " names the test");
+        CheckEndsWith(record->Message, expected.second, __func__, __LINE__, expected.first + " shows the values");
     }
 }
 //---------------------------------------------------------------------------
@@ -4641,8 +4649,9 @@ void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
         std::string const prefix = (expected.first.compare(0, 6, "Assert") == 0) ?
                 "Values out of order: Test_" + expected.first + " (" :
                 "Check failed for: \"Test_" + expected.first + "\" (";
-        CheckTrue(record->Message.find(prefix) == 0 && NameEndsWith(record->Message, expected.second), __func__,
-            __LINE__, expected.first + " shows the value and the bound: " + record->Message);
+        CheckStartsWith(record->Message, prefix, __func__, __LINE__, expected.first + " names the test");
+        CheckEndsWith(record->Message, expected.second, __func__, __LINE__,
+            expected.first + " shows the value and the bound");
     }
 }
 //---------------------------------------------------------------------------
@@ -4798,8 +4807,8 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetai
     AssertTrue(failViaCheck != nullptr && continuesAfterCheck != nullptr && checkThenAssert != nullptr &&
         failViaAssert != nullptr && pass != nullptr, __func__, __LINE__, "every expected record exists");
 
-    CheckEquals(static_cast<size_t>(0), failViaCheck->Message.find("Check failed for: \"Test_FailViaCheck\""),
-        __func__, __LINE__, "a Check-only failure's detail is its Check failure, not empty");
+    CheckStartsWith(failViaCheck->Message, "Check failed for: \"Test_FailViaCheck\"", __func__, __LINE__,
+        "a Check-only failure's detail is its Check failure, not empty");
     CheckNotContains(failViaCheck->Message, "\n", __func__, __LINE__,
         "one Check failure is one line, with no other test's Check failures carried over");
 
@@ -5360,21 +5369,20 @@ void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()
         __func__, __LINE__, "every expected record exists");
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
-    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
-        {
-            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
-        };
-
-    CheckTrue(messageMatches(*assertFalse, "Expected false but was true: Test_AssertFalse_True_Fails (",
-        "): value is true"), __func__, __LINE__, "AssertFalse expects false: " + assertFalse->Message);
-    CheckTrue(messageMatches(*assertTrue, "Expected true but was false: Test_AssertTrue_False_Fails (",
-        "): value is false"), __func__, __LINE__, "AssertTrue expects true: " + assertTrue->Message);
-    CheckTrue(messageMatches(*checkFalse, "Check failed for: \"Test_CheckFalse_True_Fails\" (",
-        "): Expected false but was true: \"value is true\""), __func__, __LINE__,
-        "CheckFalse expects false: " + checkFalse->Message);
-    CheckTrue(messageMatches(*checkTrue, "Check failed for: \"Test_CheckTrue_False_Fails\" (",
-        "): Expected true but was false: \"value is false\""), __func__, __LINE__,
-        "CheckTrue expects true: " + checkTrue->Message);
+    CheckStartsWith(assertFalse->Message, "Expected false but was true: Test_AssertFalse_True_Fails (", __func__,
+        __LINE__, "AssertFalse expects false");
+    CheckEndsWith(assertFalse->Message, "): value is true", __func__, __LINE__, "AssertFalse shows the message");
+    CheckStartsWith(assertTrue->Message, "Expected true but was false: Test_AssertTrue_False_Fails (", __func__,
+        __LINE__, "AssertTrue expects true");
+    CheckEndsWith(assertTrue->Message, "): value is false", __func__, __LINE__, "AssertTrue shows the message");
+    CheckStartsWith(checkFalse->Message, "Check failed for: \"Test_CheckFalse_True_Fails\" (", __func__, __LINE__,
+        "CheckFalse names the test");
+    CheckEndsWith(checkFalse->Message, "): Expected false but was true: \"value is true\"", __func__, __LINE__,
+        "CheckFalse expects false");
+    CheckStartsWith(checkTrue->Message, "Check failed for: \"Test_CheckTrue_False_Fails\" (", __func__, __LINE__,
+        "CheckTrue names the test");
+    CheckEndsWith(checkTrue->Message, "): Expected true but was false: \"value is false\"", __func__, __LINE__,
+        "CheckTrue expects true");
 }
 //---------------------------------------------------------------------------
 
