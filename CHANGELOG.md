@@ -63,6 +63,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Changed
 
+- A failed `CheckEquals`/`AssertEquals` of two `std::wstring` or
+  `wchar_t const*` values shows both values, converted to UTF-8, like the
+  `std::string` overloads, instead of only the message. A failed
+  `CheckNotEquals`/`AssertNotEquals` of two strings, narrow or wide, shows the
+  value they share, like the integer overloads. A null C string is shown as
+  `(null)`, including when both are null.
 - Development builds between releases are versioned with a SemVer pre-release
   (e.g. `1.1.0-dev.1`), which sorts before the release it leads up to.
 

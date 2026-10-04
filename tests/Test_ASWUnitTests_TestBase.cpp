@@ -2517,6 +2517,147 @@ void TFixture_SourceLocations::Test_Skip_Skips()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_StringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test per string
+// overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals() whose failure message didn't use to
+// show the values: wide text (shown as UTF-8), the NotEquals overloads (which show the shared value), and null wide
+// C strings (shown as "(null)", like narrow ones). Used by Test_Equals_ShowsStringValues below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StringComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_WideCStringNull_Fails();
+    void Test_AssertEquals_Wide_Fails();
+    void Test_AssertNotEquals_CStringBothNull_Fails();
+    void Test_AssertNotEquals_String_Fails();
+    void Test_AssertNotEquals_WideCStringBothNull_Fails();
+    void Test_AssertNotEquals_Wide_Fails();
+    void Test_CheckEquals_WideCStringNull_Fails();
+    void Test_CheckEquals_WideCString_Fails();
+    void Test_CheckEquals_Wide_Fails();
+    void Test_CheckNotEquals_CStringBothNull_Fails();
+    void Test_CheckNotEquals_String_Fails();
+    void Test_CheckNotEquals_WideCStringBothNull_Fails();
+    void Test_CheckNotEquals_Wide_Fails();
+
+public:
+    TFixture_StringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_StringComparisons::TFixture_StringComparisons()
+    : inherited("Fixture_StringComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_StringComparisons::Test_AssertEquals_WideCStringNull_Fails,
+        "AssertEquals_WideCStringNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertEquals_Wide_Fails, "AssertEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_CStringBothNull_Fails,
+        "AssertNotEquals_CStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_String_Fails, "AssertNotEquals_String_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_WideCStringBothNull_Fails,
+        "AssertNotEquals_WideCStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_Wide_Fails, "AssertNotEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_WideCStringNull_Fails,
+        "CheckEquals_WideCStringNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_WideCString_Fails, "CheckEquals_WideCString_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_Wide_Fails, "CheckEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_CStringBothNull_Fails,
+        "CheckNotEquals_CStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_String_Fails, "CheckNotEquals_String_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_WideCStringBothNull_Fails,
+        "CheckNotEquals_WideCStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails, "CheckNotEquals_Wide_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertEquals_WideCStringNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    AssertEquals(L"abc", nullStr, __func__, __LINE__, "null never matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertEquals_Wide_Fails()
+{
+    // "cafe" with an e-acute.
+    AssertEquals(std::wstring(L"caf" L"\x00E9"), std::wstring(L"cafe"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_CStringBothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    AssertNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_String_Fails()
+{
+    AssertNotEquals(std::string("abc"), std::string("abc"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_WideCStringBothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    AssertNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_Wide_Fails()
+{
+    // "ete" with two e-acutes.
+    std::wstring const text = L"\x00E9" L"t" L"\x00E9";
+    AssertNotEquals(text, text, __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_WideCStringNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, L"", __func__, __LINE__, "null never matches, even an empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_WideCString_Fails()
+{
+    CheckEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_Wide_Fails()
+{
+    // "cafe" with an e-acute.
+    CheckEquals(std::wstring(L"caf" L"\x00E9"), std::wstring(L"cafe"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_CStringBothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_String_Fails()
+{
+    CheckNotEquals(std::string("abc"), std::string("abc"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_WideCStringBothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails()
+{
+    // "ete" with two e-acutes.
+    std::wstring const text = L"\x00E9" L"t" L"\x00E9";
+    CheckNotEquals(text, text, __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_TrueFalseChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
@@ -2693,6 +2834,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Equals_ComparesMixedIntegerTypesByValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
         "Equals_ShowsBoolValuesAsTrueOrFalse");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
         "Ordering_ComparesByValueAndShowsBoth");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
@@ -3042,6 +3184,54 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
         __LINE__, "CheckEquals shows bools as true/false");
     CheckTrue(checkNotEquals->Message.find("Both values equal: \"true\"") != std::string::npos, __func__, __LINE__,
         "CheckNotEquals shows bools as true/false");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
+{
+    // Arrange
+    TFixture_StringComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. Wide
+    // text is shown as UTF-8 ("caf\xC3\xA9" is "cafe" with an e-acute).
+    std::vector<std::pair<std::string, std::string> > const expectedDetails = {
+        { "AssertEquals_WideCStringNull_Fails", "): Expected: \"abc\" but was \"(null)\". null never matches" },
+        { "AssertEquals_Wide_Fails", "): Expected: \"caf\xC3\xA9\" but was \"cafe\". different text" },
+        { "AssertNotEquals_CStringBothNull_Fails", "): Value: \"(null)\". two nulls are equal" },
+        { "AssertNotEquals_String_Fails", "): Value: \"abc\". same text" },
+        { "AssertNotEquals_WideCStringBothNull_Fails", "): Value: \"(null)\". two nulls are equal" },
+        { "AssertNotEquals_Wide_Fails", "): Value: \"\xC3\xA9t\xC3\xA9\". same text" },
+        { "CheckEquals_WideCStringNull_Fails",
+          "): Expected \"(null)\" but was \"\". null never matches, even an empty string" },
+        { "CheckEquals_WideCString_Fails", "): Expected \"abc\" but was \"xyz\". different text" },
+        { "CheckEquals_Wide_Fails", "): Expected \"caf\xC3\xA9\" but was \"cafe\". different text" },
+        { "CheckNotEquals_CStringBothNull_Fails", "): Both values equal: \"(null)\". two nulls are equal" },
+        { "CheckNotEquals_String_Fails", "): Both values equal: \"abc\". same text" },
+        { "CheckNotEquals_WideCStringBothNull_Fails", "): Both values equal: \"(null)\". two nulls are equal" },
+        { "CheckNotEquals_Wide_Fails", "): Both values equal: \"\xC3\xA9t\xC3\xA9\". same text" },
+    };
+
+    for (std::pair<std::string, std::string> const& expected : expectedDetails)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+        CheckTrue(record->Outcome == TTestOutcome::Fail, __func__, __LINE__, expected.first + " should fail");
+
+        std::string prefix = "Check failed for: \"Test_" + expected.first + "\" (";
+        if (expected.first.compare(0, 12, "AssertEquals") == 0)
+            prefix = "Values not equal: Test_" + expected.first + " (";
+        else if (expected.first.compare(0, 15, "AssertNotEquals") == 0)
+            prefix = "Values are equal: Test_" + expected.first + " (";
+
+        CheckTrue(record->Message.find(prefix) == 0 && NameEndsWith(record->Message, expected.second), __func__,
+            __LINE__, expected.first + " shows the values: " + record->Message);
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()

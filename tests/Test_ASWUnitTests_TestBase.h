@@ -51,6 +51,7 @@ private: // Test methods
     void Test_Equals_ComparesCStringsByContent();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
     void Test_Equals_ShowsBoolValuesAsTrueOrFalse();
+    void Test_Equals_ShowsStringValues();
     void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();

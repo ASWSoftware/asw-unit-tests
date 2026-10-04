@@ -507,6 +507,9 @@ char const buffer[] = "abc";
 CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
 ```
 
+A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the value they share, for C strings,
+`std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer is shown as `(null)`.
+
 ### Comparing Strings, Ignoring Case
 
 `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC` compare two `std::string` or
