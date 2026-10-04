@@ -123,8 +123,7 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter()
     CheckTrue(filter != nullptr, __func__, __LINE__, "filter is constructed");
     CheckTrue(filter("ASWTools_String_Tests.HexSingleToByte[A]"), __func__, __LINE__, "matches a test fitting the pattern");
     CheckFalse(filter("ASWTools_String_Tests.Compare"), __func__, __LINE__, "does not match an unrelated test");
-    CheckTrue(filterDescription.find("HexSingleToByte") != std::string::npos,
-        __func__, __LINE__, "description mentions the pattern");
+    CheckContains(filterDescription, "HexSingleToByte", __func__, __LINE__, "description mentions the pattern");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
@@ -173,8 +172,8 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
     // Assert
     CheckEquals(static_cast<size_t>(0), matchedByBoth, __func__, __LINE__, "the two partitions do not overlap");
     CheckEquals(allNames.size(), matchedByEither, __func__, __LINE__, "the two partitions cover every test exactly once");
-    CheckTrue(description1.find("partition 1 of 2") != std::string::npos, __func__, __LINE__, "partition 1 description");
-    CheckTrue(description2.find("partition 2 of 2") != std::string::npos, __func__, __LINE__, "partition 2 description");
+    CheckContains(description1, "partition 1 of 2", __func__, __LINE__, "partition 1 description");
+    CheckContains(description2, "partition 2 of 2", __func__, __LINE__, "partition 2 description");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ExitCodeForResults_MapsEachOutcome()

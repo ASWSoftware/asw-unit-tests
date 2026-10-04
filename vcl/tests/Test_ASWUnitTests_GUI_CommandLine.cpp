@@ -121,7 +121,7 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_HelpText_MatchesHelpOption()
 
     // Assert
     CheckEquals(helpOutput, text, __func__, __LINE__, "the same text --help shows");
-    CheckTrue(text.find("--run ") != std::string::npos, __func__, __LINE__, "including the GUI-only options");
+    CheckContains(text, "--run ", __func__, __LINE__, "including the GUI-only options");
     CheckTrue(consoleOutput.empty(), __func__, __LINE__, "nothing was written to std::cout");
 }
 //---------------------------------------------------------------------------
@@ -160,8 +160,7 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_ExitWithoutRunIsInvalid()
     AssertTrue(result.EarlyExitCode.has_value(), __func__, __LINE__, "the GUI doesn't open");
     CheckEquals(ExitCode_InvalidArguments, *result.EarlyExitCode, __func__, __LINE__,
         "with the invalid-arguments exit code");
-    CheckTrue(result.Message.find("--exit requires --run") != std::string::npos, __func__, __LINE__,
-        "and says why");
+    CheckContains(result.Message, "--exit requires --run", __func__, __LINE__, "and says why");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_HelpIncludesGUIOptions()
@@ -181,14 +180,10 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_HelpIncludesGUIOptions()
     // Assert
     AssertTrue(result.EarlyExitCode.has_value(), __func__, __LINE__, "--help doesn't open the GUI");
     CheckEquals(ExitCode_Success, *result.EarlyExitCode, __func__, __LINE__, "and isn't an error");
-    CheckTrue(result.Message.find("--filter <pattern>") != std::string::npos, __func__, __LINE__,
-        "the console runner's options are listed");
-    CheckTrue(result.Message.find("--run ") != std::string::npos, __func__, __LINE__,
-        "and so are the GUI-only ones");
-    CheckTrue(result.Message.find("--layout-ignore ") != std::string::npos, __func__, __LINE__,
-        "including --layout-ignore");
-    CheckTrue(result.Message.find("--layout-reset ") != std::string::npos, __func__, __LINE__,
-        "and --layout-reset");
+    CheckContains(result.Message, "--filter <pattern>", __func__, __LINE__, "the console runner's options are listed");
+    CheckContains(result.Message, "--run ", __func__, __LINE__, "and so are the GUI-only ones");
+    CheckContains(result.Message, "--layout-ignore ", __func__, __LINE__, "including --layout-ignore");
+    CheckContains(result.Message, "--layout-reset ", __func__, __LINE__, "and --layout-reset");
     CheckTrue(consoleOutput.empty(), __func__, __LINE__, "the parser's output was captured, not written to std::cout");
 }
 //---------------------------------------------------------------------------
@@ -280,9 +275,9 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_UnrecognizedOptionIsInvalid(
     AssertTrue(result.EarlyExitCode.has_value(), __func__, __LINE__, "the GUI doesn't open");
     CheckEquals(ExitCode_InvalidArguments, *result.EarlyExitCode, __func__, __LINE__,
         "with the invalid-arguments exit code");
-    CheckTrue(result.Message.find("unrecognized option \"--no-such-option\"") != std::string::npos, __func__,
-        __LINE__, "the console runner's own error message is passed on");
-    CheckTrue(result.Message.find("--run ") != std::string::npos, __func__, __LINE__,
+    CheckContains(result.Message, "unrecognized option \"--no-such-option\"", __func__, __LINE__,
+        "the console runner's own error message is passed on");
+    CheckContains(result.Message, "--run ", __func__, __LINE__,
         "and the usage text that follows it lists the GUI-only options too");
 }
 //---------------------------------------------------------------------------

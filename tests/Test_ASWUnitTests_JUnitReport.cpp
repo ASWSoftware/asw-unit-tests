@@ -123,14 +123,14 @@ void TTest_ASWUnitTests_JUnitReport::Test_BuildXML_CountsAndEscapes()
     // Assert
     CheckTrue(xml.rfind("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n", 0) == 0, __func__, __LINE__,
         "starts with the XML declaration");
-    CheckTrue(xml.find("<testsuites name=\"My&lt;Project&gt;\" tests=\"3\" failures=\"1\" skipped=\"1\" "
-        "time=\"0.750000\">") != std::string::npos, __func__, __LINE__, "root element's name and totals");
-    CheckTrue(xml.find("<testsuite name=\"GroupA\" tests=\"2\" failures=\"1\" skipped=\"0\" time=\"0.750000\"") !=
-        std::string::npos, __func__, __LINE__, "GroupA's counts");
-    CheckTrue(xml.find("<testsuite name=\"GroupB\" tests=\"1\" failures=\"0\" skipped=\"1\" time=\"0.000000\"") !=
-        std::string::npos, __func__, __LINE__, "GroupB's counts");
-    CheckTrue(xml.find("<failure message=\"expected &lt;1&gt; &amp; &quot;2&quot;\">") != std::string::npos,
-        __func__, __LINE__, "failure message escaped");
+    CheckContains(xml, "<testsuites name=\"My&lt;Project&gt;\" tests=\"3\" failures=\"1\" skipped=\"1\" "
+        "time=\"0.750000\">", __func__, __LINE__, "root element's name and totals");
+    CheckContains(xml, "<testsuite name=\"GroupA\" tests=\"2\" failures=\"1\" skipped=\"0\" time=\"0.750000\"",
+        __func__, __LINE__, "GroupA's counts");
+    CheckContains(xml, "<testsuite name=\"GroupB\" tests=\"1\" failures=\"0\" skipped=\"1\" time=\"0.000000\"",
+        __func__, __LINE__, "GroupB's counts");
+    CheckContains(xml, "<failure message=\"expected &lt;1&gt; &amp; &quot;2&quot;\">", __func__, __LINE__,
+        "failure message escaped");
     CheckTrue(xml.size() >= 14 && xml.compare(xml.size() - 14, 14, "</testsuites>\n") == 0, __func__, __LINE__,
         "ends with the closing root element");
 }
@@ -185,13 +185,13 @@ void TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport()
     std::ifstream reportFile(reportPath);
     std::string const content((std::istreambuf_iterator<char>(reportFile)), std::istreambuf_iterator<char>());
 
-    CheckTrue(content.find("<testsuites name=\"MyProject\"") != std::string::npos,
-        __func__, __LINE__, "root element carries the project name");
-    CheckTrue(content.find("<testsuite name=\"GroupA\"") != std::string::npos, __func__, __LINE__, "GroupA testsuite present");
-    CheckTrue(content.find("<testsuite name=\"GroupB\"") != std::string::npos, __func__, __LINE__, "GroupB testsuite present");
-    CheckTrue(content.find("name=\"TestPass\"") != std::string::npos, __func__, __LINE__, "TestPass present");
-    CheckTrue(content.find("<failure") != std::string::npos, __func__, __LINE__, "failure element present for TestFail");
-    CheckTrue(content.find("<skipped") != std::string::npos, __func__, __LINE__, "skipped element present for TestSkip");
+    CheckContains(content, "<testsuites name=\"MyProject\"", __func__, __LINE__,
+        "root element carries the project name");
+    CheckContains(content, "<testsuite name=\"GroupA\"", __func__, __LINE__, "GroupA testsuite present");
+    CheckContains(content, "<testsuite name=\"GroupB\"", __func__, __LINE__, "GroupB testsuite present");
+    CheckContains(content, "name=\"TestPass\"", __func__, __LINE__, "TestPass present");
+    CheckContains(content, "<failure", __func__, __LINE__, "failure element present for TestFail");
+    CheckContains(content, "<skipped", __func__, __LINE__, "skipped element present for TestSkip");
 }
 //---------------------------------------------------------------------------
 

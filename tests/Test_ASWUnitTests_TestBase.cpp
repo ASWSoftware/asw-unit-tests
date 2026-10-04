@@ -3121,9 +3121,9 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
     TTestCaseRecord const* const checkNull = FindRecord(results, "CheckEquals_NullAndEmpty_Fails");
     AssertTrue(assertNull != nullptr && checkNull != nullptr, __func__, __LINE__, "every expected record exists");
 
-    CheckTrue(assertNull->Message.find("\"(null)\"") != std::string::npos, __func__, __LINE__,
+    CheckContains(assertNull->Message, "\"(null)\"", __func__, __LINE__,
         "an Assert failure shows a null C string as (null)");
-    CheckTrue(checkNull->Message.find("Expected \"(null)\" but was \"\"") != std::string::npos, __func__, __LINE__,
+    CheckContains(checkNull->Message, "Expected \"(null)\" but was \"\"", __func__, __LINE__,
         "a Check failure shows a null C string as (null), distinct from an empty one");
 }
 //---------------------------------------------------------------------------
@@ -3153,10 +3153,10 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
     TTestCaseRecord const* const uint64Max = FindRecord(results, "CheckEquals_NegativeAndUint64Max_Fails");
     AssertTrue(unsignedMax != nullptr && uint64Max != nullptr, __func__, __LINE__, "every expected record exists");
 
-    CheckTrue(unsignedMax->Message.find("Expected \"-1\" but was \"4294967295\"") != std::string::npos, __func__,
-        __LINE__, "a failure shows both values as they are, without wrapping either");
-    CheckTrue(uint64Max->Message.find("Expected \"-1\" but was \"18446744073709551615\"") != std::string::npos,
-        __func__, __LINE__, "a failure beyond int64_t's range shows both values as they are");
+    CheckContains(unsignedMax->Message, "Expected \"-1\" but was \"4294967295\"", __func__, __LINE__,
+        "a failure shows both values as they are, without wrapping either");
+    CheckContains(uint64Max->Message, "Expected \"-1\" but was \"18446744073709551615\"", __func__, __LINE__,
+        "a failure beyond int64_t's range shows both values as they are");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
@@ -3176,13 +3176,13 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
     AssertTrue(assertEquals != nullptr && assertNotEquals != nullptr && checkEquals != nullptr &&
         checkNotEquals != nullptr, __func__, __LINE__, "every expected record exists");
 
-    CheckTrue(assertEquals->Message.find("\"true\" but was \"false\"") != std::string::npos, __func__, __LINE__,
+    CheckContains(assertEquals->Message, "\"true\" but was \"false\"", __func__, __LINE__,
         "AssertEquals shows bools as true/false");
-    CheckTrue(assertNotEquals->Message.find("Value: \"true\"") != std::string::npos, __func__, __LINE__,
+    CheckContains(assertNotEquals->Message, "Value: \"true\"", __func__, __LINE__,
         "AssertNotEquals shows bools as true/false");
-    CheckTrue(checkEquals->Message.find("Expected \"true\" but was \"false\"") != std::string::npos, __func__,
-        __LINE__, "CheckEquals shows bools as true/false");
-    CheckTrue(checkNotEquals->Message.find("Both values equal: \"true\"") != std::string::npos, __func__, __LINE__,
+    CheckContains(checkEquals->Message, "Expected \"true\" but was \"false\"", __func__, __LINE__,
+        "CheckEquals shows bools as true/false");
+    CheckContains(checkNotEquals->Message, "Both values equal: \"true\"", __func__, __LINE__,
         "CheckNotEquals shows bools as true/false");
 }
 //---------------------------------------------------------------------------
@@ -3311,7 +3311,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeo
     CheckEquals(std::string("HangsForever"), record.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually timed out");
     CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
-    CheckTrue(record.Message.find("timeout") != std::string::npos, __func__, __LINE__,
+    CheckContains(record.Message, "timeout", __func__, __LINE__,
         "the failure message explains why: it exceeded its timeout");
 }
 //---------------------------------------------------------------------------
@@ -3386,8 +3386,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
     CheckEquals(std::string("CrashesButDoesNotAbort"), crashedRecord.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually crashed");
     CheckTrue(crashedRecord.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
-    CheckTrue(crashedRecord.Message.find("crashed") != std::string::npos, __func__, __LINE__,
-        "the failure message explains why: it crashed");
+    CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
@@ -3436,23 +3435,25 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetai
 
     CheckEquals(static_cast<size_t>(0), failViaCheck->Message.find("Check failed for: \"Test_FailViaCheck\""),
         __func__, __LINE__, "a Check-only failure's detail is its Check failure, not empty");
-    CheckEquals(std::string::npos, failViaCheck->Message.find('\n'), __func__, __LINE__,
+    CheckNotContains(failViaCheck->Message, "\n", __func__, __LINE__,
         "one Check failure is one line, with no other test's Check failures carried over");
 
     CheckEquals(static_cast<size_t>(2),
         CountOccurrences(continuesAfterCheck->Message, "Check failed for: \"Test_ContinuesAfterCheckFailure\""),
         __func__, __LINE__, "both Check failures are in the detail");
-    CheckTrue(continuesAfterCheck->Message.find('\n') != std::string::npos, __func__, __LINE__,
+    CheckContains(continuesAfterCheck->Message, "\n", __func__, __LINE__,
         "multiple Check failures are separated by newlines");
 
-    size_t const checkPos = checkThenAssert->Message.find("deliberate Check failure before an Assert");
-    size_t const assertPos = checkThenAssert->Message.find("deliberate Assert failure after a Check");
-    CheckTrue(checkPos != std::string::npos && assertPos != std::string::npos, __func__, __LINE__,
-        "a Check failure followed by an Assert failure records both");
-    CheckTrue(checkPos < assertPos, __func__, __LINE__, "in the order they happened");
+    std::string const checkFailure = "deliberate Check failure before an Assert";
+    std::string const assertFailure = "deliberate Assert failure after a Check";
+    CheckContains(checkThenAssert->Message, checkFailure, __func__, __LINE__,
+        "a Check failure followed by an Assert failure records the Check failure");
+    CheckContains(checkThenAssert->Message, assertFailure, __func__, __LINE__, "and the Assert failure");
+    CheckLessThan(checkThenAssert->Message.find(checkFailure), checkThenAssert->Message.find(assertFailure), __func__,
+        __LINE__, "in the order they happened");
 
     CheckFalse(failViaAssert->Message.empty(), __func__, __LINE__, "an Assert failure still records its message");
-    CheckEquals(std::string::npos, failViaAssert->Message.find("Check failed for"), __func__, __LINE__,
+    CheckNotContains(failViaAssert->Message, "Check failed for", __func__, __LINE__,
         "a test with no Check failures gets none in its detail");
     CheckTrue(pass->Message.empty(), __func__, __LINE__, "a passing test's detail stays empty");
 }
@@ -3525,8 +3526,8 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()
             record.TestName + ": and its recorded detail");
     }
 
-    CheckTrue(observer.LogText().find("Running test: Fixture_MixedOutcomes.Pass") != std::string::npos, __func__,
-        __LINE__, "the group's log output goes to the observer");
+    CheckContains(observer.LogText(), "Running test: Fixture_MixedOutcomes.Pass", __func__, __LINE__,
+        "the group's log output goes to the observer");
     CheckTrue(consoleOutput.empty(), __func__, __LINE__, "and none of it goes to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
@@ -3679,8 +3680,8 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFa
 
         ++assertFailedTests;
         CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
-        CheckTrue(record.Message.find("deliberate Assert failure while an exception is expected") != std::string::npos,
-            __func__, __LINE__, record.TestName + "'s record carries its Assert failure");
+        CheckContains(record.Message, "deliberate Assert failure while an exception is expected", __func__, __LINE__,
+            record.TestName + "'s record carries its Assert failure");
     }
 
     CheckEquals(static_cast<size_t>(2), assertFailedTests, __func__, __LINE__,
@@ -3707,8 +3708,8 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureS
 
         ++checkFailedTests;
         CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
-        CheckTrue(record.Message.find("deliberate Check failure before the expected exception") != std::string::npos,
-            __func__, __LINE__, record.TestName + "'s record carries its Check failure");
+        CheckContains(record.Message, "deliberate Check failure before the expected exception", __func__, __LINE__,
+            record.TestName + "'s record carries its Check failure");
     }
 
     CheckEquals(static_cast<size_t>(4), checkFailedTests, __func__, __LINE__,
@@ -3797,15 +3798,15 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
         auto const expectedLine = fixture.ExpectedLines.find(record.TestName);
         AssertTrue(expectedLine != fixture.ExpectedLines.end(), __func__, __LINE__,
             record.TestName + " recorded the line of its call");
-        CheckTrue(record.Message.find("Test_" + record.TestName) != std::string::npos, __func__, __LINE__,
-            record.TestName + " reports its own function: " + record.Message);
-        CheckTrue(record.Message.find("(" + std::to_string(expectedLine->second) + ")") != std::string::npos,
-            __func__, __LINE__, record.TestName + " reports the line of its call: " + record.Message);
+        CheckContains(record.Message, "Test_" + record.TestName, __func__, __LINE__,
+            record.TestName + " reports its own function");
+        CheckContains(record.Message, "(" + std::to_string(expectedLine->second) + ")", __func__, __LINE__,
+            record.TestName + " reports the line of its call");
     }
 
     TTestCaseRecord const* const throughHelper = FindRecord(results, "CheckTrue_ThroughHelper_Fails");
     AssertTrue(throughHelper != nullptr, __func__, __LINE__, "the helper test's record exists");
-    CheckTrue(throughHelper->Message.find("CheckIsEven") == std::string::npos, __func__, __LINE__,
+    CheckNotContains(throughHelper->Message, "CheckIsEven", __func__, __LINE__,
         "a helper that passes its caller's location through isn't itself reported");
 }
 //---------------------------------------------------------------------------

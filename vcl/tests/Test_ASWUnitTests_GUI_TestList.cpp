@@ -217,12 +217,10 @@ void TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesAFinishedTest()
 
     // Assert
     CheckEquals(static_cast<size_t>(0), text.find("Alpha.Two\n"), __func__, __LINE__, "it starts with the full name");
-    CheckTrue(text.find("Result: Failed (0.412 ms)") != std::string::npos, __func__, __LINE__,
+    CheckContains(text, "Result: Failed (0.412 ms)", __func__, __LINE__,
         "then the status and duration in milliseconds");
-    CheckTrue(text.find("\nCheck failed for: needle\n") != std::string::npos, __func__, __LINE__,
-        "then the failure detail");
-    CheckTrue(text.find("\nLog:\nRunning test: Alpha.Two\n") != std::string::npos, __func__, __LINE__,
-        "then the test's own log");
+    CheckContains(text, "\nCheck failed for: needle\n", __func__, __LINE__, "then the failure detail");
+    CheckContains(text, "\nLog:\nRunning test: Alpha.Two\n", __func__, __LINE__, "then the test's own log");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesATestThatHasNotRun()
