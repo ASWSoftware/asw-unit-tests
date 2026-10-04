@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 VCL GUI app that runs the ASWUnitTests framework's tests.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -258,7 +258,7 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
             "\n\n"
             "https://github.com/ASWSoftware/asw-unit-tests\n"
             "\n"
-            "Copyright 2026 Anthony S. West\n"
+            "Copyright 2026 ASW Software\n"
             "Licensed under the Apache License, Version 2.0.\n");
     });
 }

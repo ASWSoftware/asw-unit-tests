@@ -6,7 +6,7 @@ Command-line option parsing and filter/partition composition for main.cpp,
 split out into its own unit so it can be linked from a test module without
 pulling in main() itself.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
