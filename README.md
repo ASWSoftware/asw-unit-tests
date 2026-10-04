@@ -58,7 +58,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Drop-in submodule](#submodule-integration)** - Add the repository as a git submodule and build its `src`
   folder alongside your own tests, with `ASWUnitTests_Sources.cmake` for CMake projects.
 - **[RAD Studio RTL exceptions](#rad-studio-rtl-exceptions-vclfmx)** - Opt-in support for VCL/FMX `Exception`
-  classes such as `EConvertError` via `ASWUNITTESTS_RTL_EXCEPTIONS`.
+  classes such as `EConvertError`, and for [`System::String`](#comparing-systemstring-vclfmx) in the string
+  checks, via `ASWUNITTESTS_RTL_EXCEPTIONS`.
 
 For the full list of `Check`/`Assert` methods, see `src/ASWUnitTests_TestBase.h`. For working examples, see the
 `tests` folder, e.g. `tests/Test_ASWTools_String.cpp` for `SetExceptionExpected()`.
@@ -460,6 +461,24 @@ catch (TExceptRTLException const& ex)
 tests in `vcl\tests`. It has its own `Build_*.bat` scripts, and writes its executable to
 `vcl\console\rad370\<Platform>\<Config>`. The [VCL GUI runner](#vcl-gui-runner) is set up the same way.
 
+### Comparing System::String (VCL/FMX)
+
+The same `ASWUNITTESTS_RTL_EXCEPTIONS` define (see [above](#rad-studio-rtl-exceptions-vclfmx)) also lets the string
+`Check`/`Assert` methods take a `System::String` (`UnicodeString`): `Equals`, `Contains`, `StartsWith`, `EndsWith`,
+and their `Not` and `IC` forms. At least one of the two texts must be a `System::String`. The other may also be a
+`std::string`, `std::wstring` or C string, including a literal:
+
+```
+CheckEquals("Ready", Label1->Caption, __func__, __LINE__, "status after loading");
+CheckStartsWithIC(Edit1->Text, L"https://", __func__, __LINE__, "a secure URL");
+```
+
+Both texts are converted to UTF-8 and compared as two `std::string` values, so a failure shows them the same way.
+Narrow text is read as UTF-8, as elsewhere in the framework, and a null C string is empty text, as it is for
+`System::String`. A `System::String` converts implicitly from a number or a character, but these methods don't accept
+either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile error rather than a comparison with `"5"`. Other RTL string
+types, such as `AnsiString`, need converting to `System::String` first, and the message is still a `std::string`.
+
 ### Omitting the Method and Line (C++20)
 
 Every `Check*`/`Assert*` method, `Skip()`, and both forms of `SetExceptionExpected()` also have an overload without
@@ -775,7 +794,8 @@ Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` f
 your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after updating the submodule.
 
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to enable
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx). To run your tests in the
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and
+[`System::String` comparisons](#comparing-systemstring-vclfmx). To run your tests in the
 [VCL GUI runner](#vcl-gui-runner) instead of a console, see that section for the files it needs.
 
 # Coding Standards

@@ -12,6 +12,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- With `ASWUNITTESTS_RTL_EXCEPTIONS` defined, the string `Check`/`Assert`
+  methods (`Equals`, `Contains`, `StartsWith`, `EndsWith`, and their `Not` and
+  `IC` forms) also take a `System::String`, compared with another
+  `System::String`, a `std::string`, a `std::wstring` or a C string. Both are
+  compared as UTF-8, and a failure shows them as for `std::string`. Comparing
+  a `System::String` with a number remains a compile error.
 - `CheckStartsWith`/`AssertStartsWith` and `CheckEndsWith`/`AssertEndsWith`,
   and their `Not` forms (`CheckNotStartsWith`, etc.), for `std::string` and
   `std::wstring`, taking the text first and then the prefix or suffix. Unlike

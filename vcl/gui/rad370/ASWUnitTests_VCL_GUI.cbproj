@@ -343,6 +343,10 @@
             <DependentOn>..\..\tests\Test_ASWUnitTests_RTLExceptions.h</DependentOn>
             <BuildOrder>32</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_RTLStrings.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_RTLStrings.h</DependentOn>
+            <BuildOrder>38</BuildOrder>
+        </CppCompile>
         <FormResources Include="..\src\ASWUnitTests_GUI_MainForm.dfm"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

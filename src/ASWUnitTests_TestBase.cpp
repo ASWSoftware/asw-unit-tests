@@ -1332,6 +1332,39 @@ char const* TTestGroupBase::OrderingSymbol(TOrdering ordering)
     }
 }
 //---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::RTLTextToUTF8(std::string const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::RTLTextToUTF8(std::wstring const& text)
+{
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::RTLTextToUTF8(char const* text)
+{
+    return CStringOrEmpty(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::RTLTextToUTF8(wchar_t const* text)
+{
+    return WideToUTF8(CStringOrEmpty(text));
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::RTLTextToUTF8(System::String const& text)
+{
+#if defined(WIDECHAR_IS_WCHAR)
+    // The same conversion as wide text, so both give the same bytes even for an unpaired surrogate.
+    return WideToUTF8(std::wstring(text.c_str(), static_cast<std::size_t>(text.Length())));
+#else
+    System::UTF8String const utf8(text);
+    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
+#endif
+}
+//---------------------------------------------------------------------------
+#endif
 /*
     TTestGroupBase::RegisterTest
 

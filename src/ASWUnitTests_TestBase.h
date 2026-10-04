@@ -377,6 +377,16 @@ private:
     // The operator for 'ordering' in a failure message, e.g. ">=".
     static char const* OrderingSymbol(TOrdering ordering);
 
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    // Returns 'text' as UTF-8 for the System::String overloads, which forward to the std::string ones. A null C string
+    // is empty text, as it is for System::String.
+    static std::string RTLTextToUTF8(std::string const& text);
+    static std::string RTLTextToUTF8(std::wstring const& text);
+    static std::string RTLTextToUTF8(char const* text);
+    static std::string RTLTextToUTF8(wchar_t const* text);
+    static std::string RTLTextToUTF8(System::String const& text);
+#endif
+
     template <typename T>
     static int ThreeWayCompare(T a, T b)
     {
@@ -881,6 +891,219 @@ protected: // Assertion/Check methods - Ordering (value compared with a bound)
     {
         CheckOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
     }
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+protected: // Assertion/Check methods - System::String (RTL)
+    // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
+    // UTF-8. The other may also be a std::string, std::wstring or C string.
+    template <typename TText>
+    using TIsRTLString = std::is_same<typename std::decay<TText>::type, System::String>;
+    template <typename TText>
+    using TIsRTLText = std::integral_constant<bool, TIsRTLString<TText>::value ||
+        std::is_same<typename std::decay<TText>::type, std::string>::value ||
+        std::is_same<typename std::decay<TText>::type, std::wstring>::value ||
+        std::is_same<typename std::decay<TText>::type, char const*>::value ||
+        std::is_same<typename std::decay<TText>::type, char*>::value ||
+        std::is_same<typename std::decay<TText>::type, wchar_t const*>::value ||
+        std::is_same<typename std::decay<TText>::type, wchar_t*>::value>;
+    template <typename TFirst, typename TSecond>
+    using TEnableIfRTLText = typename std::enable_if<(TIsRTLString<TFirst>::value ||
+        TIsRTLString<TSecond>::value) && TIsRTLText<TFirst>::value && TIsRTLText<TSecond>::value, int>::type;
+
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+#endif // #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 protected: // Assertion/Check methods - std::source_location

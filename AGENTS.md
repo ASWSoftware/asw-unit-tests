@@ -12,7 +12,7 @@ ASWUnitTests is a lightweight C++ console unit-testing framework.
 - `tests/` contains unit tests for the example code.
 - `toTest/` contains example code under test.
 - `rad370/` contains the RAD Studio 13.1 project and Windows build scripts.
-- `vcl/` contains RAD Studio projects that link the VCL and define `ASWUNITTESTS_RTL_EXCEPTIONS`, exercising the framework's opt-in RTL exception support: `vcl/console/rad370/` is a VCL console project (with its own build scripts) that runs the full self-test suite plus the RTL-specific and GUI unit tests in `vcl/tests/`. `vcl/gui/rad370/` is the VCL GUI runner project (with its own build scripts, and a project group that also opens the console project), built from the sources in `vcl/gui/src/`. The console project also compiles the GUI's non-form units, so their tests run without the GUI.
+- `vcl/` contains RAD Studio projects that link the VCL and define `ASWUNITTESTS_RTL_EXCEPTIONS`, exercising the framework's opt-in RTL support (RTL exceptions and the `System::String` overloads): `vcl/console/rad370/` is a VCL console project (with its own build scripts) that runs the full self-test suite plus the RTL-specific and GUI unit tests in `vcl/tests/`. `vcl/gui/rad370/` is the VCL GUI runner project (with its own build scripts, and a project group that also opens the console project), built from the sources in `vcl/gui/src/`. The console project also compiles the GUI's non-form units, so their tests run without the GUI.
 - `README.md` contains usage and integration examples.
 - `.uncrustify.cfg` and `.githooks/` define the repository formatting workflow.
 

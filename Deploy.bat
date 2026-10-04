@@ -247,6 +247,10 @@ call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLExceptions.cpp" "vcl\tests\Test_A
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLExceptions.h" "vcl\tests\Test_ASWUnitTests_RTLExceptions.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp" "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.h" "vcl\tests\Test_ASWUnitTests_RTLStrings.h"
+if errorlevel 1 exit /b 1
 
 echo Deployment completed successfully.
 exit /b 0

@@ -301,6 +301,10 @@
             <DependentOn>..\..\tests\Test_ASWUnitTests_RTLExceptions.h</DependentOn>
             <BuildOrder>26</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_RTLStrings.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_RTLStrings.h</DependentOn>
+            <BuildOrder>38</BuildOrder>
+        </CppCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
