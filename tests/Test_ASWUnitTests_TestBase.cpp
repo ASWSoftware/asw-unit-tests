@@ -665,6 +665,240 @@ void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContainsIC()/CheckContainsIC()/
+// AssertNotContainsIC()/CheckNotContainsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded: the
+// "NonLetters" tests use characters 0x20 apart, which a fold that just sets bit 0x20 would wrongly match, and the
+// "NonASCII" tests show that accented letters keep their case. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContainsIC_Absent_Fails();
+    void Test_AssertContainsIC_DifferentCase_Passes();
+    void Test_AssertContainsIC_Wide_Absent_Fails();
+    void Test_AssertContainsIC_Wide_DifferentCase_Passes();
+    void Test_AssertNotContainsIC_Absent_Passes();
+    void Test_AssertNotContainsIC_DifferentCase_Fails();
+    void Test_AssertNotContainsIC_Wide_Absent_Passes();
+    void Test_AssertNotContainsIC_Wide_DifferentCase_Fails();
+    void Test_CheckContainsIC_Absent_Fails();
+    void Test_CheckContainsIC_BothEmpty_Passes();
+    void Test_CheckContainsIC_DifferentCase_Passes();
+    void Test_CheckContainsIC_EmptySubstring_Passes();
+    void Test_CheckContainsIC_EmptyText_Fails();
+    void Test_CheckContainsIC_NonASCII_Fails();
+    void Test_CheckContainsIC_NonLetters_Fails();
+    void Test_CheckContainsIC_SubstringAtEnd_Passes();
+    void Test_CheckContainsIC_SubstringLongerThanText_Fails();
+    void Test_CheckContainsIC_Wide_Absent_Fails();
+    void Test_CheckContainsIC_Wide_DifferentCase_Passes();
+    void Test_CheckContainsIC_Wide_NonASCII_Fails();
+    void Test_CheckNotContainsIC_Absent_Passes();
+    void Test_CheckNotContainsIC_DifferentCase_Fails();
+    void Test_CheckNotContainsIC_EmptySubstring_Fails();
+    void Test_CheckNotContainsIC_Wide_Absent_Passes();
+    void Test_CheckNotContainsIC_Wide_DifferentCase_Fails();
+
+public:
+    TFixture_ContainsICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ContainsICComparisons::TFixture_ContainsICComparisons()
+    : inherited("Fixture_ContainsICComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Absent_Fails, "AssertContainsIC_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_DifferentCase_Passes,
+        "AssertContainsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_Absent_Fails,
+        "AssertContainsIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_DifferentCase_Passes,
+        "AssertContainsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Absent_Passes,
+        "AssertNotContainsIC_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_DifferentCase_Fails,
+        "AssertNotContainsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_Absent_Passes,
+        "AssertNotContainsIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_DifferentCase_Fails,
+        "AssertNotContainsIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Absent_Fails, "CheckContainsIC_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_BothEmpty_Passes,
+        "CheckContainsIC_BothEmpty_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_DifferentCase_Passes,
+        "CheckContainsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptySubstring_Passes,
+        "CheckContainsIC_EmptySubstring_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptyText_Fails,
+        "CheckContainsIC_EmptyText_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_NonASCII_Fails,
+        "CheckContainsIC_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_NonLetters_Fails,
+        "CheckContainsIC_NonLetters_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringAtEnd_Passes,
+        "CheckContainsIC_SubstringAtEnd_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringLongerThanText_Fails,
+        "CheckContainsIC_SubstringLongerThanText_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_Absent_Fails,
+        "CheckContainsIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_DifferentCase_Passes,
+        "CheckContainsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_NonASCII_Fails,
+        "CheckContainsIC_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Absent_Passes,
+        "CheckNotContainsIC_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_DifferentCase_Fails,
+        "CheckNotContainsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_EmptySubstring_Fails,
+        "CheckNotContainsIC_EmptySubstring_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_Absent_Passes,
+        "CheckNotContainsIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_Fails,
+        "CheckNotContainsIC_Wide_DifferentCase_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Absent_Fails()
+{
+    AssertContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_DifferentCase_Passes()
+{
+    AssertContainsIC(std::string("Hello World"), "lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_Absent_Fails()
+{
+    AssertContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_DifferentCase_Passes()
+{
+    AssertContainsIC(std::wstring(L"Hello World"), L"lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Absent_Passes()
+{
+    AssertNotContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_DifferentCase_Fails()
+{
+    AssertNotContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_Absent_Passes()
+{
+    AssertNotContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_DifferentCase_Fails()
+{
+    AssertNotContainsIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Absent_Fails()
+{
+    CheckContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_BothEmpty_Passes()
+{
+    CheckContainsIC(std::string(), "", __func__, __LINE__, "even an empty string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_DifferentCase_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "lO wO", __func__, __LINE__, "case differs");
+    CheckContainsIC(std::string("Hello World"), "hello world", __func__, __LINE__, "the whole text, case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptySubstring_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptyText_Fails()
+{
+    CheckContainsIC(std::string(), "a", __func__, __LINE__, "an empty string contains no letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_NonASCII_Fails()
+{
+    // UTF-8 E-acute and e-acute.
+    CheckContainsIC(std::string("caf\xC3\x89"), "caf\xC3\xA9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_NonLetters_Fails()
+{
+    CheckContainsIC(std::string("a@b[c"), "a`b{c", __func__, __LINE__, "@ and `, and [ and {, are not letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringAtEnd_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs, at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringLongerThanText_Fails()
+{
+    CheckContainsIC(std::string("Hello"), "HELLO WORLD", __func__, __LINE__, "the text contains the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_Absent_Fails()
+{
+    CheckContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_DifferentCase_Passes()
+{
+    CheckContainsIC(std::wstring(L"Hello World"), L"lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_NonASCII_Fails()
+{
+    // E-acute and e-acute.
+    CheckContainsIC(std::wstring(L"caf" L"\x00C9"), L"caf" L"\x00E9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Absent_Passes()
+{
+    CheckNotContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_DifferentCase_Fails()
+{
+    CheckNotContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_EmptySubstring_Fails()
+{
+    CheckNotContainsIC(std::string("Hello World"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_Absent_Passes()
+{
+    CheckNotContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_Fails()
+{
+    CheckNotContainsIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixtureSpecificError
 //
 // Unrelated (sibling) exception type for TFixture_ExceptionExpectations
@@ -1389,15 +1623,18 @@ private:
 private:
     void CheckIsEven(int value, std::source_location loc = std::source_location::current());
 
+    void Test_AssertContainsIC_Passes();
     void Test_AssertContains_Fails();
     void Test_AssertEquals_CStrings_Passes();
     void Test_AssertEquals_Fails();
     void Test_AssertFalse_Fails();
     void Test_AssertNear_Fails();
+    void Test_AssertNotContainsIC_Fails();
     void Test_AssertNotContains_Fails();
     void Test_AssertNotEquals_Fails();
     void Test_AssertNotNear_Fails();
     void Test_AssertTrue_Fails();
+    void Test_CheckContainsIC_Passes();
     void Test_CheckContains_Fails();
     void Test_CheckContains_Wide_Passes();
     void Test_CheckEquals_Fails();
@@ -1405,6 +1642,7 @@ private:
     void Test_CheckFalse_Fails();
     void Test_CheckNear_Fails();
     void Test_CheckNear_Passes();
+    void Test_CheckNotContainsIC_Fails();
     void Test_CheckNotContains_Fails();
     void Test_CheckNotEquals_Fails();
     void Test_CheckNotNear_Fails();
@@ -1431,15 +1669,18 @@ TFixture_SourceLocations::TFixture_SourceLocations()
 {
     SetLogSuppressed(true);
 
+    RegisterTest(&TFixture_SourceLocations::Test_AssertContainsIC_Passes, "AssertContainsIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertContains_Fails, "AssertContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContainsIC_Passes, "CheckContainsIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Fails, "CheckContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Wide_Passes, "CheckContains_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
@@ -1447,6 +1688,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotContainsIC_Fails, "CheckNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
@@ -1466,6 +1708,11 @@ TFixture_SourceLocations::TFixture_SourceLocations()
 void TFixture_SourceLocations::CheckIsEven(int value, std::source_location loc)
 {
     CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertContainsIC_Passes()
+{
+    AssertContainsIC(std::string("abc"), "B", "case differs");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertContains_Fails()
@@ -1498,6 +1745,12 @@ void TFixture_SourceLocations::Test_AssertNear_Fails()
     AssertNear(1.0, 2.0, 0.5, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotContainsIC_Fails()
+{
+    ExpectedLines["AssertNotContainsIC_Fails"] = __LINE__ + 1;
+    AssertNotContainsIC(std::string("abc"), "B", "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotContains_Fails()
 {
     ExpectedLines["AssertNotContains_Fails"] = __LINE__ + 1;
@@ -1520,6 +1773,11 @@ void TFixture_SourceLocations::Test_AssertTrue_Fails()
 {
     ExpectedLines["AssertTrue_Fails"] = __LINE__ + 1;
     AssertTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContainsIC_Passes()
+{
+    CheckContainsIC(std::string("abc"), "B", "case differs");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckContains_Fails()
@@ -1559,6 +1817,12 @@ void TFixture_SourceLocations::Test_CheckNear_Fails()
 void TFixture_SourceLocations::Test_CheckNear_Passes()
 {
     CheckNear(1.0f, 1.25f, 0.5f, "within tolerance");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotContainsIC_Fails()
+{
+    ExpectedLines["CheckNotContainsIC_Fails"] = __LINE__ + 1;
+    CheckNotContainsIC(std::string("abc"), "B", "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotContains_Fails()
@@ -1705,6 +1969,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive,
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly, "ContainsIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring, "Contains_ShowsTextAndSubstring");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
@@ -1805,6 +2070,60 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
     // Assert
     CheckTrue(fixture.ReachedSecondCheck, __func__, __LINE__,
         "a Check failure does not abort the rest of the test, unlike Assert");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly()
+{
+    // Arrange
+    TFixture_ContainsICComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(25), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContainsIC_Absent_Fails");
+    TTestCaseRecord const* const assertNotContains =
+        FindRecord(results, "AssertNotContainsIC_Wide_DifferentCase_Fails");
+    TTestCaseRecord const* const checkContains = FindRecord(results, "CheckContainsIC_Absent_Fails");
+    TTestCaseRecord const* const checkNotContains = FindRecord(results, "CheckNotContainsIC_DifferentCase_Fails");
+    AssertTrue(assertContains != nullptr && assertNotContains != nullptr && checkContains != nullptr &&
+        checkNotContains != nullptr, __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
+    // text and substring are shown as given, not case-folded.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+    std::string const containsDetail =
+        "): Expected \"Hello World\" to contain \"xyz\" (ignoring case). substring absent";
+    std::string const notContainsDetail =
+        "): Expected \"Hello World\" not to contain \"WORLD\" (ignoring case). case differs";
+
+    CheckTrue(messageMatches(*assertContains, "Substring not found: Test_AssertContainsIC_Absent_Fails (",
+        containsDetail), __func__, __LINE__,
+        "AssertContainsIC shows the text and substring: " + assertContains->Message);
+    CheckTrue(messageMatches(*assertNotContains, "Substring found: Test_AssertNotContainsIC_Wide_DifferentCase_Fails (",
+        notContainsDetail), __func__, __LINE__,
+        "AssertNotContainsIC shows the wide text and substring: " + assertNotContains->Message);
+    CheckTrue(messageMatches(*checkContains, "Check failed for: \"Test_CheckContainsIC_Absent_Fails\" (",
+        containsDetail), __func__, __LINE__, "CheckContainsIC shows the text and substring: " + checkContains->Message);
+    CheckTrue(messageMatches(*checkNotContains, "Check failed for: \"Test_CheckNotContainsIC_DifferentCase_Fails\" (",
+        notContainsDetail), __func__, __LINE__,
+        "CheckNotContainsIC shows the text and substring: " + checkNotContains->Message);
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
@@ -2444,7 +2763,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(26), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+    CheckEquals(static_cast<size_t>(30), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
     {

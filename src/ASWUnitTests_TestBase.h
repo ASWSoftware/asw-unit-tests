@@ -593,19 +593,39 @@ protected: // Assertion/Check methods - Contains (substring)
     virtual void AssertContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
 
+    virtual void AssertContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
     virtual void AssertNotContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+
+    virtual void AssertNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotContainsIC(std::wstring const& text, std::wstring const& substring,
+        std::string const& method, int line, std::string const& msg);
 
     virtual void CheckContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
 
+    virtual void CheckContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
     virtual void CheckNotContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
 
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
@@ -617,6 +637,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         AssertContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>
@@ -642,6 +669,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         AssertNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertNotContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>
@@ -670,6 +704,13 @@ protected: // Assertion/Check methods - std::source_location
         CheckContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TSubstring>
+    void CheckContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void CheckEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -693,6 +734,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         CheckNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void CheckNotContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>

@@ -15,7 +15,9 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 - `CheckContains`/`AssertContains` and `CheckNotContains`/`AssertNotContains`,
   for `std::string` and `std::wstring`, taking the text first and then the
   substring. Unlike `CheckTrue(text.find(substring) != std::string::npos, ...)`,
-  a failure shows both, with wide text converted to UTF-8. They use the new
+  a failure shows both, with wide text converted to UTF-8. Case-insensitive
+  `IC` variants (`CheckContainsIC`, etc.) ignore the case of the ASCII letters
+  `A`-`Z` only, the same on every platform and locale. They use the new
   `src/ASWUnitTests_Utils.cpp`, which a project that lists the framework's
   source files by hand, rather than through `ASWUnitTests_Sources.cmake`, must
   add.

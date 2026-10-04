@@ -61,6 +61,28 @@ std::wstring CStringOrEmpty(wchar_t const* str)
     return (str != nullptr) ? std::wstring(str) : std::wstring();
 }
 
+// True if 'text' contains 'substring', ignoring the case of the ASCII letters A-Z only, so the result doesn't depend
+// on the platform or the current locale (and a multi-byte UTF-8 sequence is never changed).
+template <typename TString>
+bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
+{
+    auto const toLower = [](auto character)
+        {
+            if (character >= 'A' && character <= 'Z')
+                return static_cast<decltype(character)>(character - 'A' + 'a');
+
+            return character;
+        };
+    auto const equalIgnoringCase = [&toLower](auto textChar, auto substringChar)
+        {
+            return toLower(textChar) == toLower(substringChar);
+        };
+
+    // std::search finds an empty substring at the start, which is the end of an empty text.
+    return substring.empty() ||
+        (std::search(text.begin(), text.end(), substring.begin(), substring.end(), equalIgnoringCase) != text.end());
+}
+
 std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
 {
     double const elapsedMs = std::chrono::duration<double, std::milli>(
@@ -138,6 +160,20 @@ void TTestGroupBase::AssertContains(std::wstring const& text, std::wstring const
 {
     if (text.find(substring) == std::wstring::npos)
         throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContainsIC(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!ContainsIgnoringASCIICase(text, substring))
+        throw TExceptContains(method, line, text, substring, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContainsIC(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!ContainsIgnoringASCIICase(text, substring))
+        throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEquals(
@@ -285,6 +321,20 @@ void TTestGroupBase::AssertNotContains(std::wstring const& text, std::wstring co
         throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContainsIC(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (ContainsIgnoringASCIICase(text, substring))
+        throw TExceptNotContains(method, line, text, substring, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContainsIC(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (ContainsIgnoringASCIICase(text, substring))
+        throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -429,6 +479,26 @@ void TTestGroupBase::CheckContains(std::wstring const& text, std::wstring const&
     {
         SetTestFailedCheck(method, line,
             "Expected \"" + WideToUTF8(text) + "\" to contain \"" + WideToUTF8(substring) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContainsIC(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!ContainsIgnoringASCIICase(text, substring))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" to contain \"" + substring + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContainsIC(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!ContainsIgnoringASCIICase(text, substring))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to contain \"" +
+            WideToUTF8(substring) + "\" (ignoring case). " + msg);
     }
 }
 //---------------------------------------------------------------------------
@@ -590,6 +660,26 @@ void TTestGroupBase::CheckNotContains(std::wstring const& text, std::wstring con
     {
         SetTestFailedCheck(method, line,
             "Expected \"" + WideToUTF8(text) + "\" not to contain \"" + WideToUTF8(substring) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContainsIC(std::string const& text, std::string const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (ContainsIgnoringASCIICase(text, substring))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" not to contain \"" + substring + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContainsIC(std::wstring const& text, std::wstring const& substring,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (ContainsIgnoringASCIICase(text, substring))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" not to contain \"" +
+            WideToUTF8(substring) + "\" (ignoring case). " + msg);
     }
 }
 //---------------------------------------------------------------------------

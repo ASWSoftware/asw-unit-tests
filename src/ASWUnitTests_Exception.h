@@ -113,7 +113,7 @@ class TExceptContains : public TTestException
 {
 public:
     TExceptContains(std::string const& method, int line, std::string const& text, std::string const& substring,
-        std::string const& msg);
+        std::string const& msg, bool ignoreCase = false);
 };
 
 
@@ -124,7 +124,7 @@ class TExceptNotContains : public TTestException
 {
 public:
     TExceptNotContains(std::string const& method, int line, std::string const& text, std::string const& substring,
-        std::string const& msg);
+        std::string const& msg, bool ignoreCase = false);
 };
 
 

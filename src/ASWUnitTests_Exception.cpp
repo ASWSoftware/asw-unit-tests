@@ -101,10 +101,10 @@ TExceptExpected::TExceptExpected(std::string const& msg)
 
 //---------------------------------------------------------------------------
 TExceptContains::TExceptContains(std::string const& method, int line, std::string const& text,
-    std::string const& substring, std::string const& msg)
+    std::string const& substring, std::string const& msg, bool ignoreCase)
 {
     m_Message = "Substring not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
-        "\" to contain \"" + substring + "\". " + msg;
+        "\" to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -156,10 +156,10 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 
 //---------------------------------------------------------------------------
 TExceptNotContains::TExceptNotContains(std::string const& method, int line, std::string const& text,
-    std::string const& substring, std::string const& msg)
+    std::string const& substring, std::string const& msg, bool ignoreCase)
 {
     m_Message = "Substring found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
-        "\" not to contain \"" + substring + "\". " + msg;
+        "\" not to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
 }
 //---------------------------------------------------------------------------
 

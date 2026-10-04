@@ -11,7 +11,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains`.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, and `Contains`/`NotContains` (plus
+  `ContainsIC`/`NotContainsIC`, ignoring case).
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -519,6 +520,15 @@ CheckContains(log, "timeout", __func__, __LINE__, "logs the timeout");
 
 The comparison is case-sensitive, and every string contains the empty string. A failure shows `std::wstring` text
 converted to UTF-8.
+
+`CheckContainsIC`/`AssertContainsIC` and `CheckNotContainsIC`/`AssertNotContainsIC` do the same, ignoring case. Only
+the ASCII letters `A`-`Z` and `a`-`z` are matched regardless of case, so the result is the same on every platform and
+in every locale, and the bytes of a multi-byte UTF-8 character are never changed. Other letters, such as an accented
+capital and small E, still have to match exactly:
+
+```
+CheckContainsIC(log, "CONNECTED", __func__, __LINE__, "passes");
+```
 
 ### Comparing Integers of Different Types
 
