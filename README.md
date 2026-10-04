@@ -105,8 +105,8 @@ the test executable directly rather than packaging or installing it.
 ## Versions
 
 ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the VCL GUI's caption.
-Releases are tagged on `main` (e.g. `v1.0.0`). Between releases, the `develop` branch carries the next planned version
-with a pre-release, e.g. `1.1.0-dev.1`, which comes before `1.1.0`. `src/ASWUnitTests_Version.h` has the version as
+Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop` branch carries the next planned version
+with a pre-release, e.g. `1.2.0-dev.1`, which comes before `1.2.0`. `src/ASWUnitTests_Version.h` has the version as
 macros, for code that supports several ASWUnitTests versions, and as constants in the `ASWUnitTests` namespace:
 
 ```
