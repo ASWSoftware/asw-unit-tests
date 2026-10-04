@@ -68,6 +68,8 @@ TTest_ASWUnitTests_GUI_TestList::TTest_ASWUnitTests_GUI_TestList()
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckedFilter_MatchesExactlyTheCheckedTests,
         "CheckedFilter_MatchesExactlyTheCheckedTests");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckMatching_ChecksExactlyTheMatches, "CheckMatching_ChecksExactlyTheMatches");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckOnlyFailed_ChecksVisibleFailuresOnly,
+        "CheckOnlyFailed_ChecksVisibleFailuresOnly");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CountMatching_CountsFilterMatches, "CountMatching_CountsFilterMatches");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesAFinishedTest, "DetailText_DescribesAFinishedTest");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesATestThatHasNotRun,
@@ -157,6 +159,31 @@ void TTest_ASWUnitTests_GUI_TestList::Test_CheckMatching_ChecksExactlyTheMatches
         "a filter checks exactly its matches (here, both Alpha tests and Alpha.Sub's)");
     CheckFalse(betaCheckedByFilter, __func__, __LINE__, "and unchecks the rest");
     CheckEquals(static_cast<size_t>(4), list.CheckedCount(), __func__, __LINE__, "an empty filter checks everything");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_CheckOnlyFailed_ChecksVisibleFailuresOnly()
+{
+    // Arrange: "Beta.Three" failed but is unchecked and hidden, which must leave it as it is.
+    TGUITestList list;
+    list.Load(SampleTests());
+    list.SetStatus(1, TGUITestStatus::Failed);
+    list.SetStatus(2, TGUITestStatus::Failed);
+    list.SetStatus(3, TGUITestStatus::Skipped);
+    list.SetChecked(2, false);
+    list.SetVisibleFilter([](std::string const& fullTestName)
+        {
+            return fullTestName != "Beta.Three";
+        });
+
+    // Act
+    list.CheckOnlyFailed();
+
+    // Assert
+    CheckFalse(list.IsChecked(0), __func__, __LINE__, "a visible test that didn't fail is unchecked");
+    CheckTrue(list.IsChecked(1), __func__, __LINE__, "a visible failed test is checked");
+    CheckFalse(list.IsChecked(2), __func__, __LINE__, "a hidden failed test is left alone, like Select All does");
+    CheckFalse(list.IsChecked(3), __func__, __LINE__, "a skipped test isn't a failure");
+    CheckEquals(static_cast<size_t>(1), list.CheckedCount(), __func__, __LINE__, "only the visible failure");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_CountMatching_CountsFilterMatches()

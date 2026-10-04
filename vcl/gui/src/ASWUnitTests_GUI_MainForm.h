@@ -74,6 +74,7 @@ __published: // IDE-managed Components
     TAction* Act_RunFailed;
     TAction* Act_RunSelected;
     TAction* Act_SelectAll;
+    TAction* Act_SelectFailed;
     TAction* Act_SelectNone;
     TAction* Act_Stop;
     TActionList* AL_Main;
@@ -81,6 +82,7 @@ __published: // IDE-managed Components
     TButton* Btn_RunFailed;
     TButton* Btn_RunSelected;
     TButton* Btn_SelectAll;
+    TButton* Btn_SelectFailed;
     TButton* Btn_SelectNone;
     TButton* Btn_Stop;
     TEdit* Edt_Filter;
@@ -103,6 +105,7 @@ __published: // IDE-managed Components
     TMenuItem* MI_TestsCopyDetails;
     TMenuItem* MI_TestsFilter;
     TMenuItem* MI_TestsSelectAll;
+    TMenuItem* MI_TestsSelectFailed;
     TMenuItem* MI_TestsSelectNone;
     TMenuItem* MI_TestsSeparator1;
     TMenuItem* MI_View;
@@ -130,6 +133,7 @@ __published: // IDE-managed Components
     void __fastcall Act_RunFailedExecute(TObject* Sender);
     void __fastcall Act_RunSelectedExecute(TObject* Sender);
     void __fastcall Act_SelectAllExecute(TObject* Sender);
+    void __fastcall Act_SelectFailedExecute(TObject* Sender);
     void __fastcall Act_SelectNoneExecute(TObject* Sender);
     void __fastcall Act_StopExecute(TObject* Sender);
     void __fastcall Edt_FilterChange(TObject* Sender);

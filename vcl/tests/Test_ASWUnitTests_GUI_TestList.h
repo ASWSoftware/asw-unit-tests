@@ -43,6 +43,7 @@ private:
 private: // Test methods
     void Test_CheckedFilter_MatchesExactlyTheCheckedTests();
     void Test_CheckMatching_ChecksExactlyTheMatches();
+    void Test_CheckOnlyFailed_ChecksVisibleFailuresOnly();
     void Test_CountMatching_CountsFilterMatches();
     void Test_DetailText_DescribesAFinishedTest();
     void Test_DetailText_DescribesATestThatHasNotRun();

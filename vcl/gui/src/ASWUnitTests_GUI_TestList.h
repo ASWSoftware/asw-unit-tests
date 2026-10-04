@@ -119,6 +119,8 @@ public:
     // Checks exactly the tests 'filter' matches by full name, or all of them if it's empty, e.g. to start
     // from the command line's --filter and partition options.
     void CheckMatching(TestFilter const& filter);
+    // Checks the visible tests that failed in this run and unchecks the other visible tests, for Select Failed.
+    void CheckOnlyFailed();
     size_t Count() const;
     // Number of tests 'filter' matches by full name, or all of them if it's empty.
     size_t CountMatching(TestFilter const& filter) const;

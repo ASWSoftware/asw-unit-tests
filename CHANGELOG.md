@@ -12,6 +12,9 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- VCL GUI runner: **Select Failed** (Tests menu and toolbar), which checks only
+  the shown tests that failed in the latest run, so they can be rerun with Run
+  Selected.
 - Version macros in `ASWUnitTests_Version.h`: `ASWUNITTESTS_VERSION_MAJOR`,
   `ASWUNITTESTS_VERSION_MINOR`, `ASWUNITTESTS_VERSION_PATCH`,
   `ASWUNITTESTS_VERSION_PRERELEASE` (empty on a release, e.g. `dev.1` between

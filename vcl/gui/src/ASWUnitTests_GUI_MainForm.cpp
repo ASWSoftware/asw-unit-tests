@@ -395,6 +395,15 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_SelectAllExecute(TObject* /*Sender
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_SelectFailedExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Select Failed", [this]()
+    {
+        m_TestList.CheckOnlyFailed();
+        SyncTreeChecks();
+    });
+}
+//---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Act_SelectNoneExecute(TObject* /*Sender*/)
 {
     RunGuarded("Select None", [this]()
@@ -1084,6 +1093,7 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     Act_RunFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_RunSelected->Enabled = !running;
     Act_SelectAll->Enabled = !running;
+    Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_SelectNone->Enabled = !running;
     Act_Stop->Enabled = running;
 

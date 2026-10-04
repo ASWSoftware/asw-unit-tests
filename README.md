@@ -292,7 +292,8 @@ The toolbar, whose commands are also in the Run and Tests menus:
 
 - **Run Selected** (F9) runs the checked tests, and **Run Failed** reruns the latest run's failures.
 - **Stop** ends the run after the current test. Closing the window during a run does the same, then closes.
-- **Select All** and **Select None** check or uncheck every shown test.
+- **Select All** and **Select None** check or uncheck every shown test, and **Select Failed** checks only the shown
+  tests that failed in the latest run.
 - **Copy Details** (Ctrl+Shift+C) copies the detail pane to the clipboard.
 - **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, ignoring case, with the same
   `*` and `?` wildcards as `--filter`. While it hides tests, checking them and Run Selected only apply to the shown

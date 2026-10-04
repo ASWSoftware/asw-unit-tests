@@ -104,6 +104,15 @@ void TGUITestList::CheckMatching(TestFilter const& filter)
         m_Checked[i] = (filter == nullptr) || filter(m_Tests[i].GroupName + "." + m_Tests[i].TestName);
 }
 //---------------------------------------------------------------------------
+void TGUITestList::CheckOnlyFailed()
+{
+    for (size_t i = 0; i < m_Tests.size(); ++i)
+    {
+        if (m_Visible[i])
+            m_Checked[i] = (m_Statuses[i] == TGUITestStatus::Failed);
+    }
+}
+//---------------------------------------------------------------------------
 size_t TGUITestList::Count() const
 {
     return m_Tests.size();
