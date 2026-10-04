@@ -56,6 +56,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Fixed
 
+- A failed `AssertTrue()` reporting "Expected false but was true". It now
+  reports "Expected true but was false", by throwing `TExceptTrue` instead of
+  `TExceptFalse`, so code that catches `TExceptFalse` to detect a failed
+  `AssertTrue()` must catch `TExceptTrue` instead.
 - `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` comparing two
   C strings (e.g. two string literals) as `bool` instead of by content, so an
   `Equals` check always passed and a `NotEquals` check always failed, whatever

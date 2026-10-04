@@ -1889,6 +1889,94 @@ void TFixture_SourceLocations::Test_Skip_Skips()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_TrueFalseChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
+// CheckFalse() with a value that passes and one that fails, so Test_TrueFalse_FailureNamesTheExpectedValue below can
+// check that each failure states the value that was expected, not the opposite. Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TrueFalseChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertFalse_False_Passes();
+    void Test_AssertFalse_True_Fails();
+    void Test_AssertTrue_False_Fails();
+    void Test_AssertTrue_True_Passes();
+    void Test_CheckFalse_False_Passes();
+    void Test_CheckFalse_True_Fails();
+    void Test_CheckTrue_False_Fails();
+    void Test_CheckTrue_True_Passes();
+
+public:
+    TFixture_TrueFalseChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_TrueFalseChecks::TFixture_TrueFalseChecks()
+    : inherited("Fixture_TrueFalseChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertFalse_False_Passes, "AssertFalse_False_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertFalse_True_Fails, "AssertFalse_True_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertTrue_False_Fails, "AssertTrue_False_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertTrue_True_Passes, "AssertTrue_True_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckFalse_False_Passes, "CheckFalse_False_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckFalse_True_Fails, "CheckFalse_True_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckTrue_False_Fails, "CheckTrue_False_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes, "CheckTrue_True_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertFalse_False_Passes()
+{
+    AssertFalse(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertFalse_True_Fails()
+{
+    AssertFalse(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertTrue_False_Fails()
+{
+    AssertTrue(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertTrue_True_Passes()
+{
+    AssertTrue(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckFalse_False_Passes()
+{
+    CheckFalse(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckFalse_True_Fails()
+{
+    CheckFalse(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckTrue_False_Fails()
+{
+    CheckTrue(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes()
+{
+    CheckTrue(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_CrashingTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
@@ -2010,6 +2098,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLine,
         "SourceLocation_ReportsCallerFunctionAndLine");
 #endif
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
+        "TrueFalse_FailureNamesTheExpectedValue");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_TestBase::~TTest_ASWUnitTests_TestBase()
@@ -2798,6 +2888,53 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 }
 //---------------------------------------------------------------------------
 #endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()
+{
+    // Arrange
+    TFixture_TrueFalseChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(8), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertFalse = FindRecord(results, "AssertFalse_True_Fails");
+    TTestCaseRecord const* const assertTrue = FindRecord(results, "AssertTrue_False_Fails");
+    TTestCaseRecord const* const checkFalse = FindRecord(results, "CheckFalse_True_Fails");
+    TTestCaseRecord const* const checkTrue = FindRecord(results, "CheckTrue_False_Fails");
+    AssertTrue(assertFalse != nullptr && assertTrue != nullptr && checkFalse != nullptr && checkTrue != nullptr,
+        __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+
+    CheckTrue(messageMatches(*assertFalse, "Expected false but was true: Test_AssertFalse_True_Fails (",
+        "): value is true"), __func__, __LINE__, "AssertFalse expects false: " + assertFalse->Message);
+    CheckTrue(messageMatches(*assertTrue, "Expected true but was false: Test_AssertTrue_False_Fails (",
+        "): value is false"), __func__, __LINE__, "AssertTrue expects true: " + assertTrue->Message);
+    CheckTrue(messageMatches(*checkFalse, "Check failed for: \"Test_CheckFalse_True_Fails\" (",
+        "): Expected false but was true: \"value is true\""), __func__, __LINE__,
+        "CheckFalse expects false: " + checkFalse->Message);
+    CheckTrue(messageMatches(*checkTrue, "Check failed for: \"Test_CheckTrue_False_Fails\" (",
+        "): Expected true but was false: \"value is false\""), __func__, __LINE__,
+        "CheckTrue expects true: " + checkTrue->Message);
+}
+//---------------------------------------------------------------------------
 
 } // namespace ASWUnitTests
 

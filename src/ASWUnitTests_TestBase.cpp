@@ -462,7 +462,7 @@ void TTestGroupBase::AssertNotNear(
 void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (!testVal)
-        throw TExceptFalse(method, line, msg);
+        throw TExceptTrue(method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckContains(std::string const& text, std::string const& substring,

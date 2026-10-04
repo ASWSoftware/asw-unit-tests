@@ -69,6 +69,7 @@ private: // Test methods
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
     void Test_SourceLocation_ReportsCallerFunctionAndLine();
 #endif
+    void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:
     TTest_ASWUnitTests_TestBase();
