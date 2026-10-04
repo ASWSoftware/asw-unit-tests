@@ -8,7 +8,7 @@ To register a test module, create a class that inherits 'TTestGroupBase'
 and self-register it with the ASW_REGISTER_TEST_GROUP macro
 (see ASWUnitTests_Registry.h). No framework source file needs to change.
 
-Copyright 2025 Anthony S. West
+Copyright 2025-2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -34,7 +34,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     ShowCaption = False
     TabOrder = 0
     object Lbl_Filter: TLabel
-      Left = 666
+      Left = 762
       Top = 13
       Width = 29
       Height = 15
@@ -83,23 +83,31 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Action = Act_SelectNone
       TabOrder = 4
     end
+    object Btn_SelectFailed: TButton
+      Left = 520
+      Top = 8
+      Width = 90
+      Height = 26
+      Action = Act_SelectFailed
+      TabOrder = 5
+    end
     object Btn_CopyDetails: TButton
-      Left = 532
+      Left = 628
       Top = 8
       Width = 110
       Height = 26
       Action = Act_CopyDetails
-      TabOrder = 5
+      TabOrder = 6
     end
     object Edt_Filter: TEdit
-      Left = 704
+      Left = 800
       Top = 9
-      Width = 240
+      Width = 192
       Height = 23
       Hint = 
         'Show only tests whose "Group.Test" name contains this text, whic' +
         'h may use the * and ? wildcards of --filter; not case-sensitive'
-      TabOrder = 6
+      TabOrder = 7
       TextHint = 'e.g. String or *Handler*.Run_*'
       OnChange = Edt_FilterChange
     end
@@ -321,6 +329,12 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Hint = 'Restore the default window size and panel sizes'
       OnExecute = Act_ResetLayoutExecute
     end
+    object Act_SelectFailed: TAction
+      Caption = 'Select Fai&led'
+      Enabled = False
+      Hint = 'Check only the shown tests that failed in the last run'
+      OnExecute = Act_SelectFailedExecute
+    end
   end
   object IL_Status: TImageList
     Left = 120
@@ -360,6 +374,9 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       end
       object MI_TestsSelectNone: TMenuItem
         Action = Act_SelectNone
+      end
+      object MI_TestsSelectFailed: TMenuItem
+        Action = Act_SelectFailed
       end
       object MI_TestsFilter: TMenuItem
         Action = Act_FocusFilter

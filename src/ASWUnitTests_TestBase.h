@@ -8,7 +8,7 @@ To register a test module, create a class that inherits 'TTestGroupBase'
 and self-register it with the ASW_REGISTER_TEST_GROUP macro
 (see ASWUnitTests_Registry.h). No framework source file needs to change.
 
-Copyright 2025 Anthony S. West
+Copyright 2025-2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,15 +27,31 @@ limitations under the License.
 #ifndef ASWUnitTests_TestBaseH
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
+
+// std::source_location (C++20) is used where the compiler and library support it, which RAD Studio's 32-bit
+// compilers (C++17) don't; code elsewhere tests the derived ASWUNITTESTS_SOURCE_LOCATION_ENABLED. The feature-test
+// macro is checked rather than __has_include(<source_location>), since bcc32c has that header but can't compile it.
+#if defined(__has_include)
+#  if __has_include(<version>)
+#    include <version>
+#  endif
+#endif
+#if defined(__cpp_lib_source_location)
+#  define ASWUNITTESTS_SOURCE_LOCATION_ENABLED 1
+#  include <source_location>
+#endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
 //---------------------------------------------------------------------------
@@ -239,6 +255,144 @@ class TTestGroupBase : public ITestGroup
 private:
     typedef ITestGroup inherited;
 
+    // The relation an ordering method (e.g. CheckGreaterThan()) checks 'value' has to 'bound'.
+    enum class TOrdering
+    {
+        GreaterThan,
+        GreaterThanOrEqual,
+        LessThan,
+        LessThanOrEqual
+    };
+
+    // Used by the Assert ordering methods: throws TExceptOrdering unless 'value' has relation 'ordering' to 'bound'.
+    template <typename TValue, typename TBound>
+    void AssertOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (!OrderingHolds(CompareForOrdering(value, bound), ordering))
+        {
+            std::pair<std::string, std::string> const texts = FormatOrderingValues(value, bound);
+            throw TExceptOrdering(method, line, texts.first, OrderingSymbol(ordering), texts.second, msg);
+        }
+    }
+
+    // Used by the Check ordering methods: records a failure unless 'value' has relation 'ordering' to 'bound'.
+    template <typename TValue, typename TBound>
+    void CheckOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (!OrderingHolds(CompareForOrdering(value, bound), ordering))
+        {
+            std::pair<std::string, std::string> const texts = FormatOrderingValues(value, bound);
+            SetTestFailedCheck(method, line, "Expected " + texts.first + " to be " + OrderingSymbol(ordering) + " " +
+                texts.second + ". " + msg);
+        }
+    }
+
+    // Returns a negative number, zero or a positive number when 'value' is less than, equal to or greater than
+    // 'bound', or nullopt when either is a floating-point NaN. Two integers are compared by value, like
+    // ForwardIntegerComparison(); when one is negative and the other is above INT64_MAX, the negative one is less.
+    // Otherwise both are converted to their common floating-point type, as the built-in operators do.
+    template <typename TValue, typename TBound>
+    static std::optional<int> CompareForOrdering(TValue value, TBound bound)
+    {
+        if constexpr (std::is_floating_point<TValue>::value || std::is_floating_point<TBound>::value)
+        {
+            typedef typename std::common_type<TValue, TBound>::type TCommon;
+            TCommon const commonValue = static_cast<TCommon>(value);
+            TCommon const commonBound = static_cast<TCommon>(bound);
+
+            if (std::isnan(commonValue) || std::isnan(commonBound))
+                return std::nullopt;
+
+            return ThreeWayCompare(commonValue, commonBound);
+        }
+        else
+        {
+            if (FitsInInt64(value) && FitsInInt64(bound))
+                return ThreeWayCompare(static_cast<int64_t>(value), static_cast<int64_t>(bound));
+
+            if (IsNonNegative(value) && IsNonNegative(bound))
+                return ThreeWayCompare(static_cast<uint64_t>(value), static_cast<uint64_t>(bound));
+
+            return IsNonNegative(value) ? 1 : -1;
+        }
+    }
+
+    template <typename TInteger>
+    static bool FitsInInt64(TInteger value)
+    {
+        if constexpr (std::is_signed<TInteger>::value)
+            return true;
+        else
+            return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    }
+
+    // Formats a pair of floating-point values for an ordering failure; see FormatOrderingValues().
+    static std::pair<std::string, std::string> FormatFloatingPointValues(float value, float bound);
+    static std::pair<std::string, std::string> FormatFloatingPointValues(double value, double bound);
+    static std::pair<std::string, std::string> FormatFloatingPointValues(long double value, long double bound);
+
+    // Formats 'value' and 'bound' for an ordering failure. Floating-point values are shown in their common type, with
+    // as many digits as it reliably holds, or all of them when that would make two different values look equal.
+    template <typename TValue, typename TBound>
+    static std::pair<std::string, std::string> FormatOrderingValues(TValue value, TBound bound)
+    {
+        if constexpr (std::is_floating_point<TValue>::value || std::is_floating_point<TBound>::value)
+        {
+            typedef typename std::common_type<TValue, TBound>::type TCommon;
+            return FormatFloatingPointValues(static_cast<TCommon>(value), static_cast<TCommon>(bound));
+        }
+        else
+        {
+            return std::pair<std::string, std::string>(std::to_string(value), std::to_string(bound));
+        }
+    }
+
+    // Calls 'compare' with 'expected' and 'actual' as two int64_t when both fit, otherwise as two uint64_t when
+    // neither is negative, otherwise (one negative, the other above INT64_MAX) as two decimal strings, so neither
+    // value wraps around. Used by the integer template overloads of the Equals/NotEquals methods.
+    template <typename TExpected, typename TActual, typename TCompare>
+    static void ForwardIntegerComparison(TExpected expected, TActual actual, TCompare compare)
+    {
+        if (FitsInInt64(expected) && FitsInInt64(actual))
+            compare(static_cast<int64_t>(expected), static_cast<int64_t>(actual));
+        else if (IsNonNegative(expected) && IsNonNegative(actual))
+            compare(static_cast<uint64_t>(expected), static_cast<uint64_t>(actual));
+        else
+            compare(std::to_string(expected), std::to_string(actual));
+    }
+
+    template <typename TInteger>
+    static bool IsNonNegative(TInteger value)
+    {
+        if constexpr (std::is_signed<TInteger>::value)
+            return value >= 0;
+        else
+            return true;
+    }
+
+    // True when 'order' (from CompareForOrdering()) satisfies 'ordering'; never when it's nullopt (a NaN).
+    static bool OrderingHolds(std::optional<int> order, TOrdering ordering);
+    // The operator for 'ordering' in a failure message, e.g. ">=".
+    static char const* OrderingSymbol(TOrdering ordering);
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    // Returns 'text' as UTF-8 for the System::String overloads, which forward to the std::string ones. A null C string
+    // is empty text, as it is for System::String.
+    static std::string RTLTextToUTF8(std::string const& text);
+    static std::string RTLTextToUTF8(std::wstring const& text);
+    static std::string RTLTextToUTF8(char const* text);
+    static std::string RTLTextToUTF8(wchar_t const* text);
+    static std::string RTLTextToUTF8(System::String const& text);
+#endif
+
+    template <typename T>
+    static int ThreeWayCompare(T a, T b)
+    {
+        return (a < b) ? -1 : ((b < a) ? 1 : 0);
+    }
+
 protected:
     bool m_ExceptionExpected;
     bool m_LogSuppressed;
@@ -387,6 +541,30 @@ protected: // Assertion/Check methods - Equals
         int line, std::string const& msg);
     virtual void AssertEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void AssertEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
+    // Any two integer types except bool that no overload above matches exactly (e.g. int and int64_t), compared
+    // by value.
+    template <typename TExpected, typename TActual>
+    using TEnableIfIntegers = typename std::enable_if<std::is_integral<TExpected>::value &&
+        std::is_integral<TActual>::value && !std::is_same<TExpected, bool>::value &&
+        !std::is_same<TActual, bool>::value, int>::type;
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void AssertEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                AssertEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
+
+    virtual void AssertEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
 
     virtual void CheckEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -409,6 +587,24 @@ protected: // Assertion/Check methods - Equals
     virtual void CheckEquals(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
+    void CheckEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void CheckEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                CheckEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
+
+    virtual void CheckEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
 
 protected: // Assertion/Check methods - Not Equals
@@ -434,6 +630,24 @@ protected: // Assertion/Check methods - Not Equals
         int line, std::string const& msg);
     virtual void AssertNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                AssertNotEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
+
+    virtual void AssertNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEqualsIC(std::wstring const& expected, std::wstring const& actual,
+        std::string const& method, int line, std::string const& msg);
 
     virtual void CheckNotEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -456,6 +670,24 @@ protected: // Assertion/Check methods - Not Equals
     virtual void CheckNotEquals(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotEquals(std::wstring const& expected, std::wstring const& actual, std::string const& method,
+        int line, std::string const& msg);
+    void CheckNotEquals(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotEquals(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
+    template <typename TExpected, typename TActual, TEnableIfIntegers<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        ForwardIntegerComparison(expected, actual, [&](auto expectedValue, auto actualValue)
+            {
+                CheckNotEquals(expectedValue, actualValue, method, line, msg);
+            });
+    }
+
+    virtual void CheckNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
 
 protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
@@ -484,6 +716,741 @@ protected: // Assertion/Check methods - Boolean
     virtual void AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg);
+
+protected: // Assertion/Check methods - Contains (substring)
+    virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotContainsIC(std::wstring const& text, std::wstring const& substring,
+        std::string const& method, int line, std::string const& msg);
+
+    virtual void CheckContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotContains(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
+        int line, std::string const& msg);
+
+protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
+    virtual void AssertEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+        std::string const& method, int line, std::string const& msg);
+
+    virtual void AssertStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+protected: // Assertion/Check methods - Ordering (value compared with a bound)
+    // Any two integer or floating-point types except bool.
+    template <typename TValue, typename TBound>
+    using TEnableIfOrderable = typename std::enable_if<std::is_arithmetic<TValue>::value &&
+        std::is_arithmetic<TBound>::value && !std::is_same<TValue, bool>::value &&
+        !std::is_same<TBound, bool>::value, int>::type;
+
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertGreaterThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::GreaterThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertGreaterThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::GreaterThanOrEqual, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertLessThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::LessThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void AssertLessThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
+    }
+
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckGreaterThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::GreaterThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckGreaterThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::GreaterThanOrEqual, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckLessThan(TValue value, TBound bound, std::string const& method, int line, std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::LessThan, method, line, msg);
+    }
+    template <typename TValue, typename TBound, TEnableIfOrderable<TValue, TBound> = 0>
+    void CheckLessThanOrEqual(TValue value, TBound bound, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
+    }
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+protected: // Assertion/Check methods - System::String (RTL)
+    // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
+    // UTF-8. The other may also be a std::string, std::wstring or C string.
+    template <typename TText>
+    using TIsRTLString = std::is_same<typename std::decay<TText>::type, System::String>;
+    template <typename TText>
+    using TIsRTLText = std::integral_constant<bool, TIsRTLString<TText>::value ||
+        std::is_same<typename std::decay<TText>::type, std::string>::value ||
+        std::is_same<typename std::decay<TText>::type, std::wstring>::value ||
+        std::is_same<typename std::decay<TText>::type, char const*>::value ||
+        std::is_same<typename std::decay<TText>::type, char*>::value ||
+        std::is_same<typename std::decay<TText>::type, wchar_t const*>::value ||
+        std::is_same<typename std::decay<TText>::type, wchar_t*>::value>;
+    template <typename TFirst, typename TSecond>
+    using TEnableIfRTLText = typename std::enable_if<(TIsRTLString<TFirst>::value ||
+        TIsRTLString<TSecond>::value) && TIsRTLText<TFirst>::value && TIsRTLText<TSecond>::value, int>::type;
+
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void AssertNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void AssertNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void AssertNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void AssertStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        AssertStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    void CheckNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    void CheckNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    void CheckNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
+    void CheckStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        CheckStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+    }
+#endif // #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+protected: // Assertion/Check methods - std::source_location
+    // Each takes a location (by default, the caller's) in place of a method and line, and forwards to the
+    // method/line overload with loc.function_name() and loc.line().
+    template <typename TText, typename TSubstring>
+    void AssertContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertGreaterThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertGreaterThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertGreaterThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertLessThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertLessThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void AssertLessThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void AssertNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void AssertNotContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertNotEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertNotEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void AssertNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertNotStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void AssertTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+
+    template <typename TText, typename TSubstring>
+    void CheckContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void CheckContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckGreaterThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckGreaterThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckGreaterThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckLessThan(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckLessThan(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue, typename TBound>
+    void CheckLessThanOrEqual(TValue&& value, TBound&& bound, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void CheckNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void CheckNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotContains(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSubstring>
+    void CheckNotContainsIC(TText&& text, TSubstring&& substring, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckNotEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEquals(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckNotEqualsIC(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void CheckNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
+            std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckNotStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    void CheckTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+
+    void SetExceptionExpected(bool expected, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        SetExceptionExpected(expected, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TException>
+    void SetExceptionExpected(std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        SetExceptionExpected<TException>(loc.function_name(), static_cast<int>(loc.line()), msg, expectedMessage);
+    }
+    void Skip(std::string const& reason, std::source_location loc = std::source_location::current())
+    {
+        Skip(loc.function_name(), static_cast<int>(loc.line()), reason);
+    }
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 
 public:
     TTestGroupBase(std::string const& name);

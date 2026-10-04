@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -258,13 +258,12 @@ void TTest_ASWUnitTests_GUI_RunObserver::Test_Run_ReportsEachTestWithItsOwnLogUn
 
     // Assert
     AssertEquals(static_cast<size_t>(2), recorder.TestLogs.size(), __func__, __LINE__, "both tests were reported");
-    CheckTrue(recorder.TestLogs[0].find("Running test: Fixture_GUIObserved.FailsCheck") != std::string::npos,
-        __func__, __LINE__, "the first test's log is its own");
-    CheckTrue(recorder.TestLogs[0].find("deliberate Check failure") != std::string::npos, __func__, __LINE__,
-        "including its Check failure");
-    CheckTrue(recorder.TestLogs[1].find("Running test: Fixture_GUIObserved.Passes") != std::string::npos,
-        __func__, __LINE__, "the second test's log is its own");
-    CheckEquals(std::string::npos, recorder.TestLogs[1].find("deliberate Check failure"), __func__, __LINE__,
+    CheckContains(recorder.TestLogs[0], "Running test: Fixture_GUIObserved.FailsCheck", __func__, __LINE__,
+        "the first test's log is its own");
+    CheckContains(recorder.TestLogs[0], "deliberate Check failure", __func__, __LINE__, "including its Check failure");
+    CheckContains(recorder.TestLogs[1], "Running test: Fixture_GUIObserved.Passes", __func__, __LINE__,
+        "the second test's log is its own");
+    CheckNotContains(recorder.TestLogs[1], "deliberate Check failure", __func__, __LINE__,
         "with nothing carried over from the first");
     CheckTrue(recorder.CallbacksOnConstructingThread, __func__, __LINE__,
         "every callback ran on the calling thread, though the tests ran on worker threads");

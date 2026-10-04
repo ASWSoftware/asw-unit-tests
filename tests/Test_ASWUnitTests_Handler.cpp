@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -194,10 +194,9 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOut
     CheckEquals(3u, results.SuccessCount, __func__, __LINE__, "the three WildcardMatch_* tests ran and passed");
     CheckEquals(static_cast<size_t>(3), observer.FinishedGroupNames.size(), __func__, __LINE__,
         "each was reported to the observer, through the groups Initialize() created after it was set");
-    CheckTrue(observer.LogText.find("registering test groups for ObserverTestProject") != std::string::npos,
-        __func__, __LINE__, "Initialize()'s output went to the observer");
-    CheckTrue(observer.LogText.find("Tests done") != std::string::npos, __func__, __LINE__,
-        "and so did Run()'s own summary");
+    CheckContains(observer.LogText, "registering test groups for ObserverTestProject", __func__, __LINE__,
+        "Initialize()'s output went to the observer");
+    CheckContains(observer.LogText, "Tests done", __func__, __LINE__, "and so did Run()'s own summary");
     CheckTrue(consoleOutput.empty(), __func__, __LINE__, "none of it went to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
@@ -219,10 +218,9 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups()
     CheckTrue(results.Stopped, __func__, __LINE__, "the results say the run was stopped");
     CheckEquals(static_cast<size_t>(3), results.CaseRecords.size(), __func__, __LINE__,
         "only the first group's tests ran");
-    CheckTrue(observer.LogText.find("\"ASWUnitTests_StdOutRedirect_Tests\"") == std::string::npos, __func__,
-        __LINE__, "the second group was never even set up");
-    CheckTrue(observer.LogText.find("Run stopped on request") != std::string::npos, __func__, __LINE__,
-        "the log says the run was stopped");
+    CheckNotContains(observer.LogText, "\"ASWUnitTests_StdOutRedirect_Tests\"", __func__, __LINE__,
+        "the second group was never even set up");
+    CheckContains(observer.LogText, "Run stopped on request", __func__, __LINE__, "the log says the run was stopped");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_WildcardMatch_CaseSensitivity()

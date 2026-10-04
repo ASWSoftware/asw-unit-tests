@@ -2,7 +2,7 @@
 ASWUnitTests_Exception.h
 Author: Anthony S. West - ASW Software
 
-Copyright 2025 Anthony S. West
+Copyright 2025-2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ public:
     TExceptEquals(std::string const& msg);
     TExceptEquals(std::string const& method, int line, std::string const& msg);
     TExceptEquals(std::string const& method, int line, std::string const& expected, std::string const& actual,
-        std::string const& msg);
+        std::string const& msg, bool ignoreCase = false);
 };
 
 
@@ -103,6 +103,85 @@ public:
     TExceptNotEquals(std::string const& msg);
     TExceptNotEquals(std::string const& method, int line, std::string const& msg);
     TExceptNotEquals(std::string const& method, int line, std::string const& value, std::string const& msg);
+    TExceptNotEquals(std::string const& method, int line, std::string const& value, std::string const& otherValue,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptContains
+/////////////////////////////////////////////////////////////////////////////
+class TExceptContains : public TTestException
+{
+public:
+    TExceptContains(std::string const& method, int line, std::string const& text, std::string const& substring,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotContains
+/////////////////////////////////////////////////////////////////////////////
+class TExceptNotContains : public TTestException
+{
+public:
+    TExceptNotContains(std::string const& method, int line, std::string const& text, std::string const& substring,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptStartsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptStartsWith : public TTestException
+{
+public:
+    TExceptStartsWith(std::string const& method, int line, std::string const& text, std::string const& prefix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotStartsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptNotStartsWith : public TTestException
+{
+public:
+    TExceptNotStartsWith(std::string const& method, int line, std::string const& text, std::string const& prefix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptEndsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptEndsWith : public TTestException
+{
+public:
+    TExceptEndsWith(std::string const& method, int line, std::string const& text, std::string const& suffix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotEndsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptNotEndsWith : public TTestException
+{
+public:
+    TExceptNotEndsWith(std::string const& method, int line, std::string const& text, std::string const& suffix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptOrdering
+/////////////////////////////////////////////////////////////////////////////
+class TExceptOrdering : public TTestException
+{
+public:
+    TExceptOrdering(std::string const& method, int line, std::string const& value, std::string const& relation,
+        std::string const& bound, std::string const& msg);
 };
 
 

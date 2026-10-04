@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 The VCL GUI runner's main window.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -74,6 +74,7 @@ __published: // IDE-managed Components
     TAction* Act_RunFailed;
     TAction* Act_RunSelected;
     TAction* Act_SelectAll;
+    TAction* Act_SelectFailed;
     TAction* Act_SelectNone;
     TAction* Act_Stop;
     TActionList* AL_Main;
@@ -81,6 +82,7 @@ __published: // IDE-managed Components
     TButton* Btn_RunFailed;
     TButton* Btn_RunSelected;
     TButton* Btn_SelectAll;
+    TButton* Btn_SelectFailed;
     TButton* Btn_SelectNone;
     TButton* Btn_Stop;
     TEdit* Edt_Filter;
@@ -103,6 +105,7 @@ __published: // IDE-managed Components
     TMenuItem* MI_TestsCopyDetails;
     TMenuItem* MI_TestsFilter;
     TMenuItem* MI_TestsSelectAll;
+    TMenuItem* MI_TestsSelectFailed;
     TMenuItem* MI_TestsSelectNone;
     TMenuItem* MI_TestsSeparator1;
     TMenuItem* MI_View;
@@ -130,6 +133,7 @@ __published: // IDE-managed Components
     void __fastcall Act_RunFailedExecute(TObject* Sender);
     void __fastcall Act_RunSelectedExecute(TObject* Sender);
     void __fastcall Act_SelectAllExecute(TObject* Sender);
+    void __fastcall Act_SelectFailedExecute(TObject* Sender);
     void __fastcall Act_SelectNoneExecute(TObject* Sender);
     void __fastcall Act_StopExecute(TObject* Sender);
     void __fastcall Edt_FilterChange(TObject* Sender);
@@ -157,6 +161,9 @@ private: // User declarations
     // By index into m_TestList.GroupNames(); nullptr while hidden. Read through GroupNode(), which rebuilds it
     // when the tree's window has been recreated.
     std::vector<TTreeNode*> m_GroupNodes;
+    // Set when the command line doesn't choose the tests itself (no --run, --filter, or partition options), so
+    // the saved test selection is restored at start and saved again at close.
+    bool m_KeepSelection;
     // The exit code the console runner would have returned for the latest run; see ExitCode().
     int m_LastRunExitCode;
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
@@ -198,6 +205,8 @@ private:
     TTreeNode* GroupNode(size_t groupIndex);
     // Restores the layout SaveLayout() saved, if any; see the definition.
     void LoadLayout();
+    // Restores the test selection SaveSelection() saved, if any, noting what it restored in the log.
+    void LoadSelection();
     void OnTestFinished(ASWUnitTests::TTestCaseRecord const& record, std::string const& testLog);
     void OnTestStarted(std::string const& groupName, std::string const& testName);
     // Refills m_GroupNodes and m_TestNodes from the tree's nodes, by the index each one holds in its Data.
@@ -213,6 +222,8 @@ private:
     void RunTests(ASWUnitTests::TestFilter const& filter, std::string const& filterDescription);
     // Saves the window's layout for the next start, ignoring any error.
     void SaveLayout();
+    // Saves which tests are checked and shown for the next start, ignoring any error.
+    void SaveSelection();
     void SetRunning(bool running);
     void SyncTreeChecks();
     // The test's tree node, or nullptr while it's hidden.

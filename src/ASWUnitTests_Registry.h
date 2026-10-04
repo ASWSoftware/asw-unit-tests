@@ -7,7 +7,7 @@ Self-registration support for test groups.
 Use the ASW_REGISTER_TEST_GROUP macro in a test module's .cpp file to
 register the test group with TTestHandler.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

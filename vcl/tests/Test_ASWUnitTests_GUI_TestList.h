@@ -2,7 +2,7 @@
 Test_ASWUnitTests_GUI_TestList.h
 Author: Anthony S. West - ASW Software
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ private:
 private: // Test methods
     void Test_CheckedFilter_MatchesExactlyTheCheckedTests();
     void Test_CheckMatching_ChecksExactlyTheMatches();
+    void Test_CheckOnlyFailed_ChecksVisibleFailuresOnly();
     void Test_CountMatching_CountsFilterMatches();
     void Test_DetailText_DescribesAFinishedTest();
     void Test_DetailText_DescribesATestThatHasNotRun();

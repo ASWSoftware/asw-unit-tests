@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
@@ -74,7 +77,8 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 //---------------------------------------------------------------------------
 // True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
 // "..._Fails") documents its expected outcome, and the outer verifying test can check every
-// registered test generically instead of hand-maintaining a separate expected-outcome table.
+// registered test generically instead of hand-maintaining a separate expected-outcome table. Also
+// used to check the end of a failure message.
 bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
@@ -146,6 +150,1492 @@ public:
 };
 
 //---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_BoolComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test
+// per bool overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), so
+// Test_Equals_ShowsBoolValuesAsTrueOrFalse below can check that every failure message shows the
+// values as "true"/"false" rather than "1"/"0".
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_BoolComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_Different_Fails();
+    void Test_AssertNotEquals_Same_Fails();
+    void Test_CheckEquals_Different_Fails();
+    void Test_CheckNotEquals_Same_Fails();
+
+public:
+    TFixture_BoolComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_BoolComparisons::TFixture_BoolComparisons()
+    : inherited("Fixture_BoolComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_BoolComparisons::Test_AssertEquals_Different_Fails, "AssertEquals_Different_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_AssertNotEquals_Same_Fails, "AssertNotEquals_Same_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_CheckEquals_Different_Fails, "CheckEquals_Different_Fails");
+    RegisterTest(&TFixture_BoolComparisons::Test_CheckNotEquals_Same_Fails, "CheckNotEquals_Same_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_AssertEquals_Different_Fails()
+{
+    AssertEquals(true, false, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_AssertNotEquals_Same_Fails()
+{
+    AssertNotEquals(true, true, __func__, __LINE__, "same value");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_CheckEquals_Different_Fails()
+{
+    CheckEquals(true, false, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_BoolComparisons::Test_CheckNotEquals_Same_Fails()
+{
+    CheckNotEquals(true, true, __func__, __LINE__, "same value");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_CStringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the C string overloads of
+// AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), narrow and wide. Without those
+// overloads, two C strings convert to bool and match the bool overload, so the "DifferentLiterals"
+// tests pass/fail the wrong way round. The "SameContentDifferentBuffers" tests compare a literal with
+// a separate array holding the same text, so they fail if the pointers are compared instead of the
+// content (two identical literals may share one address). Test names self-document expected outcome
+// via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_CStringComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_DifferentLiterals_Fails();
+    void Test_AssertEquals_NullAndNonNull_Fails();
+    void Test_AssertEquals_SameContentDifferentBuffers_Passes();
+    void Test_AssertEquals_Wide_DifferentLiterals_Fails();
+    void Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_AssertNotEquals_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_AssertNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails();
+    void Test_CheckEquals_BothNull_Passes();
+    void Test_CheckEquals_DifferentLiterals_Fails();
+    void Test_CheckEquals_EmptyAndNull_Fails();
+    void Test_CheckEquals_NullAndEmpty_Fails();
+    void Test_CheckEquals_SameContentDifferentBuffers_Passes();
+    void Test_CheckEquals_Wide_BothNull_Passes();
+    void Test_CheckEquals_Wide_DifferentLiterals_Fails();
+    void Test_CheckEquals_Wide_NullAndEmpty_Fails();
+    void Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_CheckNotEquals_BothNull_Fails();
+    void Test_CheckNotEquals_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_CheckNotEquals_Wide_BothNull_Fails();
+    void Test_CheckNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_Wide_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails();
+
+public:
+    TFixture_CStringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_CStringComparisons::TFixture_CStringComparisons()
+    : inherited("Fixture_CStringComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_DifferentLiterals_Fails,
+        "AssertEquals_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_NullAndNonNull_Fails,
+        "AssertEquals_NullAndNonNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_SameContentDifferentBuffers_Passes,
+        "AssertEquals_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_Wide_DifferentLiterals_Fails,
+        "AssertEquals_Wide_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes,
+        "AssertEquals_Wide_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_DifferentLiterals_Passes,
+        "AssertNotEquals_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_SameContentDifferentBuffers_Fails,
+        "AssertNotEquals_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_Wide_DifferentLiterals_Passes,
+        "AssertNotEquals_Wide_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails,
+        "AssertNotEquals_Wide_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_BothNull_Passes, "CheckEquals_BothNull_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_DifferentLiterals_Fails,
+        "CheckEquals_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_EmptyAndNull_Fails, "CheckEquals_EmptyAndNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_NullAndEmpty_Fails, "CheckEquals_NullAndEmpty_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_SameContentDifferentBuffers_Passes,
+        "CheckEquals_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_BothNull_Passes,
+        "CheckEquals_Wide_BothNull_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_DifferentLiterals_Fails,
+        "CheckEquals_Wide_DifferentLiterals_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_NullAndEmpty_Fails,
+        "CheckEquals_Wide_NullAndEmpty_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes,
+        "CheckEquals_Wide_SameContentDifferentBuffers_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_BothNull_Fails, "CheckNotEquals_BothNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_DifferentLiterals_Passes,
+        "CheckNotEquals_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_NullAndEmpty_Passes,
+        "CheckNotEquals_NullAndEmpty_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_SameContentDifferentBuffers_Fails,
+        "CheckNotEquals_SameContentDifferentBuffers_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_BothNull_Fails,
+        "CheckNotEquals_Wide_BothNull_Fails");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_DifferentLiterals_Passes,
+        "CheckNotEquals_Wide_DifferentLiterals_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_NullAndEmpty_Passes,
+        "CheckNotEquals_Wide_NullAndEmpty_Passes");
+    RegisterTest(&TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails,
+        "CheckNotEquals_Wide_SameContentDifferentBuffers_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_DifferentLiterals_Fails()
+{
+    AssertEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_NullAndNonNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    AssertEquals("abc", nullStr, __func__, __LINE__, "null never matches a non-null string");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_SameContentDifferentBuffers_Passes()
+{
+    char const buffer[] = "abc";
+    AssertEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_Wide_DifferentLiterals_Fails()
+{
+    AssertEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes()
+{
+    wchar_t const buffer[] = L"abc";
+    AssertEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_DifferentLiterals_Passes()
+{
+    AssertNotEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_SameContentDifferentBuffers_Fails()
+{
+    char const buffer[] = "abc";
+    AssertNotEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_Wide_DifferentLiterals_Passes()
+{
+    AssertNotEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails()
+{
+    wchar_t const buffer[] = L"abc";
+    AssertNotEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_BothNull_Passes()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals(nullStr, nullStr, __func__, __LINE__, "two nulls match");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_DifferentLiterals_Fails()
+{
+    CheckEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_EmptyAndNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals("", nullStr, __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_NullAndEmpty_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckEquals(nullStr, "", __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_SameContentDifferentBuffers_Passes()
+{
+    char const buffer[] = "abc";
+    CheckEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_BothNull_Passes()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, nullStr, __func__, __LINE__, "two nulls match");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_DifferentLiterals_Fails()
+{
+    CheckEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_NullAndEmpty_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, L"", __func__, __LINE__, "null never matches a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes()
+{
+    wchar_t const buffer[] = L"abc";
+    CheckEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_BothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_DifferentLiterals_Passes()
+{
+    CheckNotEquals("abc", "xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_NullAndEmpty_Passes()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, "", __func__, __LINE__, "null differs from a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_SameContentDifferentBuffers_Fails()
+{
+    char const buffer[] = "abc";
+    CheckNotEquals("abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_BothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_DifferentLiterals_Passes()
+{
+    CheckNotEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_NullAndEmpty_Passes()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, L"", __func__, __LINE__, "null differs from a non-null string, even an empty one");
+}
+//---------------------------------------------------------------------------
+void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails()
+{
+    wchar_t const buffer[] = L"abc";
+    CheckNotEquals(L"abc", buffer, __func__, __LINE__, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContains()/CheckContains()/
+// AssertNotContains()/CheckNotContains(), narrow and wide. "Wide_NonASCII" checks that a wide failure shows
+// its text as UTF-8. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContains_Absent_Fails();
+    void Test_AssertContains_Present_Passes();
+    void Test_AssertContains_Wide_Absent_Fails();
+    void Test_AssertContains_Wide_Present_Passes();
+    void Test_AssertNotContains_Absent_Passes();
+    void Test_AssertNotContains_Present_Fails();
+    void Test_AssertNotContains_Wide_Absent_Passes();
+    void Test_AssertNotContains_Wide_Present_Fails();
+    void Test_CheckContains_Absent_Fails();
+    void Test_CheckContains_DifferentCase_Fails();
+    void Test_CheckContains_EmptySubstring_Passes();
+    void Test_CheckContains_Present_Passes();
+    void Test_CheckContains_SubstringLongerThanText_Fails();
+    void Test_CheckContains_Wide_Absent_Fails();
+    void Test_CheckContains_Wide_NonASCII_Fails();
+    void Test_CheckContains_Wide_Present_Passes();
+    void Test_CheckNotContains_Absent_Passes();
+    void Test_CheckNotContains_EmptySubstring_Fails();
+    void Test_CheckNotContains_Present_Fails();
+    void Test_CheckNotContains_Wide_Absent_Passes();
+    void Test_CheckNotContains_Wide_Present_Fails();
+
+public:
+    TFixture_ContainsComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ContainsComparisons::TFixture_ContainsComparisons()
+    : inherited("Fixture_ContainsComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Absent_Fails, "AssertContains_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Present_Passes, "AssertContains_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Wide_Absent_Fails,
+        "AssertContains_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertContains_Wide_Present_Passes,
+        "AssertContains_Wide_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Absent_Passes,
+        "AssertNotContains_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Present_Fails,
+        "AssertNotContains_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Absent_Passes,
+        "AssertNotContains_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Present_Fails,
+        "AssertNotContains_Wide_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Absent_Fails, "CheckContains_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_DifferentCase_Fails,
+        "CheckContains_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_EmptySubstring_Passes,
+        "CheckContains_EmptySubstring_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Present_Passes, "CheckContains_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_SubstringLongerThanText_Fails,
+        "CheckContains_SubstringLongerThanText_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_Absent_Fails,
+        "CheckContains_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_NonASCII_Fails,
+        "CheckContains_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckContains_Wide_Present_Passes,
+        "CheckContains_Wide_Present_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Absent_Passes,
+        "CheckNotContains_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_EmptySubstring_Fails,
+        "CheckNotContains_EmptySubstring_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Present_Fails,
+        "CheckNotContains_Present_Fails");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Absent_Passes,
+        "CheckNotContains_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails,
+        "CheckNotContains_Wide_Present_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Absent_Fails()
+{
+    AssertContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Present_Passes()
+{
+    AssertContains(std::string("hello world"), "lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Wide_Absent_Fails()
+{
+    AssertContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertContains_Wide_Present_Passes()
+{
+    AssertContains(std::wstring(L"hello world"), L"lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Absent_Passes()
+{
+    AssertNotContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Present_Fails()
+{
+    AssertNotContains(std::string("hello world"), "world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Absent_Passes()
+{
+    AssertNotContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_AssertNotContains_Wide_Present_Fails()
+{
+    AssertNotContains(std::wstring(L"hello world"), L"world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Absent_Fails()
+{
+    CheckContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_DifferentCase_Fails()
+{
+    CheckContains(std::string("hello world"), "World", __func__, __LINE__, "the comparison is case-sensitive");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_EmptySubstring_Passes()
+{
+    CheckContains(std::string("hello world"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Present_Passes()
+{
+    CheckContains(std::string("hello world"), "hello world", __func__, __LINE__, "the whole text is a substring");
+    CheckContains(std::string("hello world"), "lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_SubstringLongerThanText_Fails()
+{
+    CheckContains(std::string("hello"), "hello world", __func__, __LINE__, "the text contains the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_Absent_Fails()
+{
+    CheckContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_NonASCII_Fails()
+{
+    // "cafe" with an e-acute, a space, and U+1F600 (a surrogate pair where wchar_t is 16 bits), then u-umlaut.
+    CheckContains(std::wstring(L"caf" L"\x00E9" L" \U0001F600"), L"\x00FC", __func__, __LINE__, "not present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckContains_Wide_Present_Passes()
+{
+    CheckContains(std::wstring(L"hello world"), L"lo wo", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Absent_Passes()
+{
+    CheckNotContains(std::string("hello world"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_EmptySubstring_Fails()
+{
+    CheckNotContains(std::string("hello world"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Present_Fails()
+{
+    CheckNotContains(std::string("hello world"), "world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Absent_Passes()
+{
+    CheckNotContains(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails()
+{
+    CheckNotContains(std::wstring(L"hello world"), L"world", __func__, __LINE__, "substring present");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContainsIC()/CheckContainsIC()/
+// AssertNotContainsIC()/CheckNotContainsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded: the
+// "NonLetters" tests use characters 0x20 apart, which a fold that just sets bit 0x20 would wrongly match, and the
+// "NonASCII" tests show that accented letters keep their case. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContainsIC_Absent_Fails();
+    void Test_AssertContainsIC_DifferentCase_Passes();
+    void Test_AssertContainsIC_Wide_Absent_Fails();
+    void Test_AssertContainsIC_Wide_DifferentCase_Passes();
+    void Test_AssertNotContainsIC_Absent_Passes();
+    void Test_AssertNotContainsIC_DifferentCase_Fails();
+    void Test_AssertNotContainsIC_Wide_Absent_Passes();
+    void Test_AssertNotContainsIC_Wide_DifferentCase_Fails();
+    void Test_CheckContainsIC_Absent_Fails();
+    void Test_CheckContainsIC_BothEmpty_Passes();
+    void Test_CheckContainsIC_DifferentCase_Passes();
+    void Test_CheckContainsIC_EmptySubstring_Passes();
+    void Test_CheckContainsIC_EmptyText_Fails();
+    void Test_CheckContainsIC_NonASCII_Fails();
+    void Test_CheckContainsIC_NonLetters_Fails();
+    void Test_CheckContainsIC_SubstringAtEnd_Passes();
+    void Test_CheckContainsIC_SubstringLongerThanText_Fails();
+    void Test_CheckContainsIC_Wide_Absent_Fails();
+    void Test_CheckContainsIC_Wide_DifferentCase_Passes();
+    void Test_CheckContainsIC_Wide_NonASCII_Fails();
+    void Test_CheckNotContainsIC_Absent_Passes();
+    void Test_CheckNotContainsIC_DifferentCase_Fails();
+    void Test_CheckNotContainsIC_EmptySubstring_Fails();
+    void Test_CheckNotContainsIC_Wide_Absent_Passes();
+    void Test_CheckNotContainsIC_Wide_DifferentCase_Fails();
+
+public:
+    TFixture_ContainsICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ContainsICComparisons::TFixture_ContainsICComparisons()
+    : inherited("Fixture_ContainsICComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Absent_Fails, "AssertContainsIC_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_DifferentCase_Passes,
+        "AssertContainsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_Absent_Fails,
+        "AssertContainsIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_DifferentCase_Passes,
+        "AssertContainsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Absent_Passes,
+        "AssertNotContainsIC_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_DifferentCase_Fails,
+        "AssertNotContainsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_Absent_Passes,
+        "AssertNotContainsIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_DifferentCase_Fails,
+        "AssertNotContainsIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Absent_Fails, "CheckContainsIC_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_BothEmpty_Passes,
+        "CheckContainsIC_BothEmpty_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_DifferentCase_Passes,
+        "CheckContainsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptySubstring_Passes,
+        "CheckContainsIC_EmptySubstring_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptyText_Fails,
+        "CheckContainsIC_EmptyText_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_NonASCII_Fails,
+        "CheckContainsIC_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_NonLetters_Fails,
+        "CheckContainsIC_NonLetters_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringAtEnd_Passes,
+        "CheckContainsIC_SubstringAtEnd_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringLongerThanText_Fails,
+        "CheckContainsIC_SubstringLongerThanText_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_Absent_Fails,
+        "CheckContainsIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_DifferentCase_Passes,
+        "CheckContainsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_NonASCII_Fails,
+        "CheckContainsIC_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Absent_Passes,
+        "CheckNotContainsIC_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_DifferentCase_Fails,
+        "CheckNotContainsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_EmptySubstring_Fails,
+        "CheckNotContainsIC_EmptySubstring_Fails");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_Absent_Passes,
+        "CheckNotContainsIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_Fails,
+        "CheckNotContainsIC_Wide_DifferentCase_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Absent_Fails()
+{
+    AssertContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_DifferentCase_Passes()
+{
+    AssertContainsIC(std::string("Hello World"), "lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_Absent_Fails()
+{
+    AssertContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertContainsIC_Wide_DifferentCase_Passes()
+{
+    AssertContainsIC(std::wstring(L"Hello World"), L"lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Absent_Passes()
+{
+    AssertNotContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_DifferentCase_Fails()
+{
+    AssertNotContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_Absent_Passes()
+{
+    AssertNotContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_AssertNotContainsIC_Wide_DifferentCase_Fails()
+{
+    AssertNotContainsIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Absent_Fails()
+{
+    CheckContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_BothEmpty_Passes()
+{
+    CheckContainsIC(std::string(), "", __func__, __LINE__, "even an empty string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_DifferentCase_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "lO wO", __func__, __LINE__, "case differs");
+    CheckContainsIC(std::string("Hello World"), "hello world", __func__, __LINE__, "the whole text, case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptySubstring_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_EmptyText_Fails()
+{
+    CheckContainsIC(std::string(), "a", __func__, __LINE__, "an empty string contains no letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_NonASCII_Fails()
+{
+    // UTF-8 E-acute and e-acute.
+    CheckContainsIC(std::string("caf\xC3\x89"), "caf\xC3\xA9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_NonLetters_Fails()
+{
+    CheckContainsIC(std::string("a@b[c"), "a`b{c", __func__, __LINE__, "@ and `, and [ and {, are not letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringAtEnd_Passes()
+{
+    CheckContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs, at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_SubstringLongerThanText_Fails()
+{
+    CheckContainsIC(std::string("Hello"), "HELLO WORLD", __func__, __LINE__, "the text contains the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_Absent_Fails()
+{
+    CheckContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_DifferentCase_Passes()
+{
+    CheckContainsIC(std::wstring(L"Hello World"), L"lO wO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckContainsIC_Wide_NonASCII_Fails()
+{
+    // E-acute and e-acute.
+    CheckContainsIC(std::wstring(L"caf" L"\x00C9"), L"caf" L"\x00E9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Absent_Passes()
+{
+    CheckNotContainsIC(std::string("Hello World"), "xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_DifferentCase_Fails()
+{
+    CheckNotContainsIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_EmptySubstring_Fails()
+{
+    CheckNotContainsIC(std::string("Hello World"), "", __func__, __LINE__, "every string contains the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_Absent_Passes()
+{
+    CheckNotContainsIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "substring absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_Fails()
+{
+    CheckNotContainsIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EndsWithComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWith()/CheckEndsWith()/
+// AssertNotEndsWith()/CheckNotEndsWith(), narrow and wide. "SuffixOnlyAtStart" and "SuffixOnlyInMiddle" catch a
+// check that matches anywhere but the end, and "SuffixLongerThanText" one that doesn't check the length first.
+// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EndsWithComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEndsWith_Absent_Fails();
+    void Test_AssertEndsWith_Present_Passes();
+    void Test_AssertEndsWith_Wide_Absent_Fails();
+    void Test_AssertEndsWith_Wide_Present_Passes();
+    void Test_AssertNotEndsWith_Absent_Passes();
+    void Test_AssertNotEndsWith_Present_Fails();
+    void Test_AssertNotEndsWith_Wide_Absent_Passes();
+    void Test_AssertNotEndsWith_Wide_Present_Fails();
+    void Test_CheckEndsWith_Absent_Fails();
+    void Test_CheckEndsWith_BothEmpty_Passes();
+    void Test_CheckEndsWith_DifferentCase_Fails();
+    void Test_CheckEndsWith_EmptySuffix_Passes();
+    void Test_CheckEndsWith_EmptyText_Fails();
+    void Test_CheckEndsWith_Present_Passes();
+    void Test_CheckEndsWith_SuffixLongerThanText_Fails();
+    void Test_CheckEndsWith_SuffixOnlyAtStart_Fails();
+    void Test_CheckEndsWith_SuffixOnlyInMiddle_Fails();
+    void Test_CheckEndsWith_Wide_Absent_Fails();
+    void Test_CheckEndsWith_Wide_NonASCII_Fails();
+    void Test_CheckEndsWith_Wide_Present_Passes();
+    void Test_CheckNotEndsWith_Absent_Passes();
+    void Test_CheckNotEndsWith_BothEmpty_Fails();
+    void Test_CheckNotEndsWith_EmptySuffix_Fails();
+    void Test_CheckNotEndsWith_Present_Fails();
+    void Test_CheckNotEndsWith_SuffixLongerThanText_Passes();
+    void Test_CheckNotEndsWith_SuffixOnlyAtStart_Passes();
+    void Test_CheckNotEndsWith_SuffixOnlyInMiddle_Passes();
+    void Test_CheckNotEndsWith_Wide_Absent_Passes();
+    void Test_CheckNotEndsWith_Wide_Present_Fails();
+
+public:
+    TFixture_EndsWithComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_EndsWithComparisons::TFixture_EndsWithComparisons()
+    : inherited("Fixture_EndsWithComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertEndsWith_Absent_Fails, "AssertEndsWith_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertEndsWith_Present_Passes, "AssertEndsWith_Present_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertEndsWith_Wide_Absent_Fails,
+        "AssertEndsWith_Wide_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertEndsWith_Wide_Present_Passes,
+        "AssertEndsWith_Wide_Present_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Absent_Passes,
+        "AssertNotEndsWith_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Present_Fails,
+        "AssertNotEndsWith_Present_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Wide_Absent_Passes,
+        "AssertNotEndsWith_Wide_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Wide_Present_Fails,
+        "AssertNotEndsWith_Wide_Present_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_Absent_Fails, "CheckEndsWith_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_BothEmpty_Passes, "CheckEndsWith_BothEmpty_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_DifferentCase_Fails,
+        "CheckEndsWith_DifferentCase_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_EmptySuffix_Passes,
+        "CheckEndsWith_EmptySuffix_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_EmptyText_Fails, "CheckEndsWith_EmptyText_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_Present_Passes, "CheckEndsWith_Present_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixLongerThanText_Fails,
+        "CheckEndsWith_SuffixLongerThanText_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixOnlyAtStart_Fails,
+        "CheckEndsWith_SuffixOnlyAtStart_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixOnlyInMiddle_Fails,
+        "CheckEndsWith_SuffixOnlyInMiddle_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_Absent_Fails,
+        "CheckEndsWith_Wide_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_NonASCII_Fails,
+        "CheckEndsWith_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_Present_Passes,
+        "CheckEndsWith_Wide_Present_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Absent_Passes, "CheckNotEndsWith_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_BothEmpty_Fails,
+        "CheckNotEndsWith_BothEmpty_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_EmptySuffix_Fails,
+        "CheckNotEndsWith_EmptySuffix_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Present_Fails, "CheckNotEndsWith_Present_Fails");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixLongerThanText_Passes,
+        "CheckNotEndsWith_SuffixLongerThanText_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixOnlyAtStart_Passes,
+        "CheckNotEndsWith_SuffixOnlyAtStart_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixOnlyInMiddle_Passes,
+        "CheckNotEndsWith_SuffixOnlyInMiddle_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Wide_Absent_Passes,
+        "CheckNotEndsWith_Wide_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Wide_Present_Fails,
+        "CheckNotEndsWith_Wide_Present_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertEndsWith_Absent_Fails()
+{
+    AssertEndsWith(std::string("hello world"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertEndsWith_Present_Passes()
+{
+    AssertEndsWith(std::string("hello world"), "world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertEndsWith_Wide_Absent_Fails()
+{
+    AssertEndsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertEndsWith_Wide_Present_Passes()
+{
+    AssertEndsWith(std::wstring(L"hello world"), L"world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Absent_Passes()
+{
+    AssertNotEndsWith(std::string("hello world"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Present_Fails()
+{
+    AssertNotEndsWith(std::string("hello world"), "world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Wide_Absent_Passes()
+{
+    AssertNotEndsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_AssertNotEndsWith_Wide_Present_Fails()
+{
+    AssertNotEndsWith(std::wstring(L"hello world"), L"world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_Absent_Fails()
+{
+    CheckEndsWith(std::string("hello world"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_BothEmpty_Passes()
+{
+    CheckEndsWith(std::string(), "", __func__, __LINE__, "even an empty string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_DifferentCase_Fails()
+{
+    CheckEndsWith(std::string("hello world"), "World", __func__, __LINE__, "the comparison is case-sensitive");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_EmptySuffix_Passes()
+{
+    CheckEndsWith(std::string("hello world"), "", __func__, __LINE__, "every string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_EmptyText_Fails()
+{
+    CheckEndsWith(std::string(), "d", __func__, __LINE__, "an empty string ends with no letter");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_Present_Passes()
+{
+    CheckEndsWith(std::string("hello world"), "hello world", __func__, __LINE__, "the whole text is a suffix");
+    CheckEndsWith(std::string("hello world"), "world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixLongerThanText_Fails()
+{
+    CheckEndsWith(std::string("world"), "hello world", __func__, __LINE__, "the text has the end only");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixOnlyAtStart_Fails()
+{
+    CheckEndsWith(std::string("hello world"), "hello", __func__, __LINE__, "the suffix is at the start");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_SuffixOnlyInMiddle_Fails()
+{
+    CheckEndsWith(std::string("hello world"), "lo wo", __func__, __LINE__, "the suffix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_Absent_Fails()
+{
+    CheckEndsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_NonASCII_Fails()
+{
+    // "cafe" with an e-acute, a space, and U+1F600 (a surrogate pair where wchar_t is 16 bits), then u-umlaut.
+    CheckEndsWith(std::wstring(L"caf" L"\x00E9" L" \U0001F600"), L"\x00FC", __func__, __LINE__, "not present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckEndsWith_Wide_Present_Passes()
+{
+    CheckEndsWith(std::wstring(L"hello world"), L"world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Absent_Passes()
+{
+    CheckNotEndsWith(std::string("hello world"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_BothEmpty_Fails()
+{
+    CheckNotEndsWith(std::string(), "", __func__, __LINE__, "even an empty string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_EmptySuffix_Fails()
+{
+    CheckNotEndsWith(std::string("hello world"), "", __func__, __LINE__, "every string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Present_Fails()
+{
+    CheckNotEndsWith(std::string("hello world"), "world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixLongerThanText_Passes()
+{
+    CheckNotEndsWith(std::string("world"), "hello world", __func__, __LINE__, "the text has the end only");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixOnlyAtStart_Passes()
+{
+    CheckNotEndsWith(std::string("hello world"), "hello", __func__, __LINE__, "the suffix is at the start");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_SuffixOnlyInMiddle_Passes()
+{
+    CheckNotEndsWith(std::string("hello world"), "lo wo", __func__, __LINE__, "the suffix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Wide_Absent_Passes()
+{
+    CheckNotEndsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Wide_Present_Fails()
+{
+    CheckNotEndsWith(std::wstring(L"hello world"), L"world", __func__, __LINE__, "suffix present");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EndsWithICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWithIC()/CheckEndsWithIC()/
+// AssertNotEndsWithIC()/CheckNotEndsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EndsWithICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEndsWithIC_Absent_Fails();
+    void Test_AssertEndsWithIC_DifferentCase_Passes();
+    void Test_AssertEndsWithIC_Wide_Absent_Fails();
+    void Test_AssertEndsWithIC_Wide_DifferentCase_Passes();
+    void Test_AssertNotEndsWithIC_Absent_Passes();
+    void Test_AssertNotEndsWithIC_DifferentCase_Fails();
+    void Test_AssertNotEndsWithIC_Wide_Absent_Passes();
+    void Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails();
+    void Test_CheckEndsWithIC_Absent_Fails();
+    void Test_CheckEndsWithIC_BothEmpty_Passes();
+    void Test_CheckEndsWithIC_DifferentCase_Passes();
+    void Test_CheckEndsWithIC_EmptySuffix_Passes();
+    void Test_CheckEndsWithIC_EmptyText_Fails();
+    void Test_CheckEndsWithIC_NonASCII_Fails();
+    void Test_CheckEndsWithIC_NonLetters_Fails();
+    void Test_CheckEndsWithIC_SuffixLongerThanText_Fails();
+    void Test_CheckEndsWithIC_SuffixOnlyAtStart_Fails();
+    void Test_CheckEndsWithIC_SuffixOnlyInMiddle_Fails();
+    void Test_CheckEndsWithIC_Wide_Absent_Fails();
+    void Test_CheckEndsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckEndsWithIC_Wide_NonASCII_Fails();
+    void Test_CheckNotEndsWithIC_Absent_Passes();
+    void Test_CheckNotEndsWithIC_DifferentCase_Fails();
+    void Test_CheckNotEndsWithIC_EmptySuffix_Fails();
+    void Test_CheckNotEndsWithIC_SuffixLongerThanText_Passes();
+    void Test_CheckNotEndsWithIC_SuffixOnlyAtStart_Passes();
+    void Test_CheckNotEndsWithIC_Wide_Absent_Passes();
+    void Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails();
+
+public:
+    TFixture_EndsWithICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_EndsWithICComparisons::TFixture_EndsWithICComparisons()
+    : inherited("Fixture_EndsWithICComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Absent_Fails, "AssertEndsWithIC_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_DifferentCase_Passes,
+        "AssertEndsWithIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Wide_Absent_Fails,
+        "AssertEndsWithIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Wide_DifferentCase_Passes,
+        "AssertEndsWithIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Absent_Passes,
+        "AssertNotEndsWithIC_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_DifferentCase_Fails,
+        "AssertNotEndsWithIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Wide_Absent_Passes,
+        "AssertNotEndsWithIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails,
+        "AssertNotEndsWithIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Absent_Fails, "CheckEndsWithIC_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_BothEmpty_Passes,
+        "CheckEndsWithIC_BothEmpty_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_DifferentCase_Passes,
+        "CheckEndsWithIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_EmptySuffix_Passes,
+        "CheckEndsWithIC_EmptySuffix_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_EmptyText_Fails,
+        "CheckEndsWithIC_EmptyText_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_NonASCII_Fails,
+        "CheckEndsWithIC_NonASCII_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_NonLetters_Fails,
+        "CheckEndsWithIC_NonLetters_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixLongerThanText_Fails,
+        "CheckEndsWithIC_SuffixLongerThanText_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixOnlyAtStart_Fails,
+        "CheckEndsWithIC_SuffixOnlyAtStart_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixOnlyInMiddle_Fails,
+        "CheckEndsWithIC_SuffixOnlyInMiddle_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_Absent_Fails,
+        "CheckEndsWithIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_DifferentCase_Passes,
+        "CheckEndsWithIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_NonASCII_Fails,
+        "CheckEndsWithIC_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Absent_Passes,
+        "CheckNotEndsWithIC_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_DifferentCase_Fails,
+        "CheckNotEndsWithIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_EmptySuffix_Fails,
+        "CheckNotEndsWithIC_EmptySuffix_Fails");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_SuffixLongerThanText_Passes,
+        "CheckNotEndsWithIC_SuffixLongerThanText_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_SuffixOnlyAtStart_Passes,
+        "CheckNotEndsWithIC_SuffixOnlyAtStart_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_Absent_Passes,
+        "CheckNotEndsWithIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails,
+        "CheckNotEndsWithIC_Wide_DifferentCase_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Absent_Fails()
+{
+    AssertEndsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_DifferentCase_Passes()
+{
+    AssertEndsWithIC(std::string("Hello World"), "o wORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Wide_Absent_Fails()
+{
+    AssertEndsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertEndsWithIC_Wide_DifferentCase_Passes()
+{
+    AssertEndsWithIC(std::wstring(L"Hello World"), L"o wORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Absent_Passes()
+{
+    AssertNotEndsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_DifferentCase_Fails()
+{
+    AssertNotEndsWithIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Wide_Absent_Passes()
+{
+    AssertNotEndsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails()
+{
+    AssertNotEndsWithIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Absent_Fails()
+{
+    CheckEndsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_BothEmpty_Passes()
+{
+    CheckEndsWithIC(std::string(), "", __func__, __LINE__, "even an empty string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_DifferentCase_Passes()
+{
+    CheckEndsWithIC(std::string("Hello World"), "o wORLD", __func__, __LINE__, "case differs");
+    CheckEndsWithIC(std::string("Hello World"), "hello world", __func__, __LINE__, "the whole text, case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_EmptySuffix_Passes()
+{
+    CheckEndsWithIC(std::string("Hello World"), "", __func__, __LINE__, "every string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_EmptyText_Fails()
+{
+    CheckEndsWithIC(std::string(), "d", __func__, __LINE__, "an empty string ends with no letter");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_NonASCII_Fails()
+{
+    // UTF-8 E-acute and e-acute.
+    CheckEndsWithIC(std::string("caf\xC3\x89"), "F\xC3\xA9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_NonLetters_Fails()
+{
+    CheckEndsWithIC(std::string("a@b[c"), "`b{c", __func__, __LINE__, "@ and `, and [ and {, are not letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixLongerThanText_Fails()
+{
+    CheckEndsWithIC(std::string("World"), "HELLO WORLD", __func__, __LINE__, "the text has the end only");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixOnlyAtStart_Fails()
+{
+    CheckEndsWithIC(std::string("Hello World"), "HELLO", __func__, __LINE__, "the suffix is at the start");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_SuffixOnlyInMiddle_Fails()
+{
+    CheckEndsWithIC(std::string("Hello World"), "LO WO", __func__, __LINE__, "the suffix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_Absent_Fails()
+{
+    CheckEndsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_DifferentCase_Passes()
+{
+    CheckEndsWithIC(std::wstring(L"Hello World"), L"o wORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckEndsWithIC_Wide_NonASCII_Fails()
+{
+    // E-acute and e-acute.
+    CheckEndsWithIC(std::wstring(L"caf" L"\x00C9"), L"F" L"\x00E9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Absent_Passes()
+{
+    CheckNotEndsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_DifferentCase_Fails()
+{
+    CheckNotEndsWithIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_EmptySuffix_Fails()
+{
+    CheckNotEndsWithIC(std::string("Hello World"), "", __func__, __LINE__, "every string ends with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_SuffixLongerThanText_Passes()
+{
+    CheckNotEndsWithIC(std::string("World"), "HELLO WORLD", __func__, __LINE__, "the text has the end only");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_SuffixOnlyAtStart_Passes()
+{
+    CheckNotEndsWithIC(std::string("Hello World"), "HELLO", __func__, __LINE__, "the suffix is at the start");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_Absent_Passes()
+{
+    CheckNotEndsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "suffix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails()
+{
+    CheckNotEndsWithIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EqualsICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsIC()/CheckEqualsIC()/
+// AssertNotEqualsIC()/CheckNotEqualsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. "DifferentLength" catches a comparison that stops at the end of the shorter
+// value. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EqualsICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEqualsIC_DifferentCase_Passes();
+    void Test_AssertEqualsIC_DifferentText_Fails();
+    void Test_AssertEqualsIC_Wide_DifferentCase_Passes();
+    void Test_AssertEqualsIC_Wide_DifferentText_Fails();
+    void Test_AssertNotEqualsIC_DifferentCase_Fails();
+    void Test_AssertNotEqualsIC_DifferentText_Passes();
+    void Test_AssertNotEqualsIC_Wide_DifferentCase_Fails();
+    void Test_AssertNotEqualsIC_Wide_DifferentText_Passes();
+    void Test_CheckEqualsIC_BothEmpty_Passes();
+    void Test_CheckEqualsIC_DifferentCase_Passes();
+    void Test_CheckEqualsIC_DifferentLength_Fails();
+    void Test_CheckEqualsIC_DifferentText_Fails();
+    void Test_CheckEqualsIC_EmptyAndNonEmpty_Fails();
+    void Test_CheckEqualsIC_NonASCII_Fails();
+    void Test_CheckEqualsIC_NonLetters_Fails();
+    void Test_CheckEqualsIC_Wide_DifferentCase_Passes();
+    void Test_CheckEqualsIC_Wide_DifferentText_Fails();
+    void Test_CheckEqualsIC_Wide_NonASCII_Fails();
+    void Test_CheckNotEqualsIC_DifferentCase_Fails();
+    void Test_CheckNotEqualsIC_DifferentText_Passes();
+    void Test_CheckNotEqualsIC_SameText_Fails();
+    void Test_CheckNotEqualsIC_Wide_DifferentCase_Fails();
+    void Test_CheckNotEqualsIC_Wide_DifferentText_Passes();
+
+public:
+    TFixture_EqualsICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_EqualsICComparisons::TFixture_EqualsICComparisons()
+    : inherited("Fixture_EqualsICComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertEqualsIC_DifferentCase_Passes,
+        "AssertEqualsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertEqualsIC_DifferentText_Fails,
+        "AssertEqualsIC_DifferentText_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertEqualsIC_Wide_DifferentCase_Passes,
+        "AssertEqualsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertEqualsIC_Wide_DifferentText_Fails,
+        "AssertEqualsIC_Wide_DifferentText_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_DifferentCase_Fails,
+        "AssertNotEqualsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_DifferentText_Passes,
+        "AssertNotEqualsIC_DifferentText_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_Wide_DifferentCase_Fails,
+        "AssertNotEqualsIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_Wide_DifferentText_Passes,
+        "AssertNotEqualsIC_Wide_DifferentText_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_BothEmpty_Passes, "CheckEqualsIC_BothEmpty_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentCase_Passes,
+        "CheckEqualsIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentLength_Fails,
+        "CheckEqualsIC_DifferentLength_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentText_Fails,
+        "CheckEqualsIC_DifferentText_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_EmptyAndNonEmpty_Fails,
+        "CheckEqualsIC_EmptyAndNonEmpty_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_NonASCII_Fails, "CheckEqualsIC_NonASCII_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_NonLetters_Fails, "CheckEqualsIC_NonLetters_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_DifferentCase_Passes,
+        "CheckEqualsIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_DifferentText_Fails,
+        "CheckEqualsIC_Wide_DifferentText_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_NonASCII_Fails,
+        "CheckEqualsIC_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_DifferentCase_Fails,
+        "CheckNotEqualsIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_DifferentText_Passes,
+        "CheckNotEqualsIC_DifferentText_Passes");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_SameText_Fails,
+        "CheckNotEqualsIC_SameText_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_Wide_DifferentCase_Fails,
+        "CheckNotEqualsIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_Wide_DifferentText_Passes,
+        "CheckNotEqualsIC_Wide_DifferentText_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertEqualsIC_DifferentCase_Passes()
+{
+    AssertEqualsIC(std::string("Hello World"), std::string("hELLO wORLD"), __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertEqualsIC_DifferentText_Fails()
+{
+    AssertEqualsIC(std::string("Hello"), std::string("Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertEqualsIC_Wide_DifferentCase_Passes()
+{
+    AssertEqualsIC(std::wstring(L"Hello World"), std::wstring(L"hELLO wORLD"), __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertEqualsIC_Wide_DifferentText_Fails()
+{
+    AssertEqualsIC(std::wstring(L"Hello"), std::wstring(L"Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_DifferentCase_Fails()
+{
+    AssertNotEqualsIC(std::string("Hello World"), std::string("hELLO wORLD"), __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_DifferentText_Passes()
+{
+    AssertNotEqualsIC(std::string("Hello"), std::string("Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_Wide_DifferentCase_Fails()
+{
+    AssertNotEqualsIC(std::wstring(L"Hello World"), std::wstring(L"hELLO wORLD"), __func__, __LINE__,
+        "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_AssertNotEqualsIC_Wide_DifferentText_Passes()
+{
+    AssertNotEqualsIC(std::wstring(L"Hello"), std::wstring(L"Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_BothEmpty_Passes()
+{
+    CheckEqualsIC(std::string(), std::string(), __func__, __LINE__, "two empty strings are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentCase_Passes()
+{
+    CheckEqualsIC(std::string("Hello World"), std::string("hELLO wORLD"), __func__, __LINE__, "case differs");
+    CheckEqualsIC(std::string("Hello World"), std::string("Hello World"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentLength_Fails()
+{
+    CheckEqualsIC(std::string("Hello"), std::string("HELLO WORLD"), __func__, __LINE__, "only the start matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_DifferentText_Fails()
+{
+    CheckEqualsIC(std::string("Hello"), std::string("Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_EmptyAndNonEmpty_Fails()
+{
+    CheckEqualsIC(std::string(), std::string("a"), __func__, __LINE__, "an empty string differs from a letter");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_NonASCII_Fails()
+{
+    // UTF-8 E-acute and e-acute.
+    CheckEqualsIC(std::string("caf\xC3\x89"), std::string("caf\xC3\xA9"), __func__, __LINE__,
+        "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_NonLetters_Fails()
+{
+    CheckEqualsIC(std::string("a@b[c"), std::string("a`b{c"), __func__, __LINE__,
+        "@ and `, and [ and {, are not letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_DifferentCase_Passes()
+{
+    CheckEqualsIC(std::wstring(L"Hello World"), std::wstring(L"hELLO wORLD"), __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_DifferentText_Fails()
+{
+    CheckEqualsIC(std::wstring(L"Hello"), std::wstring(L"Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckEqualsIC_Wide_NonASCII_Fails()
+{
+    // E-acute and e-acute.
+    CheckEqualsIC(std::wstring(L"caf" L"\x00C9"), std::wstring(L"caf" L"\x00E9"), __func__, __LINE__,
+        "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_DifferentCase_Fails()
+{
+    CheckNotEqualsIC(std::string("Hello World"), std::string("hELLO wORLD"), __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_DifferentText_Passes()
+{
+    CheckNotEqualsIC(std::string("Hello"), std::string("Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_SameText_Fails()
+{
+    CheckNotEqualsIC(std::string("Hello"), std::string("Hello"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_Wide_DifferentCase_Fails()
+{
+    CheckNotEqualsIC(std::wstring(L"Hello World"), std::wstring(L"hELLO wORLD"), __func__, __LINE__,
+        "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_Wide_DifferentText_Passes()
+{
+    CheckNotEqualsIC(std::wstring(L"Hello"), std::wstring(L"Help"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixtureSpecificError
@@ -360,6 +1850,188 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 {
     SetExceptionExpected<TFixtureSpecificError>(__func__, __LINE__, "wrong sibling type thrown");
     throw TFixtureOtherError("boom");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_IntegerComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
+// of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), for two integer types that no
+// fixed-width overload matches exactly. Without those overloads, most of these calls don't compile
+// (ambiguous). The "NegativeAndUnsignedMax" tests catch a comparison that lets -1 wrap around to an
+// unsigned maximum, and the "Int64Max" tests check the int64_t/uint64_t boundary. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_IntegerComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_IntAndInt64Different_Fails();
+    void Test_AssertEquals_IntAndInt64Equal_Passes();
+    void Test_AssertNotEquals_IntAndInt64Equal_Fails();
+    void Test_AssertNotEquals_NegativeAndUnsignedMax_Passes();
+    void Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails();
+    void Test_CheckEquals_Int64MaxAndUint64_Passes();
+    void Test_CheckEquals_IntAndInt64Different_Fails();
+    void Test_CheckEquals_IntAndInt64Equal_Passes();
+    void Test_CheckEquals_IntAndShort_Passes();
+    void Test_CheckEquals_IntAndUnsigned_Passes();
+    void Test_CheckEquals_LongAndLong_Passes();
+    void Test_CheckEquals_LongLongAndLongLong_Passes();
+    void Test_CheckEquals_NegativeAndUint64Max_Fails();
+    void Test_CheckEquals_NegativeAndUnsignedMax_Fails();
+    void Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes();
+    void Test_CheckNotEquals_IntAndInt64Equal_Fails();
+    void Test_CheckNotEquals_NegativeAndUint64Max_Passes();
+    void Test_CheckNotEquals_NegativeAndUnsignedMax_Passes();
+
+public:
+    TFixture_IntegerComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_IntegerComparisons::TFixture_IntegerComparisons()
+    : inherited("Fixture_IntegerComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Different_Fails,
+        "AssertEquals_IntAndInt64Different_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Equal_Passes,
+        "AssertEquals_IntAndInt64Equal_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertNotEquals_IntAndInt64Equal_Fails,
+        "AssertNotEquals_IntAndInt64Equal_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_AssertNotEquals_NegativeAndUnsignedMax_Passes,
+        "AssertNotEquals_NegativeAndUnsignedMax_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails,
+        "CheckEquals_AboveInt64MaxAndInt64Max_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_Int64MaxAndUint64_Passes,
+        "CheckEquals_Int64MaxAndUint64_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Different_Fails,
+        "CheckEquals_IntAndInt64Different_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Equal_Passes,
+        "CheckEquals_IntAndInt64Equal_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndShort_Passes, "CheckEquals_IntAndShort_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_IntAndUnsigned_Passes,
+        "CheckEquals_IntAndUnsigned_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_LongAndLong_Passes, "CheckEquals_LongAndLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_LongLongAndLongLong_Passes,
+        "CheckEquals_LongLongAndLongLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUint64Max_Fails,
+        "CheckEquals_NegativeAndUint64Max_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUnsignedMax_Fails,
+        "CheckEquals_NegativeAndUnsignedMax_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes,
+        "CheckEquals_UnsignedLongAndUnsignedLong_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_IntAndInt64Equal_Fails,
+        "CheckNotEquals_IntAndInt64Equal_Fails");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUint64Max_Passes,
+        "CheckNotEquals_NegativeAndUint64Max_Passes");
+    RegisterTest(&TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Passes,
+        "CheckNotEquals_NegativeAndUnsignedMax_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Different_Fails()
+{
+    AssertEquals(5, int64_t{ 6 }, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertEquals_IntAndInt64Equal_Passes()
+{
+    AssertEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertNotEquals_IntAndInt64Equal_Fails()
+{
+    AssertNotEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_AssertNotEquals_NegativeAndUnsignedMax_Passes()
+{
+    AssertNotEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails()
+{
+    uint64_t const aboveInt64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1;
+    CheckEquals(aboveInt64Max, std::numeric_limits<int64_t>::max(), __func__, __LINE__, "differ by one");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_Int64MaxAndUint64_Passes()
+{
+    uint64_t const int64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    CheckEquals(std::numeric_limits<int64_t>::max(), int64Max, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Different_Fails()
+{
+    CheckEquals(5, int64_t{ 6 }, __func__, __LINE__, "different values");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndInt64Equal_Passes()
+{
+    CheckEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndShort_Passes()
+{
+    short const value = 5;
+    CheckEquals(5, value, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_IntAndUnsigned_Passes()
+{
+    CheckEquals(3, 3u, __func__, __LINE__, "same value, different signedness");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_LongAndLong_Passes()
+{
+    long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "long matches no fixed-width overload on Windows");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_LongLongAndLongLong_Passes()
+{
+    long long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "long long matches no fixed-width overload on Linux");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUint64Max_Fails()
+{
+    CheckEquals(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_NegativeAndUnsignedMax_Fails()
+{
+    CheckEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes()
+{
+    unsigned long const value = 7;
+    CheckEquals(value, value, __func__, __LINE__, "unsigned long matches no fixed-width overload on Windows");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_IntAndInt64Equal_Fails()
+{
+    CheckNotEquals(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUint64Max_Passes()
+{
+    CheckNotEquals(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Passes()
+{
+    CheckNotEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
 }
 //---------------------------------------------------------------------------
 
@@ -620,6 +2292,320 @@ void TFixture_OrderRecorder::Test_H()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_OrderingComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the GreaterThan/GreaterThanOrEqual/
+// LessThan/LessThanOrEqual methods, each called as (value, bound). The "Negative...Max" and "...MaxAndNegative" tests
+// catch a comparison that lets -1 wrap around to an unsigned maximum (the built-in -1 < 4294967295u is false), the
+// "Uint64Max" ones the case where neither value fits the other's type, and the NaN ones that a NaN fails every check.
+// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_OrderingComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertGreaterThanOrEqual_Equal_Passes();
+    void Test_AssertGreaterThanOrEqual_Less_Fails();
+    void Test_AssertGreaterThan_Equal_Fails();
+    void Test_AssertGreaterThan_Greater_Passes();
+    void Test_AssertLessThanOrEqual_Equal_Passes();
+    void Test_AssertLessThanOrEqual_Greater_Fails();
+    void Test_AssertLessThan_Equal_Fails();
+    void Test_AssertLessThan_Less_Passes();
+    void Test_CheckGreaterThanOrEqual_Equal_Passes();
+    void Test_CheckGreaterThanOrEqual_Greater_Passes();
+    void Test_CheckGreaterThanOrEqual_Less_Fails();
+    void Test_CheckGreaterThanOrEqual_NaN_Fails();
+    void Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes();
+    void Test_CheckGreaterThan_DoubleAndInt_Passes();
+    void Test_CheckGreaterThan_Double_Fails();
+    void Test_CheckGreaterThan_Equal_Fails();
+    void Test_CheckGreaterThan_Float_Fails();
+    void Test_CheckGreaterThan_Greater_Passes();
+    void Test_CheckGreaterThan_Infinity_Passes();
+    void Test_CheckGreaterThan_LongDouble_Fails();
+    void Test_CheckGreaterThan_Less_Fails();
+    void Test_CheckGreaterThan_Uint64MaxAndNegative_Passes();
+    void Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes();
+    void Test_CheckLessThanOrEqual_Equal_Passes();
+    void Test_CheckLessThanOrEqual_Greater_Fails();
+    void Test_CheckLessThanOrEqual_IntAndInt64_Passes();
+    void Test_CheckLessThanOrEqual_Less_Passes();
+    void Test_CheckLessThanOrEqual_NaNBound_Fails();
+    void Test_CheckLessThan_CloseDoubles_Fails();
+    void Test_CheckLessThan_Equal_Fails();
+    void Test_CheckLessThan_Greater_Fails();
+    void Test_CheckLessThan_Less_Passes();
+    void Test_CheckLessThan_NaN_Fails();
+    void Test_CheckLessThan_NegativeAndUint64Max_Passes();
+    void Test_CheckLessThan_NegativeAndUnsignedMax_Passes();
+    void Test_CheckLessThan_Uint64MaxAndNegative_Fails();
+
+public:
+    TFixture_OrderingComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_OrderingComparisons::TFixture_OrderingComparisons()
+    : inherited("Fixture_OrderingComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Equal_Passes,
+        "AssertGreaterThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Less_Fails,
+        "AssertGreaterThanOrEqual_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThan_Equal_Fails, "AssertGreaterThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertGreaterThan_Greater_Passes,
+        "AssertGreaterThan_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Equal_Passes,
+        "AssertLessThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Greater_Fails,
+        "AssertLessThanOrEqual_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThan_Equal_Fails, "AssertLessThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_AssertLessThan_Less_Passes, "AssertLessThan_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Equal_Passes,
+        "CheckGreaterThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Greater_Passes,
+        "CheckGreaterThanOrEqual_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Less_Fails,
+        "CheckGreaterThanOrEqual_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_NaN_Fails,
+        "CheckGreaterThanOrEqual_NaN_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes,
+        "CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_DoubleAndInt_Passes,
+        "CheckGreaterThan_DoubleAndInt_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Double_Fails, "CheckGreaterThan_Double_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Equal_Fails, "CheckGreaterThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Float_Fails, "CheckGreaterThan_Float_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Greater_Passes,
+        "CheckGreaterThan_Greater_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Infinity_Passes,
+        "CheckGreaterThan_Infinity_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_LongDouble_Fails,
+        "CheckGreaterThan_LongDouble_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Less_Fails, "CheckGreaterThan_Less_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_Uint64MaxAndNegative_Passes,
+        "CheckGreaterThan_Uint64MaxAndNegative_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes,
+        "CheckGreaterThan_UnsignedMaxAndNegative_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Equal_Passes,
+        "CheckLessThanOrEqual_Equal_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Greater_Fails,
+        "CheckLessThanOrEqual_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_IntAndInt64_Passes,
+        "CheckLessThanOrEqual_IntAndInt64_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Less_Passes,
+        "CheckLessThanOrEqual_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_NaNBound_Fails,
+        "CheckLessThanOrEqual_NaNBound_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_CloseDoubles_Fails,
+        "CheckLessThan_CloseDoubles_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Equal_Fails, "CheckLessThan_Equal_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Greater_Fails, "CheckLessThan_Greater_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Less_Passes, "CheckLessThan_Less_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NaN_Fails, "CheckLessThan_NaN_Fails");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUint64Max_Passes,
+        "CheckLessThan_NegativeAndUint64Max_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUnsignedMax_Passes,
+        "CheckLessThan_NegativeAndUnsignedMax_Passes");
+    RegisterTest(&TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails,
+        "CheckLessThan_Uint64MaxAndNegative_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Equal_Passes()
+{
+    AssertGreaterThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThanOrEqual_Less_Fails()
+{
+    AssertGreaterThanOrEqual(1, 2, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThan_Equal_Fails()
+{
+    AssertGreaterThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertGreaterThan_Greater_Passes()
+{
+    AssertGreaterThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Equal_Passes()
+{
+    AssertLessThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThanOrEqual_Greater_Fails()
+{
+    AssertLessThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThan_Equal_Fails()
+{
+    AssertLessThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_AssertLessThan_Less_Passes()
+{
+    AssertLessThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Equal_Passes()
+{
+    CheckGreaterThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Greater_Passes()
+{
+    CheckGreaterThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_Less_Fails()
+{
+    CheckGreaterThanOrEqual(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThanOrEqual_NaN_Fails()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckGreaterThanOrEqual(nan, nan, __func__, __LINE__, "a NaN is never equal, even to itself");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes()
+{
+    uint64_t const aboveInt64Max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) + 1;
+    CheckGreaterThan(aboveInt64Max, std::numeric_limits<int64_t>::max(), __func__, __LINE__, "greater by one");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_DoubleAndInt_Passes()
+{
+    CheckGreaterThan(0.5, 0, __func__, __LINE__, "the int is compared as a double");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Double_Fails()
+{
+    CheckGreaterThan(0.1, 0.25, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Equal_Fails()
+{
+    CheckGreaterThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Float_Fails()
+{
+    CheckGreaterThan(0.1f, 0.25f, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Greater_Passes()
+{
+    CheckGreaterThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Infinity_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<double>::infinity(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "infinity is greater than any finite value");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_LongDouble_Fails()
+{
+    CheckGreaterThan(1.5L, 2.5L, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Less_Fails()
+{
+    CheckGreaterThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_Uint64MaxAndNegative_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<uint64_t>::max(), int64_t{ -1 }, __func__, __LINE__, "-1 must not wrap");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes()
+{
+    CheckGreaterThan(std::numeric_limits<unsigned int>::max(), -1, __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Equal_Passes()
+{
+    CheckLessThanOrEqual(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Greater_Fails()
+{
+    CheckLessThanOrEqual(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_IntAndInt64_Passes()
+{
+    CheckLessThanOrEqual(5, int64_t{ 5 }, __func__, __LINE__, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_Less_Passes()
+{
+    CheckLessThanOrEqual(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThanOrEqual_NaNBound_Fails()
+{
+    CheckLessThanOrEqual(1.0, std::numeric_limits<double>::quiet_NaN(), __func__, __LINE__, "nothing compares to NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_CloseDoubles_Fails()
+{
+    // The smallest double above 1, which looks like 1 at the usual 15 significant digits.
+    CheckLessThan(std::nextafter(1.0, 2.0), 1.0, __func__, __LINE__, "just greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Equal_Fails()
+{
+    CheckLessThan(4, 4, __func__, __LINE__, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Greater_Fails()
+{
+    CheckLessThan(5, 4, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Less_Passes()
+{
+    CheckLessThan(3, 4, __func__, __LINE__, "less");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NaN_Fails()
+{
+    CheckLessThan(std::numeric_limits<double>::quiet_NaN(), 1.0, __func__, __LINE__, "NaN compares to nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUint64Max_Passes()
+{
+    CheckLessThan(int64_t{ -1 }, std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_NegativeAndUnsignedMax_Passes()
+{
+    CheckLessThan(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+void TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails()
+{
+    CheckLessThan(std::numeric_limits<uint64_t>::max(), int64_t{ -1 }, __func__, __LINE__, "greater");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
@@ -667,6 +2653,1307 @@ void TFixture_SlowTest::Test_HangsForever()
 void TFixture_SlowTest::Test_NeverRuns()
 {
     NeverRunReached = true;
+}
+//---------------------------------------------------------------------------
+
+
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SourceLocations
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling each std::source_location
+// overload. Each "_Fails"/"_Skips" test records the line of its call in ExpectedLines, so
+// Test_SourceLocation_ReportsCallerFunctionAndLine below can check the failure names that test's
+// function and line. "_Passes" tests check that arguments forward to the same overloads as the
+// method/line form (C strings, mixed integers, wide substrings, exception expectations), and the "IC" ones that
+// they reach the case-insensitive overloads. The StartsWith/EndsWith texts are chosen so that forwarding to the wrong
+// overload (IC or not, start or end, Not or not) changes the outcome of at least one test. CheckIsEven() is a custom
+// helper of the kind a test author might write, passing its caller's location through.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SourceLocations : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void CheckIsEven(int value, std::source_location loc = std::source_location::current());
+
+    void Test_AssertContainsIC_Passes();
+    void Test_AssertContains_Fails();
+    void Test_AssertEndsWithIC_Passes();
+    void Test_AssertEndsWith_Fails();
+    void Test_AssertEqualsIC_Passes();
+    void Test_AssertEquals_CStrings_Passes();
+    void Test_AssertEquals_Fails();
+    void Test_AssertFalse_Fails();
+    void Test_AssertGreaterThanOrEqual_Passes();
+    void Test_AssertGreaterThan_Fails();
+    void Test_AssertLessThanOrEqual_Passes();
+    void Test_AssertLessThan_Fails();
+    void Test_AssertNear_Fails();
+    void Test_AssertNotContainsIC_Fails();
+    void Test_AssertNotContains_Fails();
+    void Test_AssertNotEndsWithIC_Fails();
+    void Test_AssertNotEndsWith_DifferentCase_Passes();
+    void Test_AssertNotEndsWith_Fails();
+    void Test_AssertNotEqualsIC_Fails();
+    void Test_AssertNotEquals_Fails();
+    void Test_AssertNotNear_Fails();
+    void Test_AssertNotStartsWithIC_Fails();
+    void Test_AssertNotStartsWith_DifferentCase_Passes();
+    void Test_AssertNotStartsWith_Fails();
+    void Test_AssertStartsWithIC_Passes();
+    void Test_AssertStartsWith_Fails();
+    void Test_AssertTrue_Fails();
+    void Test_CheckContainsIC_Passes();
+    void Test_CheckContains_Fails();
+    void Test_CheckContains_Wide_Passes();
+    void Test_CheckEndsWithIC_Passes();
+    void Test_CheckEndsWith_Fails();
+    void Test_CheckEndsWith_Wide_Passes();
+    void Test_CheckEqualsIC_Passes();
+    void Test_CheckEquals_Fails();
+    void Test_CheckEquals_MixedIntegers_Passes();
+    void Test_CheckFalse_Fails();
+    void Test_CheckGreaterThanOrEqual_Passes();
+    void Test_CheckGreaterThan_Fails();
+    void Test_CheckLessThanOrEqual_Passes();
+    void Test_CheckLessThan_Fails();
+    void Test_CheckNear_Fails();
+    void Test_CheckNear_Passes();
+    void Test_CheckNotContainsIC_Fails();
+    void Test_CheckNotContains_Fails();
+    void Test_CheckNotEndsWithIC_Fails();
+    void Test_CheckNotEndsWith_DifferentCase_Passes();
+    void Test_CheckNotEndsWith_Fails();
+    void Test_CheckNotEqualsIC_Fails();
+    void Test_CheckNotEquals_Fails();
+    void Test_CheckNotNear_Fails();
+    void Test_CheckNotStartsWithIC_Fails();
+    void Test_CheckNotStartsWith_DifferentCase_Passes();
+    void Test_CheckNotStartsWith_Fails();
+    void Test_CheckStartsWithIC_Passes();
+    void Test_CheckStartsWith_Fails();
+    void Test_CheckStartsWith_Wide_Passes();
+    void Test_CheckTrue_Fails();
+    void Test_CheckTrue_ThroughHelper_Fails();
+    void Test_SetExceptionExpected_Bool_NoneThrown_Fails();
+    void Test_SetExceptionExpected_Bool_Passes();
+    void Test_SetExceptionExpected_TypeAndMessage_Passes();
+    void Test_SetExceptionExpected_Type_NoneThrown_Fails();
+    void Test_Skip_Skips();
+
+public:
+    std::map<std::string, int> ExpectedLines; // Test name to the line of its failing/skipping call.
+
+    TFixture_SourceLocations();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_SourceLocations::TFixture_SourceLocations()
+    : inherited("Fixture_SourceLocations")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_SourceLocations::Test_AssertContainsIC_Passes, "AssertContainsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertContains_Fails, "AssertContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWithIC_Passes, "AssertEndsWithIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWith_Fails, "AssertEndsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEqualsIC_Passes, "AssertEqualsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThanOrEqual_Passes, "AssertGreaterThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThan_Fails, "AssertGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes, "AssertLessThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertLessThan_Fails, "AssertLessThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWithIC_Fails, "AssertNotEndsWithIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWith_DifferentCase_Passes,
+        "AssertNotEndsWith_DifferentCase_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWith_Fails, "AssertNotEndsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails, "AssertNotEqualsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails, "AssertNotStartsWithIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_DifferentCase_Passes,
+        "AssertNotStartsWith_DifferentCase_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_Fails, "AssertNotStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWithIC_Passes, "AssertStartsWithIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWith_Fails, "AssertStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContainsIC_Passes, "CheckContainsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Fails, "CheckContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Wide_Passes, "CheckContains_Wide_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWithIC_Passes, "CheckEndsWithIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Fails, "CheckEndsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes, "CheckEndsWith_Wide_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEqualsIC_Passes, "CheckEqualsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThanOrEqual_Passes, "CheckGreaterThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThan_Fails, "CheckGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes, "CheckLessThanOrEqual_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckLessThan_Fails, "CheckLessThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotContainsIC_Fails, "CheckNotContainsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWithIC_Fails, "CheckNotEndsWithIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWith_DifferentCase_Passes,
+        "CheckNotEndsWith_DifferentCase_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWith_Fails, "CheckNotEndsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails, "CheckNotEqualsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails, "CheckNotStartsWithIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_DifferentCase_Passes,
+        "CheckNotStartsWith_DifferentCase_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_Fails, "CheckNotStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWithIC_Passes, "CheckStartsWithIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Fails, "CheckStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes, "CheckStartsWith_Wide_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_Fails, "CheckTrue_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails, "CheckTrue_ThroughHelper_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails,
+        "SetExceptionExpected_Bool_NoneThrown_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_Passes,
+        "SetExceptionExpected_Bool_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_TypeAndMessage_Passes,
+        "SetExceptionExpected_TypeAndMessage_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Type_NoneThrown_Fails,
+        "SetExceptionExpected_Type_NoneThrown_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_Skip_Skips, "Skip_Skips");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::CheckIsEven(int value, std::source_location loc)
+{
+    CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertContainsIC_Passes()
+{
+    AssertContainsIC(std::string("abc"), "B", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertContains_Fails()
+{
+    ExpectedLines["AssertContains_Fails"] = __LINE__ + 1;
+    AssertContains(std::string("abc"), "x", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEndsWithIC_Passes()
+{
+    AssertEndsWithIC(std::string("abc"), "BC", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEndsWith_Fails()
+{
+    ExpectedLines["AssertEndsWith_Fails"] = __LINE__ + 1;
+    AssertEndsWith(std::string("BC-bc"), "BC", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEqualsIC_Passes()
+{
+    AssertEqualsIC(std::string("abc"), std::string("ABC"), "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes()
+{
+    char const buffer[] = "abc";
+    AssertEquals("abc", buffer, "same text in a separate buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEquals_Fails()
+{
+    ExpectedLines["AssertEquals_Fails"] = __LINE__ + 1;
+    AssertEquals(1, 2, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertFalse_Fails()
+{
+    ExpectedLines["AssertFalse_Fails"] = __LINE__ + 1;
+    AssertFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertGreaterThanOrEqual_Passes()
+{
+    AssertGreaterThanOrEqual(4, 4, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertGreaterThan_Fails()
+{
+    ExpectedLines["AssertGreaterThan_Fails"] = __LINE__ + 1;
+    AssertGreaterThan(4, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes()
+{
+    AssertLessThanOrEqual(4, 4, "equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertLessThan_Fails()
+{
+    ExpectedLines["AssertLessThan_Fails"] = __LINE__ + 1;
+    AssertLessThan(4, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNear_Fails()
+{
+    ExpectedLines["AssertNear_Fails"] = __LINE__ + 1;
+    AssertNear(1.0, 2.0, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotContainsIC_Fails()
+{
+    ExpectedLines["AssertNotContainsIC_Fails"] = __LINE__ + 1;
+    AssertNotContainsIC(std::string("abc"), "B", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotContains_Fails()
+{
+    ExpectedLines["AssertNotContains_Fails"] = __LINE__ + 1;
+    AssertNotContains(std::string("abc"), "b", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEndsWithIC_Fails()
+{
+    ExpectedLines["AssertNotEndsWithIC_Fails"] = __LINE__ + 1;
+    AssertNotEndsWithIC(std::string("abc"), "BC", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEndsWith_DifferentCase_Passes()
+{
+    AssertNotEndsWith(std::string("abc"), "BC", "matches only ignoring case");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEndsWith_Fails()
+{
+    ExpectedLines["AssertNotEndsWith_Fails"] = __LINE__ + 1;
+    AssertNotEndsWith(std::string("BC-bc"), "bc", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails()
+{
+    ExpectedLines["AssertNotEqualsIC_Fails"] = __LINE__ + 1;
+    AssertNotEqualsIC(std::string("abc"), std::string("ABC"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEquals_Fails()
+{
+    ExpectedLines["AssertNotEquals_Fails"] = __LINE__ + 1;
+    AssertNotEquals(std::string("abc"), std::string("abc"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotNear_Fails()
+{
+    ExpectedLines["AssertNotNear_Fails"] = __LINE__ + 1;
+    AssertNotNear(1.0f, 1.25f, 0.5f, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails()
+{
+    ExpectedLines["AssertNotStartsWithIC_Fails"] = __LINE__ + 1;
+    AssertNotStartsWithIC(std::string("abc"), "AB", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotStartsWith_DifferentCase_Passes()
+{
+    AssertNotStartsWith(std::string("abc"), "AB", "matches only ignoring case");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotStartsWith_Fails()
+{
+    ExpectedLines["AssertNotStartsWith_Fails"] = __LINE__ + 1;
+    AssertNotStartsWith(std::string("ab-AB"), "ab", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertStartsWithIC_Passes()
+{
+    AssertStartsWithIC(std::string("abc"), "AB", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertStartsWith_Fails()
+{
+    ExpectedLines["AssertStartsWith_Fails"] = __LINE__ + 1;
+    AssertStartsWith(std::string("ab-AB"), "AB", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertTrue_Fails()
+{
+    ExpectedLines["AssertTrue_Fails"] = __LINE__ + 1;
+    AssertTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContainsIC_Passes()
+{
+    CheckContainsIC(std::string("abc"), "B", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContains_Fails()
+{
+    ExpectedLines["CheckContains_Fails"] = __LINE__ + 1;
+    CheckContains(std::string("abc"), "x", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckContains_Wide_Passes()
+{
+    CheckContains(std::wstring(L"abc"), L"b", "wide substring present");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEndsWithIC_Passes()
+{
+    CheckEndsWithIC(std::string("abc"), "BC", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEndsWith_Fails()
+{
+    ExpectedLines["CheckEndsWith_Fails"] = __LINE__ + 1;
+    CheckEndsWith(std::string("BC-bc"), "BC", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes()
+{
+    CheckEndsWith(std::wstring(L"abc"), L"bc", "wide suffix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEqualsIC_Passes()
+{
+    CheckEqualsIC(std::string("abc"), std::string("ABC"), "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEquals_Fails()
+{
+    ExpectedLines["CheckEquals_Fails"] = __LINE__ + 1;
+    CheckEquals(std::string("abc"), std::string("xyz"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes()
+{
+    CheckEquals(5, int64_t{ 5 }, "same value, different types");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckFalse_Fails()
+{
+    ExpectedLines["CheckFalse_Fails"] = __LINE__ + 1;
+    CheckFalse(true, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckGreaterThanOrEqual_Passes()
+{
+    CheckGreaterThanOrEqual(2.0, 2, "equal, double and int");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckGreaterThan_Fails()
+{
+    ExpectedLines["CheckGreaterThan_Fails"] = __LINE__ + 1;
+    CheckGreaterThan(4u, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes()
+{
+    CheckLessThanOrEqual(int64_t{ 4 }, 4u, "equal, int64_t and unsigned int");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckLessThan_Fails()
+{
+    ExpectedLines["CheckLessThan_Fails"] = __LINE__ + 1;
+    CheckLessThan(4.0f, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNear_Fails()
+{
+    ExpectedLines["CheckNear_Fails"] = __LINE__ + 1;
+    CheckNear(1.0, 2.0, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNear_Passes()
+{
+    CheckNear(1.0f, 1.25f, 0.5f, "within tolerance");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotContainsIC_Fails()
+{
+    ExpectedLines["CheckNotContainsIC_Fails"] = __LINE__ + 1;
+    CheckNotContainsIC(std::string("abc"), "B", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotContains_Fails()
+{
+    ExpectedLines["CheckNotContains_Fails"] = __LINE__ + 1;
+    CheckNotContains(std::string("abc"), "b", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEndsWithIC_Fails()
+{
+    ExpectedLines["CheckNotEndsWithIC_Fails"] = __LINE__ + 1;
+    CheckNotEndsWithIC(std::string("abc"), "BC", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEndsWith_DifferentCase_Passes()
+{
+    CheckNotEndsWith(std::string("abc"), "BC", "matches only ignoring case");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEndsWith_Fails()
+{
+    ExpectedLines["CheckNotEndsWith_Fails"] = __LINE__ + 1;
+    CheckNotEndsWith(std::string("BC-bc"), "bc", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails()
+{
+    ExpectedLines["CheckNotEqualsIC_Fails"] = __LINE__ + 1;
+    CheckNotEqualsIC(std::string("abc"), std::string("ABC"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEquals_Fails()
+{
+    ExpectedLines["CheckNotEquals_Fails"] = __LINE__ + 1;
+    CheckNotEquals(5, 5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotNear_Fails()
+{
+    ExpectedLines["CheckNotNear_Fails"] = __LINE__ + 1;
+    CheckNotNear(1.0, 1.25, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails()
+{
+    ExpectedLines["CheckNotStartsWithIC_Fails"] = __LINE__ + 1;
+    CheckNotStartsWithIC(std::string("abc"), "AB", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotStartsWith_DifferentCase_Passes()
+{
+    CheckNotStartsWith(std::string("abc"), "AB", "matches only ignoring case");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotStartsWith_Fails()
+{
+    ExpectedLines["CheckNotStartsWith_Fails"] = __LINE__ + 1;
+    CheckNotStartsWith(std::string("ab-AB"), "ab", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckStartsWithIC_Passes()
+{
+    CheckStartsWithIC(std::string("abc"), "AB", "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckStartsWith_Fails()
+{
+    ExpectedLines["CheckStartsWith_Fails"] = __LINE__ + 1;
+    CheckStartsWith(std::string("ab-AB"), "AB", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes()
+{
+    CheckStartsWith(std::wstring(L"abc"), L"ab", "wide prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckTrue_Fails()
+{
+    ExpectedLines["CheckTrue_Fails"] = __LINE__ + 1;
+    CheckTrue(false, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails()
+{
+    ExpectedLines["CheckTrue_ThroughHelper_Fails"] = __LINE__ + 1;
+    CheckIsEven(3);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails()
+{
+    ExpectedLines["SetExceptionExpected_Bool_NoneThrown_Fails"] = __LINE__ + 1;
+    SetExceptionExpected(true, "deliberately nothing thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Bool_Passes()
+{
+    SetExceptionExpected(true, "any exception");
+    throw std::runtime_error("boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_TypeAndMessage_Passes()
+{
+    SetExceptionExpected<std::invalid_argument>("matching type and message", "boom");
+    throw std::invalid_argument("boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_SetExceptionExpected_Type_NoneThrown_Fails()
+{
+    ExpectedLines["SetExceptionExpected_Type_NoneThrown_Fails"] = __LINE__ + 1;
+    SetExceptionExpected<std::invalid_argument>("deliberately nothing thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_Skip_Skips()
+{
+    ExpectedLines["Skip_Skips"] = __LINE__ + 1;
+    Skip("deliberate skip");
+}
+//---------------------------------------------------------------------------
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StartsWithComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWith()/CheckStartsWith()/
+// AssertNotStartsWith()/CheckNotStartsWith(), narrow and wide. "PrefixOnlyAtEnd" and "PrefixOnlyInMiddle" catch a
+// check that matches anywhere but the start, and "PrefixLongerThanText" one that doesn't check the length first.
+// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StartsWithComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotStartsWith_Absent_Passes();
+    void Test_AssertNotStartsWith_Present_Fails();
+    void Test_AssertNotStartsWith_Wide_Absent_Passes();
+    void Test_AssertNotStartsWith_Wide_Present_Fails();
+    void Test_AssertStartsWith_Absent_Fails();
+    void Test_AssertStartsWith_Present_Passes();
+    void Test_AssertStartsWith_Wide_Absent_Fails();
+    void Test_AssertStartsWith_Wide_Present_Passes();
+    void Test_CheckNotStartsWith_Absent_Passes();
+    void Test_CheckNotStartsWith_BothEmpty_Fails();
+    void Test_CheckNotStartsWith_EmptyPrefix_Fails();
+    void Test_CheckNotStartsWith_PrefixLongerThanText_Passes();
+    void Test_CheckNotStartsWith_PrefixOnlyAtEnd_Passes();
+    void Test_CheckNotStartsWith_PrefixOnlyInMiddle_Passes();
+    void Test_CheckNotStartsWith_Present_Fails();
+    void Test_CheckNotStartsWith_Wide_Absent_Passes();
+    void Test_CheckNotStartsWith_Wide_Present_Fails();
+    void Test_CheckStartsWith_Absent_Fails();
+    void Test_CheckStartsWith_BothEmpty_Passes();
+    void Test_CheckStartsWith_DifferentCase_Fails();
+    void Test_CheckStartsWith_EmptyPrefix_Passes();
+    void Test_CheckStartsWith_EmptyText_Fails();
+    void Test_CheckStartsWith_PrefixLongerThanText_Fails();
+    void Test_CheckStartsWith_PrefixOnlyAtEnd_Fails();
+    void Test_CheckStartsWith_PrefixOnlyInMiddle_Fails();
+    void Test_CheckStartsWith_Present_Passes();
+    void Test_CheckStartsWith_Wide_Absent_Fails();
+    void Test_CheckStartsWith_Wide_NonASCII_Fails();
+    void Test_CheckStartsWith_Wide_Present_Passes();
+
+public:
+    TFixture_StartsWithComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_StartsWithComparisons::TFixture_StartsWithComparisons()
+    : inherited("Fixture_StartsWithComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Absent_Passes,
+        "AssertNotStartsWith_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Present_Fails,
+        "AssertNotStartsWith_Present_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Wide_Absent_Passes,
+        "AssertNotStartsWith_Wide_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Wide_Present_Fails,
+        "AssertNotStartsWith_Wide_Present_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertStartsWith_Absent_Fails, "AssertStartsWith_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertStartsWith_Present_Passes,
+        "AssertStartsWith_Present_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertStartsWith_Wide_Absent_Fails,
+        "AssertStartsWith_Wide_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_AssertStartsWith_Wide_Present_Passes,
+        "AssertStartsWith_Wide_Present_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Absent_Passes,
+        "CheckNotStartsWith_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_BothEmpty_Fails,
+        "CheckNotStartsWith_BothEmpty_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_EmptyPrefix_Fails,
+        "CheckNotStartsWith_EmptyPrefix_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixLongerThanText_Passes,
+        "CheckNotStartsWith_PrefixLongerThanText_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixOnlyAtEnd_Passes,
+        "CheckNotStartsWith_PrefixOnlyAtEnd_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixOnlyInMiddle_Passes,
+        "CheckNotStartsWith_PrefixOnlyInMiddle_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Present_Fails,
+        "CheckNotStartsWith_Present_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Wide_Absent_Passes,
+        "CheckNotStartsWith_Wide_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Wide_Present_Fails,
+        "CheckNotStartsWith_Wide_Present_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_Absent_Fails, "CheckStartsWith_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_BothEmpty_Passes,
+        "CheckStartsWith_BothEmpty_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_DifferentCase_Fails,
+        "CheckStartsWith_DifferentCase_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_EmptyPrefix_Passes,
+        "CheckStartsWith_EmptyPrefix_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_EmptyText_Fails,
+        "CheckStartsWith_EmptyText_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixLongerThanText_Fails,
+        "CheckStartsWith_PrefixLongerThanText_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixOnlyAtEnd_Fails,
+        "CheckStartsWith_PrefixOnlyAtEnd_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixOnlyInMiddle_Fails,
+        "CheckStartsWith_PrefixOnlyInMiddle_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_Present_Passes,
+        "CheckStartsWith_Present_Passes");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_Absent_Fails,
+        "CheckStartsWith_Wide_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_NonASCII_Fails,
+        "CheckStartsWith_Wide_NonASCII_Fails");
+    RegisterTest(&TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_Present_Passes,
+        "CheckStartsWith_Wide_Present_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Absent_Passes()
+{
+    AssertNotStartsWith(std::string("hello world"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Present_Fails()
+{
+    AssertNotStartsWith(std::string("hello world"), "hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Wide_Absent_Passes()
+{
+    AssertNotStartsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertNotStartsWith_Wide_Present_Fails()
+{
+    AssertNotStartsWith(std::wstring(L"hello world"), L"hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertStartsWith_Absent_Fails()
+{
+    AssertStartsWith(std::string("hello world"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertStartsWith_Present_Passes()
+{
+    AssertStartsWith(std::string("hello world"), "hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertStartsWith_Wide_Absent_Fails()
+{
+    AssertStartsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_AssertStartsWith_Wide_Present_Passes()
+{
+    AssertStartsWith(std::wstring(L"hello world"), L"hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Absent_Passes()
+{
+    CheckNotStartsWith(std::string("hello world"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_BothEmpty_Fails()
+{
+    CheckNotStartsWith(std::string(), "", __func__, __LINE__, "even an empty string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_EmptyPrefix_Fails()
+{
+    CheckNotStartsWith(std::string("hello world"), "", __func__, __LINE__, "every string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixLongerThanText_Passes()
+{
+    CheckNotStartsWith(std::string("hello"), "hello world", __func__, __LINE__, "the text has the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixOnlyAtEnd_Passes()
+{
+    CheckNotStartsWith(std::string("hello world"), "world", __func__, __LINE__, "the prefix is at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_PrefixOnlyInMiddle_Passes()
+{
+    CheckNotStartsWith(std::string("hello world"), "lo wo", __func__, __LINE__, "the prefix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Present_Fails()
+{
+    CheckNotStartsWith(std::string("hello world"), "hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Wide_Absent_Passes()
+{
+    CheckNotStartsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckNotStartsWith_Wide_Present_Fails()
+{
+    CheckNotStartsWith(std::wstring(L"hello world"), L"hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_Absent_Fails()
+{
+    CheckStartsWith(std::string("hello world"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_BothEmpty_Passes()
+{
+    CheckStartsWith(std::string(), "", __func__, __LINE__, "even an empty string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_DifferentCase_Fails()
+{
+    CheckStartsWith(std::string("hello world"), "Hello", __func__, __LINE__, "the comparison is case-sensitive");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_EmptyPrefix_Passes()
+{
+    CheckStartsWith(std::string("hello world"), "", __func__, __LINE__, "every string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_EmptyText_Fails()
+{
+    CheckStartsWith(std::string(), "h", __func__, __LINE__, "an empty string starts with no letter");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixLongerThanText_Fails()
+{
+    CheckStartsWith(std::string("hello"), "hello world", __func__, __LINE__, "the text has the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixOnlyAtEnd_Fails()
+{
+    CheckStartsWith(std::string("hello world"), "world", __func__, __LINE__, "the prefix is at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_PrefixOnlyInMiddle_Fails()
+{
+    CheckStartsWith(std::string("hello world"), "lo wo", __func__, __LINE__, "the prefix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_Present_Passes()
+{
+    CheckStartsWith(std::string("hello world"), "hello world", __func__, __LINE__, "the whole text is a prefix");
+    CheckStartsWith(std::string("hello world"), "hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_Absent_Fails()
+{
+    CheckStartsWith(std::wstring(L"hello world"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_NonASCII_Fails()
+{
+    // "cafe" with an e-acute, a space, and U+1F600 (a surrogate pair where wchar_t is 16 bits), then u-umlaut.
+    CheckStartsWith(std::wstring(L"caf" L"\x00E9" L" \U0001F600"), L"\x00FC", __func__, __LINE__, "not present");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_Present_Passes()
+{
+    CheckStartsWith(std::wstring(L"hello world"), L"hello", __func__, __LINE__, "prefix present");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StartsWithICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWithIC()/CheckStartsWithIC()/
+// AssertNotStartsWithIC()/CheckNotStartsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StartsWithICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotStartsWithIC_Absent_Passes();
+    void Test_AssertNotStartsWithIC_DifferentCase_Fails();
+    void Test_AssertNotStartsWithIC_Wide_Absent_Passes();
+    void Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails();
+    void Test_AssertStartsWithIC_Absent_Fails();
+    void Test_AssertStartsWithIC_DifferentCase_Passes();
+    void Test_AssertStartsWithIC_Wide_Absent_Fails();
+    void Test_AssertStartsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckNotStartsWithIC_Absent_Passes();
+    void Test_CheckNotStartsWithIC_DifferentCase_Fails();
+    void Test_CheckNotStartsWithIC_EmptyPrefix_Fails();
+    void Test_CheckNotStartsWithIC_PrefixLongerThanText_Passes();
+    void Test_CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes();
+    void Test_CheckNotStartsWithIC_Wide_Absent_Passes();
+    void Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails();
+    void Test_CheckStartsWithIC_Absent_Fails();
+    void Test_CheckStartsWithIC_BothEmpty_Passes();
+    void Test_CheckStartsWithIC_DifferentCase_Passes();
+    void Test_CheckStartsWithIC_EmptyPrefix_Passes();
+    void Test_CheckStartsWithIC_EmptyText_Fails();
+    void Test_CheckStartsWithIC_NonASCII_Fails();
+    void Test_CheckStartsWithIC_NonLetters_Fails();
+    void Test_CheckStartsWithIC_PrefixLongerThanText_Fails();
+    void Test_CheckStartsWithIC_PrefixOnlyAtEnd_Fails();
+    void Test_CheckStartsWithIC_PrefixOnlyInMiddle_Fails();
+    void Test_CheckStartsWithIC_Wide_Absent_Fails();
+    void Test_CheckStartsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckStartsWithIC_Wide_NonASCII_Fails();
+
+public:
+    TFixture_StartsWithICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_StartsWithICComparisons::TFixture_StartsWithICComparisons()
+    : inherited("Fixture_StartsWithICComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Absent_Passes,
+        "AssertNotStartsWithIC_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_DifferentCase_Fails,
+        "AssertNotStartsWithIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Wide_Absent_Passes,
+        "AssertNotStartsWithIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails,
+        "AssertNotStartsWithIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Absent_Fails,
+        "AssertStartsWithIC_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_DifferentCase_Passes,
+        "AssertStartsWithIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Wide_Absent_Fails,
+        "AssertStartsWithIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Wide_DifferentCase_Passes,
+        "AssertStartsWithIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Absent_Passes,
+        "CheckNotStartsWithIC_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_DifferentCase_Fails,
+        "CheckNotStartsWithIC_DifferentCase_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_EmptyPrefix_Fails,
+        "CheckNotStartsWithIC_EmptyPrefix_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_PrefixLongerThanText_Passes,
+        "CheckNotStartsWithIC_PrefixLongerThanText_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes,
+        "CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Wide_Absent_Passes,
+        "CheckNotStartsWithIC_Wide_Absent_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails,
+        "CheckNotStartsWithIC_Wide_DifferentCase_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Absent_Fails,
+        "CheckStartsWithIC_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_BothEmpty_Passes,
+        "CheckStartsWithIC_BothEmpty_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_DifferentCase_Passes,
+        "CheckStartsWithIC_DifferentCase_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_EmptyPrefix_Passes,
+        "CheckStartsWithIC_EmptyPrefix_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_EmptyText_Fails,
+        "CheckStartsWithIC_EmptyText_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_NonASCII_Fails,
+        "CheckStartsWithIC_NonASCII_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_NonLetters_Fails,
+        "CheckStartsWithIC_NonLetters_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixLongerThanText_Fails,
+        "CheckStartsWithIC_PrefixLongerThanText_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixOnlyAtEnd_Fails,
+        "CheckStartsWithIC_PrefixOnlyAtEnd_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixOnlyInMiddle_Fails,
+        "CheckStartsWithIC_PrefixOnlyInMiddle_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_Absent_Fails,
+        "CheckStartsWithIC_Wide_Absent_Fails");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_DifferentCase_Passes,
+        "CheckStartsWithIC_Wide_DifferentCase_Passes");
+    RegisterTest(&TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_NonASCII_Fails,
+        "CheckStartsWithIC_Wide_NonASCII_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Absent_Passes()
+{
+    AssertNotStartsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_DifferentCase_Fails()
+{
+    AssertNotStartsWithIC(std::string("Hello World"), "HELLO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Wide_Absent_Passes()
+{
+    AssertNotStartsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails()
+{
+    AssertNotStartsWithIC(std::wstring(L"Hello World"), L"HELLO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Absent_Fails()
+{
+    AssertStartsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_DifferentCase_Passes()
+{
+    AssertStartsWithIC(std::string("Hello World"), "hELLO w", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Wide_Absent_Fails()
+{
+    AssertStartsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_AssertStartsWithIC_Wide_DifferentCase_Passes()
+{
+    AssertStartsWithIC(std::wstring(L"Hello World"), L"hELLO w", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Absent_Passes()
+{
+    CheckNotStartsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_DifferentCase_Fails()
+{
+    CheckNotStartsWithIC(std::string("Hello World"), "HELLO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_EmptyPrefix_Fails()
+{
+    CheckNotStartsWithIC(std::string("Hello World"), "", __func__, __LINE__,
+        "every string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_PrefixLongerThanText_Passes()
+{
+    CheckNotStartsWithIC(std::string("Hello"), "HELLO WORLD", __func__, __LINE__, "the text has the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes()
+{
+    CheckNotStartsWithIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "the prefix is at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Wide_Absent_Passes()
+{
+    CheckNotStartsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails()
+{
+    CheckNotStartsWithIC(std::wstring(L"Hello World"), L"HELLO", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Absent_Fails()
+{
+    CheckStartsWithIC(std::string("Hello World"), "xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_BothEmpty_Passes()
+{
+    CheckStartsWithIC(std::string(), "", __func__, __LINE__, "even an empty string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_DifferentCase_Passes()
+{
+    CheckStartsWithIC(std::string("Hello World"), "hELLO w", __func__, __LINE__, "case differs");
+    CheckStartsWithIC(std::string("Hello World"), "hello world", __func__, __LINE__, "the whole text, case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_EmptyPrefix_Passes()
+{
+    CheckStartsWithIC(std::string("Hello World"), "", __func__, __LINE__, "every string starts with the empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_EmptyText_Fails()
+{
+    CheckStartsWithIC(std::string(), "h", __func__, __LINE__, "an empty string starts with no letter");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_NonASCII_Fails()
+{
+    // UTF-8 E-acute and e-acute.
+    CheckStartsWithIC(std::string("caf\xC3\x89s"), "CAF\xC3\xA9", __func__, __LINE__, "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_NonLetters_Fails()
+{
+    CheckStartsWithIC(std::string("a@b[c"), "a`b{", __func__, __LINE__, "@ and `, and [ and {, are not letters");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixLongerThanText_Fails()
+{
+    CheckStartsWithIC(std::string("Hello"), "HELLO WORLD", __func__, __LINE__, "the text has the start only");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixOnlyAtEnd_Fails()
+{
+    CheckStartsWithIC(std::string("Hello World"), "WORLD", __func__, __LINE__, "the prefix is at the end");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_PrefixOnlyInMiddle_Fails()
+{
+    CheckStartsWithIC(std::string("Hello World"), "LO WO", __func__, __LINE__, "the prefix is in the middle");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_Absent_Fails()
+{
+    CheckStartsWithIC(std::wstring(L"Hello World"), L"xyz", __func__, __LINE__, "prefix absent");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_DifferentCase_Passes()
+{
+    CheckStartsWithIC(std::wstring(L"Hello World"), L"hELLO w", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_NonASCII_Fails()
+{
+    // E-acute and e-acute.
+    CheckStartsWithIC(std::wstring(L"caf" L"\x00C9" L"s"), L"CAF" L"\x00E9", __func__, __LINE__,
+        "only A-Z are case-folded");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test per string
+// overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals() whose failure message didn't use to
+// show the values: wide text (shown as UTF-8), the NotEquals overloads (which show the shared value), and null wide
+// C strings (shown as "(null)", like narrow ones). Used by Test_Equals_ShowsStringValues below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StringComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_WideCStringNull_Fails();
+    void Test_AssertEquals_Wide_Fails();
+    void Test_AssertNotEquals_CStringBothNull_Fails();
+    void Test_AssertNotEquals_String_Fails();
+    void Test_AssertNotEquals_WideCStringBothNull_Fails();
+    void Test_AssertNotEquals_Wide_Fails();
+    void Test_CheckEquals_WideCStringNull_Fails();
+    void Test_CheckEquals_WideCString_Fails();
+    void Test_CheckEquals_Wide_Fails();
+    void Test_CheckNotEquals_CStringBothNull_Fails();
+    void Test_CheckNotEquals_String_Fails();
+    void Test_CheckNotEquals_WideCStringBothNull_Fails();
+    void Test_CheckNotEquals_Wide_Fails();
+
+public:
+    TFixture_StringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_StringComparisons::TFixture_StringComparisons()
+    : inherited("Fixture_StringComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_StringComparisons::Test_AssertEquals_WideCStringNull_Fails,
+        "AssertEquals_WideCStringNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertEquals_Wide_Fails, "AssertEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_CStringBothNull_Fails,
+        "AssertNotEquals_CStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_String_Fails, "AssertNotEquals_String_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_WideCStringBothNull_Fails,
+        "AssertNotEquals_WideCStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_AssertNotEquals_Wide_Fails, "AssertNotEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_WideCStringNull_Fails,
+        "CheckEquals_WideCStringNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_WideCString_Fails, "CheckEquals_WideCString_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckEquals_Wide_Fails, "CheckEquals_Wide_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_CStringBothNull_Fails,
+        "CheckNotEquals_CStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_String_Fails, "CheckNotEquals_String_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_WideCStringBothNull_Fails,
+        "CheckNotEquals_WideCStringBothNull_Fails");
+    RegisterTest(&TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails, "CheckNotEquals_Wide_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertEquals_WideCStringNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    AssertEquals(L"abc", nullStr, __func__, __LINE__, "null never matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertEquals_Wide_Fails()
+{
+    // "cafe" with an e-acute.
+    AssertEquals(std::wstring(L"caf" L"\x00E9"), std::wstring(L"cafe"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_CStringBothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    AssertNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_String_Fails()
+{
+    AssertNotEquals(std::string("abc"), std::string("abc"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_WideCStringBothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    AssertNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_AssertNotEquals_Wide_Fails()
+{
+    // "ete" with two e-acutes.
+    std::wstring const text = L"\x00E9" L"t" L"\x00E9";
+    AssertNotEquals(text, text, __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_WideCStringNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckEquals(nullStr, L"", __func__, __LINE__, "null never matches, even an empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_WideCString_Fails()
+{
+    CheckEquals(L"abc", L"xyz", __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckEquals_Wide_Fails()
+{
+    // "cafe" with an e-acute.
+    CheckEquals(std::wstring(L"caf" L"\x00E9"), std::wstring(L"cafe"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_CStringBothNull_Fails()
+{
+    char const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_String_Fails()
+{
+    CheckNotEquals(std::string("abc"), std::string("abc"), __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_WideCStringBothNull_Fails()
+{
+    wchar_t const* const nullStr = nullptr;
+    CheckNotEquals(nullStr, nullStr, __func__, __LINE__, "two nulls are equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails()
+{
+    // "ete" with two e-acutes.
+    std::wstring const text = L"\x00E9" L"t" L"\x00E9";
+    CheckNotEquals(text, text, __func__, __LINE__, "same text");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_TrueFalseChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
+// CheckFalse() with a value that passes and one that fails, so Test_TrueFalse_FailureNamesTheExpectedValue below can
+// check that each failure states the value that was expected, not the opposite. Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TrueFalseChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertFalse_False_Passes();
+    void Test_AssertFalse_True_Fails();
+    void Test_AssertTrue_False_Fails();
+    void Test_AssertTrue_True_Passes();
+    void Test_CheckFalse_False_Passes();
+    void Test_CheckFalse_True_Fails();
+    void Test_CheckTrue_False_Fails();
+    void Test_CheckTrue_True_Passes();
+
+public:
+    TFixture_TrueFalseChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_TrueFalseChecks::TFixture_TrueFalseChecks()
+    : inherited("Fixture_TrueFalseChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertFalse_False_Passes, "AssertFalse_False_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertFalse_True_Fails, "AssertFalse_True_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertTrue_False_Fails, "AssertTrue_False_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_AssertTrue_True_Passes, "AssertTrue_True_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckFalse_False_Passes, "CheckFalse_False_Passes");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckFalse_True_Fails, "CheckFalse_True_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckTrue_False_Fails, "CheckTrue_False_Fails");
+    RegisterTest(&TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes, "CheckTrue_True_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertFalse_False_Passes()
+{
+    AssertFalse(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertFalse_True_Fails()
+{
+    AssertFalse(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertTrue_False_Fails()
+{
+    AssertTrue(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_AssertTrue_True_Passes()
+{
+    AssertTrue(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckFalse_False_Passes()
+{
+    CheckFalse(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckFalse_True_Fails()
+{
+    CheckFalse(true, __func__, __LINE__, "value is true");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckTrue_False_Fails()
+{
+    CheckTrue(false, __func__, __LINE__, "value is false");
+}
+//---------------------------------------------------------------------------
+void TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes()
+{
+    CheckTrue(true, __func__, __LINE__, "value is true");
 }
 //---------------------------------------------------------------------------
 
@@ -752,6 +4039,19 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive,
         "CheckNear_ToleranceBoundaryIsInclusive");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly, "ContainsIC_IgnoresASCIICaseOnly");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring, "Contains_ShowsTextAndSubstring");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly, "EndsWithIC_IgnoresASCIICaseOnly");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix, "EndsWith_ShowsTextAndSuffix");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly, "EqualsIC_IgnoresASCIICaseOnly");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
+        "Equals_ComparesMixedIntegerTypesByValue");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
+        "Equals_ShowsBoolValuesAsTrueOrFalse");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
+        "Ordering_ComparesByValueAndShowsBoth");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
@@ -782,6 +4082,15 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
         "SetLogSuppressed_SilencesFixtureOutput");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLine,
+        "SourceLocation_ReportsCallerFunctionAndLine");
+#endif
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly,
+        "StartsWithIC_IgnoresASCIICaseOnly");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix, "StartsWith_ShowsTextAndPrefix");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
+        "TrueFalse_FailureNamesTheExpectedValue");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_TestBase::~TTest_ASWUnitTests_TestBase()
@@ -844,6 +4153,508 @@ void TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts()
         "a Check failure does not abort the rest of the test, unlike Assert");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly()
+{
+    // Arrange
+    TFixture_ContainsICComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(25), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContainsIC_Absent_Fails");
+    TTestCaseRecord const* const assertNotContains =
+        FindRecord(results, "AssertNotContainsIC_Wide_DifferentCase_Fails");
+    TTestCaseRecord const* const checkContains = FindRecord(results, "CheckContainsIC_Absent_Fails");
+    TTestCaseRecord const* const checkNotContains = FindRecord(results, "CheckNotContainsIC_DifferentCase_Fails");
+    AssertTrue(assertContains != nullptr && assertNotContains != nullptr && checkContains != nullptr &&
+        checkNotContains != nullptr, __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
+    // text and substring are shown as given, not case-folded.
+    std::string const containsDetail =
+        "): Expected \"Hello World\" to contain \"xyz\" (ignoring case). substring absent";
+    std::string const notContainsDetail =
+        "): Expected \"Hello World\" not to contain \"WORLD\" (ignoring case). case differs";
+
+    CheckStartsWith(assertContains->Message, "Substring not found: Test_AssertContainsIC_Absent_Fails (", __func__,
+        __LINE__, "AssertContainsIC names the failure and test");
+    CheckEndsWith(assertContains->Message, containsDetail, __func__, __LINE__,
+        "AssertContainsIC shows the text and substring");
+    CheckStartsWith(assertNotContains->Message,
+        "Substring found: Test_AssertNotContainsIC_Wide_DifferentCase_Fails (", __func__, __LINE__,
+        "AssertNotContainsIC names the failure and test");
+    CheckEndsWith(assertNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "AssertNotContainsIC shows the wide text and substring");
+    CheckStartsWith(checkContains->Message, "Check failed for: \"Test_CheckContainsIC_Absent_Fails\" (", __func__,
+        __LINE__, "CheckContainsIC names the test");
+    CheckEndsWith(checkContains->Message, containsDetail, __func__, __LINE__,
+        "CheckContainsIC shows the text and substring");
+    CheckStartsWith(checkNotContains->Message, "Check failed for: \"Test_CheckNotContainsIC_DifferentCase_Fails\" (",
+        __func__, __LINE__, "CheckNotContainsIC names the test");
+    CheckEndsWith(checkNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "CheckNotContainsIC shows the text and substring");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
+{
+    // Arrange
+    TFixture_ContainsComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(21), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContains_Absent_Fails");
+    TTestCaseRecord const* const assertNotContains = FindRecord(results, "AssertNotContains_Wide_Present_Fails");
+    TTestCaseRecord const* const checkContains = FindRecord(results, "CheckContains_Absent_Fails");
+    TTestCaseRecord const* const checkNonASCII = FindRecord(results, "CheckContains_Wide_NonASCII_Fails");
+    TTestCaseRecord const* const checkNotContains = FindRecord(results, "CheckNotContains_Present_Fails");
+    AssertTrue(assertContains != nullptr && assertNotContains != nullptr && checkContains != nullptr &&
+        checkNonASCII != nullptr && checkNotContains != nullptr, __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    std::string const containsDetail = "): Expected \"hello world\" to contain \"xyz\". substring absent";
+    std::string const notContainsDetail = "): Expected \"hello world\" not to contain \"world\". substring present";
+    // "cafe" with an e-acute, a space and U+1F600, then u-umlaut, as UTF-8.
+    std::string const nonASCIIDetail = "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to contain \"\xC3\xBC\". not present";
+
+    CheckStartsWith(assertContains->Message, "Substring not found: Test_AssertContains_Absent_Fails (", __func__,
+        __LINE__, "AssertContains names the failure and test");
+    CheckEndsWith(assertContains->Message, containsDetail, __func__, __LINE__,
+        "AssertContains shows the text and substring");
+    CheckStartsWith(assertNotContains->Message, "Substring found: Test_AssertNotContains_Wide_Present_Fails (",
+        __func__, __LINE__, "AssertNotContains names the failure and test");
+    CheckEndsWith(assertNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "AssertNotContains shows the wide text and substring");
+    CheckStartsWith(checkContains->Message, "Check failed for: \"Test_CheckContains_Absent_Fails\" (", __func__,
+        __LINE__, "CheckContains names the test");
+    CheckEndsWith(checkContains->Message, containsDetail, __func__, __LINE__,
+        "CheckContains shows the text and substring");
+    CheckStartsWith(checkNotContains->Message, "Check failed for: \"Test_CheckNotContains_Present_Fails\" (", __func__,
+        __LINE__, "CheckNotContains names the test");
+    CheckEndsWith(checkNotContains->Message, notContainsDetail, __func__, __LINE__,
+        "CheckNotContains shows the text and substring");
+    CheckEndsWith(checkNonASCII->Message, nonASCIIDetail, __func__, __LINE__, "a wide failure shows its text as UTF-8");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly()
+{
+    // Arrange
+    TFixture_EndsWithICComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(28), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertEndsWith = FindRecord(results, "AssertEndsWithIC_Absent_Fails");
+    TTestCaseRecord const* const assertEndsWithWide = FindRecord(results, "AssertEndsWithIC_Wide_Absent_Fails");
+    TTestCaseRecord const* const assertNotEndsWith = FindRecord(results, "AssertNotEndsWithIC_DifferentCase_Fails");
+    TTestCaseRecord const* const assertNotEndsWithWide =
+        FindRecord(results, "AssertNotEndsWithIC_Wide_DifferentCase_Fails");
+    TTestCaseRecord const* const checkEndsWith = FindRecord(results, "CheckEndsWithIC_Absent_Fails");
+    TTestCaseRecord const* const checkEndsWithWide = FindRecord(results, "CheckEndsWithIC_Wide_Absent_Fails");
+    TTestCaseRecord const* const checkNotEndsWith = FindRecord(results, "CheckNotEndsWithIC_DifferentCase_Fails");
+    TTestCaseRecord const* const checkNotEndsWithWide =
+        FindRecord(results, "CheckNotEndsWithIC_Wide_DifferentCase_Fails");
+    AssertTrue(assertEndsWith != nullptr && assertEndsWithWide != nullptr && assertNotEndsWith != nullptr &&
+        assertNotEndsWithWide != nullptr && checkEndsWith != nullptr && checkEndsWithWide != nullptr &&
+        checkNotEndsWith != nullptr && checkNotEndsWithWide != nullptr, __func__, __LINE__,
+        "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
+    // text and suffix are shown as given, not case-folded. Each "Wide_" test uses the same text as its narrow twin.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+    std::string const endsWithDetail = "): Expected \"Hello World\" to end with \"xyz\" (ignoring case). suffix absent";
+    std::string const notEndsWithDetail =
+        "): Expected \"Hello World\" not to end with \"WORLD\" (ignoring case). case differs";
+
+    CheckTrue(messageMatches(*assertEndsWith, "Suffix not found: Test_AssertEndsWithIC_Absent_Fails (", endsWithDetail),
+        __func__, __LINE__, "AssertEndsWithIC shows the text and suffix: " + assertEndsWith->Message);
+    CheckTrue(messageMatches(*assertEndsWithWide, "Suffix not found: Test_AssertEndsWithIC_Wide_Absent_Fails (",
+        endsWithDetail), __func__, __LINE__,
+        "AssertEndsWithIC shows the wide text and suffix: " + assertEndsWithWide->Message);
+    CheckTrue(messageMatches(*assertNotEndsWith, "Suffix found: Test_AssertNotEndsWithIC_DifferentCase_Fails (",
+        notEndsWithDetail), __func__, __LINE__,
+        "AssertNotEndsWithIC shows the text and suffix: " + assertNotEndsWith->Message);
+    CheckTrue(messageMatches(*assertNotEndsWithWide,
+        "Suffix found: Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails (", notEndsWithDetail), __func__, __LINE__,
+        "AssertNotEndsWithIC shows the wide text and suffix: " + assertNotEndsWithWide->Message);
+    CheckTrue(messageMatches(*checkEndsWith, "Check failed for: \"Test_CheckEndsWithIC_Absent_Fails\" (",
+        endsWithDetail), __func__, __LINE__, "CheckEndsWithIC shows the text and suffix: " + checkEndsWith->Message);
+    CheckTrue(messageMatches(*checkEndsWithWide, "Check failed for: \"Test_CheckEndsWithIC_Wide_Absent_Fails\" (",
+        endsWithDetail), __func__, __LINE__,
+        "CheckEndsWithIC shows the wide text and suffix: " + checkEndsWithWide->Message);
+    CheckTrue(messageMatches(*checkNotEndsWith, "Check failed for: \"Test_CheckNotEndsWithIC_DifferentCase_Fails\" (",
+        notEndsWithDetail), __func__, __LINE__,
+        "CheckNotEndsWithIC shows the text and suffix: " + checkNotEndsWith->Message);
+    CheckTrue(messageMatches(*checkNotEndsWithWide,
+        "Check failed for: \"Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails\" (", notEndsWithDetail), __func__,
+        __LINE__, "CheckNotEndsWithIC shows the wide text and suffix: " + checkNotEndsWithWide->Message);
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix()
+{
+    // Arrange
+    TFixture_EndsWithComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(29), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertEndsWith = FindRecord(results, "AssertEndsWith_Absent_Fails");
+    TTestCaseRecord const* const assertEndsWithWide = FindRecord(results, "AssertEndsWith_Wide_Absent_Fails");
+    TTestCaseRecord const* const assertNotEndsWith = FindRecord(results, "AssertNotEndsWith_Present_Fails");
+    TTestCaseRecord const* const assertNotEndsWithWide = FindRecord(results, "AssertNotEndsWith_Wide_Present_Fails");
+    TTestCaseRecord const* const checkEndsWith = FindRecord(results, "CheckEndsWith_Absent_Fails");
+    TTestCaseRecord const* const checkEndsWithWide = FindRecord(results, "CheckEndsWith_Wide_Absent_Fails");
+    TTestCaseRecord const* const checkNonASCII = FindRecord(results, "CheckEndsWith_Wide_NonASCII_Fails");
+    TTestCaseRecord const* const checkNotEndsWith = FindRecord(results, "CheckNotEndsWith_Present_Fails");
+    TTestCaseRecord const* const checkNotEndsWithWide = FindRecord(results, "CheckNotEndsWith_Wide_Present_Fails");
+    AssertTrue(assertEndsWith != nullptr && assertEndsWithWide != nullptr && assertNotEndsWith != nullptr &&
+        assertNotEndsWithWide != nullptr && checkEndsWith != nullptr && checkEndsWithWide != nullptr &&
+        checkNonASCII != nullptr && checkNotEndsWith != nullptr && checkNotEndsWithWide != nullptr, __func__,
+        __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. Each
+    // "Wide_" test uses the same text as its narrow twin.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+    std::string const endsWithDetail = "): Expected \"hello world\" to end with \"xyz\". suffix absent";
+    std::string const notEndsWithDetail = "): Expected \"hello world\" not to end with \"world\". suffix present";
+    // "cafe" with an e-acute, a space and U+1F600, then u-umlaut, as UTF-8.
+    std::string const nonASCIIDetail =
+        "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to end with \"\xC3\xBC\". not present";
+
+    CheckTrue(messageMatches(*assertEndsWith, "Suffix not found: Test_AssertEndsWith_Absent_Fails (", endsWithDetail),
+        __func__, __LINE__, "AssertEndsWith shows the text and suffix: " + assertEndsWith->Message);
+    CheckTrue(messageMatches(*assertEndsWithWide, "Suffix not found: Test_AssertEndsWith_Wide_Absent_Fails (",
+        endsWithDetail), __func__, __LINE__,
+        "AssertEndsWith shows the wide text and suffix: " + assertEndsWithWide->Message);
+    CheckTrue(messageMatches(*assertNotEndsWith, "Suffix found: Test_AssertNotEndsWith_Present_Fails (",
+        notEndsWithDetail), __func__, __LINE__,
+        "AssertNotEndsWith shows the text and suffix: " + assertNotEndsWith->Message);
+    CheckTrue(messageMatches(*assertNotEndsWithWide, "Suffix found: Test_AssertNotEndsWith_Wide_Present_Fails (",
+        notEndsWithDetail), __func__, __LINE__,
+        "AssertNotEndsWith shows the wide text and suffix: " + assertNotEndsWithWide->Message);
+    CheckTrue(messageMatches(*checkEndsWith, "Check failed for: \"Test_CheckEndsWith_Absent_Fails\" (", endsWithDetail),
+        __func__, __LINE__, "CheckEndsWith shows the text and suffix: " + checkEndsWith->Message);
+    CheckTrue(messageMatches(*checkEndsWithWide, "Check failed for: \"Test_CheckEndsWith_Wide_Absent_Fails\" (",
+        endsWithDetail), __func__, __LINE__,
+        "CheckEndsWith shows the wide text and suffix: " + checkEndsWithWide->Message);
+    CheckTrue(messageMatches(*checkNotEndsWith, "Check failed for: \"Test_CheckNotEndsWith_Present_Fails\" (",
+        notEndsWithDetail), __func__, __LINE__,
+        "CheckNotEndsWith shows the text and suffix: " + checkNotEndsWith->Message);
+    CheckTrue(messageMatches(*checkNotEndsWithWide, "Check failed for: \"Test_CheckNotEndsWith_Wide_Present_Fails\" (",
+        notEndsWithDetail), __func__, __LINE__,
+        "CheckNotEndsWith shows the wide text and suffix: " + checkNotEndsWithWide->Message);
+    CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
+        "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly()
+{
+    // Arrange
+    TFixture_EqualsICComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(23), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEqualsIC_DifferentText_Fails");
+    TTestCaseRecord const* const assertNotEquals = FindRecord(results, "AssertNotEqualsIC_Wide_DifferentCase_Fails");
+    TTestCaseRecord const* const checkEquals = FindRecord(results, "CheckEqualsIC_DifferentText_Fails");
+    TTestCaseRecord const* const checkNonASCII = FindRecord(results, "CheckEqualsIC_Wide_NonASCII_Fails");
+    TTestCaseRecord const* const checkNotEquals = FindRecord(results, "CheckNotEqualsIC_DifferentCase_Fails");
+    AssertTrue(assertEquals != nullptr && assertNotEquals != nullptr && checkEquals != nullptr &&
+        checkNonASCII != nullptr && checkNotEquals != nullptr, __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
+    // values are shown as given, not case-folded, and wide ones as UTF-8.
+    CheckStartsWith(assertEquals->Message, "Values not equal: Test_AssertEqualsIC_DifferentText_Fails (", __func__,
+        __LINE__, "AssertEqualsIC names the failure and test");
+    CheckEndsWith(assertEquals->Message, "): Expected: \"Hello\" but was \"Help\" (ignoring case). different text",
+        __func__, __LINE__, "AssertEqualsIC shows both values");
+    CheckStartsWith(assertNotEquals->Message, "Values are equal: Test_AssertNotEqualsIC_Wide_DifferentCase_Fails (",
+        __func__, __LINE__, "AssertNotEqualsIC names the failure and test");
+    CheckEndsWith(assertNotEquals->Message,
+        "): Values: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs", __func__, __LINE__,
+        "AssertNotEqualsIC shows both wide values");
+    CheckStartsWith(checkEquals->Message, "Check failed for: \"Test_CheckEqualsIC_DifferentText_Fails\" (", __func__,
+        __LINE__, "CheckEqualsIC names the test");
+    CheckEndsWith(checkEquals->Message, "): Expected \"Hello\" but was \"Help\" (ignoring case). different text",
+        __func__, __LINE__, "CheckEqualsIC shows both values");
+    CheckStartsWith(checkNonASCII->Message, "Check failed for: \"Test_CheckEqualsIC_Wide_NonASCII_Fails\" (",
+        __func__, __LINE__, "CheckEqualsIC names the test");
+    CheckEndsWith(checkNonASCII->Message,
+        "): Expected \"caf\xC3\x89\" but was \"caf\xC3\xA9\" (ignoring case). only A-Z are case-folded", __func__,
+        __LINE__, "CheckEqualsIC shows wide values as UTF-8");
+    CheckStartsWith(checkNotEquals->Message, "Check failed for: \"Test_CheckNotEqualsIC_DifferentCase_Fails\" (",
+        __func__, __LINE__, "CheckNotEqualsIC names the test");
+    CheckEndsWith(checkNotEquals->Message,
+        "): Both values equal: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs", __func__, __LINE__,
+        "CheckNotEqualsIC shows both values");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
+{
+    // Arrange
+    TFixture_CStringComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(26), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertNull = FindRecord(results, "AssertEquals_NullAndNonNull_Fails");
+    TTestCaseRecord const* const checkNull = FindRecord(results, "CheckEquals_NullAndEmpty_Fails");
+    AssertTrue(assertNull != nullptr && checkNull != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckContains(assertNull->Message, "\"(null)\"", __func__, __LINE__,
+        "an Assert failure shows a null C string as (null)");
+    CheckContains(checkNull->Message, "Expected \"(null)\" but was \"\"", __func__, __LINE__,
+        "a Check failure shows a null C string as (null), distinct from an empty one");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
+{
+    // Arrange
+    TFixture_IntegerComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(18), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const unsignedMax = FindRecord(results, "CheckEquals_NegativeAndUnsignedMax_Fails");
+    TTestCaseRecord const* const uint64Max = FindRecord(results, "CheckEquals_NegativeAndUint64Max_Fails");
+    AssertTrue(unsignedMax != nullptr && uint64Max != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckContains(unsignedMax->Message, "Expected \"-1\" but was \"4294967295\"", __func__, __LINE__,
+        "a failure shows both values as they are, without wrapping either");
+    CheckContains(uint64Max->Message, "Expected \"-1\" but was \"18446744073709551615\"", __func__, __LINE__,
+        "a failure beyond int64_t's range shows both values as they are");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()
+{
+    // Arrange
+    TFixture_BoolComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEquals_Different_Fails");
+    TTestCaseRecord const* const assertNotEquals = FindRecord(results, "AssertNotEquals_Same_Fails");
+    TTestCaseRecord const* const checkEquals = FindRecord(results, "CheckEquals_Different_Fails");
+    TTestCaseRecord const* const checkNotEquals = FindRecord(results, "CheckNotEquals_Same_Fails");
+    AssertTrue(assertEquals != nullptr && assertNotEquals != nullptr && checkEquals != nullptr &&
+        checkNotEquals != nullptr, __func__, __LINE__, "every expected record exists");
+
+    CheckContains(assertEquals->Message, "\"true\" but was \"false\"", __func__, __LINE__,
+        "AssertEquals shows bools as true/false");
+    CheckContains(assertNotEquals->Message, "Value: \"true\"", __func__, __LINE__,
+        "AssertNotEquals shows bools as true/false");
+    CheckContains(checkEquals->Message, "Expected \"true\" but was \"false\"", __func__, __LINE__,
+        "CheckEquals shows bools as true/false");
+    CheckContains(checkNotEquals->Message, "Both values equal: \"true\"", __func__, __LINE__,
+        "CheckNotEquals shows bools as true/false");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
+{
+    // Arrange
+    TFixture_StringComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. Wide
+    // text is shown as UTF-8 ("caf\xC3\xA9" is "cafe" with an e-acute).
+    std::vector<std::pair<std::string, std::string> > const expectedDetails = {
+        { "AssertEquals_WideCStringNull_Fails", "): Expected: \"abc\" but was \"(null)\". null never matches" },
+        { "AssertEquals_Wide_Fails", "): Expected: \"caf\xC3\xA9\" but was \"cafe\". different text" },
+        { "AssertNotEquals_CStringBothNull_Fails", "): Value: \"(null)\". two nulls are equal" },
+        { "AssertNotEquals_String_Fails", "): Value: \"abc\". same text" },
+        { "AssertNotEquals_WideCStringBothNull_Fails", "): Value: \"(null)\". two nulls are equal" },
+        { "AssertNotEquals_Wide_Fails", "): Value: \"\xC3\xA9t\xC3\xA9\". same text" },
+        { "CheckEquals_WideCStringNull_Fails",
+          "): Expected \"(null)\" but was \"\". null never matches, even an empty string" },
+        { "CheckEquals_WideCString_Fails", "): Expected \"abc\" but was \"xyz\". different text" },
+        { "CheckEquals_Wide_Fails", "): Expected \"caf\xC3\xA9\" but was \"cafe\". different text" },
+        { "CheckNotEquals_CStringBothNull_Fails", "): Both values equal: \"(null)\". two nulls are equal" },
+        { "CheckNotEquals_String_Fails", "): Both values equal: \"abc\". same text" },
+        { "CheckNotEquals_WideCStringBothNull_Fails", "): Both values equal: \"(null)\". two nulls are equal" },
+        { "CheckNotEquals_Wide_Fails", "): Both values equal: \"\xC3\xA9t\xC3\xA9\". same text" },
+    };
+
+    for (std::pair<std::string, std::string> const& expected : expectedDetails)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+        CheckTrue(record->Outcome == TTestOutcome::Fail, __func__, __LINE__, expected.first + " should fail");
+
+        std::string prefix = "Check failed for: \"Test_" + expected.first + "\" (";
+        if (expected.first.compare(0, 12, "AssertEquals") == 0)
+            prefix = "Values not equal: Test_" + expected.first + " (";
+        else if (expected.first.compare(0, 15, "AssertNotEquals") == 0)
+            prefix = "Values are equal: Test_" + expected.first + " (";
+
+        CheckStartsWith(record->Message, prefix, __func__, __LINE__, expected.first + " names the test");
+        CheckEndsWith(record->Message, expected.second, __func__, __LINE__, expected.first + " shows the values");
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
+{
+    // Arrange
+    TFixture_OrderingComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(36), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    std::vector<std::pair<std::string, std::string> > const expectedDetails = {
+        { "AssertGreaterThanOrEqual_Less_Fails", "): Expected 1 to be >= 2. less" },
+        { "CheckGreaterThan_Double_Fails", "): Expected 0.1 to be > 0.25. less" },
+        { "CheckGreaterThan_Equal_Fails", "): Expected 4 to be > 4. equal" },
+        { "CheckGreaterThan_Float_Fails", "): Expected 0.1 to be > 0.25. less" },
+        { "CheckGreaterThan_LongDouble_Fails", "): Expected 1.5 to be > 2.5. less" },
+        { "CheckLessThanOrEqual_Greater_Fails", "): Expected 5 to be <= 4. greater" },
+        { "CheckLessThan_CloseDoubles_Fails", "): Expected 1.0000000000000002 to be < 1. just greater" },
+        { "CheckLessThan_Uint64MaxAndNegative_Fails", "): Expected 18446744073709551615 to be < -1. greater" },
+    };
+
+    for (std::pair<std::string, std::string> const& expected : expectedDetails)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+
+        std::string const prefix = (expected.first.compare(0, 6, "Assert") == 0) ?
+                "Values out of order: Test_" + expected.first + " (" :
+                "Check failed for: \"Test_" + expected.first + "\" (";
+        CheckStartsWith(record->Message, prefix, __func__, __LINE__, expected.first + " names the test");
+        CheckEndsWith(record->Message, expected.second, __func__, __LINE__,
+            expected.first + " shows the value and the bound");
+    }
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout()
 {
     // Arrange
@@ -874,7 +4685,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeo
     CheckEquals(std::string("HangsForever"), record.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually timed out");
     CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
-    CheckTrue(record.Message.find("timeout") != std::string::npos, __func__, __LINE__,
+    CheckContains(record.Message, "timeout", __func__, __LINE__,
         "the failure message explains why: it exceeded its timeout");
 }
 //---------------------------------------------------------------------------
@@ -949,8 +4760,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
     CheckEquals(std::string("CrashesButDoesNotAbort"), crashedRecord.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually crashed");
     CheckTrue(crashedRecord.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
-    CheckTrue(crashedRecord.Message.find("crashed") != std::string::npos, __func__, __LINE__,
-        "the failure message explains why: it crashed");
+    CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
@@ -997,25 +4807,27 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetai
     AssertTrue(failViaCheck != nullptr && continuesAfterCheck != nullptr && checkThenAssert != nullptr &&
         failViaAssert != nullptr && pass != nullptr, __func__, __LINE__, "every expected record exists");
 
-    CheckEquals(static_cast<size_t>(0), failViaCheck->Message.find("Check failed for: \"Test_FailViaCheck\""),
-        __func__, __LINE__, "a Check-only failure's detail is its Check failure, not empty");
-    CheckEquals(std::string::npos, failViaCheck->Message.find('\n'), __func__, __LINE__,
+    CheckStartsWith(failViaCheck->Message, "Check failed for: \"Test_FailViaCheck\"", __func__, __LINE__,
+        "a Check-only failure's detail is its Check failure, not empty");
+    CheckNotContains(failViaCheck->Message, "\n", __func__, __LINE__,
         "one Check failure is one line, with no other test's Check failures carried over");
 
     CheckEquals(static_cast<size_t>(2),
         CountOccurrences(continuesAfterCheck->Message, "Check failed for: \"Test_ContinuesAfterCheckFailure\""),
         __func__, __LINE__, "both Check failures are in the detail");
-    CheckTrue(continuesAfterCheck->Message.find('\n') != std::string::npos, __func__, __LINE__,
+    CheckContains(continuesAfterCheck->Message, "\n", __func__, __LINE__,
         "multiple Check failures are separated by newlines");
 
-    size_t const checkPos = checkThenAssert->Message.find("deliberate Check failure before an Assert");
-    size_t const assertPos = checkThenAssert->Message.find("deliberate Assert failure after a Check");
-    CheckTrue(checkPos != std::string::npos && assertPos != std::string::npos, __func__, __LINE__,
-        "a Check failure followed by an Assert failure records both");
-    CheckTrue(checkPos < assertPos, __func__, __LINE__, "in the order they happened");
+    std::string const checkFailure = "deliberate Check failure before an Assert";
+    std::string const assertFailure = "deliberate Assert failure after a Check";
+    CheckContains(checkThenAssert->Message, checkFailure, __func__, __LINE__,
+        "a Check failure followed by an Assert failure records the Check failure");
+    CheckContains(checkThenAssert->Message, assertFailure, __func__, __LINE__, "and the Assert failure");
+    CheckLessThan(checkThenAssert->Message.find(checkFailure), checkThenAssert->Message.find(assertFailure), __func__,
+        __LINE__, "in the order they happened");
 
     CheckFalse(failViaAssert->Message.empty(), __func__, __LINE__, "an Assert failure still records its message");
-    CheckEquals(std::string::npos, failViaAssert->Message.find("Check failed for"), __func__, __LINE__,
+    CheckNotContains(failViaAssert->Message, "Check failed for", __func__, __LINE__,
         "a test with no Check failures gets none in its detail");
     CheckTrue(pass->Message.empty(), __func__, __LINE__, "a passing test's detail stays empty");
 }
@@ -1088,8 +4900,8 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()
             record.TestName + ": and its recorded detail");
     }
 
-    CheckTrue(observer.LogText().find("Running test: Fixture_MixedOutcomes.Pass") != std::string::npos, __func__,
-        __LINE__, "the group's log output goes to the observer");
+    CheckContains(observer.LogText(), "Running test: Fixture_MixedOutcomes.Pass", __func__, __LINE__,
+        "the group's log output goes to the observer");
     CheckTrue(consoleOutput.empty(), __func__, __LINE__, "and none of it goes to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
@@ -1242,8 +5054,8 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFa
 
         ++assertFailedTests;
         CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
-        CheckTrue(record.Message.find("deliberate Assert failure while an exception is expected") != std::string::npos,
-            __func__, __LINE__, record.TestName + "'s record carries its Assert failure");
+        CheckContains(record.Message, "deliberate Assert failure while an exception is expected", __func__, __LINE__,
+            record.TestName + "'s record carries its Assert failure");
     }
 
     CheckEquals(static_cast<size_t>(2), assertFailedTests, __func__, __LINE__,
@@ -1270,8 +5082,8 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureS
 
         ++checkFailedTests;
         CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
-        CheckTrue(record.Message.find("deliberate Check failure before the expected exception") != std::string::npos,
-            __func__, __LINE__, record.TestName + "'s record carries its Check failure");
+        CheckContains(record.Message, "deliberate Check failure before the expected exception", __func__, __LINE__,
+            record.TestName + "'s record carries its Check failure");
     }
 
     CheckEquals(static_cast<size_t>(4), checkFailedTests, __func__, __LINE__,
@@ -1325,6 +5137,252 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
     CheckFalse(verboseOutput.empty(), __func__, __LINE__, "an unsuppressed fixture logs its test run as usual");
     CheckTrue(suppressedOutput.empty(), __func__, __LINE__,
         "SetLogSuppressed(true) silences the fixture's own Log()/LogAppend()");
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLine()
+{
+    // Arrange
+    TFixture_SourceLocations fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(64), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            continue;
+        }
+
+        if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else if (NameEndsWith(record.TestName, "_Skips"))
+            CheckTrue(record.Outcome == TTestOutcome::Skip, __func__, __LINE__, record.TestName + " should skip");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes, _Fails or _Skips");
+
+        // function_name() is compiler-specific (e.g. "void NS::TClass::Test_X()" on GCC), but always contains the
+        // function's own name.
+        auto const expectedLine = fixture.ExpectedLines.find(record.TestName);
+        AssertTrue(expectedLine != fixture.ExpectedLines.end(), __func__, __LINE__,
+            record.TestName + " recorded the line of its call");
+        CheckContains(record.Message, "Test_" + record.TestName, __func__, __LINE__,
+            record.TestName + " reports its own function");
+        CheckContains(record.Message, "(" + std::to_string(expectedLine->second) + ")", __func__, __LINE__,
+            record.TestName + " reports the line of its call");
+    }
+
+    TTestCaseRecord const* const throughHelper = FindRecord(results, "CheckTrue_ThroughHelper_Fails");
+    AssertTrue(throughHelper != nullptr, __func__, __LINE__, "the helper test's record exists");
+    CheckNotContains(throughHelper->Message, "CheckIsEven", __func__, __LINE__,
+        "a helper that passes its caller's location through isn't itself reported");
+}
+//---------------------------------------------------------------------------
+#endif // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly()
+{
+    // Arrange
+    TFixture_StartsWithICComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(28), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertStartsWith = FindRecord(results, "AssertStartsWithIC_Absent_Fails");
+    TTestCaseRecord const* const assertStartsWithWide = FindRecord(results, "AssertStartsWithIC_Wide_Absent_Fails");
+    TTestCaseRecord const* const assertNotStartsWith = FindRecord(results, "AssertNotStartsWithIC_DifferentCase_Fails");
+    TTestCaseRecord const* const assertNotStartsWithWide =
+        FindRecord(results, "AssertNotStartsWithIC_Wide_DifferentCase_Fails");
+    TTestCaseRecord const* const checkStartsWith = FindRecord(results, "CheckStartsWithIC_Absent_Fails");
+    TTestCaseRecord const* const checkStartsWithWide = FindRecord(results, "CheckStartsWithIC_Wide_Absent_Fails");
+    TTestCaseRecord const* const checkNotStartsWith = FindRecord(results, "CheckNotStartsWithIC_DifferentCase_Fails");
+    TTestCaseRecord const* const checkNotStartsWithWide =
+        FindRecord(results, "CheckNotStartsWithIC_Wide_DifferentCase_Fails");
+    AssertTrue(assertStartsWith != nullptr && assertStartsWithWide != nullptr && assertNotStartsWith != nullptr &&
+        assertNotStartsWithWide != nullptr && checkStartsWith != nullptr && checkStartsWithWide != nullptr &&
+        checkNotStartsWith != nullptr && checkNotStartsWithWide != nullptr, __func__, __LINE__,
+        "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
+    // text and prefix are shown as given, not case-folded. Each "Wide_" test uses the same text as its narrow twin.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+    std::string const startsWithDetail =
+        "): Expected \"Hello World\" to start with \"xyz\" (ignoring case). prefix absent";
+    std::string const notStartsWithDetail =
+        "): Expected \"Hello World\" not to start with \"HELLO\" (ignoring case). case differs";
+
+    CheckTrue(messageMatches(*assertStartsWith, "Prefix not found: Test_AssertStartsWithIC_Absent_Fails (",
+        startsWithDetail), __func__, __LINE__,
+        "AssertStartsWithIC shows the text and prefix: " + assertStartsWith->Message);
+    CheckTrue(messageMatches(*assertStartsWithWide, "Prefix not found: Test_AssertStartsWithIC_Wide_Absent_Fails (",
+        startsWithDetail), __func__, __LINE__,
+        "AssertStartsWithIC shows the wide text and prefix: " + assertStartsWithWide->Message);
+    CheckTrue(messageMatches(*assertNotStartsWith, "Prefix found: Test_AssertNotStartsWithIC_DifferentCase_Fails (",
+        notStartsWithDetail), __func__, __LINE__,
+        "AssertNotStartsWithIC shows the text and prefix: " + assertNotStartsWith->Message);
+    CheckTrue(messageMatches(*assertNotStartsWithWide,
+        "Prefix found: Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails (", notStartsWithDetail), __func__,
+        __LINE__, "AssertNotStartsWithIC shows the wide text and prefix: " + assertNotStartsWithWide->Message);
+    CheckTrue(messageMatches(*checkStartsWith, "Check failed for: \"Test_CheckStartsWithIC_Absent_Fails\" (",
+        startsWithDetail), __func__, __LINE__,
+        "CheckStartsWithIC shows the text and prefix: " + checkStartsWith->Message);
+    CheckTrue(messageMatches(*checkStartsWithWide, "Check failed for: \"Test_CheckStartsWithIC_Wide_Absent_Fails\" (",
+        startsWithDetail), __func__, __LINE__,
+        "CheckStartsWithIC shows the wide text and prefix: " + checkStartsWithWide->Message);
+    CheckTrue(messageMatches(*checkNotStartsWith,
+        "Check failed for: \"Test_CheckNotStartsWithIC_DifferentCase_Fails\" (", notStartsWithDetail), __func__,
+        __LINE__, "CheckNotStartsWithIC shows the text and prefix: " + checkNotStartsWith->Message);
+    CheckTrue(messageMatches(*checkNotStartsWithWide,
+        "Check failed for: \"Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails\" (", notStartsWithDetail), __func__,
+        __LINE__, "CheckNotStartsWithIC shows the wide text and prefix: " + checkNotStartsWithWide->Message);
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
+{
+    // Arrange
+    TFixture_StartsWithComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(29), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertStartsWith = FindRecord(results, "AssertStartsWith_Absent_Fails");
+    TTestCaseRecord const* const assertStartsWithWide = FindRecord(results, "AssertStartsWith_Wide_Absent_Fails");
+    TTestCaseRecord const* const assertNotStartsWith = FindRecord(results, "AssertNotStartsWith_Present_Fails");
+    TTestCaseRecord const* const assertNotStartsWithWide =
+        FindRecord(results, "AssertNotStartsWith_Wide_Present_Fails");
+    TTestCaseRecord const* const checkStartsWith = FindRecord(results, "CheckStartsWith_Absent_Fails");
+    TTestCaseRecord const* const checkStartsWithWide = FindRecord(results, "CheckStartsWith_Wide_Absent_Fails");
+    TTestCaseRecord const* const checkNonASCII = FindRecord(results, "CheckStartsWith_Wide_NonASCII_Fails");
+    TTestCaseRecord const* const checkNotStartsWith = FindRecord(results, "CheckNotStartsWith_Present_Fails");
+    TTestCaseRecord const* const checkNotStartsWithWide = FindRecord(results, "CheckNotStartsWith_Wide_Present_Fails");
+    AssertTrue(assertStartsWith != nullptr && assertStartsWithWide != nullptr && assertNotStartsWith != nullptr &&
+        assertNotStartsWithWide != nullptr && checkStartsWith != nullptr && checkStartsWithWide != nullptr &&
+        checkNonASCII != nullptr && checkNotStartsWith != nullptr && checkNotStartsWithWide != nullptr, __func__,
+        __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. Each
+    // "Wide_" test uses the same text as its narrow twin.
+    auto const messageMatches = [](TTestCaseRecord const& record, std::string const& prefix, std::string const& detail)
+        {
+            return record.Message.find(prefix) == 0 && NameEndsWith(record.Message, detail);
+        };
+    std::string const startsWithDetail = "): Expected \"hello world\" to start with \"xyz\". prefix absent";
+    std::string const notStartsWithDetail = "): Expected \"hello world\" not to start with \"hello\". prefix present";
+    // "cafe" with an e-acute, a space and U+1F600, then u-umlaut, as UTF-8.
+    std::string const nonASCIIDetail =
+        "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to start with \"\xC3\xBC\". not present";
+
+    CheckTrue(messageMatches(*assertStartsWith, "Prefix not found: Test_AssertStartsWith_Absent_Fails (",
+        startsWithDetail), __func__, __LINE__,
+        "AssertStartsWith shows the text and prefix: " + assertStartsWith->Message);
+    CheckTrue(messageMatches(*assertStartsWithWide, "Prefix not found: Test_AssertStartsWith_Wide_Absent_Fails (",
+        startsWithDetail), __func__, __LINE__,
+        "AssertStartsWith shows the wide text and prefix: " + assertStartsWithWide->Message);
+    CheckTrue(messageMatches(*assertNotStartsWith, "Prefix found: Test_AssertNotStartsWith_Present_Fails (",
+        notStartsWithDetail), __func__, __LINE__,
+        "AssertNotStartsWith shows the text and prefix: " + assertNotStartsWith->Message);
+    CheckTrue(messageMatches(*assertNotStartsWithWide, "Prefix found: Test_AssertNotStartsWith_Wide_Present_Fails (",
+        notStartsWithDetail), __func__, __LINE__,
+        "AssertNotStartsWith shows the wide text and prefix: " + assertNotStartsWithWide->Message);
+    CheckTrue(messageMatches(*checkStartsWith, "Check failed for: \"Test_CheckStartsWith_Absent_Fails\" (",
+        startsWithDetail), __func__, __LINE__,
+        "CheckStartsWith shows the text and prefix: " + checkStartsWith->Message);
+    CheckTrue(messageMatches(*checkStartsWithWide, "Check failed for: \"Test_CheckStartsWith_Wide_Absent_Fails\" (",
+        startsWithDetail), __func__, __LINE__,
+        "CheckStartsWith shows the wide text and prefix: " + checkStartsWithWide->Message);
+    CheckTrue(messageMatches(*checkNotStartsWith, "Check failed for: \"Test_CheckNotStartsWith_Present_Fails\" (",
+        notStartsWithDetail), __func__, __LINE__,
+        "CheckNotStartsWith shows the text and prefix: " + checkNotStartsWith->Message);
+    CheckTrue(messageMatches(*checkNotStartsWithWide,
+        "Check failed for: \"Test_CheckNotStartsWith_Wide_Present_Fails\" (", notStartsWithDetail), __func__,
+        __LINE__, "CheckNotStartsWith shows the wide text and prefix: " + checkNotStartsWithWide->Message);
+    CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
+        "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()
+{
+    // Arrange
+    TFixture_TrueFalseChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(8), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertFalse = FindRecord(results, "AssertFalse_True_Fails");
+    TTestCaseRecord const* const assertTrue = FindRecord(results, "AssertTrue_False_Fails");
+    TTestCaseRecord const* const checkFalse = FindRecord(results, "CheckFalse_True_Fails");
+    TTestCaseRecord const* const checkTrue = FindRecord(results, "CheckTrue_False_Fails");
+    AssertTrue(assertFalse != nullptr && assertTrue != nullptr && checkFalse != nullptr && checkTrue != nullptr,
+        __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    CheckStartsWith(assertFalse->Message, "Expected false but was true: Test_AssertFalse_True_Fails (", __func__,
+        __LINE__, "AssertFalse expects false");
+    CheckEndsWith(assertFalse->Message, "): value is true", __func__, __LINE__, "AssertFalse shows the message");
+    CheckStartsWith(assertTrue->Message, "Expected true but was false: Test_AssertTrue_False_Fails (", __func__,
+        __LINE__, "AssertTrue expects true");
+    CheckEndsWith(assertTrue->Message, "): value is false", __func__, __LINE__, "AssertTrue shows the message");
+    CheckStartsWith(checkFalse->Message, "Check failed for: \"Test_CheckFalse_True_Fails\" (", __func__, __LINE__,
+        "CheckFalse names the test");
+    CheckEndsWith(checkFalse->Message, "): Expected false but was true: \"value is true\"", __func__, __LINE__,
+        "CheckFalse expects false");
+    CheckStartsWith(checkTrue->Message, "Check failed for: \"Test_CheckTrue_False_Fails\" (", __func__, __LINE__,
+        "CheckTrue names the test");
+    CheckEndsWith(checkTrue->Message, "): Expected true but was false: \"value is false\"", __func__, __LINE__,
+        "CheckTrue expects true");
 }
 //---------------------------------------------------------------------------
 

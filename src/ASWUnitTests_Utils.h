@@ -1,5 +1,5 @@
 /* **************************************************************************
-ASWUnitTests_GUI_TextDialog.h
+ASWUnitTests_Utils.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,23 +19,21 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef ASWUnitTests_GUI_TextDialogH
-#define ASWUnitTests_GUI_TextDialogH
+#ifndef ASWUnitTests_UtilsH
+#define ASWUnitTests_UtilsH
 //---------------------------------------------------------------------------
 #include <string>
-//---------------------------------------------------------------------------
-#include <System.hpp>
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
 
-// Shows 'text' (UTF-8) in a modal, resizable dialog with a read-only, scrollable, monospace text box, for
-// console-style output such as --help, whose aligned columns a regular message box's proportional font would
-// scramble. 'caption' is the dialog's title.
-void ShowTextDialog(System::UnicodeString const& caption, std::string const& text);
+// Converts wide text to UTF-8, reading it as UTF-16 where wchar_t is 16 bits (Windows) and as UTF-32 where it's
+// 32 bits (Linux). Anything that isn't a valid code point, such as an unpaired surrogate, becomes U+FFFD, the
+// Unicode replacement character.
+std::string WideToUTF8(std::wstring const& text);
 
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef ASWUnitTests_GUI_TextDialogH
+#endif // #ifndef ASWUnitTests_UtilsH

@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ limitations under the License.
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
 //---------------------------------------------------------------------------
@@ -206,6 +207,7 @@ TFormASWUnitTestsGUIMain* FormASWUnitTestsGUIMain;
 __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
     : inherited(Owner),
       m_CloseAfterRun(false),
+      m_KeepSelection(false),
       m_LastRunExitCode(ExitCode_Success),
       m_RunFinishedCount(0),
       m_Running(false),
@@ -256,7 +258,7 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
             "\n\n"
             "https://github.com/ASWSoftware/asw-unit-tests\n"
             "\n"
-            "Copyright 2026 Anthony S. West\n"
+            "Copyright 2026 ASW Software\n"
             "Licensed under the Apache License, Version 2.0.\n");
     });
 }
@@ -391,6 +393,15 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_SelectAllExecute(TObject* /*Sender
     RunGuarded("Select All", [this]()
     {
         m_TestList.SetAllChecked(true);
+        SyncTreeChecks();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_SelectFailedExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Select Failed", [this]()
+    {
+        m_TestList.CheckOnlyFailed();
         SyncTreeChecks();
     });
 }
@@ -664,6 +675,9 @@ void __fastcall TFormASWUnitTestsGUIMain::FormClose(TObject* /*Sender*/, TCloseA
         // An --exit run is automated, so nobody arranged its window.
         if (!m_Options.ExitAfterRun && !m_Options.LayoutIgnore)
             SaveLayout();
+
+        if (m_KeepSelection)
+            SaveSelection();
     });
 }
 //---------------------------------------------------------------------------
@@ -755,6 +769,27 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
             ApplyPanelSizes(layout);
         });
     });
+}
+//---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::LoadSelection()
+{
+    std::vector<TGUISavedTest> saved;
+
+    try
+    {
+        System::UnicodeString const path = GUISelectionFilePath();
+        if (!System::Sysutils::FileExists(path))
+            return;
+
+        saved = ParseGUISelection(ToUTF8(System::Ioutils::TFile::ReadAllText(path, TEncoding::UTF8)));
+    }
+    catch (...)
+    {
+        return; // A selection that can't be read only means every test starts out checked.
+    }
+
+    if (!saved.empty())
+        AppendLog(DescribeGUISelectionRestore(RestoreGUISelection(m_TestList, saved)) + "\n");
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresCustomDrawItem(TCustomListView* Sender, TListItem* Item,
@@ -1071,6 +1106,22 @@ void TFormASWUnitTestsGUIMain::SaveLayout()
     }
 }
 //---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::SaveSelection()
+{
+    try
+    {
+        System::UnicodeString const path = GUISelectionFilePath();
+        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
+
+        System::Ioutils::TFile::WriteAllText(path, FromUTF8(FormatGUISelection(CaptureGUISelection(m_TestList))),
+            TEncoding::UTF8);
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start checks every test.
+    }
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetRunning(bool running)
 {
     m_Running = running;
@@ -1084,6 +1135,7 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     Act_RunFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_RunSelected->Enabled = !running;
     Act_SelectAll->Enabled = !running;
+    Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_SelectNone->Enabled = !running;
     Act_Stop->Enabled = running;
 
@@ -1139,6 +1191,13 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     // Notes about the command line, in the log, where they stay until the first run clears it.
     if (initialFilter != nullptr)
         AppendLog("Initially checked: " + filterDescription + "\n");
+
+    // Only when the command line chooses no tests, so an automated --run or a --filter launch never replaces
+    // the selection saved interactively. Before the tree is built below.
+    m_KeepSelection = !m_Options.RunOnStart && initialFilter == nullptr;
+
+    if (m_KeepSelection)
+        LoadSelection();
 
     for (std::string const& ignored : m_Options.IgnoredOptions)
         AppendLog("Note: " + ignored + " has no effect in the GUI, so it was ignored.\n");

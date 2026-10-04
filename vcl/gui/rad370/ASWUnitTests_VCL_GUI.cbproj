@@ -222,6 +222,10 @@
             <DependentOn>..\..\..\src\ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>15</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\src\ASWUnitTests_Utils.cpp">
+            <DependentOn>..\..\..\src\ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>37</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\src\ASWUnitTests_Version.cpp">
             <DependentOn>..\..\..\src\ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>16</BuildOrder>
@@ -295,6 +299,10 @@
             <DependentOn>..\src\ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>3</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\src\ASWUnitTests_GUI_Selection.h</DependentOn>
+            <BuildOrder>35</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\src\ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>4</BuildOrder>
@@ -319,6 +327,10 @@
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>29</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
+            <BuildOrder>36</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>30</BuildOrder>
@@ -330,6 +342,10 @@
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_RTLExceptions.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_RTLExceptions.h</DependentOn>
             <BuildOrder>32</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_RTLStrings.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_RTLStrings.h</DependentOn>
+            <BuildOrder>38</BuildOrder>
         </CppCompile>
         <FormResources Include="..\src\ASWUnitTests_GUI_MainForm.dfm"/>
         <BuildConfiguration Include="Base">

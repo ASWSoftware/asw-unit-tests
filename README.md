@@ -11,7 +11,11 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, and `Near`/`NotNear`.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, `Contains`/`NotContains`,
+  `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus
+  case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
+- **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
+  report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
   and `double` values within a tolerance.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** - `SetExceptionExpected()`, with an
@@ -54,7 +58,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Drop-in submodule](#submodule-integration)** - Add the repository as a git submodule and build its `src`
   folder alongside your own tests, with `ASWUnitTests_Sources.cmake` for CMake projects.
 - **[RAD Studio RTL exceptions](#rad-studio-rtl-exceptions-vclfmx)** - Opt-in support for VCL/FMX `Exception`
-  classes such as `EConvertError` via `ASWUNITTESTS_RTL_EXCEPTIONS`.
+  classes such as `EConvertError`, and for [`System::String`](#comparing-systemstring-vclfmx) in the string
+  checks, via `ASWUNITTESTS_RTL_EXCEPTIONS`.
 
 For the full list of `Check`/`Assert` methods, see `src/ASWUnitTests_TestBase.h`. For working examples, see the
 `tests` folder, e.g. `tests/Test_ASWTools_String.cpp` for `SetExceptionExpected()`.
@@ -94,9 +99,23 @@ cmake --build build --config Release
 The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration generators. The RAD Studio
 project writes its final executable to the same `build/bin/<Config>` directory.
 
-The executable uses semantic versioning for its `--version` output. Update `src/ASWUnitTests_Version.h` when preparing a
-release. The CMake project does not need a separate version declaration because it currently builds the test executable
-directly rather than packaging or installing it.
+The CMake project does not need a separate version declaration (see [Versions](#versions)) because it currently builds
+the test executable directly rather than packaging or installing it.
+
+## Versions
+
+ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the VCL GUI's caption.
+Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop` branch carries the next planned version
+with a pre-release, e.g. `1.2.0-dev.1`, which comes before `1.2.0`. `src/ASWUnitTests_Version.h` has the version as
+macros, for code that supports several ASWUnitTests versions, and as constants in the `ASWUnitTests` namespace:
+
+```
+#include "ASWUnitTests_Version.h"
+
+#if ASWUNITTESTS_VERSION_MAJOR > 1 || (ASWUNITTESTS_VERSION_MAJOR == 1 && ASWUNITTESTS_VERSION_MINOR >= 1)
+    // Uses something added in 1.1 (also present in 1.1.0-dev.N builds)
+#endif
+```
 
 ## Command Line Options
 
@@ -276,7 +295,8 @@ The toolbar, whose commands are also in the Run and Tests menus:
 
 - **Run Selected** (F9) runs the checked tests, and **Run Failed** reruns the latest run's failures.
 - **Stop** ends the run after the current test. Closing the window during a run does the same, then closes.
-- **Select All** and **Select None** check or uncheck every shown test.
+- **Select All** and **Select None** check or uncheck every shown test, and **Select Failed** checks only the shown
+  tests that failed in the latest run.
 - **Copy Details** (Ctrl+Shift+C) copies the detail pane to the clipboard.
 - **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, ignoring case, with the same
   `*` and `?` wildcards as `--filter`. While it hides tests, checking them and Run Selected only apply to the shown
@@ -291,13 +311,26 @@ When the window closes, it saves its size, position, maximized state, and panel 
 longer connected is ignored. An `--exit` run doesn't save the layout. **View > Reset Layout** restores the default
 layout right away; `--layout-ignore` and `--layout-reset` (below) control this from the command line.
 
+The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`, as long as the
+command line doesn't choose them itself (no `--run`, `--filter`, or partition options). What it saves is what Run
+Selected would run, the checked tests that are shown; the filter box itself starts empty. Since tests come and go
+between sessions, it adapts:
+
+- A test that's been removed is skipped.
+- A new test (or a renamed one, which looks the same) is checked if its group was entirely checked, and otherwise
+  isn't. A test in a new group is checked only if every test was.
+- If none of the checked tests still exist, every test is checked instead.
+
+The log notes what was restored. So **Select Failed**, closing the window, fixing the code, and reopening it leaves
+just those tests checked for Run Selected.
+
 Tests run on the main (VCL) thread, so a test can create forms and controls. `--test-timeout-seconds` runs each test
 on a worker thread instead, so it can't be combined with tests like that; the log says so when it's given.
 
 The GUI takes the same [command line options](#command-line-options) as the console runner, with these differences:
 
-- `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, and `--filter`'s
-  pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
+- `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, instead of the
+  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
   unchecked, since the box ignores case and matches anywhere in the name).
 - `--project-name` is also shown in the window's caption.
 - `--report-junit` writes the report after every run, including Run Failed.
@@ -428,6 +461,148 @@ catch (TExceptRTLException const& ex)
 tests in `vcl\tests`. It has its own `Build_*.bat` scripts, and writes its executable to
 `vcl\console\rad370\<Platform>\<Config>`. The [VCL GUI runner](#vcl-gui-runner) is set up the same way.
 
+### Comparing System::String (VCL/FMX)
+
+The same `ASWUNITTESTS_RTL_EXCEPTIONS` define (see [above](#rad-studio-rtl-exceptions-vclfmx)) also lets the string
+`Check`/`Assert` methods take a `System::String` (`UnicodeString`): `Equals`, `Contains`, `StartsWith`, `EndsWith`,
+and their `Not` and `IC` forms. At least one of the two texts must be a `System::String`. The other may also be a
+`std::string`, `std::wstring` or C string, including a literal:
+
+```
+CheckEquals("Ready", Label1->Caption, __func__, __LINE__, "status after loading");
+CheckStartsWithIC(Edit1->Text, L"https://", __func__, __LINE__, "a secure URL");
+```
+
+Both texts are converted to UTF-8 and compared as two `std::string` values, so a failure shows them the same way.
+Narrow text is read as UTF-8, as elsewhere in the framework, and a null C string is empty text, as it is for
+`System::String`. A `System::String` converts implicitly from a number or a character, but these methods don't accept
+either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile error rather than a comparison with `"5"`. Other RTL string
+types, such as `AnsiString`, need converting to `System::String` first, and the message is still a `std::string`.
+
+### Omitting the Method and Line (C++20)
+
+Every `Check*`/`Assert*` method, `Skip()`, and both forms of `SetExceptionExpected()` also have an overload without
+the method and line arguments. It takes an optional `std::source_location` as its last argument instead, which
+defaults to the caller's location:
+
+```
+CheckEquals(5, total, "int and int64_t");
+Skip("Windows-only feature");
+SetExceptionExpected<std::invalid_argument>("StrToInt32 invalid", "signed 32-bit int");
+```
+
+Failure messages then show `std::source_location::function_name()` as the method. Unlike `__func__`, its text is up
+to the compiler, and is typically the full signature, e.g. `void TTest_TMyClassToTest::Test_Something()` on GCC and
+Clang, or `void __cdecl TTest_TMyClassToTest::Test_Something(void)` on MSVC. The method and line overloads remain,
+for a bare or custom name.
+
+A helper that makes its own checks can take a location and pass it on, so its failures report the helper's caller
+rather than the helper itself:
+
+```
+// In the class declaration
+void CheckIsEven(int value, std::source_location loc = std::source_location::current());
+
+// In the .cpp
+void TTest_TMyClassToTest::CheckIsEven(int value, std::source_location loc)
+{
+    CheckTrue(value % 2 == 0, std::to_string(value) + " should be even", loc);
+}
+```
+
+These overloads need C++20's `std::source_location`, so they're only declared when `ASWUnitTests_TestBase.h` finds it
+supported, which it signals by defining `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`. RAD Studio's 32-bit compilers only
+support C++17, so they don't have these overloads. Tests that also need to build there should keep the method and
+line form, or check `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`.
+
+### Comparing C Strings
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare two C strings (`char const*` or
+`wchar_t const*`, including string literals and character arrays) by content, the same as `std::string` and
+`std::wstring`. A null pointer only matches another null pointer, never a string, not even an empty one:
+
+```
+char const buffer[] = "abc";
+CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer passes");
+```
+
+A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the value they share, for C strings,
+`std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer is shown as `(null)`.
+
+### Comparing Strings, Ignoring Case
+
+`CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC` compare two `std::string` or
+`std::wstring` values like `CheckEquals`/`CheckNotEquals`, but ignoring case. A failure shows both values, with wide
+text converted to UTF-8:
+
+```
+CheckEqualsIC("Content-Type", headerName, __func__, __LINE__, "header names ignore case");
+```
+
+Only the ASCII letters `A`-`Z` and `a`-`z` are matched regardless of case, so the result is the same on every platform
+and in every locale, and the bytes of a multi-byte UTF-8 character are never changed. Other letters, such as an
+accented capital and small E, still have to match exactly. The [substring](#checking-for-a-substring) and
+[prefix and suffix](#checking-the-start-or-end-of-a-string) checks ignore case the same way.
+
+### Checking for a Substring
+
+`CheckContains`/`AssertContains` pass when a `std::string` or `std::wstring` contains a given substring, and
+`CheckNotContains`/`AssertNotContains` pass when it doesn't. The text comes first, then the substring. Unlike
+`CheckTrue(text.find(substring) != std::string::npos, ...)`, a failure shows both:
+
+```
+std::string const log = "Connected to server";
+CheckContains(log, "timeout", __func__, __LINE__, "logs the timeout");
+// Check failed for: "Test_Connect" (42): Expected "Connected to server" to contain "timeout". logs the timeout
+```
+
+The comparison is case-sensitive, and every string contains the empty string. A failure shows `std::wstring` text
+converted to UTF-8.
+
+`CheckContainsIC`/`AssertContainsIC` and `CheckNotContainsIC`/`AssertNotContainsIC` do the same, ignoring the case
+of ASCII letters only, the same way as [`CheckEqualsIC`](#comparing-strings-ignoring-case):
+
+```
+CheckContainsIC(log, "CONNECTED", __func__, __LINE__, "passes");
+```
+
+### Checking the Start or End of a String
+
+`CheckStartsWith`/`AssertStartsWith` pass when a `std::string` or `std::wstring` starts with a given prefix, and
+`CheckEndsWith`/`AssertEndsWith` when it ends with a given suffix. `CheckNotStartsWith`/`AssertNotStartsWith` and
+`CheckNotEndsWith`/`AssertNotEndsWith` pass when it doesn't. The text comes first, then the prefix or suffix, read as
+"text starts with prefix". A failure shows both:
+
+```
+std::string const path = "logs/server.txt";
+CheckEndsWith(path, ".log", __func__, __LINE__, "writes a log file");
+// Check failed for: "Test_LogPath" (42): Expected "logs/server.txt" to end with ".log". writes a log file
+```
+
+As with the [substring checks](#checking-for-a-substring), the comparison is case-sensitive, every string starts and
+ends with the empty string, and a failure shows `std::wstring` text converted to UTF-8. The `IC` variants
+(`CheckStartsWithIC`, `CheckEndsWithIC`, and their `Assert` and `Not` forms) ignore the case of ASCII letters only, the
+same way as [`CheckEqualsIC`](#comparing-strings-ignoring-case):
+
+```
+CheckStartsWithIC(header, "content-type:", __func__, __LINE__, "passes for \"Content-Type: text/plain\"");
+```
+
+### Comparing Integers of Different Types
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` accept any two integer types, not just a matching
+pair of fixed-width ones, so there's no need for a suffix or cast like `0LL` to pick an overload. This includes
+`long` and `unsigned long` (e.g. `DWORD`) on Windows, and `long long` on Linux, which match none of the fixed-width
+types there. The values are compared as numbers, so `-1` never equals an unsigned value, unlike with the built-in `==`:
+
+```
+int64_t total = 5;
+CheckEquals(5, total, __func__, __LINE__, "int and int64_t");
+CheckEquals(-1, 4294967295u, __func__, __LINE__, "fails, where -1 == 4294967295u is true");
+```
+
+`bool` is the exception: comparing a `bool` with an integer remains a compile error, since it's usually a mistake.
+
 ### Comparing Floating-Point Values
 
 There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals`. Exact equality comparison of
@@ -442,6 +617,23 @@ CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
 
 Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a sensible
 tolerance depends heavily on the magnitude and accumulated error of the values involved.
+
+### Comparing Greater Than and Less Than
+
+`CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and `CheckLessThanOrEqual`, and their `Assert`
+versions, compare a value with a bound. The value comes first, then the bound, read as "value >= bound". That's the
+other way round from `CheckEquals`, whose expected value comes first. Unlike `CheckTrue(count >= 1, ...)`, a failure
+shows both:
+
+```
+CheckGreaterThanOrEqual(count, 1, __func__, __LINE__, "at least one item");
+// Check failed for: "Test_Items" (42): Expected 0 to be >= 1. at least one item
+```
+
+They accept any two integer or floating-point types except `bool`. Two integers are compared by value, like
+[`CheckEquals`](#comparing-integers-of-different-types) does, so `-1` is less than any unsigned value. When either
+value is floating point, both are compared as their common type, as the built-in operators do, and a NaN fails every
+check.
 
 ### Skipping a Test
 
@@ -602,7 +794,8 @@ Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` f
 your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after updating the submodule.
 
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to enable
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx). To run your tests in the
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and
+[`System::String` comparisons](#comparing-systemstring-vclfmx). To run your tests in the
 [VCL GUI runner](#vcl-gui-runner) instead of a console, see that section for the files it needs.
 
 # Coding Standards

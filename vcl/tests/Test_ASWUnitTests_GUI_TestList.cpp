@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ TTest_ASWUnitTests_GUI_TestList::TTest_ASWUnitTests_GUI_TestList()
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckedFilter_MatchesExactlyTheCheckedTests,
         "CheckedFilter_MatchesExactlyTheCheckedTests");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckMatching_ChecksExactlyTheMatches, "CheckMatching_ChecksExactlyTheMatches");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CheckOnlyFailed_ChecksVisibleFailuresOnly,
+        "CheckOnlyFailed_ChecksVisibleFailuresOnly");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_CountMatching_CountsFilterMatches, "CountMatching_CountsFilterMatches");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesAFinishedTest, "DetailText_DescribesAFinishedTest");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesATestThatHasNotRun,
@@ -159,6 +161,31 @@ void TTest_ASWUnitTests_GUI_TestList::Test_CheckMatching_ChecksExactlyTheMatches
     CheckEquals(static_cast<size_t>(4), list.CheckedCount(), __func__, __LINE__, "an empty filter checks everything");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_CheckOnlyFailed_ChecksVisibleFailuresOnly()
+{
+    // Arrange: "Beta.Three" failed but is unchecked and hidden, which must leave it as it is.
+    TGUITestList list;
+    list.Load(SampleTests());
+    list.SetStatus(1, TGUITestStatus::Failed);
+    list.SetStatus(2, TGUITestStatus::Failed);
+    list.SetStatus(3, TGUITestStatus::Skipped);
+    list.SetChecked(2, false);
+    list.SetVisibleFilter([](std::string const& fullTestName)
+        {
+            return fullTestName != "Beta.Three";
+        });
+
+    // Act
+    list.CheckOnlyFailed();
+
+    // Assert
+    CheckFalse(list.IsChecked(0), __func__, __LINE__, "a visible test that didn't fail is unchecked");
+    CheckTrue(list.IsChecked(1), __func__, __LINE__, "a visible failed test is checked");
+    CheckFalse(list.IsChecked(2), __func__, __LINE__, "a hidden failed test is left alone, like Select All does");
+    CheckFalse(list.IsChecked(3), __func__, __LINE__, "a skipped test isn't a failure");
+    CheckEquals(static_cast<size_t>(1), list.CheckedCount(), __func__, __LINE__, "only the visible failure");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_CountMatching_CountsFilterMatches()
 {
     // Arrange
@@ -189,13 +216,11 @@ void TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesAFinishedTest()
     std::string const text = list.DetailText(1);
 
     // Assert
-    CheckEquals(static_cast<size_t>(0), text.find("Alpha.Two\n"), __func__, __LINE__, "it starts with the full name");
-    CheckTrue(text.find("Result: Failed (0.412 ms)") != std::string::npos, __func__, __LINE__,
+    CheckStartsWith(text, "Alpha.Two\n", __func__, __LINE__, "it starts with the full name");
+    CheckContains(text, "Result: Failed (0.412 ms)", __func__, __LINE__,
         "then the status and duration in milliseconds");
-    CheckTrue(text.find("\nCheck failed for: needle\n") != std::string::npos, __func__, __LINE__,
-        "then the failure detail");
-    CheckTrue(text.find("\nLog:\nRunning test: Alpha.Two\n") != std::string::npos, __func__, __LINE__,
-        "then the test's own log");
+    CheckContains(text, "\nCheck failed for: needle\n", __func__, __LINE__, "then the failure detail");
+    CheckContains(text, "\nLog:\nRunning test: Alpha.Two\n", __func__, __LINE__, "then the test's own log");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_DetailText_DescribesATestThatHasNotRun()

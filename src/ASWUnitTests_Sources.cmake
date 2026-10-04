@@ -30,6 +30,7 @@ set(ASWUNITTESTS_SOURCES
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Registry.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_StdOutRedirect.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_TestBase.cpp"
+    "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Utils.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Version.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/main.cpp"
 )
