@@ -94,6 +94,21 @@ bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
         CharEqualsIgnoringASCIICase<typename TString::value_type>) != text.end());
 }
 
+// True if 'text' ends with 'suffix'. Every text ends with the empty string, and none with a longer suffix.
+template <typename TString>
+bool EndsWith(TString const& text, TString const& suffix)
+{
+    return text.size() >= suffix.size() && text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+// True if 'text' ends with 'suffix', comparing characters with CharEqualsIgnoringASCIICase().
+template <typename TString>
+bool EndsWithIgnoringASCIICase(TString const& text, TString const& suffix)
+{
+    return text.size() >= suffix.size() && std::equal(suffix.rbegin(), suffix.rend(), text.rbegin(),
+        CharEqualsIgnoringASCIICase<typename TString::value_type>);
+}
+
 // True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
 template <typename TString>
 bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
@@ -137,6 +152,21 @@ std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat
     }
 
     return texts;
+}
+
+// True if 'text' starts with 'prefix'. Every text starts with the empty string, and none with a longer prefix.
+template <typename TString>
+bool StartsWith(TString const& text, TString const& prefix)
+{
+    return text.size() >= prefix.size() && text.compare(0, prefix.size(), prefix) == 0;
+}
+
+// True if 'text' starts with 'prefix', comparing characters with CharEqualsIgnoringASCIICase().
+template <typename TString>
+bool StartsWithIgnoringASCIICase(TString const& text, TString const& prefix)
+{
+    return text.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), text.begin(),
+        CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
 } // namespace
@@ -220,6 +250,34 @@ void TTestGroupBase::AssertContainsIC(std::wstring const& text, std::wstring con
 {
     if (!ContainsIgnoringASCIICase(text, substring))
         throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWith(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWith(text, suffix))
+        throw TExceptEndsWith(method, line, text, suffix, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWith(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWith(text, suffix))
+        throw TExceptEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWithIC(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWithIgnoringASCIICase(text, suffix))
+        throw TExceptEndsWith(method, line, text, suffix, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWithIC(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWithIgnoringASCIICase(text, suffix))
+        throw TExceptEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg, true);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEquals(
@@ -395,6 +453,34 @@ void TTestGroupBase::AssertNotContainsIC(std::wstring const& text, std::wstring 
         throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWith(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWith(text, suffix))
+        throw TExceptNotEndsWith(method, line, text, suffix, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWith(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWith(text, suffix))
+        throw TExceptNotEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWithIC(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWithIgnoringASCIICase(text, suffix))
+        throw TExceptNotEndsWith(method, line, text, suffix, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWithIC(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWithIgnoringASCIICase(text, suffix))
+        throw TExceptNotEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg, true);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -539,6 +625,62 @@ void TTestGroupBase::AssertNotNear(
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWith(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWith(text, prefix))
+        throw TExceptNotStartsWith(method, line, text, prefix, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWith(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWith(text, prefix))
+        throw TExceptNotStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWithIC(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWithIgnoringASCIICase(text, prefix))
+        throw TExceptNotStartsWith(method, line, text, prefix, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWithIgnoringASCIICase(text, prefix))
+        throw TExceptNotStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWith(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWith(text, prefix))
+        throw TExceptStartsWith(method, line, text, prefix, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWith(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWith(text, prefix))
+        throw TExceptStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWithIC(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWithIgnoringASCIICase(text, prefix))
+        throw TExceptStartsWith(method, line, text, prefix, msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWithIgnoringASCIICase(text, prefix))
+        throw TExceptStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg, true);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (!testVal)
@@ -579,6 +721,43 @@ void TTestGroupBase::CheckContainsIC(std::wstring const& text, std::wstring cons
     {
         SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to contain \"" +
             WideToUTF8(substring) + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWith(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWith(text, suffix))
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" to end with \"" + suffix + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWith(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWith(text, suffix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" to end with \"" + WideToUTF8(suffix) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWithIC(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWithIgnoringASCIICase(text, suffix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" to end with \"" + suffix + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWithIC(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!EndsWithIgnoringASCIICase(text, suffix))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to end with \"" +
+            WideToUTF8(suffix) + "\" (ignoring case). " + msg);
     }
 }
 //---------------------------------------------------------------------------
@@ -779,6 +958,43 @@ void TTestGroupBase::CheckNotContainsIC(std::wstring const& text, std::wstring c
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWith(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWith(text, suffix))
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" not to end with \"" + suffix + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWith(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWith(text, suffix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" not to end with \"" + WideToUTF8(suffix) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWithIC(std::string const& text, std::string const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWithIgnoringASCIICase(text, suffix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" not to end with \"" + suffix + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWithIC(std::wstring const& text, std::wstring const& suffix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (EndsWithIgnoringASCIICase(text, suffix))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" not to end with \"" +
+            WideToUTF8(suffix) + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEquals(
     bool expected, bool actual, std::string const& method, int line, std::string const& msg)
 {
@@ -932,6 +1148,80 @@ void TTestGroupBase::CheckNotNear(
         std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
             std::to_string(tolerance) + ")";
         SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWith(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWith(text, prefix))
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" not to start with \"" + prefix + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWith(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWith(text, prefix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" not to start with \"" + WideToUTF8(prefix) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWithIC(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWithIgnoringASCIICase(text, prefix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" not to start with \"" + prefix + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (StartsWithIgnoringASCIICase(text, prefix))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" not to start with \"" +
+            WideToUTF8(prefix) + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWith(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWith(text, prefix))
+        SetTestFailedCheck(method, line, "Expected \"" + text + "\" to start with \"" + prefix + "\". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWith(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWith(text, prefix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + WideToUTF8(text) + "\" to start with \"" + WideToUTF8(prefix) + "\". " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWithIC(std::string const& text, std::string const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWithIgnoringASCIICase(text, prefix))
+    {
+        SetTestFailedCheck(method, line,
+            "Expected \"" + text + "\" to start with \"" + prefix + "\" (ignoring case). " + msg);
+    }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+    std::string const& method, int line, std::string const& msg)
+{
+    if (!StartsWithIgnoringASCIICase(text, prefix))
+    {
+        SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to start with \"" +
+            WideToUTF8(prefix) + "\" (ignoring case). " + msg);
     }
 }
 //---------------------------------------------------------------------------

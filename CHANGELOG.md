@@ -12,6 +12,13 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ### Added
 
+- `CheckStartsWith`/`AssertStartsWith` and `CheckEndsWith`/`AssertEndsWith`,
+  and their `Not` forms (`CheckNotStartsWith`, etc.), for `std::string` and
+  `std::wstring`, taking the text first and then the prefix or suffix. Unlike
+  `CheckTrue(text.rfind(prefix, 0) == 0, ...)`, a failure shows both, with wide
+  text converted to UTF-8. Case-insensitive `IC` variants
+  (`CheckStartsWithIC`, etc.) ignore the case of the ASCII letters `A`-`Z`
+  only, like the `ContainsIC` methods.
 - `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and
   `CheckLessThanOrEqual`, with matching `Assert` methods, taking the value
   first and then the bound (e.g. `CheckGreaterThanOrEqual(count, 1, ...)`

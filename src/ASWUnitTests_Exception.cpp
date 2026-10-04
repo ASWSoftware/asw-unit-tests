@@ -110,6 +110,20 @@ TExceptContains::TExceptContains(std::string const& method, int line, std::strin
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptEndsWith
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptEndsWith::TExceptEndsWith(std::string const& method, int line, std::string const& text,
+    std::string const& suffix, std::string const& msg, bool ignoreCase)
+{
+    m_Message = "Suffix not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" to end with \"" + suffix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptEquals
 /////////////////////////////////////////////////////////////////////////////
 
@@ -165,6 +179,20 @@ TExceptNotContains::TExceptNotContains(std::string const& method, int line, std:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNotEndsWith
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotEndsWith::TExceptNotEndsWith(std::string const& method, int line, std::string const& text,
+    std::string const& suffix, std::string const& msg, bool ignoreCase)
+{
+    m_Message = "Suffix found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" not to end with \"" + suffix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotEquals
 /////////////////////////////////////////////////////////////////////////////
 
@@ -195,6 +223,20 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNotStartsWith
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotStartsWith::TExceptNotStartsWith(std::string const& method, int line, std::string const& text,
+    std::string const& prefix, std::string const& msg, bool ignoreCase)
+{
+    m_Message = "Prefix found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" not to start with \"" + prefix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptOrdering
 /////////////////////////////////////////////////////////////////////////////
 
@@ -204,6 +246,20 @@ TExceptOrdering::TExceptOrdering(std::string const& method, int line, std::strin
 {
     m_Message = "Values out of order: " + method + " (" + std::to_string(line) + "): Expected " + value + " to be " +
         relation + " " + bound + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptStartsWith
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptStartsWith::TExceptStartsWith(std::string const& method, int line, std::string const& text,
+    std::string const& prefix, std::string const& msg, bool ignoreCase)
+{
+    m_Message = "Prefix not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
+        "\" to start with \"" + prefix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
 }
 //---------------------------------------------------------------------------
 

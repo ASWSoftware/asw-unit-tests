@@ -131,6 +131,50 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptStartsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptStartsWith : public TTestException
+{
+public:
+    TExceptStartsWith(std::string const& method, int line, std::string const& text, std::string const& prefix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotStartsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptNotStartsWith : public TTestException
+{
+public:
+    TExceptNotStartsWith(std::string const& method, int line, std::string const& text, std::string const& prefix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptEndsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptEndsWith : public TTestException
+{
+public:
+    TExceptEndsWith(std::string const& method, int line, std::string const& text, std::string const& suffix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotEndsWith
+/////////////////////////////////////////////////////////////////////////////
+class TExceptNotEndsWith : public TTestException
+{
+public:
+    TExceptNotEndsWith(std::string const& method, int line, std::string const& text, std::string const& suffix,
+        std::string const& msg, bool ignoreCase = false);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptOrdering
 /////////////////////////////////////////////////////////////////////////////
 class TExceptOrdering : public TTestException

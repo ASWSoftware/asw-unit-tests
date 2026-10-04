@@ -748,6 +748,87 @@ protected: // Assertion/Check methods - Contains (substring)
     virtual void CheckNotContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
+    virtual void AssertEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotStartsWithIC(std::wstring const& text, std::wstring const& prefix,
+        std::string const& method, int line, std::string const& msg);
+
+    virtual void AssertStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
+        int line, std::string const& msg);
+
 protected: // Assertion/Check methods - Ordering (value compared with a bound)
     // Any two integer or floating-point types except bool.
     template <typename TValue, typename TBound>
@@ -819,6 +900,20 @@ protected: // Assertion/Check methods - std::source_location
         AssertContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TSuffix>
+    void AssertEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void AssertEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -886,6 +981,20 @@ protected: // Assertion/Check methods - std::source_location
         AssertNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TSuffix>
+    void AssertNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void AssertNotEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void AssertNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -907,6 +1016,34 @@ protected: // Assertion/Check methods - std::source_location
         AssertNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TPrefix>
+    void AssertNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertNotStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void AssertStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     void AssertTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -924,6 +1061,20 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         CheckContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual>
@@ -993,6 +1144,20 @@ protected: // Assertion/Check methods - std::source_location
         CheckNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TSuffix>
+    void CheckNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEndsWith(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TSuffix>
+    void CheckNotEndsWithIC(TText&& text, TSuffix&& suffix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEndsWithIC(std::forward<TText>(text), std::forward<TSuffix>(suffix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual>
     void CheckNotEquals(TExpected&& expected, TActual&& actual, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1013,6 +1178,34 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckNotStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckStartsWith(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPrefix>
+    void CheckStartsWithIC(TText&& text, TPrefix&& prefix, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     void CheckTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
