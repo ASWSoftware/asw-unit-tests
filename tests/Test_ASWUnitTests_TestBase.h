@@ -2,7 +2,7 @@
 Test_ASWUnitTests_TestBase.h
 Author: Anthony S. West - ASW Software
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,16 @@ private:
 private: // Test methods
     void Test_CheckNear_ToleranceBoundaryIsInclusive();
     void Test_Check_ContinuesButAssert_Aborts();
+    void Test_ContainsIC_IgnoresASCIICaseOnly();
+    void Test_Contains_ShowsTextAndSubstring();
+    void Test_EndsWithIC_IgnoresASCIICaseOnly();
+    void Test_EndsWith_ShowsTextAndSuffix();
+    void Test_EqualsIC_IgnoresASCIICaseOnly();
+    void Test_Equals_ComparesCStringsByContent();
+    void Test_Equals_ComparesMixedIntegerTypesByValue();
+    void Test_Equals_ShowsBoolValuesAsTrueOrFalse();
+    void Test_Equals_ShowsStringValues();
+    void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
@@ -61,6 +71,12 @@ private: // Test methods
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_SourceLocation_ReportsCallerFunctionAndLine();
+#endif
+    void Test_StartsWithIC_IgnoresASCIICaseOnly();
+    void Test_StartsWith_ShowsTextAndPrefix();
+    void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:
     TTest_ASWUnitTests_TestBase();

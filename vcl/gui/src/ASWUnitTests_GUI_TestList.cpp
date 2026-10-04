@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,6 +102,15 @@ void TGUITestList::CheckMatching(TestFilter const& filter)
 {
     for (size_t i = 0; i < m_Tests.size(); ++i)
         m_Checked[i] = (filter == nullptr) || filter(m_Tests[i].GroupName + "." + m_Tests[i].TestName);
+}
+//---------------------------------------------------------------------------
+void TGUITestList::CheckOnlyFailed()
+{
+    for (size_t i = 0; i < m_Tests.size(); ++i)
+    {
+        if (m_Visible[i])
+            m_Checked[i] = (m_Statuses[i] == TGUITestStatus::Failed);
+    }
 }
 //---------------------------------------------------------------------------
 size_t TGUITestList::Count() const

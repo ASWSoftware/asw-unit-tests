@@ -4,7 +4,7 @@ Author: Anthony S. West - ASW Software
 
 See header for info.
 
-Copyright 2026 Anthony S. West
+Copyright 2026 ASW Software
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ void TTest_ASWUnitTests_StdOutRedirect::Test_Capture_ResumesCapturingWithFreshBu
         "Capture() after Restore() starts a fresh buffer, discarding the first session's content");
     CheckEquals(std::string("second-capture"), afterRedundantCapture, __func__, __LINE__,
         "calling Capture() while already capturing does not clear the buffer");
-    CheckTrue(outer.Str().find("escapes-to-outer") != std::string::npos, __func__, __LINE__,
+    CheckContains(outer.Str(), "escapes-to-outer", __func__, __LINE__,
         "text written between Restore() and Capture() reached the real stream");
 }
 //---------------------------------------------------------------------------
@@ -128,9 +128,9 @@ void TTest_ASWUnitTests_StdOutRedirect::Test_Restore_StopsCapturingAndIsIdempote
     // Assert
     CheckEquals(std::string("captured-by-inner"), innerCaptured, __func__, __LINE__,
         "only text written before Restore() was captured");
-    CheckTrue(outerCaptured.find("not-captured-by-inner") != std::string::npos, __func__, __LINE__,
+    CheckContains(outerCaptured, "not-captured-by-inner", __func__, __LINE__,
         "text written after Restore() reached the real stream (here, outer's capture) instead");
-    CheckTrue(outerCaptured.find("after-inner-destroyed") != std::string::npos, __func__, __LINE__,
+    CheckContains(outerCaptured, "after-inner-destroyed", __func__, __LINE__,
         "text written after inner's destructor still reaches the real stream (its Restore() was harmless)");
 }
 //---------------------------------------------------------------------------

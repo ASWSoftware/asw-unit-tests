@@ -10,8 +10,94 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- With `ASWUNITTESTS_RTL_EXCEPTIONS` defined, the string `Check`/`Assert`
+  methods (`Equals`, `Contains`, `StartsWith`, `EndsWith`, and their `Not` and
+  `IC` forms) also take a `System::String`, compared with another
+  `System::String`, a `std::string`, a `std::wstring` or a C string. Both are
+  compared as UTF-8, and a failure shows them as for `std::string`. Comparing
+  a `System::String` with a number remains a compile error.
+- `CheckStartsWith`/`AssertStartsWith` and `CheckEndsWith`/`AssertEndsWith`,
+  and their `Not` forms (`CheckNotStartsWith`, etc.), for `std::string` and
+  `std::wstring`, taking the text first and then the prefix or suffix. Unlike
+  `CheckTrue(text.rfind(prefix, 0) == 0, ...)`, a failure shows both, with wide
+  text converted to UTF-8. Case-insensitive `IC` variants
+  (`CheckStartsWithIC`, etc.) ignore the case of the ASCII letters `A`-`Z`
+  only, like the `ContainsIC` methods.
+- `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and
+  `CheckLessThanOrEqual`, with matching `Assert` methods, taking the value
+  first and then the bound (e.g. `CheckGreaterThanOrEqual(count, 1, ...)`
+  checks `count >= 1`). Unlike `CheckTrue(count >= 1, ...)`, a failure shows
+  both, e.g. `Expected 0 to be >= 1`. They accept any two integer or
+  floating-point types except `bool`. Integers are compared by value, so `-1`
+  is less than any unsigned value, unlike with the built-in `<`, and a NaN
+  fails every check.
+- `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC`,
+  which compare two `std::string` or `std::wstring` values ignoring the case
+  of the ASCII letters `A`-`Z` only, like the `ContainsIC` methods. A failure
+  shows both values, with wide text converted to UTF-8.
+- `CheckContains`/`AssertContains` and `CheckNotContains`/`AssertNotContains`,
+  for `std::string` and `std::wstring`, taking the text first and then the
+  substring. Unlike `CheckTrue(text.find(substring) != std::string::npos, ...)`,
+  a failure shows both, with wide text converted to UTF-8. Case-insensitive
+  `IC` variants (`CheckContainsIC`, etc.) ignore the case of the ASCII letters
+  `A`-`Z` only, the same on every platform and locale. They use the new
+  `src/ASWUnitTests_Utils.cpp`, which a project that lists the framework's
+  source files by hand, rather than through `ASWUnitTests_Sources.cmake`, must
+  add.
+- VCL GUI runner: the checked tests are saved when the window closes and
+  restored when it next opens, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
+  unless the command line chooses the tests itself (`--run`, `--filter`, or
+  partition options). New tests are checked if their group was entirely
+  checked, removed tests are skipped, and the log notes what was restored.
+- VCL GUI runner: **Select Failed** (Tests menu and toolbar), which checks only
+  the shown tests that failed in the latest run, so they can be rerun with Run
+  Selected.
+- Version macros in `ASWUnitTests_Version.h`: `ASWUNITTESTS_VERSION_MAJOR`,
+  `ASWUNITTESTS_VERSION_MINOR`, `ASWUNITTESTS_VERSION_PATCH`,
+  `ASWUNITTESTS_VERSION_PRERELEASE` (empty on a release, e.g. `dev.1` between
+  releases) and `ASWUNITTESTS_VERSION_STRING` (e.g. `1.1.0-dev.1`), usable in
+  `#if`, plus a matching `ASWUnitTests::VersionPreRelease` constant. The
+  existing `VersionMajor`, `VersionMinor`, `VersionPatch` and `Version`
+  constants now come from the macros.
+- `std::source_location` overloads of every `Check*`/`Assert*` method,
+  `Skip()`, and `SetExceptionExpected()`, taking the caller's location by
+  default instead of a method and line, so a call no longer needs
+  `__func__, __LINE__`. Requires C++20, so they're unavailable with RAD
+  Studio's 32-bit compilers; `ASWUNITTESTS_SOURCE_LOCATION_ENABLED` is defined
+  when they're available. The method and line overloads are unchanged.
+- `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` overloads
+  for any two integer types other than `bool`, compared by value. A call
+  mixing integer types (e.g. `int` and `int64_t`), or using one that matches
+  none of the fixed-width overloads (e.g. `long` on Windows, `long long` on
+  Linux), used to be an ambiguous-overload compile error. A negative value
+  never equals an unsigned one, unlike with the built-in `==`.
+
+### Changed
+
+- A failed `CheckEquals`/`AssertEquals` of two `std::wstring` or
+  `wchar_t const*` values shows both values, converted to UTF-8, like the
+  `std::string` overloads, instead of only the message. A failed
+  `CheckNotEquals`/`AssertNotEquals` of two strings, narrow or wide, shows the
+  value they share, like the integer overloads. A null C string is shown as
+  `(null)`, including when both are null.
+- Development builds between releases are versioned with a SemVer pre-release
+  (e.g. `1.1.0-dev.1`), which sorts before the release it leads up to.
+
 ### Fixed
 
+- A failed `AssertTrue()` reporting "Expected false but was true". It now
+  reports "Expected true but was false", by throwing `TExceptTrue` instead of
+  `TExceptFalse`, so code that catches `TExceptFalse` to detect a failed
+  `AssertTrue()` must catch `TExceptTrue` instead.
+- `CheckEquals`/`AssertEquals`/`CheckNotEquals`/`AssertNotEquals` comparing two
+  C strings (e.g. two string literals) as `bool` instead of by content, so an
+  `Equals` check always passed and a `NotEquals` check always failed, whatever
+  the text. New `char const*` and `wchar_t const*` overloads compare by
+  content. A test that used to pass this way may now correctly fail.
+- A failed `CheckEquals` of two `bool` values showing them as `1`/`0`. It now
+  shows `true`/`false`, the same as `AssertEquals` and the `NotEquals` methods.
 - CI test-results reporting failing for pull requests from forks, whose
   read-only token can't create check runs. Each CI job now shows its JUnit
   report on the run's summary page instead, which needs no write permission,

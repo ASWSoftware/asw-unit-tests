@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_CLI.h
+Test_ASWUnitTests_Version.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,14 +19,9 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_CLIH
-#define Test_ASWUnitTests_CLIH
+#ifndef Test_ASWUnitTests_VersionH
+#define Test_ASWUnitTests_VersionH
 //---------------------------------------------------------------------------
-#include <optional>
-#include <string>
-#include <vector>
-//---------------------------------------------------------------------------
-#include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 
@@ -34,40 +29,21 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_CLI
+// TTest_ASWUnitTests_Version
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_CLI : public TTestGroupBase
+class TTest_ASWUnitTests_Version : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
-private:
-    // Builds a real argv-shaped array from 'args' (owned locally, so ParseArguments's
-    // char* argv[] never points at temporary or literal storage) and parses it.
-    std::optional<int> ParseArgs(std::vector<std::string> args, TCLIOptions& options);
-
 private: // Test methods
-    void Test_BuildTestFilter_Filter();
-    void Test_BuildTestFilter_Partition();
-    void Test_ExitCodeForResults_MapsEachOutcome();
-    void Test_ParseArguments_CatchCrashes();
-    void Test_ParseArguments_Color();
-    void Test_ParseArguments_Filter();
-    void Test_ParseArguments_HelpVersionList();
-    void Test_ParseArguments_InvalidOption();
-    void Test_ParseArguments_PartitionValidation();
-    void Test_ParseArguments_Pause();
-    void Test_ParseArguments_ReportAndProjectName();
-    void Test_ParseArguments_Shuffle();
-    void Test_ParseArguments_TestTimeout();
-    void Test_ParseColorMode();
-    void Test_ParseUnsignedInt_Invalid();
-    void Test_ParseUnsignedInt_Valid();
-    void Test_ToJUnitTestCases_CopiesEachRecord();
+    void Test_GetVersionStr_ReturnsVersion();
+    void Test_PreRelease_IsValidSemVer();
+    void Test_VersionString_MatchesParts();
 
 public:
-    TTest_ASWUnitTests_CLI();
-    ~TTest_ASWUnitTests_CLI() override;
+    TTest_ASWUnitTests_Version();
+    ~TTest_ASWUnitTests_Version() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -78,4 +54,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_CLIH
+#endif // #ifndef Test_ASWUnitTests_VersionH

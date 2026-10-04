@@ -188,6 +188,10 @@
             <DependentOn>..\src\ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>10</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Utils.cpp">
+            <DependentOn>..\src\ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>24</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Version.cpp">
             <DependentOn>..\src\ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>11</BuildOrder>
@@ -230,6 +234,14 @@
         <CppCompile Include="..\tests\Test_ASWUnitTests_TestBase.cpp">
             <DependentOn>..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>18</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Utils.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>25</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\tests\Test_ASWUnitTests_Version.cpp">
+            <DependentOn>..\tests\Test_ASWUnitTests_Version.h</DependentOn>
+            <BuildOrder>23</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\toTest\ASWTools_Random.h</DependentOn>
