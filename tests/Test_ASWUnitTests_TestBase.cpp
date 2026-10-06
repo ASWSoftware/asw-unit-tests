@@ -27,11 +27,13 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -2760,6 +2762,163 @@ void TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_PointerComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
+// AssertNotEquals()/CheckNotEquals() with two pointers. Without the pointer overloads, two pointers convert to bool
+// and match the bool overload, so two different non-null pointers compare equal and the "DifferentPointers" tests
+// pass/fail the wrong way round. The tests compare the addresses of First and Second, so
+// Test_Equals_ComparesPointersByAddress below can check the addresses a failure shows. Test names self-document
+// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_PointerComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    struct TBase
+    {
+        int Value = 0;
+    };
+
+    struct TDerived : TBase
+    {
+    };
+
+    // Different bodies, so a linker that merges identical functions (e.g. MSVC's /OPT:ICF) can't give them one address.
+    static int FirstFunction() { return 1; }
+    static int SecondFunction() { return 2; }
+
+private:
+    void Test_AssertEquals_DifferentPointers_Fails();
+    void Test_AssertEquals_SamePointer_Passes();
+    void Test_AssertNotEquals_DifferentPointers_Passes();
+    void Test_AssertNotEquals_SamePointer_Fails();
+    void Test_CheckEquals_BaseAndDerived_Passes();
+    void Test_CheckEquals_DifferentFunctions_Fails();
+    void Test_CheckEquals_DifferentPointers_Fails();
+    void Test_CheckEquals_MutableCStringBuffer_Passes();
+    void Test_CheckEquals_NullAndNonNull_Fails();
+    void Test_CheckEquals_SamePointer_Passes();
+    void Test_CheckEquals_VoidAndTyped_Passes();
+    void Test_CheckNotEquals_DifferentPointers_Passes();
+    void Test_CheckNotEquals_SamePointer_Fails();
+
+public:
+    int First = 0;
+    int Second = 0;
+
+    TFixture_PointerComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_PointerComparisons::TFixture_PointerComparisons()
+    : inherited("Fixture_PointerComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_PointerComparisons::Test_AssertEquals_DifferentPointers_Fails,
+        "AssertEquals_DifferentPointers_Fails");
+    RegisterTest(&TFixture_PointerComparisons::Test_AssertEquals_SamePointer_Passes, "AssertEquals_SamePointer_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_AssertNotEquals_DifferentPointers_Passes,
+        "AssertNotEquals_DifferentPointers_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_AssertNotEquals_SamePointer_Fails,
+        "AssertNotEquals_SamePointer_Fails");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_BaseAndDerived_Passes,
+        "CheckEquals_BaseAndDerived_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_DifferentFunctions_Fails,
+        "CheckEquals_DifferentFunctions_Fails");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_DifferentPointers_Fails,
+        "CheckEquals_DifferentPointers_Fails");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_MutableCStringBuffer_Passes,
+        "CheckEquals_MutableCStringBuffer_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_NullAndNonNull_Fails,
+        "CheckEquals_NullAndNonNull_Fails");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_SamePointer_Passes, "CheckEquals_SamePointer_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckEquals_VoidAndTyped_Passes, "CheckEquals_VoidAndTyped_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckNotEquals_DifferentPointers_Passes,
+        "CheckNotEquals_DifferentPointers_Passes");
+    RegisterTest(&TFixture_PointerComparisons::Test_CheckNotEquals_SamePointer_Fails,
+        "CheckNotEquals_SamePointer_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_AssertEquals_DifferentPointers_Fails()
+{
+    AssertEquals(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_AssertEquals_SamePointer_Passes()
+{
+    AssertEquals(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_AssertNotEquals_DifferentPointers_Passes()
+{
+    AssertNotEquals(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_AssertNotEquals_SamePointer_Fails()
+{
+    AssertNotEquals(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_BaseAndDerived_Passes()
+{
+    TDerived derived;
+    TBase* const base = &derived;
+    CheckEquals(base, &derived, __func__, __LINE__, "a base pointer to the derived object");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_DifferentFunctions_Fails()
+{
+    CheckEquals(&FirstFunction, &SecondFunction, __func__, __LINE__, "different functions");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_DifferentPointers_Fails()
+{
+    CheckEquals(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_MutableCStringBuffer_Passes()
+{
+    // A char* (not char const*) must still reach the C string overload, which compares by content.
+    char buffer[] = "abc";
+    CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different, non-const buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_NullAndNonNull_Fails()
+{
+    int* const pointer = nullptr;
+    CheckEquals(pointer, &First, __func__, __LINE__, "null and non-null");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_SamePointer_Passes()
+{
+    CheckEquals(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckEquals_VoidAndTyped_Passes()
+{
+    void const* const untyped = &First;
+    CheckEquals(untyped, &First, __func__, __LINE__, "void pointer to the same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckNotEquals_DifferentPointers_Passes()
+{
+    CheckNotEquals(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_PointerComparisons::Test_CheckNotEquals_SamePointer_Fails()
+{
+    CheckNotEquals(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
@@ -4242,6 +4401,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
         "Equals_ComparesMixedIntegerTypesByValue");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesPointersByAddress,
+        "Equals_ComparesPointersByAddress");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
         "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
@@ -4727,6 +4888,61 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
         "a failure shows both values as they are, without wrapping either");
     CheckContains(uint64Max->Message, "Expected \"-1\" but was \"18446744073709551615\"", __func__, __LINE__,
         "a failure beyond int64_t's range shows both values as they are");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesPointersByAddress()
+{
+    // Arrange
+    TFixture_PointerComparisons fixture;
+    auto const formatAddress = [](void const* pointer)
+        {
+            std::ostringstream stream;
+            stream << "0x" << std::hex << reinterpret_cast<std::uintptr_t>(pointer);
+            return stream.str();
+        };
+    std::string const first = formatAddress(&fixture.First);
+    std::string const second = formatAddress(&fixture.Second);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEquals_DifferentPointers_Fails");
+    TTestCaseRecord const* const assertNotEquals = FindRecord(results, "AssertNotEquals_SamePointer_Fails");
+    TTestCaseRecord const* const checkEquals = FindRecord(results, "CheckEquals_DifferentPointers_Fails");
+    TTestCaseRecord const* const checkFunctions = FindRecord(results, "CheckEquals_DifferentFunctions_Fails");
+    TTestCaseRecord const* const checkNull = FindRecord(results, "CheckEquals_NullAndNonNull_Fails");
+    TTestCaseRecord const* const checkNotEquals = FindRecord(results, "CheckNotEquals_SamePointer_Fails");
+    AssertTrue(assertEquals != nullptr && assertNotEquals != nullptr && checkEquals != nullptr &&
+        checkFunctions != nullptr && checkNull != nullptr && checkNotEquals != nullptr, __func__, __LINE__,
+        "every expected record exists");
+
+    CheckEndsWith(assertEquals->Message, "): Expected: \"" + first + "\" but was \"" + second + "\". different objects",
+        __func__, __LINE__, "AssertEquals shows both addresses");
+    CheckEndsWith(assertNotEquals->Message, "): Value: \"" + first + "\". same object", __func__, __LINE__,
+        "AssertNotEquals shows the shared address");
+    CheckEndsWith(checkEquals->Message, "): Expected \"" + first + "\" but was \"" + second + "\". different objects",
+        __func__, __LINE__, "CheckEquals shows both addresses");
+    CheckContains(checkFunctions->Message, "Expected \"0x", __func__, __LINE__,
+        "a function pointer's address is shown too");
+    CheckEndsWith(checkNull->Message, "): Expected \"(null)\" but was \"" + first + "\". null and non-null", __func__,
+        __LINE__, "a null pointer is shown as (null)");
+    CheckEndsWith(checkNotEquals->Message, "): Both values equal: \"" + first + "\". same object", __func__, __LINE__,
+        "CheckNotEquals shows the shared address");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse()

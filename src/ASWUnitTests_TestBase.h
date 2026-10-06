@@ -30,6 +30,7 @@ limitations under the License.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <limits>
@@ -328,6 +329,9 @@ private:
             return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
     }
 
+    // Formats 'address' in hexadecimal for a pointer comparison failure, e.g. "0x7ffd5a2c"; see FormatPointer().
+    static std::string FormatAddress(std::uintptr_t address);
+
     // Formats a pair of floating-point values for an ordering failure; see FormatOrderingValues().
     static std::pair<std::string, std::string> FormatFloatingPointValues(float value, float bound);
     static std::pair<std::string, std::string> FormatFloatingPointValues(double value, double bound);
@@ -346,6 +350,26 @@ private:
         else
         {
             return std::pair<std::string, std::string>(std::to_string(value), std::to_string(bound));
+        }
+    }
+
+    // Formats 'pointer' for a pointer comparison failure: its address (see FormatAddress()), or "(null)".
+    template <typename TPointer>
+    static std::string FormatPointer(TPointer pointer)
+    {
+        if (pointer == nullptr)
+            return "(null)";
+
+        if constexpr (std::is_function<typename std::remove_pointer<TPointer>::type>::value)
+        {
+            // A function pointer can't portably be cast to an integer, so its bytes are copied instead.
+            std::uintptr_t address = 0;
+            std::memcpy(&address, &pointer, (sizeof(pointer) < sizeof(address)) ? sizeof(pointer) : sizeof(address));
+            return FormatAddress(address);
+        }
+        else
+        {
+            return FormatAddress(reinterpret_cast<std::uintptr_t>(pointer));
         }
     }
 
@@ -560,6 +584,23 @@ protected: // Assertion/Check methods - Equals
                 AssertEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+    // Any two pointers, compared by address, except two C strings of the same character type, which the overloads
+    // above compare by content. Without these, two pointers would convert to bool and match the bool overload. Two
+    // pointers that can't be compared with each other (e.g. int* and long*) are a compile error.
+    template <typename TPointer, typename TChar>
+    using TPointsTo = std::is_same<typename std::remove_cv<typename std::remove_pointer<TPointer>::type>::type, TChar>;
+    template <typename TExpected, typename TActual>
+    using TEnableIfPointers = typename std::enable_if<std::is_pointer<TExpected>::value &&
+        std::is_pointer<TActual>::value &&
+        !(TPointsTo<TExpected, char>::value && TPointsTo<TActual, char>::value) &&
+        !(TPointsTo<TExpected, wchar_t>::value && TPointsTo<TActual, wchar_t>::value), int>::type;
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void AssertEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected != actual)
+            throw TExceptEquals(method, line, FormatPointer(expected), FormatPointer(actual), msg);
+    }
 
     virtual void AssertEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -600,6 +641,13 @@ protected: // Assertion/Check methods - Equals
             {
                 CheckEquals(expectedValue, actualValue, method, line, msg);
             });
+    }
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void CheckEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected != actual)
+            SetTestFailedCheck(method, line, FormatPointer(expected), FormatPointer(actual), msg);
     }
 
     virtual void CheckEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
@@ -643,6 +691,14 @@ protected: // Assertion/Check methods - Not Equals
                 AssertNotEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+    // Two pointers, compared by address; see TEnableIfPointers.
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected == actual)
+            throw TExceptNotEquals(method, line, FormatPointer(expected), msg);
+    }
 
     virtual void AssertNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -683,6 +739,13 @@ protected: // Assertion/Check methods - Not Equals
             {
                 CheckNotEquals(expectedValue, actualValue, method, line, msg);
             });
+    }
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected == actual)
+            SetTestFailedCheckNotEquals(method, line, FormatPointer(expected), msg);
     }
 
     virtual void CheckNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,

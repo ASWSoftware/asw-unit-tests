@@ -1244,6 +1244,13 @@ bool TTestGroupBase::ExceptionTypeExpected() const
     return m_ExpectedExceptionTypeChecker != nullptr;
 }
 //---------------------------------------------------------------------------
+std::string TTestGroupBase::FormatAddress(std::uintptr_t address)
+{
+    std::ostringstream stream;
+    stream << "0x" << std::hex << address;
+    return stream.str();
+}
+//---------------------------------------------------------------------------
 std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(float value, float bound)
 {
     return FormatFloatingPointPair(value, bound);

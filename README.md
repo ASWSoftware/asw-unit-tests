@@ -530,6 +530,18 @@ CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer 
 A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the value they share, for C strings,
 `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer is shown as `(null)`.
 
+### Comparing Pointers
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare any other two pointers by address, and a
+failure shows both addresses:
+
+```
+CheckEquals(expectedWidget, list.Find("button"), __func__, __LINE__, "finds the widget that was added");
+// Check failed for: "Test_Find" (42): Expected "0x1f2a40" but was "(null)". finds the widget that was added
+```
+
+Comparing two pointers to unrelated types (e.g. `int*` and `long*`) is a compile error.
+
 ### Comparing Strings, Ignoring Case
 
 `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC` compare two `std::string` or

@@ -16,8 +16,18 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   value with `nullptr`. They accept anything that can be compared with
   `nullptr`, such as a raw pointer, `std::unique_ptr`, `std::shared_ptr` or
   `std::function`. A C string is checked as a pointer, so an empty string
-  such as `""` is not null. With C++20, they also have `std::source_location` overloads, like the other
-  `Check*`/`Assert*` methods.
+  such as `""` is not null. With C++20, they also have `std::source_location`
+  overloads, like the other `Check*`/`Assert*` methods.
+
+### Fixed
+
+- `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` given
+  two pointers compared them as `bool`, so any two non-null pointers were
+  equal: `CheckEquals(&a, &b, ...)` passed. They now compare the addresses,
+  and a failure shows both (e.g. `0x7ffd5a2c`, or `(null)`). Two C strings
+  are still compared by content. A test that passed only because of this now
+  fails, and comparing two pointers to unrelated types (e.g. `int*` and
+  `long*`) is now a compile error.
 
 ## [1.1.0] - 2026-10-04
 

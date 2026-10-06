@@ -52,6 +52,7 @@ private: // Test methods
     void Test_EqualsIC_IgnoresASCIICaseOnly();
     void Test_Equals_ComparesCStringsByContent();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
+    void Test_Equals_ComparesPointersByAddress();
     void Test_Equals_ShowsBoolValuesAsTrueOrFalse();
     void Test_Equals_ShowsStringValues();
     void Test_NullNotNull_FailureNamesTheExpectedValue();
