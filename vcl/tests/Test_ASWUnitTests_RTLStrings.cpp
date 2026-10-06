@@ -792,7 +792,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
     for (TExpectedFailure const& expected : expectedFailures)
     {
         TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
-        AssertTrue(record != nullptr, __func__, __LINE__, expected.TestName + " has a record");
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
 
         std::string const prefix = expected.Category.empty() ?
                 "Check failed for: \"Test_" + expected.TestName + "\" (" :
@@ -804,7 +804,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
     // function_name() is compiler-specific, but always contains the function's own name.
     TTestCaseRecord const* const sourceLocation = FindRecord(results, "SourceLocation_CheckEndsWith_Fails");
-    AssertTrue(sourceLocation != nullptr, __func__, __LINE__, "the source location test has a record");
+    AssertNotNull(sourceLocation, __func__, __LINE__, "the source location test has a record");
     CheckContains(sourceLocation->Message, "Test_SourceLocation_CheckEndsWith_Fails", __func__, __LINE__,
         "the source location form reports its caller's function");
     CheckContains(sourceLocation->Message, "(" + std::to_string(fixture.SourceLocationLine) + ")", __func__, __LINE__,

@@ -4790,7 +4790,7 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
     for (std::pair<std::string, std::string> const& expected : expectedDetails)
     {
         TTestCaseRecord const* const record = FindRecord(results, expected.first);
-        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+        AssertNotNull(record, __func__, __LINE__, expected.first + " has a record");
         CheckTrue(record->Outcome == TTestOutcome::Fail, __func__, __LINE__, expected.first + " should fail");
 
         std::string prefix = "Check failed for: \"Test_" + expected.first + "\" (";
@@ -4888,7 +4888,7 @@ void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
     for (std::pair<std::string, std::string> const& expected : expectedDetails)
     {
         TTestCaseRecord const* const record = FindRecord(results, expected.first);
-        AssertTrue(record != nullptr, __func__, __LINE__, expected.first + " has a record");
+        AssertNotNull(record, __func__, __LINE__, expected.first + " has a record");
 
         std::string const prefix = (expected.first.compare(0, 6, "Assert") == 0) ?
                 "Values out of order: Test_" + expected.first + " (" :
@@ -5424,7 +5424,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
     }
 
     TTestCaseRecord const* const throughHelper = FindRecord(results, "CheckTrue_ThroughHelper_Fails");
-    AssertTrue(throughHelper != nullptr, __func__, __LINE__, "the helper test's record exists");
+    AssertNotNull(throughHelper, __func__, __LINE__, "the helper test's record exists");
     CheckNotContains(throughHelper->Message, "CheckIsEven", __func__, __LINE__,
         "a helper that passes its caller's location through isn't itself reported");
 }

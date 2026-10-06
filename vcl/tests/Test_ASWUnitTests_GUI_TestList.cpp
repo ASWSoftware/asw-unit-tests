@@ -131,7 +131,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_CheckedFilter_MatchesExactlyTheChecke
     TestFilter const filter = list.CheckedFilter();
 
     // Assert
-    AssertTrue(filter != nullptr, __func__, __LINE__, "a filter is returned");
+    AssertNotNull(filter, __func__, __LINE__, "a filter is returned");
     CheckTrue(filter("Alpha.One"), __func__, __LINE__, "a checked test matches");
     CheckFalse(filter("Alpha.Two"), __func__, __LINE__, "an unchecked test doesn't");
     CheckFalse(filter("Beta.Three"), __func__, __LINE__, "nor does another group's unchecked test");
@@ -354,7 +354,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_ResetResults_SetsEveryTestBackToNotRu
     // Assert
     CheckEquals(static_cast<size_t>(4), list.StatusCount(TGUITestStatus::NotRun), __func__, __LINE__,
         "every test is back to not run");
-    CheckTrue(list.Result(2) == nullptr, __func__, __LINE__, "and no longer has a result");
+    CheckNull(list.Result(2), __func__, __LINE__, "and no longer has a result");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_SetAllChecked_ChecksOrUnchecksEveryTest()
@@ -421,9 +421,9 @@ void TTest_ASWUnitTests_GUI_TestList::Test_SetResult_StoresTheResultAndSetsTheSt
     list.SetResult(2, TTestCaseRecord{ "Beta", "Three", 0.25, TTestOutcome::Skip, "not on this platform" }, "log");
 
     // Assert
-    CheckTrue(before == nullptr, __func__, __LINE__, "a test has no result before it finishes");
+    CheckNull(before, __func__, __LINE__, "a test has no result before it finishes");
     TGUITestResult const* const after = list.Result(2);
-    AssertTrue(after != nullptr, __func__, __LINE__, "it has one after");
+    AssertNotNull(after, __func__, __LINE__, "it has one after");
     CheckEquals(std::string("not on this platform"), after->Record.Message, __func__, __LINE__, "with its record");
     CheckEquals(std::string("log"), after->Log, __func__, __LINE__, "and its log");
     CheckTrue(list.Status(2) == TGUITestStatus::Skipped, __func__, __LINE__, "its status follows the outcome");
