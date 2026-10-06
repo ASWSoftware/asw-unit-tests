@@ -27,8 +27,10 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <thread>
@@ -2199,6 +2201,158 @@ void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_NullChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertNull()/CheckNull()/AssertNotNull()/
+// CheckNotNull() with null and non-null raw pointers, smart pointers, std::function objects, C strings and a nullptr
+// literal, so Test_NullNotNull_FailureNamesTheExpectedValue below can check each is compared with nullptr and that
+// each failure states the value that was expected. Test names self-document expected outcome via NameEndsWith(), same
+// as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NullChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotNull_NonNull_Passes();
+    void Test_AssertNotNull_Null_Fails();
+    void Test_AssertNull_NonNull_Fails();
+    void Test_AssertNull_Null_Passes();
+    void Test_CheckNotNull_EmptyCString_Passes();
+    void Test_CheckNotNull_EmptyFunction_Fails();
+    void Test_CheckNotNull_NonNull_Passes();
+    void Test_CheckNotNull_Null_Fails();
+    void Test_CheckNotNull_SharedPtr_Passes();
+    void Test_CheckNull_EmptyFunction_Passes();
+    void Test_CheckNull_NonNull_Fails();
+    void Test_CheckNull_NullCString_Passes();
+    void Test_CheckNull_Null_Passes();
+    void Test_CheckNull_NullptrLiteral_Passes();
+    void Test_CheckNull_UniquePtr_Fails();
+
+public:
+    TFixture_NullChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_NullChecks::TFixture_NullChecks()
+    : inherited("Fixture_NullChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_NullChecks::Test_AssertNotNull_NonNull_Passes, "AssertNotNull_NonNull_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_AssertNotNull_Null_Fails, "AssertNotNull_Null_Fails");
+    RegisterTest(&TFixture_NullChecks::Test_AssertNull_NonNull_Fails, "AssertNull_NonNull_Fails");
+    RegisterTest(&TFixture_NullChecks::Test_AssertNull_Null_Passes, "AssertNull_Null_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNotNull_EmptyCString_Passes, "CheckNotNull_EmptyCString_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNotNull_EmptyFunction_Fails, "CheckNotNull_EmptyFunction_Fails");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNotNull_NonNull_Passes, "CheckNotNull_NonNull_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNotNull_Null_Fails, "CheckNotNull_Null_Fails");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNotNull_SharedPtr_Passes, "CheckNotNull_SharedPtr_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_EmptyFunction_Passes, "CheckNull_EmptyFunction_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_NonNull_Fails, "CheckNull_NonNull_Fails");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_NullCString_Passes, "CheckNull_NullCString_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_Null_Passes, "CheckNull_Null_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_NullptrLiteral_Passes, "CheckNull_NullptrLiteral_Passes");
+    RegisterTest(&TFixture_NullChecks::Test_CheckNull_UniquePtr_Fails, "CheckNull_UniquePtr_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_AssertNotNull_NonNull_Passes()
+{
+    int value = 0;
+    AssertNotNull(&value, __func__, __LINE__, "pointer is not null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_AssertNotNull_Null_Fails()
+{
+    int* const pointer = nullptr;
+    AssertNotNull(pointer, __func__, __LINE__, "pointer is null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_AssertNull_NonNull_Fails()
+{
+    int value = 0;
+    AssertNull(&value, __func__, __LINE__, "pointer is not null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_AssertNull_Null_Passes()
+{
+    int* const pointer = nullptr;
+    AssertNull(pointer, __func__, __LINE__, "pointer is null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNotNull_EmptyCString_Passes()
+{
+    char const* const text = "";
+    CheckNotNull(text, __func__, __LINE__, "empty text is not a null pointer");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNotNull_EmptyFunction_Fails()
+{
+    std::function<void()> const callback;
+    CheckNotNull(callback, __func__, __LINE__, "function is empty");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNotNull_NonNull_Passes()
+{
+    int value = 0;
+    CheckNotNull(&value, __func__, __LINE__, "pointer is not null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNotNull_Null_Fails()
+{
+    int* const pointer = nullptr;
+    CheckNotNull(pointer, __func__, __LINE__, "pointer is null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNotNull_SharedPtr_Passes()
+{
+    std::shared_ptr<int> const pointer = std::make_shared<int>(0);
+    CheckNotNull(pointer, __func__, __LINE__, "shared_ptr owns an int");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_EmptyFunction_Passes()
+{
+    std::function<void()> const callback;
+    CheckNull(callback, __func__, __LINE__, "function is empty");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_NonNull_Fails()
+{
+    int value = 0;
+    CheckNull(&value, __func__, __LINE__, "pointer is not null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_NullCString_Passes()
+{
+    char const* const text = nullptr;
+    CheckNull(text, __func__, __LINE__, "a null C string is a null pointer, not empty text");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_Null_Passes()
+{
+    int* const pointer = nullptr;
+    CheckNull(pointer, __func__, __LINE__, "pointer is null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_NullptrLiteral_Passes()
+{
+    CheckNull(nullptr, __func__, __LINE__, "nullptr is null");
+}
+//---------------------------------------------------------------------------
+void TFixture_NullChecks::Test_CheckNull_UniquePtr_Fails()
+{
+    std::unique_ptr<int> const pointer = std::make_unique<int>(0);
+    CheckNull(pointer, __func__, __LINE__, "unique_ptr owns an int");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_OrderRecorder
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group of 8 trivially-passing tests (A-H)
@@ -2699,9 +2853,11 @@ private:
     void Test_AssertNotEqualsIC_Fails();
     void Test_AssertNotEquals_Fails();
     void Test_AssertNotNear_Fails();
+    void Test_AssertNotNull_Fails();
     void Test_AssertNotStartsWithIC_Fails();
     void Test_AssertNotStartsWith_DifferentCase_Passes();
     void Test_AssertNotStartsWith_Fails();
+    void Test_AssertNull_Fails();
     void Test_AssertStartsWithIC_Passes();
     void Test_AssertStartsWith_Fails();
     void Test_AssertTrue_Fails();
@@ -2729,9 +2885,12 @@ private:
     void Test_CheckNotEqualsIC_Fails();
     void Test_CheckNotEquals_Fails();
     void Test_CheckNotNear_Fails();
+    void Test_CheckNotNull_Fails();
     void Test_CheckNotStartsWithIC_Fails();
     void Test_CheckNotStartsWith_DifferentCase_Passes();
     void Test_CheckNotStartsWith_Fails();
+    void Test_CheckNull_Fails();
+    void Test_CheckNull_UniquePtr_Passes();
     void Test_CheckStartsWithIC_Passes();
     void Test_CheckStartsWith_Fails();
     void Test_CheckStartsWith_Wide_Passes();
@@ -2780,10 +2939,12 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails, "AssertNotEqualsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotNull_Fails, "AssertNotNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails, "AssertNotStartsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_DifferentCase_Passes,
         "AssertNotStartsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_Fails, "AssertNotStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNull_Fails, "AssertNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWithIC_Passes, "AssertStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWith_Fails, "AssertStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
@@ -2812,10 +2973,13 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails, "CheckNotEqualsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotNull_Fails, "CheckNotNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails, "CheckNotStartsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_DifferentCase_Passes,
         "CheckNotStartsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_Fails, "CheckNotStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNull_Fails, "CheckNull_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNull_UniquePtr_Passes, "CheckNull_UniquePtr_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWithIC_Passes, "CheckStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Fails, "CheckStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes, "CheckStartsWith_Wide_Passes");
@@ -2957,6 +3121,12 @@ void TFixture_SourceLocations::Test_AssertNotNear_Fails()
     AssertNotNear(1.0f, 1.25f, 0.5f, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotNull_Fails()
+{
+    ExpectedLines["AssertNotNull_Fails"] = __LINE__ + 1;
+    AssertNotNull(nullptr, "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails()
 {
     ExpectedLines["AssertNotStartsWithIC_Fails"] = __LINE__ + 1;
@@ -2972,6 +3142,13 @@ void TFixture_SourceLocations::Test_AssertNotStartsWith_Fails()
 {
     ExpectedLines["AssertNotStartsWith_Fails"] = __LINE__ + 1;
     AssertNotStartsWith(std::string("ab-AB"), "ab", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNull_Fails()
+{
+    int value = 0;
+    ExpectedLines["AssertNull_Fails"] = __LINE__ + 1;
+    AssertNull(&value, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertStartsWithIC_Passes()
@@ -3125,6 +3302,12 @@ void TFixture_SourceLocations::Test_CheckNotNear_Fails()
     CheckNotNear(1.0, 1.25, 0.5, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotNull_Fails()
+{
+    ExpectedLines["CheckNotNull_Fails"] = __LINE__ + 1;
+    CheckNotNull(std::shared_ptr<int>(), "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails()
 {
     ExpectedLines["CheckNotStartsWithIC_Fails"] = __LINE__ + 1;
@@ -3140,6 +3323,18 @@ void TFixture_SourceLocations::Test_CheckNotStartsWith_Fails()
 {
     ExpectedLines["CheckNotStartsWith_Fails"] = __LINE__ + 1;
     CheckNotStartsWith(std::string("ab-AB"), "ab", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNull_Fails()
+{
+    int value = 0;
+    ExpectedLines["CheckNull_Fails"] = __LINE__ + 1;
+    CheckNull(&value, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNull_UniquePtr_Passes()
+{
+    CheckNull(std::unique_ptr<int>(), "a move-only rvalue forwards to the method/line overload");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckStartsWithIC_Passes()
@@ -4050,6 +4245,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
         "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
+        "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
         "Ordering_ComparesByValueAndShowsBoth");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout,
@@ -4607,6 +4804,53 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
     }
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue()
+{
+    // Arrange
+    TFixture_NullChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(15), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertNotNull = FindRecord(results, "AssertNotNull_Null_Fails");
+    TTestCaseRecord const* const assertNull = FindRecord(results, "AssertNull_NonNull_Fails");
+    TTestCaseRecord const* const checkNotNull = FindRecord(results, "CheckNotNull_Null_Fails");
+    TTestCaseRecord const* const checkNull = FindRecord(results, "CheckNull_NonNull_Fails");
+    AssertTrue(assertNotNull != nullptr && assertNull != nullptr && checkNotNull != nullptr && checkNull != nullptr,
+        __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    CheckStartsWith(assertNotNull->Message, "Expected not null but was null: Test_AssertNotNull_Null_Fails (", __func__,
+        __LINE__, "AssertNotNull expects not null");
+    CheckEndsWith(assertNotNull->Message, "): pointer is null", __func__, __LINE__, "AssertNotNull shows the message");
+    CheckStartsWith(assertNull->Message, "Expected null but was not null: Test_AssertNull_NonNull_Fails (", __func__,
+        __LINE__, "AssertNull expects null");
+    CheckEndsWith(assertNull->Message, "): pointer is not null", __func__, __LINE__, "AssertNull shows the message");
+    CheckStartsWith(checkNotNull->Message, "Check failed for: \"Test_CheckNotNull_Null_Fails\" (", __func__, __LINE__,
+        "CheckNotNull names the test");
+    CheckEndsWith(checkNotNull->Message, "): Expected not null but was null: \"pointer is null\"", __func__, __LINE__,
+        "CheckNotNull expects not null");
+    CheckStartsWith(checkNull->Message, "Check failed for: \"Test_CheckNull_NonNull_Fails\" (", __func__, __LINE__,
+        "CheckNull names the test");
+    CheckEndsWith(checkNull->Message, "): Expected null but was not null: \"pointer is not null\"", __func__, __LINE__,
+        "CheckNull expects null");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
 {
     // Arrange
@@ -5150,7 +5394,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(64), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(69), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

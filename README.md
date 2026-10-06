@@ -11,9 +11,10 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, `Contains`/`NotContains`,
-  `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus
-  case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Near`/`NotNear`,
+  `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their
+  `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith`
+  methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -634,6 +635,19 @@ They accept any two integer or floating-point types except `bool`. Two integers 
 [`CheckEquals`](#comparing-integers-of-different-types) does, so `-1` is less than any unsigned value. When either
 value is floating point, both are compared as their common type, as the built-in operators do, and a NaN fails every
 check.
+
+### Checking for Null
+
+`CheckNull`/`AssertNull` and `CheckNotNull`/`AssertNotNull` compare a value with `nullptr`. They accept anything that
+can be compared with `nullptr`, such as a raw pointer, `std::unique_ptr`, `std::shared_ptr` or `std::function`:
+
+```
+std::unique_ptr<TWidget> widget = factory.Create("button");
+AssertNotNull(widget, __func__, __LINE__, "factory should create a button");
+CheckNull(factory.Find("missing"), __func__, __LINE__, "no widget has that name");
+```
+
+A C string is checked as a pointer, so an empty string such as `""` is not null.
 
 ### Skipping a Test
 

@@ -223,6 +223,18 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNotNull
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotNull::TExceptNotNull(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected not null but was null: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotStartsWith
 /////////////////////////////////////////////////////////////////////////////
 
@@ -232,6 +244,18 @@ TExceptNotStartsWith::TExceptNotStartsWith(std::string const& method, int line, 
 {
     m_Message = "Prefix found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" not to start with \"" + prefix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNull
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNull::TExceptNull(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected null but was not null: " + method + " (" + std::to_string(line) + "): " + msg;
 }
 //---------------------------------------------------------------------------
 

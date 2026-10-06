@@ -717,6 +717,43 @@ protected: // Assertion/Check methods - Boolean
     virtual void CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Null (value compared with nullptr)
+    // Any type that can be compared with nullptr, e.g. a raw pointer, std::unique_ptr, std::shared_ptr or
+    // std::function, except an array, which is never null.
+    template <typename TValue>
+    using TEnableIfNullComparable = typename std::enable_if<!std::is_array<TValue>::value &&
+        std::is_convertible<decltype(std::declval<TValue const&>() == nullptr), bool>::value, int>::type;
+
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void AssertNotNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (isNull)
+            throw TExceptNotNull(method, line, msg);
+    }
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void AssertNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (!isNull)
+            throw TExceptNull(method, line, msg);
+    }
+
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void CheckNotNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (isNull)
+            SetTestFailedCheck(method, line, "Expected not null but was null: \"" + msg + "\"");
+    }
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void CheckNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (!isNull)
+            SetTestFailedCheck(method, line, "Expected null but was not null: \"" + msg + "\"");
+    }
+
 protected: // Assertion/Check methods - Contains (substring)
     virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
@@ -1239,6 +1276,12 @@ protected: // Assertion/Check methods - std::source_location
         AssertNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TValue>
+    void AssertNotNull(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TPrefix>
     void AssertNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1252,6 +1295,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void AssertNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void AssertStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
@@ -1402,6 +1450,12 @@ protected: // Assertion/Check methods - std::source_location
         CheckNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TValue>
+    void CheckNotNull(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TPrefix>
     void CheckNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1415,6 +1469,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void CheckStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,

@@ -10,6 +10,15 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- `CheckNull`/`AssertNull` and `CheckNotNull`/`AssertNotNull`, which compare a
+  value with `nullptr`. They accept anything that can be compared with
+  `nullptr`, such as a raw pointer, `std::unique_ptr`, `std::shared_ptr` or
+  `std::function`. A C string is checked as a pointer, so an empty string
+  such as `""` is not null. With C++20, they also have `std::source_location` overloads, like the other
+  `Check*`/`Assert*` methods.
+
 ## [1.1.0] - 2026-10-04
 
 ### Added
