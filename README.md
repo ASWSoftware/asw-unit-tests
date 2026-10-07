@@ -12,9 +12,9 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
   immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
-  `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), `Matches`/`NotMatches`
-  (regular expression), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus case-insensitive `IC` variants
-  of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
+  `IsType`/`IsNotType`, `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms),
+  `Matches`/`NotMatches` (regular expression), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus
+  case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -572,6 +572,23 @@ compare C strings by address too, unlike `CheckEquals`:
 CheckSame(buffer, Trim(buffer), __func__, __LINE__, "trims in place, returning the same buffer");
 CheckSame(cache.Get("a"), cache.Get("a"), __func__, __LINE__, "both calls return the one shared_ptr object");
 ```
+
+### Checking an Object's Type
+
+`CheckIsType<TType>`/`AssertIsType<TType>` check that an object is a `TType`, and `CheckIsNotType`/`AssertIsNotType`
+that it isn't. They take a raw pointer, a smart pointer (`std::unique_ptr`, `std::shared_ptr`) or an object, of a
+polymorphic class (one with a virtual function), including RTL classes. They use `dynamic_cast`, so a subclass of
+`TType` counts as one, and a null pointer is never one. A failure shows the expected type and the object's actual
+type:
+
+```
+std::unique_ptr<TShape> const shape = factory.Create("circle");
+CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
+// Check failed for: "Test_Create" (42): Expected type "TCircle" but was "TSquare". the factory makes a circle
+```
+
+Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form (e.g. a namespace or
+`class ` prefix) depends on the compiler.
 
 ### Comparing Strings, Ignoring Case
 

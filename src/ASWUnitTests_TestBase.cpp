@@ -27,6 +27,7 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <future>
 #include <iomanip>
 #include <iostream>
@@ -42,6 +43,15 @@ limitations under the License.
 #include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
+// abi::__cxa_demangle(), for TypeName(), where the library has it (GCC and Clang, whose std::type_info::name() is
+// mangled). MSVC's name() is already readable.
+#if defined(__has_include)
+#  if __has_include(<cxxabi.h>)
+#    include <cxxabi.h>
+#    define ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED 1
+#  endif
+#endif
 //---------------------------------------------------------------------------
 
 namespace
@@ -2103,6 +2113,22 @@ void TTestGroupBase::Test(ITestCase& testCase)
 bool TTestGroupBase::TestFailedOneOrMoreChecks()
 {
     return m_TestFailedCheck;
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TypeName(std::type_info const& type)
+{
+#if defined(ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED)
+    int status = 0;
+    char* const demangled = abi::__cxa_demangle(type.name(), nullptr, nullptr, &status);
+    if (demangled != nullptr)
+    {
+        std::string const name(demangled);
+        std::free(demangled);
+        return name;
+    }
+#endif
+
+    return type.name();
 }
 //---------------------------------------------------------------------------
 

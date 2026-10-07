@@ -3621,6 +3621,8 @@ private:
     void Test_AssertFalse_Fails();
     void Test_AssertGreaterThanOrEqual_Passes();
     void Test_AssertGreaterThan_Fails();
+    void Test_AssertIsNotType_Fails();
+    void Test_AssertIsType_Fails();
     void Test_AssertLessThanOrEqual_Passes();
     void Test_AssertLessThan_Fails();
     void Test_AssertMatches_Fails();
@@ -3661,6 +3663,8 @@ private:
     void Test_CheckFalse_Fails();
     void Test_CheckGreaterThanOrEqual_Passes();
     void Test_CheckGreaterThan_Fails();
+    void Test_CheckIsNotType_Fails();
+    void Test_CheckIsType_Fails();
     void Test_CheckLessThanOrEqual_Passes();
     void Test_CheckLessThan_Fails();
     void Test_CheckMatches_Fails();
@@ -3727,6 +3731,8 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThanOrEqual_Passes, "AssertGreaterThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThan_Fails, "AssertGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertIsNotType_Fails, "AssertIsNotType_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertIsType_Fails, "AssertIsType_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes, "AssertLessThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThan_Fails, "AssertLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertMatches_Fails, "AssertMatches_Fails");
@@ -3769,6 +3775,8 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThanOrEqual_Passes, "CheckGreaterThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThan_Fails, "CheckGreaterThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckIsNotType_Fails, "CheckIsNotType_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckIsType_Fails, "CheckIsType_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes, "CheckLessThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckLessThan_Fails, "CheckLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckMatches_Fails, "CheckMatches_Fails");
@@ -3882,6 +3890,22 @@ void TFixture_SourceLocations::Test_AssertGreaterThan_Fails()
 {
     ExpectedLines["AssertGreaterThan_Fails"] = __LINE__ + 1;
     AssertGreaterThan(4, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertIsNotType_Fails()
+{
+    std::out_of_range const error("index");
+    std::exception const& ex = error;
+    ExpectedLines["AssertIsNotType_Fails"] = __LINE__ + 1;
+    AssertIsNotType<std::logic_error>(ex, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertIsType_Fails()
+{
+    std::runtime_error const error("boom");
+    std::exception const& ex = error;
+    ExpectedLines["AssertIsType_Fails"] = __LINE__ + 1;
+    AssertIsType<std::logic_error>(ex, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes()
@@ -4124,6 +4148,22 @@ void TFixture_SourceLocations::Test_CheckGreaterThan_Fails()
 {
     ExpectedLines["CheckGreaterThan_Fails"] = __LINE__ + 1;
     CheckGreaterThan(4u, 4, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckIsNotType_Fails()
+{
+    std::out_of_range const error("index");
+    std::exception const* const ex = &error;
+    ExpectedLines["CheckIsNotType_Fails"] = __LINE__ + 1;
+    CheckIsNotType<std::logic_error>(ex, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckIsType_Fails()
+{
+    std::runtime_error const error("boom");
+    std::exception const* const ex = &error;
+    ExpectedLines["CheckIsType_Fails"] = __LINE__ + 1;
+    CheckIsType<std::logic_error>(ex, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes()
@@ -5294,6 +5334,177 @@ void TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_TypeChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertIsType()/CheckIsType()/
+// AssertIsNotType()/CheckIsNotType() with a small class hierarchy, through raw and smart pointers and a reference, so
+// Test_IsType_UsesDynamicTypeAndShowsNames below can check their outcomes and messages. A subclass counts as its base
+// class's type, and a null pointer is never any type. Test names self-document expected outcome via NameEndsWith(),
+// same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TypeChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    struct TShape
+    {
+        virtual ~TShape() = default;
+    };
+
+    struct TCircle : TShape
+    {
+    };
+
+    struct TBigCircle : TCircle
+    {
+    };
+
+    struct TSquare : TShape
+    {
+    };
+
+private:
+    void Test_AssertIsNotType_OtherType_Passes();
+    void Test_AssertIsNotType_SameType_Fails();
+    void Test_AssertIsType_RightType_Passes();
+    void Test_AssertIsType_WrongType_Fails();
+    void Test_CheckIsNotType_Null_Passes();
+    void Test_CheckIsNotType_OtherType_Passes();
+    void Test_CheckIsNotType_Subclass_Fails();
+    void Test_CheckIsType_BaseObject_Fails();
+    void Test_CheckIsType_Null_Fails();
+    void Test_CheckIsType_Reference_Passes();
+    void Test_CheckIsType_RightType_Passes();
+    void Test_CheckIsType_SharedPtr_Passes();
+    void Test_CheckIsType_Subclass_Passes();
+    void Test_CheckIsType_UniquePtr_Fails();
+
+public:
+    TFixture_TypeChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_TypeChecks::TFixture_TypeChecks()
+    : inherited("Fixture_TypeChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_TypeChecks::Test_AssertIsNotType_OtherType_Passes, "AssertIsNotType_OtherType_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_AssertIsNotType_SameType_Fails, "AssertIsNotType_SameType_Fails");
+    RegisterTest(&TFixture_TypeChecks::Test_AssertIsType_RightType_Passes, "AssertIsType_RightType_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_AssertIsType_WrongType_Fails, "AssertIsType_WrongType_Fails");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsNotType_Null_Passes, "CheckIsNotType_Null_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsNotType_OtherType_Passes, "CheckIsNotType_OtherType_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsNotType_Subclass_Fails, "CheckIsNotType_Subclass_Fails");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_BaseObject_Fails, "CheckIsType_BaseObject_Fails");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_Null_Fails, "CheckIsType_Null_Fails");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_Reference_Passes, "CheckIsType_Reference_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_RightType_Passes, "CheckIsType_RightType_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_SharedPtr_Passes, "CheckIsType_SharedPtr_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_Subclass_Passes, "CheckIsType_Subclass_Passes");
+    RegisterTest(&TFixture_TypeChecks::Test_CheckIsType_UniquePtr_Fails, "CheckIsType_UniquePtr_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_AssertIsNotType_OtherType_Passes()
+{
+    TSquare square;
+    TShape const* const shape = &square;
+    AssertIsNotType<TCircle>(shape, __func__, __LINE__, "a square isn't a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_AssertIsNotType_SameType_Fails()
+{
+    TCircle circle;
+    TShape const* const shape = &circle;
+    AssertIsNotType<TCircle>(shape, __func__, __LINE__, "it is a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_AssertIsType_RightType_Passes()
+{
+    TCircle circle;
+    TShape const* const shape = &circle;
+    AssertIsType<TCircle>(shape, __func__, __LINE__, "a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_AssertIsType_WrongType_Fails()
+{
+    TSquare square;
+    TShape const* const shape = &square;
+    AssertIsType<TCircle>(shape, __func__, __LINE__, "wrong type");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsNotType_Null_Passes()
+{
+    TShape const* const shape = nullptr;
+    CheckIsNotType<TCircle>(shape, __func__, __LINE__, "a null pointer isn't a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsNotType_OtherType_Passes()
+{
+    TSquare square;
+    TShape* const shape = &square;
+    CheckIsNotType<TCircle>(shape, __func__, __LINE__, "a square isn't a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsNotType_Subclass_Fails()
+{
+    TBigCircle bigCircle;
+    TShape* const shape = &bigCircle;
+    CheckIsNotType<TCircle>(shape, __func__, __LINE__, "a big circle is a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_BaseObject_Fails()
+{
+    TShape shape;
+    CheckIsType<TCircle>(&shape, __func__, __LINE__, "a plain shape isn't a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_Null_Fails()
+{
+    TShape const* const shape = nullptr;
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "null");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_Reference_Passes()
+{
+    TCircle circle;
+    TShape const& shape = circle;
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "an object, not a pointer");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_RightType_Passes()
+{
+    TCircle circle;
+    TShape* const shape = &circle;
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_SharedPtr_Passes()
+{
+    std::shared_ptr<TShape> const shape = std::make_shared<TCircle>();
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "through a shared_ptr");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_Subclass_Passes()
+{
+    TBigCircle bigCircle;
+    TShape* const shape = &bigCircle;
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "a big circle is a circle");
+}
+//---------------------------------------------------------------------------
+void TFixture_TypeChecks::Test_CheckIsType_UniquePtr_Fails()
+{
+    std::unique_ptr<TShape> const shape = std::make_unique<TSquare>();
+    CheckIsType<TCircle>(shape, __func__, __LINE__, "through a unique_ptr");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_CrashingTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
@@ -5391,6 +5602,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed, "Fail_AbortsTestAsFailed");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_IsType_UsesDynamicTypeAndShowsNames,
+        "IsType_UsesDynamicTypeAndShowsNames");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
@@ -6156,6 +6369,76 @@ void TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed()
         "Fail isn't taken as the expected exception");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_IsType_UsesDynamicTypeAndShowsNames()
+{
+    // Arrange
+    TFixture_TypeChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(14), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Type names vary by compiler (e.g. a namespace or "struct " prefix), but always end with the class's own name,
+    // so each check is of the text around a name: '"' + <prefix> + "TCircle" + '"' and so on.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::vector<std::string> Parts; // In order, each found after the previous one.
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertIsNotType_SameType_Fails", "Type matched: Test_AssertIsNotType_SameType_Fails (",
+          { "): Expected not type \"", "TCircle\" but was \"", "TCircle\". it is a circle" } },
+        { "AssertIsType_WrongType_Fails", "Type mismatch: Test_AssertIsType_WrongType_Fails (",
+          { "): Expected type \"", "TCircle\" but was \"", "TSquare\". wrong type" } },
+        { "CheckIsNotType_Subclass_Fails", "Check failed for: \"Test_CheckIsNotType_Subclass_Fails\" (",
+          { "): Expected not type \"", "TCircle\" but was \"", "TBigCircle\". a big circle is a circle" } },
+        { "CheckIsType_BaseObject_Fails", "Check failed for: \"Test_CheckIsType_BaseObject_Fails\" (",
+          { "): Expected type \"", "TCircle\" but was \"", "TShape\". a plain shape isn't a circle" } },
+        { "CheckIsType_Null_Fails", "Check failed for: \"Test_CheckIsType_Null_Fails\" (",
+          { "): Expected type \"", "TCircle\" but was null. null" } },
+        { "CheckIsType_UniquePtr_Fails", "Check failed for: \"Test_CheckIsType_UniquePtr_Fails\" (",
+          { "): Expected type \"", "TCircle\" but was \"", "TSquare\". through a unique_ptr" } },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+
+        size_t position = 0;
+        for (std::string const& part : expected.Parts)
+        {
+            position = record->Message.find(part, position);
+            if (position == std::string::npos)
+            {
+                Fail(__func__, __LINE__, expected.TestName + " should contain \"" + part + "\", in order: " +
+                    record->Message);
+            }
+
+            position += part.size();
+        }
+
+        CheckEquals(record->Message.size(), position, __func__, __LINE__, expected.TestName + " ends with the message");
+    }
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
 {
     // Arrange
@@ -6871,7 +7154,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(90), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(94), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

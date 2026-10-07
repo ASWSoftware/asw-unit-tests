@@ -49,6 +49,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   an ECMAScript regular expression (`std::regex_match`). A failure shows the
   text and the pattern, and an invalid pattern fails the check rather than
   throwing `std::regex_error`.
+- `CheckIsType<TType>`/`AssertIsType<TType>` and
+  `CheckIsNotType<TType>`/`AssertIsNotType<TType>`, which check with
+  `dynamic_cast` whether an object, given as a raw or smart pointer or by
+  reference, is a `TType` (a subclass counting as one). A failure shows the
+  expected type and the object's actual type. RTL classes work too.
 
 ### Fixed
 

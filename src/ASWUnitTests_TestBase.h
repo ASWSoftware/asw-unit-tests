@@ -38,6 +38,7 @@ limitations under the License.
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -263,6 +264,17 @@ private:
         GreaterThanOrEqual,
         LessThan,
         LessThanOrEqual
+    };
+
+    // True when TValue has a get() member returning a pointer, like std::unique_ptr and std::shared_ptr.
+    template <typename TValue, typename = void>
+    struct THasPointerGet : std::false_type
+    {
+    };
+    template <typename TValue>
+    struct THasPointerGet<TValue, std::void_t<decltype(std::declval<TValue const&>().get())> > :
+        std::is_pointer<decltype(std::declval<TValue const&>().get())>
+    {
     };
 
     // True when TValue has a size() member, which DescribeContents() shows as an element count.
@@ -589,6 +601,44 @@ private:
 
         return failure;
     }
+
+    // Why 'value' fails a type check against TType (with 'expectType' false for an IsNotType method), or an empty
+    // string when it passes. The check uses dynamic_cast, so a subclass of TType counts as a TType, and a null pointer
+    // never does. A failure shows the type names (see TypeName()), with the object's dynamic type.
+    template <typename TType, typename TValue>
+    static std::string TypeCheckFailure(TValue const& value, bool expectType)
+    {
+        static_assert(std::is_class<TType>::value, "TType must be a class type, e.g. CheckIsType<TCircle>(shape, ...)");
+
+        auto const pointer = TypeCheckPointer(value);
+        typedef typename std::remove_cv<typename std::remove_pointer<decltype(pointer)>::type>::type TPointee;
+        static_assert(std::is_polymorphic<TPointee>::value,
+            "the value must point to a polymorphic class (one with a virtual function), as dynamic_cast requires");
+
+        bool const isType = (dynamic_cast<TType const*>(pointer) != nullptr);
+        if (isType == expectType)
+            return std::string();
+
+        std::string const actual = (pointer == nullptr) ? std::string("null") :
+                ("\"" + TypeName(typeid(*pointer)) + "\"");
+        return std::string(expectType ? "Expected type \"" : "Expected not type \"") + TypeName(typeid(TType)) +
+            "\" but was " + actual;
+    }
+
+    // The pointer a type check inspects: a raw pointer as it is, a smart pointer's get(), or an object's address.
+    template <typename TValue>
+    static auto TypeCheckPointer(TValue const& value)
+    {
+        if constexpr (std::is_pointer<TValue>::value)
+            return value;
+        else if constexpr (THasPointerGet<TValue>::value)
+            return value.get();
+        else
+            return std::addressof(value);
+    }
+
+    // 'type''s name for a failure message, demangled where the compiler's name() is mangled (e.g. GCC and Clang).
+    static std::string TypeName(std::type_info const& type);
 
 protected:
     bool m_ExceptionExpected;
@@ -1067,6 +1117,40 @@ protected: // Assertion/Check methods - Same (identity, compared by address)
             SetTestFailedCheck(method, line, "Expected the same object as \"" + FormatPointer(SameAddress(expected)) +
                 "\" but was \"" + FormatPointer(SameAddress(actual)) + "\". " + msg);
         }
+    }
+
+protected: // Assertion/Check methods - Type (dynamic type, via dynamic_cast)
+    // Each takes a raw pointer, a smart pointer (std::unique_ptr, std::shared_ptr) or an object, of a polymorphic
+    // class, and checks whether it is a TType, a subclass counting as one. A null pointer is never a TType. A failure
+    // shows the expected type and the object's actual type; see TypeCheckFailure().
+    template <typename TType, typename TValue>
+    void AssertIsNotType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, false);
+        if (!failure.empty())
+            throw TExceptIsNotType(method, line, failure, msg);
+    }
+    template <typename TType, typename TValue>
+    void AssertIsType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, true);
+        if (!failure.empty())
+            throw TExceptIsType(method, line, failure, msg);
+    }
+
+    template <typename TType, typename TValue>
+    void CheckIsNotType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, false);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+    template <typename TType, typename TValue>
+    void CheckIsType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, true);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
     }
 
 protected: // Assertion/Check methods - Throws (exception from a callable)
@@ -1645,6 +1729,18 @@ protected: // Assertion/Check methods - std::source_location
         AssertGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TType, typename TValue>
+    void AssertIsNotType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertIsNotType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TType, typename TValue>
+    void AssertIsType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertIsType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TValue, typename TBound>
     void AssertLessThan(TValue&& value, TBound&& bound, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1870,6 +1966,17 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TType, typename TValue>
+    void CheckIsNotType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckIsNotType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TType, typename TValue>
+    void CheckIsType(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckIsType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TValue, typename TBound>
     void CheckLessThan(TValue&& value, TBound&& bound, std::string const& msg,

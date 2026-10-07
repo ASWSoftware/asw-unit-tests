@@ -371,6 +371,79 @@ void TFixture_RTLThrowsChecks::Test_CheckThrows_WrongSiblingType_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLTypeChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckIsType()/CheckIsNotType() with RTL
+// (Delphi) classes, held as their base class System::Sysutils::Exception: a subclass, a sibling, and a reference.
+// Test names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_RTLTypeChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CheckIsNotType_Sibling_Passes();
+    void Test_CheckIsNotType_Subclass_Fails();
+    void Test_CheckIsType_Reference_Passes();
+    void Test_CheckIsType_Sibling_Fails();
+    void Test_CheckIsType_Subclass_Passes();
+
+public:
+    TFixture_RTLTypeChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_RTLTypeChecks::TFixture_RTLTypeChecks()
+    : inherited("Fixture_RTLTypeChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsNotType_Sibling_Passes, "CheckIsNotType_Sibling_Passes");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsNotType_Subclass_Fails, "CheckIsNotType_Subclass_Fails");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Reference_Passes, "CheckIsType_Reference_Passes");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Sibling_Fails, "CheckIsType_Sibling_Fails");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Subclass_Passes, "CheckIsType_Subclass_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsNotType_Sibling_Passes()
+{
+    // RTL (Delphi-style) classes can only live on the heap.
+    std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EArgumentException(L"boom"));
+    CheckIsNotType<System::Sysutils::EConvertError>(ex, __func__, __LINE__, "a sibling class");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsNotType_Subclass_Fails()
+{
+    std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EConvertError(L"boom"));
+    CheckIsNotType<System::Sysutils::EConvertError>(ex, __func__, __LINE__, "it is one");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsType_Reference_Passes()
+{
+    std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EConvertError(L"boom"));
+    System::Sysutils::Exception const& reference = *ex;
+    CheckIsType<System::Sysutils::EConvertError>(reference, __func__, __LINE__, "an object, not a pointer");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsType_Sibling_Fails()
+{
+    std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EArgumentException(L"boom"));
+    CheckIsType<System::Sysutils::EConvertError>(ex, __func__, __LINE__, "a sibling class");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsType_Subclass_Passes()
+{
+    std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EConvertError(L"boom"));
+    CheckIsType<System::Sysutils::EConvertError>(ex, __func__, __LINE__, "held as its base class");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_UnexpectedRTLException
 //
 // A never-registered fixture group with a single test that throws an RTL exception without expecting
@@ -423,6 +496,7 @@ TTest_ASWUnitTests_RTLExceptions::TTest_ASWUnitTests_RTLExceptions()
 {
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNameAndMessage,
         "DescribeRTLException_IncludesClassNameAndMessage");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses, "IsType_MatchesRTLClasses");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_RTLExceptionMessage_ConvertsToUTF8,
         "RTLExceptionMessage_ConvertsToUTF8");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesUnexpectedRTLException,
@@ -511,6 +585,50 @@ void TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNa
 
     // Assert
     CheckEquals(std::string("EConvertError: boom"), description, __func__, __LINE__, "\"ClassName: Message\"");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses()
+{
+    // Arrange
+    TFixture_RTLTypeChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(5), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    std::string siblingMessage;
+    std::string subclassMessage;
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__,
+                record.TestName + " should pass: " + record.Message);
+        }
+        else if (NameEndsWith(record.TestName, "_Fails"))
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        }
+        else
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
+
+        if (record.TestName == "CheckIsType_Sibling_Fails")
+            siblingMessage = record.Message;
+        else if (record.TestName == "CheckIsNotType_Subclass_Fails")
+            subclassMessage = record.Message;
+    }
+
+    // Type names vary by compiler, but always contain the class's own name.
+    CheckMatches(siblingMessage, std::string(".*Expected type \".*EConvertError\" but was \".*EArgumentException\"\\. "
+        "a sibling class"), __func__, __LINE__, "shows the expected class and the object's actual class");
+    CheckMatches(subclassMessage, std::string(".*Expected not type \".*EConvertError\" but was \".*EConvertError\"\\. "
+        "it is one"), __func__, __LINE__, "shows the class it shouldn't have been");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_RTLExceptions::Test_RTLExceptionMessage_ConvertsToUTF8()
