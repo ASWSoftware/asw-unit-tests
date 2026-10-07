@@ -1424,6 +1424,19 @@ protected: // Assertion/Check methods - Ordering (value compared with a bound)
         CheckOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
     }
 
+protected: // Assertion/Check methods - Memory (bytes)
+    // Each compares the 'size' bytes at 'expected' with those at 'actual'. A failure shows the offset of the first
+    // differing byte and up to 16 bytes from there, in hex. Zero bytes, or the same pointer twice (even null), are
+    // equal; exactly one null pointer isn't equal to anything, and neither is read.
+    virtual void AssertEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+        std::string const& method, int line, std::string const& msg);
+    virtual void CheckEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+        std::string const& method, int line, std::string const& msg);
+
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 protected: // Assertion/Check methods - System::String (RTL)
     // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
@@ -1711,6 +1724,11 @@ protected: // Assertion/Check methods - std::source_location
         AssertEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void AssertEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -1822,6 +1840,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    void AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPattern>
     void AssertNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,
@@ -1949,6 +1972,11 @@ protected: // Assertion/Check methods - std::source_location
         CheckEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void CheckEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -2059,6 +2087,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    void CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPattern>
     void CheckNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,

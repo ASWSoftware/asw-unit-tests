@@ -172,6 +172,19 @@ TExceptEquals::TExceptEquals(std::string const& method, int line, std::string co
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptEqualsMem
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptEqualsMem::TExceptEqualsMem(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Memory not equal: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptFail
 /////////////////////////////////////////////////////////////////////////////
 
@@ -315,6 +328,19 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 {
     m_Message = "Values are equal: " + method + " (" + std::to_string(line) + "): Values: \"" + value + "\" and \"" +
         otherValue + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotEqualsMem
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotEqualsMem::TExceptNotEqualsMem(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Memory equal: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
 }
 //---------------------------------------------------------------------------
 

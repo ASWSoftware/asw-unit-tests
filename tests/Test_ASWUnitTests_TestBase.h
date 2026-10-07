@@ -51,6 +51,7 @@ private: // Test methods
     void Test_EndsWithIC_IgnoresASCIICaseOnly();
     void Test_EndsWith_ShowsTextAndSuffix();
     void Test_EqualsIC_IgnoresASCIICaseOnly();
+    void Test_EqualsMem_ShowsFirstDifferingBytes();
     void Test_Equals_ComparesCStringsByContent();
     void Test_Equals_ComparesEnumClassByUnderlyingValue();
     void Test_Equals_ComparesMixedIntegerTypesByValue();

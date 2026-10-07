@@ -13,8 +13,9 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
   immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
   `IsType`/`IsNotType`, `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms),
-  `Matches`/`NotMatches` (regular expression), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus
-  case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
+  `Matches`/`NotMatches` (regular expression), `EqualsMem`/`NotEqualsMem` (bytes), and `GreaterThan`/`LessThan` (and
+  their `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and
+  `EndsWith` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -691,6 +692,20 @@ CheckEquals(TColorMode::Always, options.ColorMode, __func__, __LINE__, "--color 
 
 Comparing two different enum types, or an `enum class` with an integer, is a compile error. An unscoped `enum`
 converts to an integer, so it's compared like one, as before.
+
+### Comparing Memory
+
+`CheckEqualsMem`/`AssertEqualsMem` compare a number of bytes at two addresses, and `CheckNotEqualsMem`/
+`AssertNotEqualsMem` check that they differ. A failure shows the offset of the first differing byte, and up to 16 bytes
+from there in hex:
+
+```
+CheckEqualsMem(expected, packet.Data(), sizeof(expected), __func__, __LINE__, "encoded header");
+// Check failed for: "Test_Encode" (42): Bytes differ at offset 2 of 4: expected "03 04" but was "FF 04". encoded header
+```
+
+Zero bytes, or the same pointer twice, are always equal, without reading either. Exactly one null pointer is never
+equal to the other memory, and isn't read either.
 
 ### Comparing Floating-Point Values
 

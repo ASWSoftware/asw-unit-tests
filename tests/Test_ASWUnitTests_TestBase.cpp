@@ -2512,6 +2512,164 @@ void TFixture_MatchesChecks::Test_CheckNotMatches_NotMatching_Passes()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_MemoryComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsMem()/CheckEqualsMem()/
+// AssertNotEqualsMem()/CheckNotEqualsMem(), so Test_EqualsMem_ShowsFirstDifferingBytes below can check their outcomes
+// and messages: a difference at the start, in the middle and past 16 bytes, zero bytes, the same pointer twice, and
+// null pointers. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_MemoryComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEqualsMem_Different_Fails();
+    void Test_AssertEqualsMem_Same_Passes();
+    void Test_AssertNotEqualsMem_Different_Passes();
+    void Test_AssertNotEqualsMem_Same_Fails();
+    void Test_CheckEqualsMem_ActualNull_Fails();
+    void Test_CheckEqualsMem_BothNull_Passes();
+    void Test_CheckEqualsMem_DifferentLater_Fails();
+    void Test_CheckEqualsMem_LongDifference_Fails();
+    void Test_CheckEqualsMem_SameBuffer_Passes();
+    void Test_CheckEqualsMem_ZeroSize_Passes();
+    void Test_CheckNotEqualsMem_Different_Passes();
+    void Test_CheckNotEqualsMem_NullAndBuffer_Passes();
+    void Test_CheckNotEqualsMem_Same_Fails();
+
+public:
+    TFixture_MemoryComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_MemoryComparisons::TFixture_MemoryComparisons()
+    : inherited("Fixture_MemoryComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_MemoryComparisons::Test_AssertEqualsMem_Different_Fails, "AssertEqualsMem_Different_Fails");
+    RegisterTest(&TFixture_MemoryComparisons::Test_AssertEqualsMem_Same_Passes, "AssertEqualsMem_Same_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_AssertNotEqualsMem_Different_Passes,
+        "AssertNotEqualsMem_Different_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_AssertNotEqualsMem_Same_Fails, "AssertNotEqualsMem_Same_Fails");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_ActualNull_Fails, "CheckEqualsMem_ActualNull_Fails");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_BothNull_Passes, "CheckEqualsMem_BothNull_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_DifferentLater_Fails,
+        "CheckEqualsMem_DifferentLater_Fails");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_LongDifference_Fails,
+        "CheckEqualsMem_LongDifference_Fails");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_SameBuffer_Passes,
+        "CheckEqualsMem_SameBuffer_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckEqualsMem_ZeroSize_Passes, "CheckEqualsMem_ZeroSize_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckNotEqualsMem_Different_Passes,
+        "CheckNotEqualsMem_Different_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckNotEqualsMem_NullAndBuffer_Passes,
+        "CheckNotEqualsMem_NullAndBuffer_Passes");
+    RegisterTest(&TFixture_MemoryComparisons::Test_CheckNotEqualsMem_Same_Fails, "CheckNotEqualsMem_Same_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_AssertEqualsMem_Different_Fails()
+{
+    unsigned char const expected[] = { 0x01, 0x02, 0x03, 0x04 };
+    unsigned char const actual[] = { 0x01, 0x02, 0xFF, 0x04 };
+    AssertEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "third byte differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_AssertEqualsMem_Same_Passes()
+{
+    unsigned char const expected[] = { 0x01, 0x02, 0x03, 0x04 };
+    unsigned char const actual[] = { 0x01, 0x02, 0x03, 0x04 };
+    AssertEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "same bytes, different buffers");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_AssertNotEqualsMem_Different_Passes()
+{
+    unsigned char const expected[] = { 0x01, 0x02, 0x03, 0x04 };
+    unsigned char const actual[] = { 0x01, 0x02, 0x03, 0x05 };
+    AssertNotEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "last byte differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_AssertNotEqualsMem_Same_Fails()
+{
+    unsigned char const expected[] = { 0x01, 0x02, 0x03, 0x04 };
+    unsigned char const actual[] = { 0x01, 0x02, 0x03, 0x04 };
+    AssertNotEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "same bytes");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_ActualNull_Fails()
+{
+    unsigned char const expected[] = { 0x01, 0x02, 0x03, 0x04 };
+    CheckEqualsMem(expected, nullptr, sizeof(expected), __func__, __LINE__, "nothing to compare with");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_BothNull_Passes()
+{
+    CheckEqualsMem(nullptr, nullptr, 4, __func__, __LINE__, "the same pointer, so never read");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_DifferentLater_Fails()
+{
+    unsigned char expected[24];
+    unsigned char actual[24];
+    for (unsigned char i = 0; i < 24; ++i)
+    {
+        expected[i] = i;
+        actual[i] = i;
+    }
+
+    actual[20] = 0xAA;
+    CheckEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "byte 20 differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_LongDifference_Fails()
+{
+    std::vector<unsigned char> const expected(20, 0x00);
+    std::vector<unsigned char> const actual(20, 0x11);
+    CheckEqualsMem(expected.data(), actual.data(), expected.size(), __func__, __LINE__, "shows 16 bytes, then ...");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_SameBuffer_Passes()
+{
+    int const values[] = { 1, 2, 3 };
+    CheckEqualsMem(values, values, sizeof(values), __func__, __LINE__, "the same buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckEqualsMem_ZeroSize_Passes()
+{
+    unsigned char const expected[] = { 0x01 };
+    unsigned char const actual[] = { 0x02 };
+    CheckEqualsMem(expected, actual, 0, __func__, __LINE__, "zero bytes are always equal");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckNotEqualsMem_Different_Passes()
+{
+    unsigned char const expected[] = { 0x01, 0x02 };
+    unsigned char const actual[] = { 0x02, 0x01 };
+    CheckNotEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "different order");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckNotEqualsMem_NullAndBuffer_Passes()
+{
+    unsigned char const actual[] = { 0x01, 0x02 };
+    CheckNotEqualsMem(nullptr, actual, sizeof(actual), __func__, __LINE__, "null isn't equal to any memory");
+}
+//---------------------------------------------------------------------------
+void TFixture_MemoryComparisons::Test_CheckNotEqualsMem_Same_Fails()
+{
+    unsigned char const expected[] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    unsigned char const actual[] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    CheckNotEqualsMem(expected, actual, sizeof(expected), __func__, __LINE__, "same bytes");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_MixedOutcomes
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
@@ -3616,6 +3774,7 @@ private:
     void Test_AssertEndsWithIC_Passes();
     void Test_AssertEndsWith_Fails();
     void Test_AssertEqualsIC_Passes();
+    void Test_AssertEqualsMem_Fails();
     void Test_AssertEquals_CStrings_Passes();
     void Test_AssertEquals_Fails();
     void Test_AssertFalse_Fails();
@@ -3635,6 +3794,7 @@ private:
     void Test_AssertNotEndsWith_DifferentCase_Passes();
     void Test_AssertNotEndsWith_Fails();
     void Test_AssertNotEqualsIC_Fails();
+    void Test_AssertNotEqualsMem_Fails();
     void Test_AssertNotEquals_Fails();
     void Test_AssertNotMatches_Fails();
     void Test_AssertNotNear_Fails();
@@ -3657,6 +3817,7 @@ private:
     void Test_CheckEndsWith_Fails();
     void Test_CheckEndsWith_Wide_Passes();
     void Test_CheckEqualsIC_Passes();
+    void Test_CheckEqualsMem_Fails();
     void Test_CheckEquals_EnumClass_Fails();
     void Test_CheckEquals_Fails();
     void Test_CheckEquals_MixedIntegers_Passes();
@@ -3679,6 +3840,7 @@ private:
     void Test_CheckNotEndsWith_DifferentCase_Passes();
     void Test_CheckNotEndsWith_Fails();
     void Test_CheckNotEqualsIC_Fails();
+    void Test_CheckNotEqualsMem_Fails();
     void Test_CheckNotEquals_Fails();
     void Test_CheckNotMatches_Fails();
     void Test_CheckNotNear_Fails();
@@ -3726,6 +3888,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWithIC_Passes, "AssertEndsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWith_Fails, "AssertEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEqualsIC_Passes, "AssertEqualsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEqualsMem_Fails, "AssertEqualsMem_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes, "AssertEquals_CStrings_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEquals_Fails, "AssertEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertFalse_Fails, "AssertFalse_Fails");
@@ -3746,6 +3909,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
         "AssertNotEndsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWith_Fails, "AssertNotEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails, "AssertNotEqualsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEqualsMem_Fails, "AssertNotEqualsMem_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotMatches_Fails, "AssertNotMatches_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
@@ -3769,6 +3933,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Fails, "CheckEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes, "CheckEndsWith_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEqualsIC_Passes, "CheckEqualsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEqualsMem_Fails, "CheckEqualsMem_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_EnumClass_Fails, "CheckEquals_EnumClass_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
@@ -3792,6 +3957,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
         "CheckNotEndsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWith_Fails, "CheckNotEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails, "CheckNotEqualsIC_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEqualsMem_Fails, "CheckNotEqualsMem_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotMatches_Fails, "CheckNotMatches_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
@@ -3861,6 +4027,14 @@ void TFixture_SourceLocations::Test_AssertEndsWith_Fails()
 void TFixture_SourceLocations::Test_AssertEqualsIC_Passes()
 {
     AssertEqualsIC(std::string("abc"), std::string("ABC"), "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEqualsMem_Fails()
+{
+    int const expected = 1;
+    int const actual = 2;
+    ExpectedLines["AssertEqualsMem_Fails"] = __LINE__ + 1;
+    AssertEqualsMem(&expected, &actual, sizeof(expected), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertEquals_CStrings_Passes()
@@ -3978,6 +4152,14 @@ void TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails()
 {
     ExpectedLines["AssertNotEqualsIC_Fails"] = __LINE__ + 1;
     AssertNotEqualsIC(std::string("abc"), std::string("ABC"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEqualsMem_Fails()
+{
+    int const expected = 1;
+    int const actual = 1;
+    ExpectedLines["AssertNotEqualsMem_Fails"] = __LINE__ + 1;
+    AssertNotEqualsMem(&expected, &actual, sizeof(expected), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotEquals_Fails()
@@ -4108,6 +4290,14 @@ void TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes()
 void TFixture_SourceLocations::Test_CheckEqualsIC_Passes()
 {
     CheckEqualsIC(std::string("abc"), std::string("ABC"), "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEqualsMem_Fails()
+{
+    int const expected = 1;
+    int const actual = 2;
+    ExpectedLines["CheckEqualsMem_Fails"] = __LINE__ + 1;
+    CheckEqualsMem(&expected, &actual, sizeof(expected), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckEquals_EnumClass_Fails()
@@ -4246,6 +4436,14 @@ void TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails()
 {
     ExpectedLines["CheckNotEqualsIC_Fails"] = __LINE__ + 1;
     CheckNotEqualsIC(std::string("abc"), std::string("ABC"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEqualsMem_Fails()
+{
+    int const expected = 1;
+    int const actual = 1;
+    ExpectedLines["CheckNotEqualsMem_Fails"] = __LINE__ + 1;
+    CheckNotEqualsMem(&expected, &actual, sizeof(expected), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotEquals_Fails()
@@ -5591,6 +5789,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly, "EndsWithIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix, "EndsWith_ShowsTextAndSuffix");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly, "EqualsIC_IgnoresASCIICaseOnly");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EqualsMem_ShowsFirstDifferingBytes,
+        "EqualsMem_ShowsFirstDifferingBytes");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesEnumClassByUnderlyingValue,
         "Equals_ComparesEnumClassByUnderlyingValue");
@@ -6097,6 +6297,62 @@ void TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly()
     CheckEndsWith(checkNotEquals->Message,
         "): Both values equal: \"Hello World\" and \"hELLO wORLD\" (ignoring case). case differs", __func__, __LINE__,
         "CheckNotEqualsIC shows both values");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_EqualsMem_ShowsFirstDifferingBytes()
+{
+    // Arrange
+    TFixture_MemoryComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each test name, the start of its failure message, and the end after the varying line number.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::string Detail;
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertEqualsMem_Different_Fails", "Memory not equal: Test_AssertEqualsMem_Different_Fails (",
+          "): Bytes differ at offset 2 of 4: expected \"03 04\" but was \"FF 04\". third byte differs" },
+        { "AssertNotEqualsMem_Same_Fails", "Memory equal: Test_AssertNotEqualsMem_Same_Fails (",
+          "): Expected the 4 bytes to differ, but both are \"01 02 03 04\". same bytes" },
+        { "CheckEqualsMem_ActualNull_Fails", "Check failed for: \"Test_CheckEqualsMem_ActualNull_Fails\" (",
+          "): Cannot compare 4 bytes: actual is null. nothing to compare with" },
+        { "CheckEqualsMem_DifferentLater_Fails", "Check failed for: \"Test_CheckEqualsMem_DifferentLater_Fails\" (",
+          "): Bytes differ at offset 20 of 24: expected \"14 15 16 17\" but was \"AA 15 16 17\". byte 20 differs" },
+        { "CheckEqualsMem_LongDifference_Fails", "Check failed for: \"Test_CheckEqualsMem_LongDifference_Fails\" (",
+          "): Bytes differ at offset 0 of 20: expected \"00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ...\" but was "
+          "\"11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 ...\". shows 16 bytes, then ..." },
+        { "CheckNotEqualsMem_Same_Fails", "Check failed for: \"Test_CheckNotEqualsMem_Same_Fails\" (",
+          "): Expected the 4 bytes to differ, but both are \"DE AD BE EF\". same bytes" },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+        CheckEndsWith(record->Message, expected.Detail, __func__, __LINE__, expected.TestName + " shows the bytes");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
@@ -7154,7 +7410,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(94), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(98), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

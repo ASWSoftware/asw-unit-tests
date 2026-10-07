@@ -54,6 +54,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `dynamic_cast` whether an object, given as a raw or smart pointer or by
   reference, is a `TType` (a subclass counting as one). A failure shows the
   expected type and the object's actual type. RTL classes work too.
+- `CheckEqualsMem`/`AssertEqualsMem` and `CheckNotEqualsMem`/
+  `AssertNotEqualsMem`, which compare a number of bytes at two addresses. A
+  failure shows the offset of the first differing byte and up to 16 bytes from
+  there, in hex.
 
 ### Fixed
 
