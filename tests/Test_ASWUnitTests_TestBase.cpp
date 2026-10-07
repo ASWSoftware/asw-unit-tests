@@ -1421,6 +1421,157 @@ void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_DifferentCase_
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_EnumComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
+// AssertNotEquals()/CheckNotEquals() with scoped enums (enum class), compared and shown by their underlying values,
+// including char, signed and 64-bit unsigned underlying types; plus an unscoped enum with an int, which must still
+// compile and compare as before. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EnumComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    enum class TBig : uint64_t
+    {
+        One = 1,
+        Max = std::numeric_limits<uint64_t>::max()
+    };
+
+    enum class TColor
+    {
+        Red,
+        Green,
+        Blue
+    };
+
+    enum class TLetter : char
+    {
+        A = 'A',
+        B = 'B'
+    };
+
+    enum TPlain
+    {
+        PlainA,
+        PlainB
+    };
+
+    enum class TSmall : int8_t
+    {
+        Negative = -1,
+        Positive = 1
+    };
+
+private:
+    void Test_AssertEquals_Different_Fails();
+    void Test_AssertEquals_Same_Passes();
+    void Test_AssertNotEquals_Different_Passes();
+    void Test_AssertNotEquals_Same_Fails();
+    void Test_CheckEquals_CharUnderlying_Fails();
+    void Test_CheckEquals_Different_Fails();
+    void Test_CheckEquals_NegativeUnderlying_Fails();
+    void Test_CheckEquals_Same_Passes();
+    void Test_CheckEquals_UInt64Underlying_Fails();
+    void Test_CheckEquals_UnscopedEnumAndInt_Passes();
+    void Test_CheckNotEquals_Different_Passes();
+    void Test_CheckNotEquals_Same_Fails();
+
+public:
+    TFixture_EnumComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_EnumComparisons::TFixture_EnumComparisons()
+    : inherited("Fixture_EnumComparisons")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_EnumComparisons::Test_AssertEquals_Different_Fails, "AssertEquals_Different_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_AssertEquals_Same_Passes, "AssertEquals_Same_Passes");
+    RegisterTest(&TFixture_EnumComparisons::Test_AssertNotEquals_Different_Passes, "AssertNotEquals_Different_Passes");
+    RegisterTest(&TFixture_EnumComparisons::Test_AssertNotEquals_Same_Fails, "AssertNotEquals_Same_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_CharUnderlying_Fails, "CheckEquals_CharUnderlying_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_Different_Fails, "CheckEquals_Different_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_NegativeUnderlying_Fails,
+        "CheckEquals_NegativeUnderlying_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_Same_Passes, "CheckEquals_Same_Passes");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_UInt64Underlying_Fails,
+        "CheckEquals_UInt64Underlying_Fails");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckEquals_UnscopedEnumAndInt_Passes,
+        "CheckEquals_UnscopedEnumAndInt_Passes");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckNotEquals_Different_Passes, "CheckNotEquals_Different_Passes");
+    RegisterTest(&TFixture_EnumComparisons::Test_CheckNotEquals_Same_Fails, "CheckNotEquals_Same_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_AssertEquals_Different_Fails()
+{
+    AssertEquals(TColor::Red, TColor::Blue, __func__, __LINE__, "different colors");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_AssertEquals_Same_Passes()
+{
+    AssertEquals(TColor::Green, TColor::Green, __func__, __LINE__, "same color");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_AssertNotEquals_Different_Passes()
+{
+    AssertNotEquals(TColor::Red, TColor::Blue, __func__, __LINE__, "different colors");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_AssertNotEquals_Same_Fails()
+{
+    AssertNotEquals(TColor::Green, TColor::Green, __func__, __LINE__, "same color");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_CharUnderlying_Fails()
+{
+    CheckEquals(TLetter::A, TLetter::B, __func__, __LINE__, "shown as numbers, not characters");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_Different_Fails()
+{
+    CheckEquals(TColor::Red, TColor::Blue, __func__, __LINE__, "different colors");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_NegativeUnderlying_Fails()
+{
+    CheckEquals(TSmall::Negative, TSmall::Positive, __func__, __LINE__, "a negative value stays negative");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_Same_Passes()
+{
+    CheckEquals(TColor::Green, TColor::Green, __func__, __LINE__, "same color");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_UInt64Underlying_Fails()
+{
+    CheckEquals(TBig::Max, TBig::One, __func__, __LINE__, "a value above INT64_MAX doesn't wrap");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckEquals_UnscopedEnumAndInt_Passes()
+{
+    CheckEquals(1, PlainB, __func__, __LINE__, "an unscoped enum still converts to its integer value");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckNotEquals_Different_Passes()
+{
+    CheckNotEquals(TColor::Red, TColor::Blue, __func__, __LINE__, "different colors");
+}
+//---------------------------------------------------------------------------
+void TFixture_EnumComparisons::Test_CheckNotEquals_Same_Fails()
+{
+    CheckNotEquals(TColor::Green, TColor::Green, __func__, __LINE__, "same color");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_EqualsICComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsIC()/CheckEqualsIC()/
@@ -3237,6 +3388,7 @@ private:
     void Test_CheckEndsWith_Fails();
     void Test_CheckEndsWith_Wide_Passes();
     void Test_CheckEqualsIC_Passes();
+    void Test_CheckEquals_EnumClass_Fails();
     void Test_CheckEquals_Fails();
     void Test_CheckEquals_MixedIntegers_Passes();
     void Test_CheckFalse_Fails();
@@ -3335,6 +3487,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Fails, "CheckEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes, "CheckEndsWith_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEqualsIC_Passes, "CheckEqualsIC_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_EnumClass_Fails, "CheckEquals_EnumClass_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_Fails, "CheckEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEquals_MixedIntegers_Passes, "CheckEquals_MixedIntegers_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckFalse_Fails, "CheckFalse_Fails");
@@ -3621,6 +3774,18 @@ void TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes()
 void TFixture_SourceLocations::Test_CheckEqualsIC_Passes()
 {
     CheckEqualsIC(std::string("abc"), std::string("ABC"), "case differs");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEquals_EnumClass_Fails()
+{
+    enum class TState
+    {
+        Off,
+        On
+    };
+
+    ExpectedLines["CheckEquals_EnumClass_Fails"] = __LINE__ + 1;
+    CheckEquals(TState::Off, TState::On, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckEquals_Fails()
@@ -4882,6 +5047,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix, "EndsWith_ShowsTextAndSuffix");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly, "EqualsIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent, "Equals_ComparesCStringsByContent");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesEnumClassByUnderlyingValue,
+        "Equals_ComparesEnumClassByUnderlyingValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue,
         "Equals_ComparesMixedIntegerTypesByValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ComparesPointersByAddress,
@@ -5344,6 +5511,49 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
         "an Assert failure shows a null C string as (null)");
     CheckContains(checkNull->Message, "Expected \"(null)\" but was \"\"", __func__, __LINE__,
         "a Check failure shows a null C string as (null), distinct from an empty one");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesEnumClassByUnderlyingValue()
+{
+    // Arrange
+    TFixture_EnumComparisons fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(12), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each test name and the end of its failure message, after the varying line number.
+    std::vector<std::pair<std::string, std::string> > const expectedDetails = {
+        { "AssertEquals_Different_Fails", "): Expected: \"0\" but was \"2\". different colors" },
+        { "AssertNotEquals_Same_Fails", "): Value: \"1\". same color" },
+        { "CheckEquals_CharUnderlying_Fails", "): Expected \"65\" but was \"66\". shown as numbers, not characters" },
+        { "CheckEquals_Different_Fails", "): Expected \"0\" but was \"2\". different colors" },
+        { "CheckEquals_NegativeUnderlying_Fails", "): Expected \"-1\" but was \"1\". a negative value stays negative" },
+        { "CheckEquals_UInt64Underlying_Fails",
+          "): Expected \"18446744073709551615\" but was \"1\". a value above INT64_MAX doesn't wrap" },
+        { "CheckNotEquals_Same_Fails", "): Both values equal: \"1\". same color" },
+    };
+
+    for (std::pair<std::string, std::string> const& expected : expectedDetails)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.first);
+        AssertNotNull(record, __func__, __LINE__, expected.first + " has a record");
+        CheckEndsWith(record->Message, expected.second, __func__, __LINE__, expected.first + " shows the values");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
@@ -6188,7 +6398,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(80), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(81), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

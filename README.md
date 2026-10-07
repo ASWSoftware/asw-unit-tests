@@ -647,6 +647,20 @@ CheckEquals(-1, 4294967295u, __func__, __LINE__, "fails, where -1 == 4294967295u
 
 `bool` is the exception: comparing a `bool` with an integer remains a compile error, since it's usually a mistake.
 
+### Comparing Enums
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` also compare two values of the same scoped enum
+(`enum class`) type. Unlike `CheckTrue(mode == TColorMode::Always, ...)`, a failure shows both values, as their
+underlying numbers:
+
+```
+CheckEquals(TColorMode::Always, options.ColorMode, __func__, __LINE__, "--color always");
+// Check failed for: "Test_ColorOption" (42): Expected "1" but was "0". --color always
+```
+
+Comparing two different enum types, or an `enum class` with an integer, is a compile error. An unscoped `enum`
+converts to an integer, so it's compared like one, as before.
+
 ### Comparing Floating-Point Values
 
 There are no `float`/`double` overloads of `CheckEquals`/`AssertEquals`. Exact equality comparison of

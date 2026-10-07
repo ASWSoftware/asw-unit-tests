@@ -51,6 +51,7 @@ private: // Test methods
     void Test_EndsWith_ShowsTextAndSuffix();
     void Test_EqualsIC_IgnoresASCIICaseOnly();
     void Test_Equals_ComparesCStringsByContent();
+    void Test_Equals_ComparesEnumClassByUnderlyingValue();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
     void Test_Equals_ComparesPointersByAddress();
     void Test_Equals_ShowsBoolValuesAsTrueOrFalse();

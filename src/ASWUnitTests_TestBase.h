@@ -741,6 +741,17 @@ protected: // Assertion/Check methods - Equals
         if (expected != actual)
             throw TExceptEquals(method, line, FormatPointer(expected), FormatPointer(actual), msg);
     }
+    // Two values of the same scoped enum (enum class) type, compared by their underlying values, which a failure
+    // shows. An unscoped enum converts to an integer and matches an overload above instead.
+    template <typename TEnum>
+    using TEnableIfScopedEnum = typename std::enable_if<std::is_enum<TEnum>::value &&
+        !std::is_convertible<TEnum, int>::value, int>::type;
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void AssertEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        AssertEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
+    }
 
     virtual void AssertEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -788,6 +799,12 @@ protected: // Assertion/Check methods - Equals
     {
         if (expected != actual)
             SetTestFailedCheck(method, line, FormatPointer(expected), FormatPointer(actual), msg);
+    }
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void CheckEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        CheckEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
     }
 
     virtual void CheckEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
@@ -839,6 +856,13 @@ protected: // Assertion/Check methods - Not Equals
         if (expected == actual)
             throw TExceptNotEquals(method, line, FormatPointer(expected), msg);
     }
+    // Two values of the same scoped enum type, compared by their underlying values; see TEnableIfScopedEnum.
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void AssertNotEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        AssertNotEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
+    }
 
     virtual void AssertNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -886,6 +910,12 @@ protected: // Assertion/Check methods - Not Equals
     {
         if (expected == actual)
             SetTestFailedCheckNotEquals(method, line, FormatPointer(expected), msg);
+    }
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void CheckNotEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        CheckNotEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
     }
 
     virtual void CheckNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,

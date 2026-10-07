@@ -35,6 +35,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   message must contain, and match the type like `SetExceptionExpected()`,
   RTL exception types included. A failed `Assert*`, `Fail()` or `Skip()`
   inside the callable still ends the test as usual.
+- `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` accept
+  two values of the same scoped enum (`enum class`) type, which was a compile
+  error, and a failure shows their underlying values. Comparing two different
+  enum types, or an `enum class` with an integer, is still a compile error.
 
 ### Fixed
 
