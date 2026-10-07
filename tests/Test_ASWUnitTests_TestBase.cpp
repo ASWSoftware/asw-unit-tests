@@ -2380,6 +2380,138 @@ void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Pas
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_MatchesChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertMatches()/CheckMatches()/
+// AssertNotMatches()/CheckNotMatches(), narrow and wide, so Test_Matches_MatchesWholeTextAndShowsPattern below can
+// check their outcomes and messages. "PartialMatch" shows the whole text must match, and "InvalidPattern" that a bad
+// pattern fails the check instead of throwing std::regex_error. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_MatchesChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertMatches_InvalidPattern_Fails();
+    void Test_AssertMatches_Matching_Passes();
+    void Test_AssertMatches_NotMatching_Fails();
+    void Test_AssertNotMatches_Matching_Fails();
+    void Test_AssertNotMatches_NotMatching_Passes();
+    void Test_CheckMatches_InvalidPattern_Fails();
+    void Test_CheckMatches_Matching_Passes();
+    void Test_CheckMatches_PartialMatch_Fails();
+    void Test_CheckMatches_Wide_Matching_Passes();
+    void Test_CheckMatches_Wide_NotMatching_Fails();
+    void Test_CheckNotMatches_InvalidPattern_Fails();
+    void Test_CheckNotMatches_Matching_Fails();
+    void Test_CheckNotMatches_NotMatching_Passes();
+
+public:
+    TFixture_MatchesChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_MatchesChecks::TFixture_MatchesChecks()
+    : inherited("Fixture_MatchesChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_MatchesChecks::Test_AssertMatches_InvalidPattern_Fails,
+        "AssertMatches_InvalidPattern_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_AssertMatches_Matching_Passes, "AssertMatches_Matching_Passes");
+    RegisterTest(&TFixture_MatchesChecks::Test_AssertMatches_NotMatching_Fails, "AssertMatches_NotMatching_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_AssertNotMatches_Matching_Fails, "AssertNotMatches_Matching_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_AssertNotMatches_NotMatching_Passes,
+        "AssertNotMatches_NotMatching_Passes");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckMatches_InvalidPattern_Fails, "CheckMatches_InvalidPattern_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckMatches_Matching_Passes, "CheckMatches_Matching_Passes");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckMatches_PartialMatch_Fails, "CheckMatches_PartialMatch_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckMatches_Wide_Matching_Passes, "CheckMatches_Wide_Matching_Passes");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckMatches_Wide_NotMatching_Fails,
+        "CheckMatches_Wide_NotMatching_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckNotMatches_InvalidPattern_Fails,
+        "CheckNotMatches_InvalidPattern_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckNotMatches_Matching_Fails, "CheckNotMatches_Matching_Fails");
+    RegisterTest(&TFixture_MatchesChecks::Test_CheckNotMatches_NotMatching_Passes,
+        "CheckNotMatches_NotMatching_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_AssertMatches_InvalidPattern_Fails()
+{
+    AssertMatches(std::string("abc"), std::string("a("), __func__, __LINE__, "unbalanced parenthesis");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_AssertMatches_Matching_Passes()
+{
+    AssertMatches(std::string("2026-10-07"), std::string(R"(\d{4}-\d{2}-\d{2})"), __func__, __LINE__, "a date");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_AssertMatches_NotMatching_Fails()
+{
+    AssertMatches(std::string("2026-1-7"), std::string(R"(\d{4}-\d{2}-\d{2})"), __func__, __LINE__, "not a date");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_AssertNotMatches_Matching_Fails()
+{
+    AssertNotMatches(std::string("abc123"), std::string(R"([a-z]+\d+)"), __func__, __LINE__, "matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_AssertNotMatches_NotMatching_Passes()
+{
+    AssertNotMatches(std::string("abc"), std::string(R"(\d+)"), __func__, __LINE__, "no digits");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckMatches_InvalidPattern_Fails()
+{
+    CheckMatches(std::string("abc"), std::string("[a-"), __func__, __LINE__, "unterminated bracket");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckMatches_Matching_Passes()
+{
+    CheckMatches(std::string("Error 42: disk full"), std::string(R"(Error \d+: .*)"), __func__, __LINE__,
+        "an error message");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckMatches_PartialMatch_Fails()
+{
+    // The digits match part of the text, but not all of it.
+    CheckMatches(std::string("abc123"), std::string(R"(\d+)"), __func__, __LINE__, "only part matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckMatches_Wide_Matching_Passes()
+{
+    // With std::wregex, '.' matches U+00E9 (e with acute accent) as a single character.
+    CheckMatches(std::wstring(L"caf\x00E9"), std::wstring(L"caf."), __func__, __LINE__, "one wide character");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckMatches_Wide_NotMatching_Fails()
+{
+    CheckMatches(std::wstring(L"caf\x00E9"), std::wstring(L"tea"), __func__, __LINE__, "different text");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckNotMatches_InvalidPattern_Fails()
+{
+    CheckNotMatches(std::string("abc"), std::string("a("), __func__, __LINE__, "an invalid pattern never passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckNotMatches_Matching_Fails()
+{
+    CheckNotMatches(std::string("abc123"), std::string(R"([a-z]+\d+)"), __func__, __LINE__, "matches");
+}
+//---------------------------------------------------------------------------
+void TFixture_MatchesChecks::Test_CheckNotMatches_NotMatching_Passes()
+{
+    CheckNotMatches(std::string("abc"), std::string(R"(\d+)"), __func__, __LINE__, "no digits");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_MixedOutcomes
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
@@ -3491,6 +3623,7 @@ private:
     void Test_AssertGreaterThan_Fails();
     void Test_AssertLessThanOrEqual_Passes();
     void Test_AssertLessThan_Fails();
+    void Test_AssertMatches_Fails();
     void Test_AssertNear_Fails();
     void Test_AssertNoThrow_Fails();
     void Test_AssertNotContainsIC_Fails();
@@ -3501,6 +3634,7 @@ private:
     void Test_AssertNotEndsWith_Fails();
     void Test_AssertNotEqualsIC_Fails();
     void Test_AssertNotEquals_Fails();
+    void Test_AssertNotMatches_Fails();
     void Test_AssertNotNear_Fails();
     void Test_AssertNotNull_Fails();
     void Test_AssertNotSame_Fails();
@@ -3529,6 +3663,8 @@ private:
     void Test_CheckGreaterThan_Fails();
     void Test_CheckLessThanOrEqual_Passes();
     void Test_CheckLessThan_Fails();
+    void Test_CheckMatches_Fails();
+    void Test_CheckMatches_Wide_Passes();
     void Test_CheckNear_Fails();
     void Test_CheckNear_Passes();
     void Test_CheckNoThrow_Fails();
@@ -3540,6 +3676,7 @@ private:
     void Test_CheckNotEndsWith_Fails();
     void Test_CheckNotEqualsIC_Fails();
     void Test_CheckNotEquals_Fails();
+    void Test_CheckNotMatches_Fails();
     void Test_CheckNotNear_Fails();
     void Test_CheckNotNull_Fails();
     void Test_CheckNotSame_Fails();
@@ -3592,6 +3729,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertGreaterThan_Fails, "AssertGreaterThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes, "AssertLessThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThan_Fails, "AssertLessThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertMatches_Fails, "AssertMatches_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNoThrow_Fails, "AssertNoThrow_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
@@ -3603,6 +3741,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWith_Fails, "AssertNotEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEqualsIC_Fails, "AssertNotEqualsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotMatches_Fails, "AssertNotMatches_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNull_Fails, "AssertNotNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotSame_Fails, "AssertNotSame_Fails");
@@ -3632,6 +3771,8 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckGreaterThan_Fails, "CheckGreaterThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckLessThanOrEqual_Passes, "CheckLessThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckLessThan_Fails, "CheckLessThan_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckMatches_Fails, "CheckMatches_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckMatches_Wide_Passes, "CheckMatches_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNoThrow_Fails, "CheckNoThrow_Fails");
@@ -3644,6 +3785,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWith_Fails, "CheckNotEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEqualsIC_Fails, "CheckNotEqualsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotMatches_Fails, "CheckNotMatches_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNull_Fails, "CheckNotNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotSame_Fails, "CheckNotSame_Fails");
@@ -3753,6 +3895,12 @@ void TFixture_SourceLocations::Test_AssertLessThan_Fails()
     AssertLessThan(4, 4, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertMatches_Fails()
+{
+    ExpectedLines["AssertMatches_Fails"] = __LINE__ + 1;
+    AssertMatches(std::string("abc"), std::string(R"(\d+)"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNear_Fails()
 {
     ExpectedLines["AssertNear_Fails"] = __LINE__ + 1;
@@ -3812,6 +3960,12 @@ void TFixture_SourceLocations::Test_AssertNotEquals_Fails()
 {
     ExpectedLines["AssertNotEquals_Fails"] = __LINE__ + 1;
     AssertNotEquals(std::string("abc"), std::string("abc"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotMatches_Fails()
+{
+    ExpectedLines["AssertNotMatches_Fails"] = __LINE__ + 1;
+    AssertNotMatches(std::string("123"), std::string(R"(\d+)"), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotNear_Fails()
@@ -3983,6 +4137,17 @@ void TFixture_SourceLocations::Test_CheckLessThan_Fails()
     CheckLessThan(4.0f, 4, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckMatches_Fails()
+{
+    ExpectedLines["CheckMatches_Fails"] = __LINE__ + 1;
+    CheckMatches(std::string("abc"), std::string(R"(\d+)"), "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckMatches_Wide_Passes()
+{
+    CheckMatches(std::wstring(L"abc"), std::wstring(L"[a-c]+"), "wide text and pattern");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNear_Fails()
 {
     ExpectedLines["CheckNear_Fails"] = __LINE__ + 1;
@@ -4047,6 +4212,12 @@ void TFixture_SourceLocations::Test_CheckNotEquals_Fails()
 {
     ExpectedLines["CheckNotEquals_Fails"] = __LINE__ + 1;
     CheckNotEquals(5, 5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotMatches_Fails()
+{
+    ExpectedLines["CheckNotMatches_Fails"] = __LINE__ + 1;
+    CheckNotMatches(std::string("123"), std::string(R"(\d+)"), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotNear_Fails()
@@ -5220,6 +5391,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed, "Fail_AbortsTestAsFailed");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
+        "Matches_MatchesWholeTextAndShowsPattern");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
         "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
@@ -5983,6 +6156,74 @@ void TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed()
         "Fail isn't taken as the expected exception");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
+{
+    // Arrange
+    TFixture_MatchesChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(13), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each test name, the start of its failure message, and the end after the varying line number.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::string Detail;
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertMatches_NotMatching_Fails", "Pattern not matched: Test_AssertMatches_NotMatching_Fails (",
+          "): Expected \"2026-1-7\" to match \"\\d{4}-\\d{2}-\\d{2}\". not a date" },
+        { "AssertNotMatches_Matching_Fails", "Pattern matched: Test_AssertNotMatches_Matching_Fails (",
+          "): Expected \"abc123\" not to match \"[a-z]+\\d+\". matches" },
+        { "CheckMatches_PartialMatch_Fails", "Check failed for: \"Test_CheckMatches_PartialMatch_Fails\" (",
+          "): Expected \"abc123\" to match \"\\d+\". only part matches" },
+        { "CheckMatches_Wide_NotMatching_Fails", "Check failed for: \"Test_CheckMatches_Wide_NotMatching_Fails\" (",
+          "): Expected \"caf\xC3\xA9\" to match \"tea\". different text" },
+        { "CheckNotMatches_Matching_Fails", "Check failed for: \"Test_CheckNotMatches_Matching_Fails\" (",
+          "): Expected \"abc123\" not to match \"[a-z]+\\d+\". matches" },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+        CheckEndsWith(record->Message, expected.Detail, __func__, __LINE__, expected.TestName + " shows the pattern");
+    }
+
+    // std::regex_error's own description varies by library, so only the part before it is checked.
+    std::vector<std::pair<std::string, std::string> > const invalidPatterns = {
+        { "AssertMatches_InvalidPattern_Fails", "a(" },
+        { "CheckMatches_InvalidPattern_Fails", "[a-" },
+        { "CheckNotMatches_InvalidPattern_Fails", "a(" },
+    };
+
+    for (std::pair<std::string, std::string> const& invalid : invalidPatterns)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, invalid.first);
+        AssertNotNull(record, __func__, __LINE__, invalid.first + " has a record");
+        CheckContains(record->Message, "): Invalid regular expression \"" + invalid.second + "\": ", __func__,
+            __LINE__, invalid.first + " says the pattern is invalid");
+    }
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue()
 {
     // Arrange
@@ -6630,7 +6871,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(85), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(90), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

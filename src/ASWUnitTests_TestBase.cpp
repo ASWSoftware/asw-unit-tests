@@ -34,6 +34,7 @@ limitations under the License.
 #include <locale>
 #include <memory>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <thread>
 //---------------------------------------------------------------------------
@@ -109,6 +110,17 @@ bool EndsWithIgnoringASCIICase(TString const& text, TString const& suffix)
         CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
+// Returns 'text' for display in a failure message, as UTF-8.
+std::string DisplayText(std::string const& text)
+{
+    return text;
+}
+
+std::string DisplayText(std::wstring const& text)
+{
+    return ASWUnitTests::WideToUTF8(text);
+}
+
 // True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
 template <typename TString>
 bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
@@ -152,6 +164,41 @@ std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat
     }
 
     return texts;
+}
+
+// True if the whole of 'text' matches the ECMAScript regular expression 'pattern'. When 'pattern' is invalid, or too
+// complex to match, returns false and sets 'error' to std::regex_error's description; otherwise leaves 'error' alone.
+template <typename TString>
+bool MatchesRegex(TString const& text, TString const& pattern, std::string& error)
+{
+    try
+    {
+        std::basic_regex<typename TString::value_type> const regex(pattern);
+        return std::regex_match(text, regex);
+    }
+    catch (std::regex_error const& ex)
+    {
+        error = ex.what();
+        return false;
+    }
+}
+
+// The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
+// invalid pattern always fails, saying why.
+template <typename TString>
+std::string RegexMatchFailure(TString const& text, TString const& pattern, bool expectMatch)
+{
+    std::string error;
+    bool const matches = MatchesRegex(text, pattern, error);
+
+    if (!error.empty())
+        return "Invalid regular expression \"" + DisplayText(pattern) + "\": " + error;
+
+    if (matches == expectMatch)
+        return std::string();
+
+    return "Expected \"" + DisplayText(text) + "\" " + (expectMatch ? "to match" : "not to match") + " \"" +
+        DisplayText(pattern) + "\"";
 }
 
 // True if 'text' starts with 'prefix'. Every text starts with the empty string, and none with a longer prefix.
@@ -399,6 +446,22 @@ void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int li
         throw TExceptFalse(method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        throw TExceptMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        throw TExceptMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -597,6 +660,22 @@ void TTestGroupBase::AssertNotEqualsIC(std::wstring const& expected, std::wstrin
 {
     if (EqualsIgnoringASCIICase(expected, actual))
         throw TExceptNotEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        throw TExceptNotMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(std::wstring const& text, std::wstring const& pattern,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        throw TExceptNotMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
@@ -895,6 +974,22 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -1123,6 +1218,22 @@ void TTestGroupBase::CheckNotEqualsIC(std::wstring const& expected, std::wstring
         SetTestFailedCheck(method, line, "Both values equal: \"" + WideToUTF8(expected) + "\" and \"" +
             WideToUTF8(actual) + "\" (ignoring case). " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(

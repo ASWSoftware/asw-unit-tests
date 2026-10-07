@@ -44,6 +44,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `ASWUNITTESTS_RTL_EXCEPTIONS`, a `System::String`. Unlike
   `CheckTrue(x.empty(), ...)`, a failure shows the text, or a container's
   element count.
+- `CheckMatches`/`AssertMatches` and `CheckNotMatches`/`AssertNotMatches`,
+  which check whether the whole of a `std::string` or `std::wstring` matches
+  an ECMAScript regular expression (`std::regex_match`). A failure shows the
+  text and the pattern, and an invalid pattern fails the check rather than
+  throwing `std::regex_error`.
 
 ### Fixed
 

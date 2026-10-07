@@ -12,9 +12,9 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
   immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
-  `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), and
-  `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`,
-  `Contains`, `StartsWith` and `EndsWith` methods.
+  `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), `Matches`/`NotMatches`
+  (regular expression), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus case-insensitive `IC` variants
+  of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -631,6 +631,20 @@ same way as [`CheckEqualsIC`](#comparing-strings-ignoring-case):
 ```
 CheckStartsWithIC(header, "content-type:", __func__, __LINE__, "passes for \"Content-Type: text/plain\"");
 ```
+
+### Matching a Regular Expression
+
+`CheckMatches`/`AssertMatches` pass when the *whole* of a `std::string` or `std::wstring` matches an ECMAScript
+regular expression (as `std::regex_match` does), and `CheckNotMatches`/`AssertNotMatches` when it doesn't. To match
+part of the text, start or end the pattern with `.*`. A failure shows the text and the pattern:
+
+```
+CheckMatches(stamp, R"(\d{4}-\d{2}-\d{2})", __func__, __LINE__, "an ISO 8601 date");
+// Check failed for: "Test_Stamp" (42): Expected "2026-1-7" to match "\d{4}-\d{2}-\d{2}". an ISO 8601 date
+```
+
+Wide text is matched with `std::wregex`, so `.` matches one wide character, and a failure shows it as UTF-8. An
+invalid pattern fails the check, showing `std::regex_error`'s description, rather than throwing.
 
 ### Comparing Integers of Different Types
 

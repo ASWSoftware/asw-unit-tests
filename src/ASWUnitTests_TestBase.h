@@ -1263,6 +1263,30 @@ protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
     virtual void CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Matches (regular expression)
+    // Each checks whether the whole of 'text' matches the ECMAScript regular expression 'pattern' (std::regex_match;
+    // start or end a pattern with ".*" to match part of the text). Wide text is matched with std::wregex. An invalid
+    // pattern fails the check, showing why, rather than throwing std::regex_error.
+    virtual void AssertMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
 protected: // Assertion/Check methods - Ordering (value compared with a bound)
     // Any two integer or floating-point types except bool.
     template <typename TValue, typename TBound>
@@ -1635,6 +1659,13 @@ protected: // Assertion/Check methods - std::source_location
         AssertLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TPattern>
+    void AssertMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void AssertNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1694,6 +1725,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         AssertNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPattern>
+    void AssertNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>
@@ -1847,6 +1885,13 @@ protected: // Assertion/Check methods - std::source_location
         CheckLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TPattern>
+    void CheckMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void CheckNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1906,6 +1951,13 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         CheckNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPattern>
+    void CheckNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TExpected, typename TActual, typename TTolerance>

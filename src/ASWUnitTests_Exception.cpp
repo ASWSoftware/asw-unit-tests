@@ -201,6 +201,18 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptMatches
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptMatches::TExceptMatches(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Pattern not matched: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNoThrow
 /////////////////////////////////////////////////////////////////////////////
 
@@ -278,6 +290,19 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 {
     m_Message = "Values are equal: " + method + " (" + std::to_string(line) + "): Values: \"" + value + "\" and \"" +
         otherValue + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotMatches
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotMatches::TExceptNotMatches(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Pattern matched: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
 }
 //---------------------------------------------------------------------------
 
