@@ -84,13 +84,13 @@ const char* TTestException::what() const noexcept
 
 
 /////////////////////////////////////////////////////////////////////////////
-// TExceptExpected
+// TExceptAbortRun
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
-TExceptExpected::TExceptExpected(std::string const& msg)
+TExceptAbortRun::TExceptAbortRun(std::string const& msg)
 {
-    m_Message = "Exception expected: " + msg;
+    m_Message = msg;
 }
 //---------------------------------------------------------------------------
 
@@ -105,6 +105,18 @@ TExceptContains::TExceptContains(std::string const& method, int line, std::strin
 {
     m_Message = "Substring not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptExpected
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptExpected::TExceptExpected(std::string const& msg)
+{
+    m_Message = "Exception expected: " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -316,23 +328,6 @@ TExceptStartsWith::TExceptStartsWith(std::string const& method, int line, std::s
 
 
 /////////////////////////////////////////////////////////////////////////////
-// TExceptTrue
-/////////////////////////////////////////////////////////////////////////////
-
-//---------------------------------------------------------------------------
-TExceptTrue::TExceptTrue(std::string const& msg)
-{
-    m_Message = "Expected true but was false: \"" + msg + "\"";
-}
-//---------------------------------------------------------------------------
-TExceptTrue::TExceptTrue(std::string const& method, int line, std::string const& msg)
-{
-    m_Message = "Expected true but was false: " + method + " (" + std::to_string(line) + "): " + msg;
-}
-//---------------------------------------------------------------------------
-
-
-/////////////////////////////////////////////////////////////////////////////
 // TExceptSkipped
 /////////////////////////////////////////////////////////////////////////////
 
@@ -345,18 +340,6 @@ TExceptSkipped::TExceptSkipped(std::string const& msg)
 TExceptSkipped::TExceptSkipped(std::string const& method, int line, std::string const& msg)
 {
     m_Message = "Test skipped: " + method + " (" + std::to_string(line) + "): " + msg;
-}
-//---------------------------------------------------------------------------
-
-
-/////////////////////////////////////////////////////////////////////////////
-// TExceptAbortRun
-/////////////////////////////////////////////////////////////////////////////
-
-//---------------------------------------------------------------------------
-TExceptAbortRun::TExceptAbortRun(std::string const& msg)
-{
-    m_Message = msg;
 }
 //---------------------------------------------------------------------------
 
@@ -384,6 +367,24 @@ TExceptTestCrashed::TExceptTestCrashed(std::string const& msg)
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTrue
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptTrue::TExceptTrue(std::string const& msg)
+{
+    m_Message = "Expected true but was false: \"" + msg + "\"";
+}
+//---------------------------------------------------------------------------
+TExceptTrue::TExceptTrue(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected true but was false: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+// /////// Compiler specific exceptions after this line /////////////////////
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 /////////////////////////////////////////////////////////////////////////////

@@ -312,6 +312,7 @@ public:
     TExceptTestCrashed(std::string const& msg);
 };
 
+// /////// Compiler specific exceptions after this line /////////////////////
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 /////////////////////////////////////////////////////////////////////////////
