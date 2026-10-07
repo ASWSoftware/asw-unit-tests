@@ -253,6 +253,124 @@ void TFixture_RTLExceptionExpectations::Test_StdTypeExpected_RTLExceptionThrown_
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLThrowsChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckThrows()/AssertThrows()/
+// CheckNoThrow() with RTL exceptions: an exact type (thrown from C++ and raised from Delphi RTL code), a base
+// type, a message substring that's absent, a wrong sibling type, and RTL and std types crossed either way. Test
+// names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_RTLThrowsChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertThrows_ExactType_Passes();
+    void Test_CheckNoThrow_RTLExceptionThrown_Fails();
+    void Test_CheckThrows_BaseType_Passes();
+    void Test_CheckThrows_MessageSubstringAbsent_Fails();
+    void Test_CheckThrows_RaisedFromDelphiCode_Passes();
+    void Test_CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails();
+    void Test_CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails();
+    void Test_CheckThrows_WrongSiblingType_Fails();
+
+public:
+    TFixture_RTLThrowsChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_RTLThrowsChecks::TFixture_RTLThrowsChecks()
+    : inherited("Fixture_RTLThrowsChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_AssertThrows_ExactType_Passes, "AssertThrows_ExactType_Passes");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckNoThrow_RTLExceptionThrown_Fails,
+        "CheckNoThrow_RTLExceptionThrown_Fails");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_BaseType_Passes, "CheckThrows_BaseType_Passes");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_MessageSubstringAbsent_Fails,
+        "CheckThrows_MessageSubstringAbsent_Fails");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_RaisedFromDelphiCode_Passes,
+        "CheckThrows_RaisedFromDelphiCode_Passes");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails,
+        "CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails,
+        "CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_WrongSiblingType_Fails,
+        "CheckThrows_WrongSiblingType_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_AssertThrows_ExactType_Passes()
+{
+    AssertThrows<System::Sysutils::EConvertError>([] {
+            throw System::Sysutils::EConvertError(L"boom");
+        }, __func__,
+        __LINE__, "exact type match");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckNoThrow_RTLExceptionThrown_Fails()
+{
+    CheckNoThrow([] {
+            throw System::Sysutils::EConvertError(L"boom");
+        }, __func__, __LINE__, "must not throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_BaseType_Passes()
+{
+    CheckThrows<System::Sysutils::Exception>([] {
+            throw System::Sysutils::EConvertError(L"boom");
+        }, __func__,
+        __LINE__, "base type expected, derived type thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_MessageSubstringAbsent_Fails()
+{
+    CheckThrows<System::Sysutils::EConvertError>([] {
+            throw System::Sysutils::EConvertError(L"boom");
+        }, __func__,
+        __LINE__, "message must contain 'needle'", "needle");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_RaisedFromDelphiCode_Passes()
+{
+    // Raised inside the Delphi RTL itself, not by a C++ throw, so it arrives through Delphi's own raise mechanism.
+    CheckThrows<System::Sysutils::EConvertError>([] {
+            static_cast<void>(System::Sysutils::StrToInt(L"not a number"));
+        },
+        __func__, __LINE__, "StrToInt raises EConvertError", "not a number");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails()
+{
+    CheckThrows<System::Sysutils::EConvertError>([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__,
+        "RTL type expected, std type thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails()
+{
+    CheckThrows<std::runtime_error>([] {
+            throw System::Sysutils::EConvertError(L"boom");
+        }, __func__, __LINE__,
+        "std type expected, RTL type thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_WrongSiblingType_Fails()
+{
+    CheckThrows<System::Sysutils::EConvertError>([] {
+            throw System::Sysutils::EArgumentException(L"boom");
+        },
+        __func__, __LINE__, "wrong sibling type thrown");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_UnexpectedRTLException
 //
 // A never-registered fixture group with a single test that throws an RTL exception without expecting
@@ -321,6 +439,8 @@ TTest_ASWUnitTests_RTLExceptions::TTest_ASWUnitTests_RTLExceptions()
     RegisterTest(
         &TTest_ASWUnitTests_RTLExceptions::Test_TExceptRTLException_KeepsClassAndDescriptionAfterOriginalIsFreed,
         "TExceptRTLException_KeepsClassAndDescriptionAfterOriginalIsFreed");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Throws_MatchesRTLTypeAndMessage,
+        "Throws_MatchesRTLTypeAndMessage");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_RTLExceptions::~TTest_ASWUnitTests_RTLExceptions()
@@ -499,6 +619,55 @@ void TTest_ASWUnitTests_RTLExceptions::Test_TExceptRTLException_KeepsClassAndDes
         "RTLClass() supports a polymorphic base-class check");
     CheckFalse(wrapped.RTLClass()->InheritsFrom(__classid(System::Sysutils::EArgumentException)), __func__, __LINE__,
         "RTLClass() doesn't match an unrelated sibling class");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_Throws_MatchesRTLTypeAndMessage()
+{
+    // Arrange
+    TFixture_RTLThrowsChecks fixture;
+    auto const findMessage = [&fixture](std::string const& testName)
+        {
+            for (TTestCaseRecord const& record : fixture.Results().CaseRecords)
+            {
+                if (record.TestName == testName)
+                    return record.Message;
+            }
+
+            return std::string("(no record for " + testName + ")");
+        };
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(8), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass: " +
+                record.Message);
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // An RTL exception is described as "ClassName: Message", like DescribeRTLException().
+    CheckEndsWith(findMessage("CheckNoThrow_RTLExceptionThrown_Fails"),
+        "): Expected no exception but caught: EConvertError: boom. must not throw", __func__, __LINE__,
+        "CheckNoThrow shows the RTL exception's class and message");
+    CheckEndsWith(findMessage("CheckThrows_MessageSubstringAbsent_Fails"),
+        "): Expected the exception message to contain \"needle\" but caught: EConvertError: boom. "
+        "message must contain 'needle'", __func__, __LINE__, "a message mismatch shows the RTL exception");
+    CheckEndsWith(findMessage("CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails"),
+        "): Expected a different exception type but caught: EConvertError: boom. std type expected, RTL type thrown",
+        __func__, __LINE__, "an RTL exception is a wrong type for a std type");
+    CheckEndsWith(findMessage("CheckThrows_WrongSiblingType_Fails"),
+        "): Expected a different exception type but caught: EArgumentException: boom. wrong sibling type thrown",
+        __func__, __LINE__, "a wrong sibling type shows its class");
 }
 //---------------------------------------------------------------------------
 

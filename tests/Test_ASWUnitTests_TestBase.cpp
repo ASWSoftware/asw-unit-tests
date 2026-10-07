@@ -3210,6 +3210,7 @@ private:
     void Test_AssertLessThanOrEqual_Passes();
     void Test_AssertLessThan_Fails();
     void Test_AssertNear_Fails();
+    void Test_AssertNoThrow_Fails();
     void Test_AssertNotContainsIC_Fails();
     void Test_AssertNotContains_Fails();
     void Test_AssertNotEndsWithIC_Fails();
@@ -3227,6 +3228,7 @@ private:
     void Test_AssertSame_Fails();
     void Test_AssertStartsWithIC_Passes();
     void Test_AssertStartsWith_Fails();
+    void Test_AssertThrows_Fails();
     void Test_AssertTrue_Fails();
     void Test_CheckContainsIC_Passes();
     void Test_CheckContains_Fails();
@@ -3244,6 +3246,7 @@ private:
     void Test_CheckLessThan_Fails();
     void Test_CheckNear_Fails();
     void Test_CheckNear_Passes();
+    void Test_CheckNoThrow_Fails();
     void Test_CheckNotContainsIC_Fails();
     void Test_CheckNotContains_Fails();
     void Test_CheckNotEndsWithIC_Fails();
@@ -3264,6 +3267,8 @@ private:
     void Test_CheckStartsWithIC_Passes();
     void Test_CheckStartsWith_Fails();
     void Test_CheckStartsWith_Wide_Passes();
+    void Test_CheckThrows_Fails();
+    void Test_CheckThrows_MessageMatches_Passes();
     void Test_CheckTrue_Fails();
     void Test_CheckTrue_ThroughHelper_Fails();
     void Test_Fail_Fails();
@@ -3301,6 +3306,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThanOrEqual_Passes, "AssertLessThanOrEqual_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertLessThan_Fails, "AssertLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNear_Fails, "AssertNear_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNoThrow_Fails, "AssertNoThrow_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWithIC_Fails, "AssertNotEndsWithIC_Fails");
@@ -3320,6 +3326,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertSame_Fails, "AssertSame_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWithIC_Passes, "AssertStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWith_Fails, "AssertStartsWith_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertThrows_Fails, "AssertThrows_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContainsIC_Passes, "CheckContainsIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Fails, "CheckContains_Fails");
@@ -3337,6 +3344,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckLessThan_Fails, "CheckLessThan_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Fails, "CheckNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNear_Passes, "CheckNear_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNoThrow_Fails, "CheckNoThrow_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContainsIC_Fails, "CheckNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWithIC_Fails, "CheckNotEndsWithIC_Fails");
@@ -3359,6 +3367,9 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWithIC_Passes, "CheckStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Fails, "CheckStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes, "CheckStartsWith_Wide_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckThrows_Fails, "CheckThrows_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckThrows_MessageMatches_Passes,
+        "CheckThrows_MessageMatches_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_Fails, "CheckTrue_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails, "CheckTrue_ThroughHelper_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_Fail_Fails, "Fail_Fails");
@@ -3449,6 +3460,14 @@ void TFixture_SourceLocations::Test_AssertNear_Fails()
 {
     ExpectedLines["AssertNear_Fails"] = __LINE__ + 1;
     AssertNear(1.0, 2.0, 0.5, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNoThrow_Fails()
+{
+    ExpectedLines["AssertNoThrow_Fails"] = __LINE__ + 1;
+    AssertNoThrow([] {
+            throw std::runtime_error("boom");
+        }, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotContainsIC_Fails()
@@ -3554,6 +3573,13 @@ void TFixture_SourceLocations::Test_AssertStartsWith_Fails()
     AssertStartsWith(std::string("ab-AB"), "AB", "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertThrows_Fails()
+{
+    ExpectedLines["AssertThrows_Fails"] = __LINE__ + 1;
+    AssertThrows<std::runtime_error>([] {
+        }, "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertTrue_Fails()
 {
     ExpectedLines["AssertTrue_Fails"] = __LINE__ + 1;
@@ -3645,6 +3671,14 @@ void TFixture_SourceLocations::Test_CheckNear_Fails()
 void TFixture_SourceLocations::Test_CheckNear_Passes()
 {
     CheckNear(1.0f, 1.25f, 0.5f, "within tolerance");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNoThrow_Fails()
+{
+    ExpectedLines["CheckNoThrow_Fails"] = __LINE__ + 1;
+    CheckNoThrow([] {
+            throw std::runtime_error("boom");
+        }, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotContainsIC_Fails()
@@ -3764,6 +3798,22 @@ void TFixture_SourceLocations::Test_CheckStartsWith_Fails()
 void TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes()
 {
     CheckStartsWith(std::wstring(L"abc"), L"ab", "wide prefix present");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckThrows_Fails()
+{
+    ExpectedLines["CheckThrows_Fails"] = __LINE__ + 1;
+    CheckThrows<std::out_of_range>([] {
+            throw std::runtime_error("boom");
+        }, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckThrows_MessageMatches_Passes()
+{
+    // The optional expected message comes after 'msg', as in the method/line form.
+    CheckThrows<std::runtime_error>([] {
+            throw std::runtime_error("disk full");
+        }, "message checked", "full");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckTrue_Fails()
@@ -4485,6 +4535,179 @@ void TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_ThrowsChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertThrows()/CheckThrows()/
+// AssertNoThrow()/CheckNoThrow(), so Test_Throws_ChecksTypeAndMessageAndContinues below can check their outcomes
+// and messages. ReachedAfterCheckNoThrow shows a failed Check lets the test continue; ReachedAfterInnerAssert shows
+// an Assert failure inside the callable still ends the test instead of counting as the exception thrown. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ThrowsChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNoThrow_NoException_Passes();
+    void Test_AssertNoThrow_Throws_Fails();
+    void Test_AssertThrows_NoException_Fails();
+    void Test_AssertThrows_RightType_Passes();
+    void Test_CheckNoThrow_Throws_Fails();
+    void Test_CheckThrows_AssertFailureInside_Fails();
+    void Test_CheckThrows_FrameworkTypeRequested_Passes();
+    void Test_CheckThrows_MessageMatches_Passes();
+    void Test_CheckThrows_MessageMismatch_Fails();
+    void Test_CheckThrows_NoException_Fails();
+    void Test_CheckThrows_NonStdException_Fails();
+    void Test_CheckThrows_SeveralCalls_Passes();
+    void Test_CheckThrows_Subclass_Passes();
+    void Test_CheckThrows_WrongType_Fails();
+
+public:
+    bool ReachedAfterCheckNoThrow = false;
+    bool ReachedAfterInnerAssert = false;
+
+    TFixture_ThrowsChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ThrowsChecks::TFixture_ThrowsChecks()
+    : inherited("Fixture_ThrowsChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_ThrowsChecks::Test_AssertNoThrow_NoException_Passes, "AssertNoThrow_NoException_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_AssertNoThrow_Throws_Fails, "AssertNoThrow_Throws_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_AssertThrows_NoException_Fails, "AssertThrows_NoException_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_AssertThrows_RightType_Passes, "AssertThrows_RightType_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckNoThrow_Throws_Fails, "CheckNoThrow_Throws_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_AssertFailureInside_Fails,
+        "CheckThrows_AssertFailureInside_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_FrameworkTypeRequested_Passes,
+        "CheckThrows_FrameworkTypeRequested_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_MessageMatches_Passes, "CheckThrows_MessageMatches_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_MessageMismatch_Fails, "CheckThrows_MessageMismatch_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_NoException_Fails, "CheckThrows_NoException_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_NonStdException_Fails, "CheckThrows_NonStdException_Fails");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_SeveralCalls_Passes, "CheckThrows_SeveralCalls_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_Subclass_Passes, "CheckThrows_Subclass_Passes");
+    RegisterTest(&TFixture_ThrowsChecks::Test_CheckThrows_WrongType_Fails, "CheckThrows_WrongType_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_AssertNoThrow_NoException_Passes()
+{
+    AssertNoThrow([] {
+        }, __func__, __LINE__, "must not throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_AssertNoThrow_Throws_Fails()
+{
+    AssertNoThrow([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__, "must not throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_AssertThrows_NoException_Fails()
+{
+    AssertThrows<std::runtime_error>([] {
+        }, __func__, __LINE__, "must throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_AssertThrows_RightType_Passes()
+{
+    AssertThrows<std::runtime_error>([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__, "must throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckNoThrow_Throws_Fails()
+{
+    CheckNoThrow([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__, "must not throw");
+    ReachedAfterCheckNoThrow = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_AssertFailureInside_Fails()
+{
+    CheckThrows<std::exception>([this] {
+            AssertTrue(false, __func__, __LINE__, "inner assert");
+        }, __func__, __LINE__,
+        "an Assert failure isn't the exception being checked for");
+    ReachedAfterInnerAssert = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_FrameworkTypeRequested_Passes()
+{
+    CheckThrows<TExceptTrue>([this] {
+            AssertTrue(false, __func__, __LINE__, "inner assert");
+        }, __func__, __LINE__,
+        "asking for TExceptTrue catches the Assert failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_MessageMatches_Passes()
+{
+    CheckThrows<std::runtime_error>([] {
+            throw std::runtime_error("disk full");
+        }, __func__, __LINE__,
+        "message contains the substring", "full");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_MessageMismatch_Fails()
+{
+    CheckThrows<std::runtime_error>([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__, "wrong message",
+        "bang");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_NoException_Fails()
+{
+    CheckThrows<std::runtime_error>([] {
+        }, __func__, __LINE__, "must throw");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_NonStdException_Fails()
+{
+    CheckThrows<std::runtime_error>([] {
+            throw 42;
+        }, __func__, __LINE__, "an int isn't a runtime_error");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_SeveralCalls_Passes()
+{
+    std::vector<int> values{ 1, 2, 3 };
+    CheckThrows<std::out_of_range>([&values] {
+            static_cast<void>(values.at(3));
+        }, __func__, __LINE__, "one past");
+    CheckThrows<std::out_of_range>([&values] {
+            static_cast<void>(values.at(10));
+        }, __func__, __LINE__, "far past");
+    CheckEquals(static_cast<size_t>(3), values.size(), __func__, __LINE__, "the test carries on and checks the state");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_Subclass_Passes()
+{
+    CheckThrows<std::logic_error>([] {
+            throw std::out_of_range("index");
+        }, __func__, __LINE__,
+        "out_of_range is a logic_error");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowsChecks::Test_CheckThrows_WrongType_Fails()
+{
+    CheckThrows<std::out_of_range>([] {
+            throw std::runtime_error("boom");
+        }, __func__, __LINE__, "wrong type");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_TrueFalseChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
@@ -4710,6 +4933,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly,
         "StartsWithIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix, "StartsWith_ShowsTextAndPrefix");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues,
+        "Throws_ChecksTypeAndMessageAndContinues");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
         "TrueFalse_FailureNamesTheExpectedValue");
 }
@@ -5963,7 +6188,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(75), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(80), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
@@ -6150,6 +6375,65 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
         __LINE__, "CheckNotStartsWith shows the wide text and prefix: " + checkNotStartsWithWide->Message);
     CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
         "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()
+{
+    // Arrange
+    TFixture_ThrowsChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(14), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    CheckTrue(fixture.ReachedAfterCheckNoThrow, __func__, __LINE__, "a failed CheckNoThrow lets the test continue");
+    CheckFalse(fixture.ReachedAfterInnerAssert, __func__, __LINE__,
+        "an Assert failure inside the callable still ends the test");
+
+    TTestCaseRecord const* const assertNoThrow = FindRecord(results, "AssertNoThrow_Throws_Fails");
+    TTestCaseRecord const* const assertThrows = FindRecord(results, "AssertThrows_NoException_Fails");
+    TTestCaseRecord const* const checkNoThrow = FindRecord(results, "CheckNoThrow_Throws_Fails");
+    TTestCaseRecord const* const innerAssert = FindRecord(results, "CheckThrows_AssertFailureInside_Fails");
+    TTestCaseRecord const* const mismatch = FindRecord(results, "CheckThrows_MessageMismatch_Fails");
+    TTestCaseRecord const* const nonStd = FindRecord(results, "CheckThrows_NonStdException_Fails");
+    TTestCaseRecord const* const wrongType = FindRecord(results, "CheckThrows_WrongType_Fails");
+    AssertTrue(assertNoThrow != nullptr && assertThrows != nullptr && checkNoThrow != nullptr &&
+        innerAssert != nullptr && mismatch != nullptr && nonStd != nullptr && wrongType != nullptr, __func__,
+        __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    CheckStartsWith(assertNoThrow->Message, "Unexpected exception: Test_AssertNoThrow_Throws_Fails (", __func__,
+        __LINE__, "AssertNoThrow names the test");
+    CheckEndsWith(assertNoThrow->Message, "): Expected no exception but caught: boom. must not throw", __func__,
+        __LINE__, "AssertNoThrow shows what was thrown");
+    CheckStartsWith(assertThrows->Message, "Expected exception not caught: Test_AssertThrows_NoException_Fails (",
+        __func__, __LINE__, "AssertThrows names the test");
+    CheckEndsWith(assertThrows->Message, "): Expected an exception but none was thrown. must throw", __func__,
+        __LINE__, "AssertThrows says nothing was thrown");
+    CheckEndsWith(checkNoThrow->Message, "): Expected no exception but caught: boom. must not throw", __func__,
+        __LINE__, "CheckNoThrow shows what was thrown");
+    CheckStartsWith(innerAssert->Message, "Expected true but was false: ", __func__, __LINE__,
+        "the inner Assert failure is what's reported");
+    CheckEndsWith(mismatch->Message, "): Expected the exception message to contain \"bang\" but caught: boom. "
+        "wrong message", __func__, __LINE__, "a message mismatch shows the expected substring and what was caught");
+    CheckContains(nonStd->Message, "): Expected a different exception type but caught: ", __func__, __LINE__,
+        "a non-std::exception object is a wrong type");
+    CheckEndsWith(wrongType->Message, "): Expected a different exception type but caught: boom. wrong type",
+        __func__, __LINE__, "a wrong type shows what was caught");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()

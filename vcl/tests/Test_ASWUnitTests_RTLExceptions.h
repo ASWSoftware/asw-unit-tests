@@ -37,8 +37,9 @@ namespace ASWUnitTests
 // TTest_ASWUnitTests_RTLExceptions
 //
 // Exercises the framework's opt-in RTL exception support (see
-// ASWUnitTests_Exception.h): SetExceptionExpected<TException>() with RTL
-// exception types, the RTL catch in TTestGroupBase::Test(), and the
+// ASWUnitTests_Exception.h): SetExceptionExpected<TException>() and the
+// Throws/NoThrow methods (e.g. CheckThrows()) with RTL exception types, the
+// RTL catch in TTestGroupBase::Test(), and the
 // DescribeRTLException()/RTLExceptionMessage() helpers. Like
 // TTest_ASWUnitTests_TestBase, it runs small unregistered fixture groups
 // (see the .cpp) directly and inspects their Results(), so a deliberately
@@ -65,6 +66,7 @@ private: // Test methods
     void Test_SetExceptionExpected_MatchesRTLTypeAndMessageOnWorkerThread();
     void Test_SetExceptionExpected_MatchesRTLTypeAndMessageUnderCatchCrashes();
     void Test_TExceptRTLException_KeepsClassAndDescriptionAfterOriginalIsFreed();
+    void Test_Throws_MatchesRTLTypeAndMessage();
 
 public:
     TTest_ASWUnitTests_RTLExceptions();

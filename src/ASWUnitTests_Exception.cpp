@@ -189,6 +189,18 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNoThrow
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNoThrow::TExceptNoThrow(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Unexpected exception: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotContains
 /////////////////////////////////////////////////////////////////////////////
 
@@ -376,6 +388,18 @@ TExceptTestTimedOut::TExceptTestTimedOut(std::string const& msg)
 TExceptTestCrashed::TExceptTestCrashed(std::string const& msg)
     : TExceptAbortRun(msg)
 {
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptThrows
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptThrows::TExceptThrows(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Expected exception not caught: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
 }
 //---------------------------------------------------------------------------
 

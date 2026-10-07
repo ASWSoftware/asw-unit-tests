@@ -1234,6 +1234,30 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
     }
 }
 //---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeException(std::exception const& ex)
+{
+    return ex.what();
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::DescribeException(System::Sysutils::Exception& ex)
+{
+    return DescribeRTLException(ex);
+}
+//---------------------------------------------------------------------------
+#endif
+std::string TTestGroupBase::ExceptionMessage(std::exception const& ex)
+{
+    return ex.what();
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::ExceptionMessage(System::Sysutils::Exception& ex)
+{
+    return RTLExceptionMessage(ex);
+}
+//---------------------------------------------------------------------------
+#endif
 bool TTestGroupBase::ExceptionTypeExpected() const
 {
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)

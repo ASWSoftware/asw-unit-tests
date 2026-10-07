@@ -20,7 +20,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
   and `double` values within a tolerance.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** - `SetExceptionExpected()`, with an
-  optional check of the exception's type and message.
+  optional check of the exception's type and message, and
+  [`CheckThrows()`/`CheckNoThrow()`](#checking-that-a-call-throws) for a single call.
 - **[Parameterized tests](#parameterized-tests)** - `RegisterTestCases()` registers one named test case per row of
   data.
 - **[Failing tests](#failing-a-test)** - `Fail()` fails a test unconditionally, e.g. on a code path it should never
@@ -418,6 +419,25 @@ message rather than silently passing.
 An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails the test rather
 than counting as the expected exception, and so does a failed `Check*` earlier in the test, even if the expected
 exception then arrives.
+
+### Checking That a Call Throws
+
+`SetExceptionExpected()` covers a test that ends by throwing. To check a single call instead, so the test carries on
+afterwards, pass it as a lambda to `CheckThrows`/`AssertThrows`, with the expected exception type and, optionally, a
+substring its message must contain. `CheckNoThrow`/`AssertNoThrow` check that a call doesn't throw, and a failure
+shows what it threw:
+
+```
+CheckThrows<std::out_of_range>([&] { list.At(5); }, __func__, __LINE__, "index past the end");
+CheckThrows<std::invalid_argument>([&] { Parse("x"); }, __func__, __LINE__, "not a number", "invalid digit");
+CheckEquals(3u, list.Count(), __func__, __LINE__, "a failed call leaves the list unchanged");
+CheckNoThrow([&] { list.At(2); }, __func__, __LINE__, "last index");
+```
+
+The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, and with
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL exception types too. A failed `Assert*`, `Fail()` or
+`Skip()` inside the lambda isn't taken as the thrown exception; it ends the test as usual, unless the requested type
+is that framework exception (e.g. `CheckThrows<TExceptTrue>`).
 
 ### RAD Studio RTL Exceptions (VCL/FMX)
 

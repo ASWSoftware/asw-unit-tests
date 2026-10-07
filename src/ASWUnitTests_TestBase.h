@@ -277,6 +277,45 @@ private:
         }
     }
 
+    // Runs 'callable' for the Throws/NoThrow methods and returns a description of what it threw (see
+    // DescribeException()), or nullopt when it threw nothing. A failure signal from this framework (a TTestException,
+    // e.g. an Assert* failure, Fail() or Skip()) passes straight through. Each exception is caught exactly once,
+    // never rethrown and caught again, since an RTL exception object is freed when the first handler that catches
+    // it ends.
+    template <typename TCallable>
+    static std::optional<std::string> CallAndDescribeException(TCallable&& callable)
+    {
+        try
+        {
+            static_cast<void>(std::forward<TCallable>(callable)());
+        }
+        catch (TTestException const&)
+        {
+            throw;
+        }
+        catch (std::exception const& ex)
+        {
+            return DescribeException(ex);
+        }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        catch (System::Sysutils::Exception& ex)
+        {
+            return DescribeException(ex);
+        }
+        catch (...)
+        {
+            return std::string("an object that is neither a std::exception nor an RTL Exception");
+        }
+#else
+        catch (...)
+        {
+            return std::string("a non-std::exception object");
+        }
+#endif
+
+        return std::nullopt;
+    }
+
     // Used by the Check ordering methods: records a failure unless 'value' has relation 'ordering' to 'bound'.
     template <typename TValue, typename TBound>
     void CheckOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
@@ -319,6 +358,19 @@ private:
             return IsNonNegative(value) ? 1 : -1;
         }
     }
+
+    // Describes 'ex' for a Throws/NoThrow failure: what() for a std::exception, or "ClassName: Message" for an RTL
+    // exception (see DescribeRTLException()).
+    static std::string DescribeException(std::exception const& ex);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::string DescribeException(System::Sysutils::Exception& ex);
+#endif
+
+    // The message a Throws method checks for its expected substring: what(), or an RTL exception's Message.
+    static std::string ExceptionMessage(std::exception const& ex);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::string ExceptionMessage(System::Sysutils::Exception& ex);
+#endif
 
     template <typename TInteger>
     static bool FitsInInt64(TInteger value)
@@ -396,6 +448,19 @@ private:
             return true;
     }
 
+    // Runs 'callable' for the NoThrow methods (e.g. CheckNoThrow()) and returns why it failed, or an empty string when
+    // it threw nothing. A failure signal from this framework (e.g. an Assert* failure inside 'callable') passes
+    // straight through, failing the test as usual.
+    template <typename TCallable>
+    static std::string NoThrowFailure(TCallable&& callable)
+    {
+        std::optional<std::string> const thrown = CallAndDescribeException(std::forward<TCallable>(callable));
+        if (thrown != std::nullopt)
+            return "Expected no exception but caught: " + *thrown;
+
+        return std::string();
+    }
+
     // True when 'order' (from CompareForOrdering()) satisfies 'ordering'; never when it's nullopt (a NaN).
     static bool OrderingHolds(std::optional<int> order, TOrdering ordering);
     // The operator for 'ordering' in a failure message, e.g. ">=".
@@ -430,6 +495,62 @@ private:
     static int ThreeWayCompare(T a, T b)
     {
         return (a < b) ? -1 : ((b < a) ? 1 : 0);
+    }
+
+    // Runs 'callable' for the Throws methods (e.g. CheckThrows()) and returns why it failed, or an empty string when
+    // it threw a TException (or a subclass) whose message contains 'expectedMessage'. A failure signal from this
+    // framework (e.g. an Assert* failure inside 'callable') passes straight through, failing the test as usual,
+    // unless TException asks for one (e.g. TExceptTrue).
+    template <typename TException, typename TCallable>
+    static std::string ThrowsFailure(TCallable&& callable, std::string const& expectedMessage)
+    {
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        constexpr bool isRTLException = std::is_base_of<System::Sysutils::Exception, TException>::value;
+#else
+        constexpr bool isRTLException = false;
+#endif
+        static_assert(std::is_base_of<std::exception, TException>::value || isRTLException,
+            "TException must be a std::exception, or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception, or a subclass");
+
+        bool caught = false;
+        std::string failure;
+
+        // The TException handler is in its own try block, so anything else 'callable' throws propagates once to
+        // CallAndDescribeException()'s handlers rather than being rethrown and caught again (see there).
+        std::optional<std::string> const otherException = CallAndDescribeException([&]()
+            {
+                try
+                {
+                    static_cast<void>(std::forward<TCallable>(callable)());
+                }
+                catch (TException& ex)
+                {
+                    // A TException that is a base of TTestException (e.g. std::exception) also catches the
+                    // framework's own signals, which must still pass through.
+                    if constexpr (std::is_base_of<TException, TTestException>::value &&
+                                  !std::is_same<TException, TTestException>::value)
+                    {
+                        if (dynamic_cast<TTestException*>(&ex) != nullptr)
+                            throw;
+                    }
+
+                    caught = true;
+
+                    if (!expectedMessage.empty() && (ExceptionMessage(ex).find(expectedMessage) == std::string::npos))
+                    {
+                        failure = "Expected the exception message to contain \"" + expectedMessage + "\" but caught: " +
+                            DescribeException(ex);
+                    }
+                }
+            });
+
+        if (otherException != std::nullopt)
+            return "Expected a different exception type but caught: " + *otherException;
+
+        if (!caught)
+            return "Expected an exception but none was thrown";
+
+        return failure;
     }
 
 protected:
@@ -879,6 +1000,45 @@ protected: // Assertion/Check methods - Same (identity, compared by address)
             SetTestFailedCheck(method, line, "Expected the same object as \"" + FormatPointer(SameAddress(expected)) +
                 "\" but was \"" + FormatPointer(SameAddress(actual)) + "\". " + msg);
         }
+    }
+
+protected: // Assertion/Check methods - Throws (exception from a callable)
+    // Each runs 'callable' (e.g. a lambda) and checks whether it throws. Unlike with SetExceptionExpected(), the test
+    // carries on afterwards (unless an Assert method fails), so it can check several calls and the state after each.
+    // The Throws methods pass when 'callable' throws a TException or a subclass (TException being a std::exception,
+    // or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception) whose message contains 'expectedMessage', when that isn't
+    // empty. A failure signal from this framework inside 'callable' (e.g. an Assert* failure, Fail() or Skip()) still
+    // ends the test as usual, unless TException asks for one.
+    template <typename TCallable>
+    void AssertNoThrow(TCallable&& callable, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = NoThrowFailure(std::forward<TCallable>(callable));
+        if (!failure.empty())
+            throw TExceptNoThrow(method, line, failure, msg);
+    }
+    template <typename TException, typename TCallable>
+    void AssertThrows(TCallable&& callable, std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        std::string const failure = ThrowsFailure<TException>(std::forward<TCallable>(callable), expectedMessage);
+        if (!failure.empty())
+            throw TExceptThrows(method, line, failure, msg);
+    }
+
+    template <typename TCallable>
+    void CheckNoThrow(TCallable&& callable, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = NoThrowFailure(std::forward<TCallable>(callable));
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+    template <typename TException, typename TCallable>
+    void CheckThrows(TCallable&& callable, std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        std::string const failure = ThrowsFailure<TException>(std::forward<TCallable>(callable), expectedMessage);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
     }
 
 protected: // Assertion/Check methods - Contains (substring)
@@ -1354,6 +1514,12 @@ protected: // Assertion/Check methods - std::source_location
         AssertNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TCallable>
+    void AssertNoThrow(TCallable&& callable, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNoThrow(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TSubstring>
     void AssertNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1456,6 +1622,13 @@ protected: // Assertion/Check methods - std::source_location
         AssertStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TException, typename TCallable>
+    void AssertThrows(TCallable&& callable, std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        AssertThrows<TException>(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()),
+            msg, expectedMessage);
+    }
     void AssertTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -1541,6 +1714,12 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TCallable>
+    void CheckNoThrow(TCallable&& callable, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNoThrow(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSubstring>
     void CheckNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
@@ -1643,6 +1822,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TException, typename TCallable>
+    void CheckThrows(TCallable&& callable, std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        CheckThrows<TException>(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()),
+            msg, expectedMessage);
     }
     void CheckTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {

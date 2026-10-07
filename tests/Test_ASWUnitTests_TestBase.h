@@ -80,6 +80,7 @@ private: // Test methods
 #endif
     void Test_StartsWithIC_IgnoresASCIICaseOnly();
     void Test_StartsWith_ShowsTextAndPrefix();
+    void Test_Throws_ChecksTypeAndMessageAndContinues();
     void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:

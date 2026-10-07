@@ -27,6 +27,14 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   place of `AssertTrue(false, ...)`. Like an `Assert*` method, it aborts the
   test, and it fails the test even while an exception is expected. It throws
   the new `TExceptFail`.
+- `CheckThrows<TException>`/`AssertThrows<TException>` and
+  `CheckNoThrow`/`AssertNoThrow`, which run a callable (e.g. a lambda) and
+  check that it does or doesn't throw. Unlike `SetExceptionExpected()`, the
+  test carries on afterwards, so it can check several calls and the state
+  after each. The Throws methods take an optional substring the exception's
+  message must contain, and match the type like `SetExceptionExpected()`,
+  RTL exception types included. A failed `Assert*`, `Fail()` or `Skip()`
+  inside the callable still ends the test as usual.
 
 ### Fixed
 
