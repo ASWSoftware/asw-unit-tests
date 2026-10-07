@@ -11,10 +11,10 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Near`/`NotNear`,
-  `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their
-  `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith`
-  methods.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
+  `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), and
+  `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`,
+  `Contains`, `StartsWith` and `EndsWith` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
@@ -692,6 +692,20 @@ They accept any two integer or floating-point types except `bool`. Two integers 
 [`CheckEquals`](#comparing-integers-of-different-types) does, so `-1` is less than any unsigned value. When either
 value is floating point, both are compared as their common type, as the built-in operators do, and a NaN fails every
 check.
+
+### Checking for Empty
+
+`CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take anything with an `empty()` member, such as a
+`std::string`, `std::wstring`, `std::vector` or `std::map`, and with
+[RTL support](#comparing-systemstring-vclfmx), a `System::String`. Unlike `CheckTrue(list.empty(), ...)`, a failure
+shows what was there: the text, or the element count of a container with a `size()`:
+
+```
+CheckEmpty(errors, __func__, __LINE__, "no errors reported");
+// Check failed for: "Test_Load" (42): Expected empty but had 2 elements. no errors reported
+CheckEmpty(GetWarning(), __func__, __LINE__, "no warning");
+// Check failed for: "Test_Load" (43): Expected empty but was "low disk space". no warning
+```
 
 ### Checking for Null
 

@@ -1234,6 +1234,16 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
     }
 }
 //---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeContents(std::string const& text)
+{
+    return "was \"" + text + "\"";
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeContents(std::wstring const& text)
+{
+    return "was \"" + WideToUTF8(text) + "\"";
+}
+//---------------------------------------------------------------------------
 std::string TTestGroupBase::DescribeException(std::exception const& ex)
 {
     return ex.what();

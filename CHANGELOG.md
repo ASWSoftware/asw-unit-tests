@@ -39,6 +39,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   two values of the same scoped enum (`enum class`) type, which was a compile
   error, and a failure shows their underlying values. Comparing two different
   enum types, or an `enum class` with an integer, is still a compile error.
+- `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty`, for
+  anything with an `empty()` member (strings, containers) and, with
+  `ASWUNITTESTS_RTL_EXCEPTIONS`, a `System::String`. Unlike
+  `CheckTrue(x.empty(), ...)`, a failure shows the text, or a container's
+  element count.
 
 ### Fixed
 

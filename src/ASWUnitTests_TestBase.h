@@ -265,6 +265,16 @@ private:
         LessThanOrEqual
     };
 
+    // True when TValue has a size() member, which DescribeContents() shows as an element count.
+    template <typename TValue, typename = void>
+    struct THasSize : std::false_type
+    {
+    };
+    template <typename TValue>
+    struct THasSize<TValue, std::void_t<decltype(std::declval<TValue const&>().size())> > : std::true_type
+    {
+    };
+
     // Used by the Assert ordering methods: throws TExceptOrdering unless 'value' has relation 'ordering' to 'bound'.
     template <typename TValue, typename TBound>
     void AssertOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
@@ -356,6 +366,33 @@ private:
                 return ThreeWayCompare(static_cast<uint64_t>(value), static_cast<uint64_t>(bound));
 
             return IsNonNegative(value) ? 1 : -1;
+        }
+    }
+
+    // Describes a non-empty 'value' for an Empty failure: its text (e.g. "was \"abc\""), with wide text as UTF-8, its
+    // element count (e.g. "had 3 elements") when it has a size(), or "was not empty".
+    static std::string DescribeContents(std::string const& text);
+    static std::string DescribeContents(std::wstring const& text);
+    template <typename TValue>
+    static std::string DescribeContents(TValue const& value)
+    {
+        // Text types other than std::string/std::wstring, such as std::string_view.
+        if constexpr (std::is_constructible<std::string, TValue const&>::value)
+        {
+            return DescribeContents(std::string(value));
+        }
+        else if constexpr (std::is_constructible<std::wstring, TValue const&>::value)
+        {
+            return DescribeContents(std::wstring(value));
+        }
+        else if constexpr (THasSize<TValue>::value)
+        {
+            unsigned long long const size = static_cast<unsigned long long>(value.size());
+            return "had " + std::to_string(size) + ((size == 1) ? " element" : " elements");
+        }
+        else
+        {
+            return "was not empty";
         }
     }
 
@@ -1071,6 +1108,39 @@ protected: // Assertion/Check methods - Throws (exception from a callable)
             SetTestFailedCheck(method, line, failure + ". " + msg);
     }
 
+protected: // Assertion/Check methods - Empty (string or container)
+    // Anything with an empty() member, e.g. std::string, std::wstring, std::vector or std::map. A failure shows a
+    // non-empty value's text or element count; see DescribeContents().
+    template <typename TValue>
+    using TEnableIfHasEmpty = typename std::enable_if<
+        std::is_convertible<decltype(std::declval<TValue const&>().empty()), bool>::value, int>::type;
+
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void AssertEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (!value.empty())
+            throw TExceptEmpty(method, line, "Expected empty but " + DescribeContents(value), msg);
+    }
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void AssertNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (value.empty())
+            throw TExceptNotEmpty(method, line, msg);
+    }
+
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void CheckEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (!value.empty())
+            SetTestFailedCheck(method, line, "Expected empty but " + DescribeContents(value) + ". " + msg);
+    }
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void CheckNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (value.empty())
+            SetTestFailedCheck(method, line, "Expected not empty but was empty. " + msg);
+    }
+
 protected: // Assertion/Check methods - Contains (substring)
     virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
@@ -1249,7 +1319,7 @@ protected: // Assertion/Check methods - Ordering (value compared with a bound)
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 protected: // Assertion/Check methods - System::String (RTL)
     // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
-    // UTF-8. The other may also be a std::string, std::wstring or C string.
+    // UTF-8. The other may also be a std::string, std::wstring or C string. The Empty methods take one System::String.
     template <typename TText>
     using TIsRTLString = std::is_same<typename std::decay<TText>::type, System::String>;
     template <typename TText>
@@ -1263,6 +1333,9 @@ protected: // Assertion/Check methods - System::String (RTL)
     template <typename TFirst, typename TSecond>
     using TEnableIfRTLText = typename std::enable_if<(TIsRTLString<TFirst>::value ||
         TIsRTLString<TSecond>::value) && TIsRTLText<TFirst>::value && TIsRTLText<TSecond>::value, int>::type;
+    // Exactly a System::String, so nothing else converts to one implicitly (e.g. a C string, only in RTL builds).
+    template <typename TText>
+    using TEnableIfRTLString = typename std::enable_if<TIsRTLString<TText>::value, int>::type;
 
     template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
     void AssertContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
@@ -1275,6 +1348,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         AssertContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void AssertEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        AssertEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void AssertEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -1311,6 +1389,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         AssertNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void AssertNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        AssertNotEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -1373,6 +1456,11 @@ protected: // Assertion/Check methods - System::String (RTL)
     {
         CheckContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
     }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void CheckEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        CheckEmpty(RTLTextToUTF8(text), method, line, msg);
+    }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
         std::string const& msg)
@@ -1408,6 +1496,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         CheckNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void CheckNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        CheckNotEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -1476,6 +1569,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void AssertEmpty(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void AssertEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
@@ -1563,6 +1661,12 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void AssertNotEmpty(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void AssertNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
@@ -1678,6 +1782,11 @@ protected: // Assertion/Check methods - std::source_location
         CheckContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TValue>
+    void CheckEmpty(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TSuffix>
     void CheckEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1764,6 +1873,12 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckNotEmpty(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void CheckNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,

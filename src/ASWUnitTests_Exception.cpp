@@ -122,6 +122,18 @@ TExceptExpected::TExceptExpected(std::string const& msg)
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptEmpty
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptEmpty::TExceptEmpty(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Not empty: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptEndsWith
 /////////////////////////////////////////////////////////////////////////////
 
@@ -210,6 +222,18 @@ TExceptNotContains::TExceptNotContains(std::string const& method, int line, std:
 {
     m_Message = "Substring found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" not to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotEmpty
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotEmpty::TExceptNotEmpty(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Empty: " + method + " (" + std::to_string(line) + "): Expected not empty but was empty. " + msg;
 }
 //---------------------------------------------------------------------------
 

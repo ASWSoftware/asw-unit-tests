@@ -28,6 +28,7 @@ limitations under the License.
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <forward_list>
 #include <functional>
 #include <limits>
 #include <map>
@@ -35,9 +36,14 @@ limitations under the License.
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
 #include <vector>
+// The test header's ASWUnitTests_TestBase.h includes <version>, where available, for this feature-test macro.
+#if defined(__cpp_lib_string_view)
+#  include <string_view>
+#endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
@@ -900,6 +906,130 @@ void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_Absent_Passes(
 void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_Fails()
 {
     CheckNotContainsIC(std::wstring(L"Hello World"), L"WORLD", __func__, __LINE__, "case differs");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EmptyChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEmpty()/CheckEmpty()/
+// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), and (where the
+// library has it) std::string_view, so Test_Empty_ShowsContentsOnFailure below can check what each failure shows.
+// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EmptyChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEmpty_EmptyString_Passes();
+    void Test_AssertEmpty_String_Fails();
+    void Test_AssertNotEmpty_EmptyVector_Fails();
+    void Test_AssertNotEmpty_Vector_Passes();
+    void Test_CheckEmpty_EmptyMap_Passes();
+    void Test_CheckEmpty_ForwardList_Fails();
+    void Test_CheckEmpty_OneElement_Fails();
+#if defined(__cpp_lib_string_view)
+    void Test_CheckEmpty_StringView_Fails();
+#endif
+    void Test_CheckEmpty_Vector_Fails();
+    void Test_CheckEmpty_WideString_Fails();
+    void Test_CheckNotEmpty_EmptyString_Fails();
+    void Test_CheckNotEmpty_String_Passes();
+
+public:
+    TFixture_EmptyChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_EmptyChecks::TFixture_EmptyChecks()
+    : inherited("Fixture_EmptyChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes, "AssertEmpty_EmptyString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_String_Fails, "AssertEmpty_String_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails, "AssertNotEmpty_EmptyVector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes, "AssertNotEmpty_Vector_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes, "CheckEmpty_EmptyMap_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails, "CheckEmpty_ForwardList_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails, "CheckEmpty_OneElement_Fails");
+#if defined(__cpp_lib_string_view)
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_StringView_Fails, "CheckEmpty_StringView_Fails");
+#endif
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails, "CheckEmpty_Vector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails, "CheckEmpty_WideString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails, "CheckNotEmpty_EmptyString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes, "CheckNotEmpty_String_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes()
+{
+    AssertEmpty(std::string(), __func__, __LINE__, "empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_String_Fails()
+{
+    AssertEmpty(std::string("abc"), __func__, __LINE__, "has text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails()
+{
+    AssertNotEmpty(std::vector<int>(), __func__, __LINE__, "no elements");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes()
+{
+    AssertNotEmpty(std::vector<int>{ 1 }, __func__, __LINE__, "one element");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes()
+{
+    CheckEmpty(std::map<std::string, int>(), __func__, __LINE__, "empty map");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails()
+{
+    // std::forward_list has empty() but no size().
+    CheckEmpty(std::forward_list<int>{ 1, 2 }, __func__, __LINE__, "no size to show");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails()
+{
+    CheckEmpty(std::vector<int>{ 7 }, __func__, __LINE__, "one element");
+}
+//---------------------------------------------------------------------------
+#if defined(__cpp_lib_string_view)
+void TFixture_EmptyChecks::Test_CheckEmpty_StringView_Fails()
+{
+    CheckEmpty(std::string_view("xyz"), __func__, __LINE__, "shown as text, not an element count");
+}
+//---------------------------------------------------------------------------
+#endif
+void TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails()
+{
+    CheckEmpty(std::vector<int>{ 1, 2, 3 }, __func__, __LINE__, "three elements");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails()
+{
+    // U+00E9 (e with acute accent) is shown as its UTF-8 bytes.
+    CheckEmpty(std::wstring(L"caf\x00E9"), __func__, __LINE__, "wide text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails()
+{
+    CheckNotEmpty(std::string(), __func__, __LINE__, "empty string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes()
+{
+    CheckNotEmpty(std::string("abc"), __func__, __LINE__, "has text");
 }
 //---------------------------------------------------------------------------
 
@@ -3350,6 +3480,7 @@ private:
 
     void Test_AssertContainsIC_Passes();
     void Test_AssertContains_Fails();
+    void Test_AssertEmpty_Fails();
     void Test_AssertEndsWithIC_Passes();
     void Test_AssertEndsWith_Fails();
     void Test_AssertEqualsIC_Passes();
@@ -3364,6 +3495,7 @@ private:
     void Test_AssertNoThrow_Fails();
     void Test_AssertNotContainsIC_Fails();
     void Test_AssertNotContains_Fails();
+    void Test_AssertNotEmpty_Fails();
     void Test_AssertNotEndsWithIC_Fails();
     void Test_AssertNotEndsWith_DifferentCase_Passes();
     void Test_AssertNotEndsWith_Fails();
@@ -3384,6 +3516,7 @@ private:
     void Test_CheckContainsIC_Passes();
     void Test_CheckContains_Fails();
     void Test_CheckContains_Wide_Passes();
+    void Test_CheckEmpty_Fails();
     void Test_CheckEndsWithIC_Passes();
     void Test_CheckEndsWith_Fails();
     void Test_CheckEndsWith_Wide_Passes();
@@ -3401,6 +3534,7 @@ private:
     void Test_CheckNoThrow_Fails();
     void Test_CheckNotContainsIC_Fails();
     void Test_CheckNotContains_Fails();
+    void Test_CheckNotEmpty_Fails();
     void Test_CheckNotEndsWithIC_Fails();
     void Test_CheckNotEndsWith_DifferentCase_Passes();
     void Test_CheckNotEndsWith_Fails();
@@ -3447,6 +3581,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
 
     RegisterTest(&TFixture_SourceLocations::Test_AssertContainsIC_Passes, "AssertContainsIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertContains_Fails, "AssertContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertEmpty_Fails, "AssertEmpty_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWithIC_Passes, "AssertEndsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEndsWith_Fails, "AssertEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertEqualsIC_Passes, "AssertEqualsIC_Passes");
@@ -3461,6 +3596,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertNoThrow_Fails, "AssertNoThrow_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContainsIC_Fails, "AssertNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotEmpty_Fails, "AssertNotEmpty_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWithIC_Fails, "AssertNotEndsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEndsWith_DifferentCase_Passes,
         "AssertNotEndsWith_DifferentCase_Passes");
@@ -3483,6 +3619,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckContainsIC_Passes, "CheckContainsIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Fails, "CheckContains_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckContains_Wide_Passes, "CheckContains_Wide_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckEmpty_Fails, "CheckEmpty_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWithIC_Passes, "CheckEndsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Fails, "CheckEndsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckEndsWith_Wide_Passes, "CheckEndsWith_Wide_Passes");
@@ -3500,6 +3637,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckNoThrow_Fails, "CheckNoThrow_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContainsIC_Fails, "CheckNotContainsIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotEmpty_Fails, "CheckNotEmpty_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWithIC_Fails, "CheckNotEndsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEndsWith_DifferentCase_Passes,
         "CheckNotEndsWith_DifferentCase_Passes");
@@ -3551,6 +3689,12 @@ void TFixture_SourceLocations::Test_AssertContains_Fails()
 {
     ExpectedLines["AssertContains_Fails"] = __LINE__ + 1;
     AssertContains(std::string("abc"), "x", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertEmpty_Fails()
+{
+    ExpectedLines["AssertEmpty_Fails"] = __LINE__ + 1;
+    AssertEmpty(std::string("abc"), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertEndsWithIC_Passes()
@@ -3633,6 +3777,12 @@ void TFixture_SourceLocations::Test_AssertNotContains_Fails()
 {
     ExpectedLines["AssertNotContains_Fails"] = __LINE__ + 1;
     AssertNotContains(std::string("abc"), "b", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotEmpty_Fails()
+{
+    ExpectedLines["AssertNotEmpty_Fails"] = __LINE__ + 1;
+    AssertNotEmpty(std::vector<int>(), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotEndsWithIC_Fails()
@@ -3755,6 +3905,12 @@ void TFixture_SourceLocations::Test_CheckContains_Wide_Passes()
     CheckContains(std::wstring(L"abc"), L"b", "wide substring present");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckEmpty_Fails()
+{
+    ExpectedLines["CheckEmpty_Fails"] = __LINE__ + 1;
+    CheckEmpty(std::vector<int>{ 1 }, "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckEndsWithIC_Passes()
 {
     CheckEndsWithIC(std::string("abc"), "BC", "case differs");
@@ -3856,6 +4012,12 @@ void TFixture_SourceLocations::Test_CheckNotContains_Fails()
 {
     ExpectedLines["CheckNotContains_Fails"] = __LINE__ + 1;
     CheckNotContains(std::string("abc"), "b", "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotEmpty_Fails()
+{
+    ExpectedLines["CheckNotEmpty_Fails"] = __LINE__ + 1;
+    CheckNotEmpty(std::string(), "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotEndsWithIC_Fails()
@@ -5043,6 +5205,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Check_ContinuesButAssert_Aborts, "Check_ContinuesButAssert_Aborts");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly, "ContainsIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring, "Contains_ShowsTextAndSubstring");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure, "Empty_ShowsContentsOnFailure");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly, "EndsWithIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix, "EndsWith_ShowsTextAndSuffix");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly, "EqualsIC_IgnoresASCIICaseOnly");
@@ -5275,6 +5438,75 @@ void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
     CheckEndsWith(checkNotContains->Message, notContainsDetail, __func__, __LINE__,
         "CheckNotContains shows the text and substring");
     CheckEndsWith(checkNonASCII->Message, nonASCIIDetail, __func__, __LINE__, "a wide failure shows its text as UTF-8");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
+{
+    // Arrange
+    TFixture_EmptyChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+#if defined(__cpp_lib_string_view)
+    size_t const expectedCount = 12;
+#else
+    size_t const expectedCount = 11;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    // Each test name, the start of its failure message, and the end after the varying line number.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::string Detail;
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertEmpty_String_Fails", "Not empty: Test_AssertEmpty_String_Fails (",
+          "): Expected empty but was \"abc\". has text" },
+        { "AssertNotEmpty_EmptyVector_Fails", "Empty: Test_AssertNotEmpty_EmptyVector_Fails (",
+          "): Expected not empty but was empty. no elements" },
+        { "CheckEmpty_ForwardList_Fails", "Check failed for: \"Test_CheckEmpty_ForwardList_Fails\" (",
+          "): Expected empty but was not empty. no size to show" },
+        { "CheckEmpty_OneElement_Fails", "Check failed for: \"Test_CheckEmpty_OneElement_Fails\" (",
+          "): Expected empty but had 1 element. one element" },
+#if defined(__cpp_lib_string_view)
+        {
+            "CheckEmpty_StringView_Fails", "Check failed for: \"Test_CheckEmpty_StringView_Fails\" (",
+            "): Expected empty but was \"xyz\". shown as text, not an element count"
+        },
+#endif
+        {
+            "CheckEmpty_Vector_Fails", "Check failed for: \"Test_CheckEmpty_Vector_Fails\" (",
+            "): Expected empty but had 3 elements. three elements"
+        },
+        { "CheckEmpty_WideString_Fails", "Check failed for: \"Test_CheckEmpty_WideString_Fails\" (",
+          "): Expected empty but was \"caf\xC3\xA9\". wide text" },
+        { "CheckNotEmpty_EmptyString_Fails", "Check failed for: \"Test_CheckNotEmpty_EmptyString_Fails\" (",
+          "): Expected not empty but was empty. empty string" },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+        CheckEndsWith(record->Message, expected.Detail, __func__, __LINE__, expected.TestName + " shows the contents");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly()
@@ -6398,7 +6630,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(81), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(85), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

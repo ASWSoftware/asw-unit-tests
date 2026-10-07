@@ -47,6 +47,7 @@ private: // Test methods
     void Test_Check_ContinuesButAssert_Aborts();
     void Test_ContainsIC_IgnoresASCIICaseOnly();
     void Test_Contains_ShowsTextAndSubstring();
+    void Test_Empty_ShowsContentsOnFailure();
     void Test_EndsWithIC_IgnoresASCIICaseOnly();
     void Test_EndsWith_ShowsTextAndSuffix();
     void Test_EqualsIC_IgnoresASCIICaseOnly();
