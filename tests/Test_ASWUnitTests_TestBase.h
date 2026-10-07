@@ -69,6 +69,7 @@ private: // Test methods
     void Test_Run_ResetsResultsBetweenRuns();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
     void Test_Run_StopsWhenRunObserverRequests();
+    void Test_Same_ComparesAddressesNotContent();
     void Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();

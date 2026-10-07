@@ -18,6 +18,11 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `std::function`. A C string is checked as a pointer, so an empty string
   such as `""` is not null. With C++20, they also have `std::source_location`
   overloads, like the other `Check*`/`Assert*` methods.
+- `CheckSame`/`AssertSame` and `CheckNotSame`/`AssertNotSame`, which check
+  that two values do or don't point to the same object. They take raw
+  pointers, arrays, and smart pointers (`std::unique_ptr`, `std::shared_ptr`)
+  in any mix, and compare C strings by address, not content. A failure shows
+  the addresses.
 
 ### Fixed
 

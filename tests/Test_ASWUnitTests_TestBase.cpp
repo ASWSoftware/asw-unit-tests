@@ -2919,6 +2919,154 @@ void TFixture_PointerComparisons::Test_CheckNotEquals_SamePointer_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_SameChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertSame()/CheckSame()/AssertNotSame()/
+// CheckNotSame() with raw pointers, arrays, smart pointers and C strings, which unlike CheckEquals() are compared by
+// address, not content. The basic tests compare the addresses of First and Second, so
+// Test_Same_ComparesAddressesNotContent below can check the addresses a failure shows. Test names self-document
+// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SameChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotSame_DifferentObjects_Passes();
+    void Test_AssertNotSame_SameObject_Fails();
+    void Test_AssertSame_DifferentObjects_Fails();
+    void Test_AssertSame_SameObject_Passes();
+    void Test_CheckNotSame_CStringsSameContent_Passes();
+    void Test_CheckNotSame_SameObject_Fails();
+    void Test_CheckSame_ArrayAndPointer_Passes();
+    void Test_CheckSame_BothNull_Passes();
+    void Test_CheckSame_CStringsSameContent_Fails();
+    void Test_CheckSame_DifferentObjects_Fails();
+    void Test_CheckSame_RawAndSharedPtr_Passes();
+    void Test_CheckSame_SameObject_Passes();
+    void Test_CheckSame_SharedPtrCopies_Passes();
+    void Test_CheckSame_UniquePtrs_Fails();
+
+public:
+    int First = 0;
+    int Second = 0;
+
+    TFixture_SameChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_SameChecks::TFixture_SameChecks()
+    : inherited("Fixture_SameChecks")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_SameChecks::Test_AssertNotSame_DifferentObjects_Passes,
+        "AssertNotSame_DifferentObjects_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_AssertNotSame_SameObject_Fails, "AssertNotSame_SameObject_Fails");
+    RegisterTest(&TFixture_SameChecks::Test_AssertSame_DifferentObjects_Fails, "AssertSame_DifferentObjects_Fails");
+    RegisterTest(&TFixture_SameChecks::Test_AssertSame_SameObject_Passes, "AssertSame_SameObject_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckNotSame_CStringsSameContent_Passes,
+        "CheckNotSame_CStringsSameContent_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckNotSame_SameObject_Fails, "CheckNotSame_SameObject_Fails");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_ArrayAndPointer_Passes, "CheckSame_ArrayAndPointer_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_BothNull_Passes, "CheckSame_BothNull_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_CStringsSameContent_Fails, "CheckSame_CStringsSameContent_Fails");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_DifferentObjects_Fails, "CheckSame_DifferentObjects_Fails");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_RawAndSharedPtr_Passes, "CheckSame_RawAndSharedPtr_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_SameObject_Passes, "CheckSame_SameObject_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_SharedPtrCopies_Passes, "CheckSame_SharedPtrCopies_Passes");
+    RegisterTest(&TFixture_SameChecks::Test_CheckSame_UniquePtrs_Fails, "CheckSame_UniquePtrs_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_AssertNotSame_DifferentObjects_Passes()
+{
+    AssertNotSame(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_AssertNotSame_SameObject_Fails()
+{
+    AssertNotSame(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_AssertSame_DifferentObjects_Fails()
+{
+    AssertSame(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_AssertSame_SameObject_Passes()
+{
+    AssertSame(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckNotSame_CStringsSameContent_Passes()
+{
+    char const buffer[] = "abc";
+    CheckNotSame("abc", buffer, __func__, __LINE__, "same text in a different buffer is a different object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckNotSame_SameObject_Fails()
+{
+    CheckNotSame(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_ArrayAndPointer_Passes()
+{
+    char buffer[] = "abc";
+    char const* const pointer = buffer;
+    CheckSame(buffer, pointer, __func__, __LINE__, "a pointer to the array's first element");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_BothNull_Passes()
+{
+    int* const pointer = nullptr;
+    std::shared_ptr<int> const empty;
+    CheckSame(pointer, empty, __func__, __LINE__, "both null");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_CStringsSameContent_Fails()
+{
+    char const buffer[] = "abc";
+    CheckSame("abc", buffer, __func__, __LINE__, "same text in a different buffer");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_DifferentObjects_Fails()
+{
+    CheckSame(&First, &Second, __func__, __LINE__, "different objects");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_RawAndSharedPtr_Passes()
+{
+    std::shared_ptr<int> const shared = std::make_shared<int>(0);
+    int const* const raw = shared.get();
+    CheckSame(raw, shared, __func__, __LINE__, "a raw pointer to the shared object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_SameObject_Passes()
+{
+    CheckSame(&First, &First, __func__, __LINE__, "same object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_SharedPtrCopies_Passes()
+{
+    std::shared_ptr<int> const original = std::make_shared<int>(0);
+    std::shared_ptr<int> const copy = original;
+    CheckSame(original, copy, __func__, __LINE__, "copies share one object");
+}
+//---------------------------------------------------------------------------
+void TFixture_SameChecks::Test_CheckSame_UniquePtrs_Fails()
+{
+    std::unique_ptr<int> const first = std::make_unique<int>(0);
+    std::unique_ptr<int> const second = std::make_unique<int>(0);
+    CheckSame(first, second, __func__, __LINE__, "two objects with the same value");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
@@ -3013,10 +3161,12 @@ private:
     void Test_AssertNotEquals_Fails();
     void Test_AssertNotNear_Fails();
     void Test_AssertNotNull_Fails();
+    void Test_AssertNotSame_Fails();
     void Test_AssertNotStartsWithIC_Fails();
     void Test_AssertNotStartsWith_DifferentCase_Passes();
     void Test_AssertNotStartsWith_Fails();
     void Test_AssertNull_Fails();
+    void Test_AssertSame_Fails();
     void Test_AssertStartsWithIC_Passes();
     void Test_AssertStartsWith_Fails();
     void Test_AssertTrue_Fails();
@@ -3045,11 +3195,14 @@ private:
     void Test_CheckNotEquals_Fails();
     void Test_CheckNotNear_Fails();
     void Test_CheckNotNull_Fails();
+    void Test_CheckNotSame_Fails();
+    void Test_CheckNotSame_UniquePtrs_Passes();
     void Test_CheckNotStartsWithIC_Fails();
     void Test_CheckNotStartsWith_DifferentCase_Passes();
     void Test_CheckNotStartsWith_Fails();
     void Test_CheckNull_Fails();
     void Test_CheckNull_UniquePtr_Passes();
+    void Test_CheckSame_Fails();
     void Test_CheckStartsWithIC_Passes();
     void Test_CheckStartsWith_Fails();
     void Test_CheckStartsWith_Wide_Passes();
@@ -3099,11 +3252,13 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotEquals_Fails, "AssertNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNear_Fails, "AssertNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotNull_Fails, "AssertNotNull_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertNotSame_Fails, "AssertNotSame_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails, "AssertNotStartsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_DifferentCase_Passes,
         "AssertNotStartsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNotStartsWith_Fails, "AssertNotStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertNull_Fails, "AssertNull_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_AssertSame_Fails, "AssertSame_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWithIC_Passes, "AssertStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_AssertStartsWith_Fails, "AssertStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_AssertTrue_Fails, "AssertTrue_Fails");
@@ -3133,12 +3288,15 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotEquals_Fails, "CheckNotEquals_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNear_Fails, "CheckNotNear_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotNull_Fails, "CheckNotNull_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotSame_Fails, "CheckNotSame_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckNotSame_UniquePtrs_Passes, "CheckNotSame_UniquePtrs_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails, "CheckNotStartsWithIC_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_DifferentCase_Passes,
         "CheckNotStartsWith_DifferentCase_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNotStartsWith_Fails, "CheckNotStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNull_Fails, "CheckNull_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckNull_UniquePtr_Passes, "CheckNull_UniquePtr_Passes");
+    RegisterTest(&TFixture_SourceLocations::Test_CheckSame_Fails, "CheckSame_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWithIC_Passes, "CheckStartsWithIC_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Fails, "CheckStartsWith_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes, "CheckStartsWith_Wide_Passes");
@@ -3286,6 +3444,13 @@ void TFixture_SourceLocations::Test_AssertNotNull_Fails()
     AssertNotNull(nullptr, "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertNotSame_Fails()
+{
+    int value = 0;
+    ExpectedLines["AssertNotSame_Fails"] = __LINE__ + 1;
+    AssertNotSame(&value, &value, "deliberate failure");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertNotStartsWithIC_Fails()
 {
     ExpectedLines["AssertNotStartsWithIC_Fails"] = __LINE__ + 1;
@@ -3308,6 +3473,14 @@ void TFixture_SourceLocations::Test_AssertNull_Fails()
     int value = 0;
     ExpectedLines["AssertNull_Fails"] = __LINE__ + 1;
     AssertNull(&value, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_AssertSame_Fails()
+{
+    int first = 0;
+    int second = 0;
+    ExpectedLines["AssertSame_Fails"] = __LINE__ + 1;
+    AssertSame(&first, &second, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_AssertStartsWithIC_Passes()
@@ -3467,6 +3640,19 @@ void TFixture_SourceLocations::Test_CheckNotNull_Fails()
     CheckNotNull(std::shared_ptr<int>(), "deliberate failure");
 }
 //---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotSame_Fails()
+{
+    int value = 0;
+    ExpectedLines["CheckNotSame_Fails"] = __LINE__ + 1;
+    CheckNotSame(&value, &value, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckNotSame_UniquePtrs_Passes()
+{
+    CheckNotSame(std::make_unique<int>(0), std::make_unique<int>(0),
+        "move-only rvalues forward to the method/line form");
+}
+//---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckNotStartsWithIC_Fails()
 {
     ExpectedLines["CheckNotStartsWithIC_Fails"] = __LINE__ + 1;
@@ -3494,6 +3680,14 @@ void TFixture_SourceLocations::Test_CheckNull_Fails()
 void TFixture_SourceLocations::Test_CheckNull_UniquePtr_Passes()
 {
     CheckNull(std::unique_ptr<int>(), "a move-only rvalue forwards to the method/line overload");
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_CheckSame_Fails()
+{
+    int first = 0;
+    int second = 0;
+    ExpectedLines["CheckSame_Fails"] = __LINE__ + 1;
+    CheckSame(&first, &second, "deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_CheckStartsWithIC_Passes()
@@ -4432,6 +4626,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_ShuffleSeedProducesDeterministicOrder");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests,
         "Run_StopsWhenRunObserverRequests");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Same_ComparesAddressesNotContent,
+        "Same_ComparesAddressesNotContent");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded,
         "SetExceptionExpected_AssertFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
@@ -5494,6 +5690,63 @@ void TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests()
         "the observer was asked before each test, up to and including the one that stopped the run");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Same_ComparesAddressesNotContent()
+{
+    // Arrange
+    TFixture_SameChecks fixture;
+    auto const formatAddress = [](void const* pointer)
+        {
+            std::ostringstream stream;
+            stream << "0x" << std::hex << reinterpret_cast<std::uintptr_t>(pointer);
+            return stream.str();
+        };
+    std::string const first = formatAddress(&fixture.First);
+    std::string const second = formatAddress(&fixture.Second);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(14), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        else
+            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    TTestCaseRecord const* const assertNotSame = FindRecord(results, "AssertNotSame_SameObject_Fails");
+    TTestCaseRecord const* const assertSame = FindRecord(results, "AssertSame_DifferentObjects_Fails");
+    TTestCaseRecord const* const checkNotSame = FindRecord(results, "CheckNotSame_SameObject_Fails");
+    TTestCaseRecord const* const checkSame = FindRecord(results, "CheckSame_DifferentObjects_Fails");
+    AssertTrue(assertNotSame != nullptr && assertSame != nullptr && checkNotSame != nullptr && checkSame != nullptr,
+        __func__, __LINE__, "every expected record exists");
+
+    // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
+    CheckStartsWith(assertNotSame->Message, "Same object: Test_AssertNotSame_SameObject_Fails (", __func__, __LINE__,
+        "AssertNotSame names the test");
+    CheckEndsWith(assertNotSame->Message, "): Expected a different object but both are \"" + first +
+        "\". same object", __func__, __LINE__, "AssertNotSame shows the shared address");
+    CheckStartsWith(assertSame->Message, "Not the same object: Test_AssertSame_DifferentObjects_Fails (", __func__,
+        __LINE__, "AssertSame names the test");
+    CheckEndsWith(assertSame->Message, "): Expected the same object as \"" + first + "\" but was \"" + second +
+        "\". different objects", __func__, __LINE__, "AssertSame shows both addresses");
+    CheckStartsWith(checkNotSame->Message, "Check failed for: \"Test_CheckNotSame_SameObject_Fails\" (", __func__,
+        __LINE__, "CheckNotSame names the test");
+    CheckEndsWith(checkNotSame->Message, "): Expected a different object but both are \"" + first +
+        "\". same object", __func__, __LINE__, "CheckNotSame shows the shared address");
+    CheckStartsWith(checkSame->Message, "Check failed for: \"Test_CheckSame_DifferentObjects_Fails\" (", __func__,
+        __LINE__, "CheckSame names the test");
+    CheckEndsWith(checkSame->Message, "): Expected the same object as \"" + first + "\" but was \"" + second +
+        "\". different objects", __func__, __LINE__, "CheckSame shows both addresses");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded()
 {
     // Arrange
@@ -5610,7 +5863,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(69), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(74), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

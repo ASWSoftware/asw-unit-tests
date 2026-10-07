@@ -235,6 +235,19 @@ TExceptNotNull::TExceptNotNull(std::string const& method, int line, std::string 
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNotSame
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotSame::TExceptNotSame(std::string const& method, int line, std::string const& value, std::string const& msg)
+{
+    m_Message = "Same object: " + method + " (" + std::to_string(line) +
+        "): Expected a different object but both are \"" + value + "\". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotStartsWith
 /////////////////////////////////////////////////////////////////////////////
 
@@ -270,6 +283,20 @@ TExceptOrdering::TExceptOrdering(std::string const& method, int line, std::strin
 {
     m_Message = "Values out of order: " + method + " (" + std::to_string(line) + "): Expected " + value + " to be " +
         relation + " " + bound + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptSame
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptSame::TExceptSame(std::string const& method, int line, std::string const& expected,
+    std::string const& actual, std::string const& msg)
+{
+    m_Message = "Not the same object: " + method + " (" + std::to_string(line) + "): Expected the same object as \"" +
+        expected + "\" but was \"" + actual + "\". " + msg;
 }
 //---------------------------------------------------------------------------
 

@@ -411,6 +411,21 @@ private:
     static std::string RTLTextToUTF8(System::String const& text);
 #endif
 
+    // The address the Same methods (e.g. CheckSame()) compare: a smart pointer's get(), or a raw pointer (or an
+    // array, or a function) as it is.
+    template <typename TValue, typename std::enable_if<
+        std::is_pointer<decltype(std::declval<TValue const&>().get())>::value, int>::type = 0>
+    static auto SameAddress(TValue const& value)
+    {
+        return value.get();
+    }
+    template <typename TValue, typename std::enable_if<
+        std::is_pointer<typename std::decay<TValue const>::type>::value, int>::type = 0>
+    static typename std::decay<TValue const>::type SameAddress(TValue const& value)
+    {
+        return value;
+    }
+
     template <typename T>
     static int ThreeWayCompare(T a, T b)
     {
@@ -815,6 +830,51 @@ protected: // Assertion/Check methods - Null (value compared with nullptr)
         bool const isNull = (value == nullptr);
         if (!isNull)
             SetTestFailedCheck(method, line, "Expected null but was not null: \"" + msg + "\"");
+    }
+
+protected: // Assertion/Check methods - Same (identity, compared by address)
+    // Any two raw pointers, arrays or smart pointers (std::unique_ptr, std::shared_ptr) that point to types that can
+    // be compared with each other, mixed freely. Unlike CheckEquals(), two C strings are compared by address too.
+    template <typename TExpected, typename TActual>
+    using TEnableIfSameComparable = typename std::enable_if<std::is_convertible<
+        decltype(SameAddress(std::declval<TExpected const&>()) == SameAddress(std::declval<TActual const&>())),
+        bool>::value, int>::type;
+
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void AssertNotSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) == SameAddress(actual))
+            throw TExceptNotSame(method, line, FormatPointer(SameAddress(expected)), msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void AssertSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) != SameAddress(actual))
+            throw TExceptSame(method, line, FormatPointer(SameAddress(expected)), FormatPointer(SameAddress(actual)),
+                msg);
+    }
+
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void CheckNotSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) == SameAddress(actual))
+        {
+            SetTestFailedCheck(method, line, "Expected a different object but both are \"" +
+                FormatPointer(SameAddress(expected)) + "\". " + msg);
+        }
+    }
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void CheckSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) != SameAddress(actual))
+        {
+            SetTestFailedCheck(method, line, "Expected the same object as \"" + FormatPointer(SameAddress(expected)) +
+                "\" but was \"" + FormatPointer(SameAddress(actual)) + "\". " + msg);
+        }
     }
 
 protected: // Assertion/Check methods - Contains (substring)
@@ -1345,6 +1405,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TExpected, typename TActual>
+    void AssertNotSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TPrefix>
     void AssertNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1363,6 +1430,13 @@ protected: // Assertion/Check methods - std::source_location
     void AssertNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void AssertStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
@@ -1519,6 +1593,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
+    template <typename TExpected, typename TActual>
+    void CheckNotSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TPrefix>
     void CheckNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1537,6 +1618,13 @@ protected: // Assertion/Check methods - std::source_location
     void CheckNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void CheckStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,

@@ -11,7 +11,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Near`/`NotNear`,
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Near`/`NotNear`,
   `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their
   `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith`
   methods.
@@ -541,6 +541,15 @@ CheckEquals(expectedWidget, list.Find("button"), __func__, __LINE__, "finds the 
 ```
 
 Comparing two pointers to unrelated types (e.g. `int*` and `long*`) is a compile error.
+
+`CheckSame`/`AssertSame` and `CheckNotSame`/`AssertNotSame` check that two values do or don't point to the same
+object. They take raw pointers, arrays, and smart pointers (`std::unique_ptr`, `std::shared_ptr`), in any mix, and
+compare C strings by address too, unlike `CheckEquals`:
+
+```
+CheckSame(buffer, Trim(buffer), __func__, __LINE__, "trims in place, returning the same buffer");
+CheckSame(cache.Get("a"), cache.Get("a"), __func__, __LINE__, "both calls return the one shared_ptr object");
+```
 
 ### Comparing Strings, Ignoring Case
 
