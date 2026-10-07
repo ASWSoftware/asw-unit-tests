@@ -249,6 +249,19 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptFail
+//
+// Thrown by TTestGroupBase::Fail() to abort the current test and have it
+// reported as failed.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptFail : public TTestException
+{
+public:
+    TExceptFail(std::string const& method, int line, std::string const& msg);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptSkipped
 //
 // Thrown by TTestGroupBase::Skip() to abort the current test and have it

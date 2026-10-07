@@ -1859,6 +1859,64 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_FailCalls
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling Fail(), so Test_Fail_AbortsTestAsFailed
+// below can check it fails the test, stops it (ReachedAfterFail stays false), still fails while an exception is
+// expected, and keeps an earlier Check failure in the record. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_FailCalls : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_Fail_AfterCheckFailure_Fails();
+    void Test_Fail_Fails();
+    void Test_Fail_WhileExceptionExpected_Fails();
+
+public:
+    bool ReachedAfterFail = false;
+
+    TFixture_FailCalls();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_FailCalls::TFixture_FailCalls()
+    : inherited("Fixture_FailCalls")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_FailCalls::Test_Fail_AfterCheckFailure_Fails, "Fail_AfterCheckFailure_Fails");
+    RegisterTest(&TFixture_FailCalls::Test_Fail_Fails, "Fail_Fails");
+    RegisterTest(&TFixture_FailCalls::Test_Fail_WhileExceptionExpected_Fails, "Fail_WhileExceptionExpected_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_FailCalls::Test_Fail_AfterCheckFailure_Fails()
+{
+    CheckTrue(false, __func__, __LINE__, "earlier check failure");
+    Fail(__func__, __LINE__, "then an unconditional failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_FailCalls::Test_Fail_Fails()
+{
+    Fail(__func__, __LINE__, "unconditional failure");
+    ReachedAfterFail = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_FailCalls::Test_Fail_WhileExceptionExpected_Fails()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "any exception");
+    Fail(__func__, __LINE__, "not the exception the test expects");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_IntegerComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
@@ -3208,6 +3266,7 @@ private:
     void Test_CheckStartsWith_Wide_Passes();
     void Test_CheckTrue_Fails();
     void Test_CheckTrue_ThroughHelper_Fails();
+    void Test_Fail_Fails();
     void Test_SetExceptionExpected_Bool_NoneThrown_Fails();
     void Test_SetExceptionExpected_Bool_Passes();
     void Test_SetExceptionExpected_TypeAndMessage_Passes();
@@ -3302,6 +3361,7 @@ TFixture_SourceLocations::TFixture_SourceLocations()
     RegisterTest(&TFixture_SourceLocations::Test_CheckStartsWith_Wide_Passes, "CheckStartsWith_Wide_Passes");
     RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_Fails, "CheckTrue_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails, "CheckTrue_ThroughHelper_Fails");
+    RegisterTest(&TFixture_SourceLocations::Test_Fail_Fails, "Fail_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails,
         "SetExceptionExpected_Bool_NoneThrown_Fails");
     RegisterTest(&TFixture_SourceLocations::Test_SetExceptionExpected_Bool_Passes,
@@ -3716,6 +3776,12 @@ void TFixture_SourceLocations::Test_CheckTrue_ThroughHelper_Fails()
 {
     ExpectedLines["CheckTrue_ThroughHelper_Fails"] = __LINE__ + 1;
     CheckIsEven(3);
+}
+//---------------------------------------------------------------------------
+void TFixture_SourceLocations::Test_Fail_Fails()
+{
+    ExpectedLines["Fail_Fails"] = __LINE__ + 1;
+    Fail("deliberate failure");
 }
 //---------------------------------------------------------------------------
 void TFixture_SourceLocations::Test_SetExceptionExpected_Bool_NoneThrown_Fails()
@@ -4600,6 +4666,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsBoolValuesAsTrueOrFalse,
         "Equals_ShowsBoolValuesAsTrueOrFalse");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues, "Equals_ShowsStringValues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed, "Fail_AbortsTestAsFailed");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
         "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
@@ -5214,6 +5281,39 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
         CheckStartsWith(record->Message, prefix, __func__, __LINE__, expected.first + " names the test");
         CheckEndsWith(record->Message, expected.second, __func__, __LINE__, expected.first + " shows the values");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed()
+{
+    // Arrange
+    TFixture_FailCalls fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(3), results.CaseRecords.size(), __func__, __LINE__,
+        "one record per registered test");
+    CheckEquals(3u, results.FailedCount, __func__, __LINE__, "every test fails");
+    CheckFalse(fixture.ReachedAfterFail, __func__, __LINE__, "Fail aborts the test");
+
+    TTestCaseRecord const* const fail = FindRecord(results, "Fail_Fails");
+    TTestCaseRecord const* const afterCheck = FindRecord(results, "Fail_AfterCheckFailure_Fails");
+    TTestCaseRecord const* const whileExpected = FindRecord(results, "Fail_WhileExceptionExpected_Fails");
+    AssertTrue(fail != nullptr && afterCheck != nullptr && whileExpected != nullptr, __func__, __LINE__,
+        "every expected record exists");
+
+    // The message is "Failed: <method> (<line>): <msg>"; the line varies, so the parts either side of it are checked.
+    CheckTrue(fail->Outcome == TTestOutcome::Fail, __func__, __LINE__, "Fail fails the test");
+    CheckStartsWith(fail->Message, "Failed: Test_Fail_Fails (", __func__, __LINE__, "Fail names the test");
+    CheckEndsWith(fail->Message, "): unconditional failure", __func__, __LINE__, "Fail shows the message");
+    CheckStartsWith(afterCheck->Message, "Check failed for: \"Test_Fail_AfterCheckFailure_Fails\" (", __func__,
+        __LINE__, "the earlier check failure comes first");
+    CheckEndsWith(afterCheck->Message, "): then an unconditional failure", __func__, __LINE__,
+        "followed by the Fail message");
+    CheckStartsWith(whileExpected->Message, "Failed: Test_Fail_WhileExceptionExpected_Fails (", __func__, __LINE__,
+        "Fail isn't taken as the expected exception");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue()
@@ -5863,7 +5963,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(74), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(75), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)

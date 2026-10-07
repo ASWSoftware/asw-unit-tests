@@ -23,6 +23,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   optional check of the exception's type and message.
 - **[Parameterized tests](#parameterized-tests)** - `RegisterTestCases()` registers one named test case per row of
   data.
+- **[Failing tests](#failing-a-test)** - `Fail()` fails a test unconditionally, e.g. on a code path it should never
+  reach.
 - **[Skipping tests](#skipping-a-test)** - `Skip()` reports a test as skipped, unconditionally or after a runtime
   check.
 - **Setup and teardown hooks** - `SetUp_Group()`/`TearDown_Group()` run around each group, and
@@ -669,6 +671,20 @@ CheckNull(factory.Find("missing"), __func__, __LINE__, "no widget has that name"
 ```
 
 A C string is checked as a pointer, so an empty string such as `""` is not null.
+
+### Failing a Test
+
+Call `Fail(method, line, msg)` to fail the current test unconditionally, e.g. on a code path the test should never
+reach. Like an `Assert*` method, it aborts the test, and it fails it even while an exception is expected:
+
+```
+switch (shape.Kind())
+{
+    case TShapeKind::Circle: CheckNear(3.14159, shape.Area(), 0.0001, __func__, __LINE__, "unit circle"); break;
+    case TShapeKind::Square: CheckNear(1.0, shape.Area(), 0.0001, __func__, __LINE__, "unit square"); break;
+    default: Fail(__func__, __LINE__, "unexpected shape kind");
+}
+```
 
 ### Skipping a Test
 

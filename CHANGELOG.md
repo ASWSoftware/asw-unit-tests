@@ -23,6 +23,10 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   pointers, arrays, and smart pointers (`std::unique_ptr`, `std::shared_ptr`)
   in any mix, and compare C strings by address, not content. A failure shows
   the addresses.
+- `Fail()`, which fails the current test unconditionally, with a message, in
+  place of `AssertTrue(false, ...)`. Like an `Assert*` method, it aborts the
+  test, and it fails the test even while an exception is expected. It throws
+  the new `TExceptFail`.
 
 ### Fixed
 

@@ -1244,6 +1244,11 @@ bool TTestGroupBase::ExceptionTypeExpected() const
     return m_ExpectedExceptionTypeChecker != nullptr;
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::Fail(std::string const& method, int line, std::string const& msg)
+{
+    throw TExceptFail(method, line, msg);
+}
+//---------------------------------------------------------------------------
 std::string TTestGroupBase::FormatAddress(std::uintptr_t address)
 {
     std::ostringstream stream;

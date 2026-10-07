@@ -454,6 +454,10 @@ protected:
     // requires a specific exception type, rather than accepting any thrown exception.
     virtual bool ExceptionTypeExpected() const;
 
+    // Aborts the current test and reports it as failed, like a failed Assert* method, even while an exception is
+    // expected.
+    virtual void Fail(std::string const& method, int line, std::string const& msg);
+
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
 
@@ -1645,6 +1649,10 @@ protected: // Assertion/Check methods - std::source_location
         CheckTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
     }
 
+    void Fail(std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        Fail(loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void SetExceptionExpected(bool expected, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {
