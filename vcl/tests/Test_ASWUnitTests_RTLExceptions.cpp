@@ -356,7 +356,7 @@ void TTest_ASWUnitTests_RTLExceptions::CheckFixtureOutcomes(std::optional<unsign
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, method, line, record.TestName + " should fail");
         else
-            AssertTrue(false, method, line, record.TestName + " name must end with _Passes or _Fails");
+            Fail(method, line, record.TestName + " name must end with _Passes or _Fails");
     }
 }
 //---------------------------------------------------------------------------

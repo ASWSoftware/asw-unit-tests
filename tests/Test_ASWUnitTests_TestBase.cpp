@@ -4757,7 +4757,7 @@ void TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 }
 //---------------------------------------------------------------------------
@@ -4793,7 +4793,7 @@ void TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContainsIC_Absent_Fails");
@@ -4849,7 +4849,7 @@ void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertContains = FindRecord(results, "AssertContains_Absent_Fails");
@@ -4905,7 +4905,7 @@ void TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertEndsWith = FindRecord(results, "AssertEndsWithIC_Absent_Fails");
@@ -4977,7 +4977,7 @@ void TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertEndsWith = FindRecord(results, "AssertEndsWith_Absent_Fails");
@@ -5051,7 +5051,7 @@ void TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEqualsIC_DifferentText_Fails");
@@ -5108,7 +5108,7 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertNull = FindRecord(results, "AssertEquals_NullAndNonNull_Fails");
@@ -5140,7 +5140,7 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const unsignedMax = FindRecord(results, "CheckEquals_NegativeAndUnsignedMax_Fails");
@@ -5181,7 +5181,7 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesPointersByAddress()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertEquals = FindRecord(results, "AssertEquals_DifferentPointers_Fails");
@@ -5336,7 +5336,7 @@ void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue(
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertNotNull = FindRecord(results, "AssertNotNull_Null_Fails");
@@ -5382,7 +5382,7 @@ void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked.
@@ -5818,7 +5818,7 @@ void TTest_ASWUnitTests_TestBase::Test_Same_ComparesAddressesNotContent()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertNotSame = FindRecord(results, "AssertNotSame_SameObject_Fails");
@@ -5922,7 +5922,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 }
 //---------------------------------------------------------------------------
@@ -5979,7 +5979,7 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
         else if (NameEndsWith(record.TestName, "_Skips"))
             CheckTrue(record.Outcome == TTestOutcome::Skip, __func__, __LINE__, record.TestName + " should skip");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes, _Fails or _Skips");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes, _Fails or _Skips");
 
         // function_name() is compiler-specific (e.g. "void NS::TClass::Test_X()" on GCC), but always contains the
         // function's own name.
@@ -6019,7 +6019,7 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertStartsWith = FindRecord(results, "AssertStartsWithIC_Absent_Fails");
@@ -6094,7 +6094,7 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertStartsWith = FindRecord(results, "AssertStartsWith_Absent_Fails");
@@ -6171,7 +6171,7 @@ void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()
         else if (NameEndsWith(record.TestName, "_Fails"))
             CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 
     TTestCaseRecord const* const assertFalse = FindRecord(results, "AssertFalse_True_Fails");
