@@ -92,7 +92,7 @@ void TTest_ASWUnitTests_GUI_Strings::Test_ToUTF8_ConvertsNonASCII()
 
     // Assert
     CheckEquals(std::string("caf\xC3\xA9"), utf8, __func__, __LINE__, "U+00E9 becomes its two UTF-8 bytes");
-    CheckTrue(ToUTF8(System::UnicodeString()).empty(), __func__, __LINE__, "an empty string stays empty");
+    CheckEmpty(ToUTF8(System::UnicodeString()), __func__, __LINE__, "an empty string stays empty");
 }
 //---------------------------------------------------------------------------
 

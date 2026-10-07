@@ -6249,10 +6249,10 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetai
     CheckLessThan(checkThenAssert->Message.find(checkFailure), checkThenAssert->Message.find(assertFailure), __func__,
         __LINE__, "in the order they happened");
 
-    CheckFalse(failViaAssert->Message.empty(), __func__, __LINE__, "an Assert failure still records its message");
+    CheckNotEmpty(failViaAssert->Message, __func__, __LINE__, "an Assert failure still records its message");
     CheckNotContains(failViaAssert->Message, "Check failed for", __func__, __LINE__,
         "a test with no Check failures gets none in its detail");
-    CheckTrue(pass->Message.empty(), __func__, __LINE__, "a passing test's detail stays empty");
+    CheckEmpty(pass->Message, __func__, __LINE__, "a passing test's detail stays empty");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
@@ -6325,7 +6325,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()
 
     CheckContains(observer.LogText(), "Running test: Fixture_MixedOutcomes.Pass", __func__, __LINE__,
         "the group's log output goes to the observer");
-    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "and none of it goes to std::cout");
+    CheckEmpty(consoleOutput, __func__, __LINE__, "and none of it goes to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
 //---------------------------------------------------------------------------
@@ -6614,8 +6614,8 @@ void TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput()
     }
 
     // Assert
-    CheckFalse(verboseOutput.empty(), __func__, __LINE__, "an unsuppressed fixture logs its test run as usual");
-    CheckTrue(suppressedOutput.empty(), __func__, __LINE__,
+    CheckNotEmpty(verboseOutput, __func__, __LINE__, "an unsuppressed fixture logs its test run as usual");
+    CheckEmpty(suppressedOutput, __func__, __LINE__,
         "SetLogSuppressed(true) silences the fixture's own Log()/LogAppend()");
 }
 //---------------------------------------------------------------------------

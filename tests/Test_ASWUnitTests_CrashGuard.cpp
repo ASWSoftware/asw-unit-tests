@@ -161,7 +161,7 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbo
     CheckTrue(result.ShouldAbortRun, __func__, __LINE__,
         "POSIX can't tell this apart from a stack overflow, so it conservatively forces an abort");
 #endif
-    CheckFalse(result.Description.empty(), __func__, __LINE__, "a human-readable description is filled in");
+    CheckNotEmpty(result.Description, __func__, __LINE__, "a human-readable description is filled in");
 }
 //---------------------------------------------------------------------------
 /*
