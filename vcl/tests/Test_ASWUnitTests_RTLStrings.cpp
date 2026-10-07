@@ -707,13 +707,17 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
     {
         if (NameEndsWith(record.TestName, "_Passes"))
         {
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__,
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__,
                 record.TestName + " should pass: " + record.Message);
         }
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        }
         else
+        {
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
     }
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The

@@ -5145,9 +5145,9 @@ void TTest_ASWUnitTests_TestBase::Test_CheckNear_ToleranceBoundaryIsInclusive()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5181,9 +5181,9 @@ void TTest_ASWUnitTests_TestBase::Test_ContainsIC_IgnoresASCIICaseOnly()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5237,9 +5237,9 @@ void TTest_ASWUnitTests_TestBase::Test_Contains_ShowsTextAndSubstring()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5293,9 +5293,9 @@ void TTest_ASWUnitTests_TestBase::Test_EndsWithIC_IgnoresASCIICaseOnly()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5365,9 +5365,9 @@ void TTest_ASWUnitTests_TestBase::Test_EndsWith_ShowsTextAndSuffix()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5439,9 +5439,9 @@ void TTest_ASWUnitTests_TestBase::Test_EqualsIC_IgnoresASCIICaseOnly()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5496,9 +5496,9 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesCStringsByContent()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5529,9 +5529,9 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesEnumClassByUnderlyingValue
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5571,9 +5571,9 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesMixedIntegerTypesByValue()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5612,9 +5612,9 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ComparesPointersByAddress()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5705,7 +5705,7 @@ void TTest_ASWUnitTests_TestBase::Test_Equals_ShowsStringValues()
     {
         TTestCaseRecord const* const record = FindRecord(results, expected.first);
         AssertNotNull(record, __func__, __LINE__, expected.first + " has a record");
-        CheckTrue(record->Outcome == TTestOutcome::Fail, __func__, __LINE__, expected.first + " should fail");
+        CheckEquals(TTestOutcome::Fail, record->Outcome, __func__, __LINE__, expected.first + " should fail");
 
         std::string prefix = "Check failed for: \"Test_" + expected.first + "\" (";
         if (expected.first.compare(0, 12, "AssertEquals") == 0)
@@ -5740,7 +5740,7 @@ void TTest_ASWUnitTests_TestBase::Test_Fail_AbortsTestAsFailed()
         "every expected record exists");
 
     // The message is "Failed: <method> (<line>): <msg>"; the line varies, so the parts either side of it are checked.
-    CheckTrue(fail->Outcome == TTestOutcome::Fail, __func__, __LINE__, "Fail fails the test");
+    CheckEquals(TTestOutcome::Fail, fail->Outcome, __func__, __LINE__, "Fail fails the test");
     CheckStartsWith(fail->Message, "Failed: Test_Fail_Fails (", __func__, __LINE__, "Fail names the test");
     CheckEndsWith(fail->Message, "): unconditional failure", __func__, __LINE__, "Fail shows the message");
     CheckStartsWith(afterCheck->Message, "Check failed for: \"Test_Fail_AfterCheckFailure_Fails\" (", __func__,
@@ -5767,9 +5767,9 @@ void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue(
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5813,9 +5813,9 @@ void TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -5875,7 +5875,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AbandonsHungTestAndAbortsGroupOnTimeo
     TTestCaseRecord const& record = results.CaseRecords.front();
     CheckEquals(std::string("HangsForever"), record.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually timed out");
-    CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
+    CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, "recorded as Fail, not Skip");
     CheckContains(record.Message, "timeout", __func__, __LINE__,
         "the failure message explains why: it exceeded its timeout");
 }
@@ -5950,7 +5950,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
     TTestCaseRecord const& crashedRecord = results.CaseRecords.front();
     CheckEquals(std::string("CrashesButDoesNotAbort"), crashedRecord.TestName, __func__, __LINE__,
         "the synthetic record names the test that actually crashed");
-    CheckTrue(crashedRecord.Outcome == TTestOutcome::Fail, __func__, __LINE__, "recorded as Fail, not Skip");
+    CheckEquals(TTestOutcome::Fail, crashedRecord.Outcome, __func__, __LINE__, "recorded as Fail, not Skip");
     CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
@@ -6044,15 +6044,15 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
     {
         if (record.TestName == "Pass")
         {
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, "Pass recorded as Pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, "Pass recorded as Pass");
         }
         else if (record.TestName == "Skip")
         {
-            CheckTrue(record.Outcome == TTestOutcome::Skip, __func__, __LINE__, "Skip recorded as Skip");
+            CheckEquals(TTestOutcome::Skip, record.Outcome, __func__, __LINE__, "Skip recorded as Skip");
         }
         else
         {
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " recorded as Fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " recorded as Fail");
         }
     }
 }
@@ -6141,7 +6141,7 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver()
         "the timed-out test is reported even though an exception ended the run");
     CheckEquals(std::string("HangsForever"), observer.FinishedRecords.front().TestName, __func__, __LINE__,
         "the report names the test that timed out");
-    CheckTrue(observer.FinishedRecords.front().Outcome == TTestOutcome::Fail, __func__, __LINE__,
+    CheckEquals(TTestOutcome::Fail, observer.FinishedRecords.front().Outcome, __func__, __LINE__,
         "and records it as failed");
 }
 //---------------------------------------------------------------------------
@@ -6249,9 +6249,9 @@ void TTest_ASWUnitTests_TestBase::Test_Same_ComparesAddressesNotContent()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -6301,7 +6301,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_AssertFailureStillFa
             continue;
 
         ++assertFailedTests;
-        CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
+        CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " fails");
         CheckContains(record.Message, "deliberate Assert failure while an exception is expected", __func__, __LINE__,
             record.TestName + "'s record carries its Assert failure");
     }
@@ -6329,7 +6329,7 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureS
             continue;
 
         ++checkFailedTests;
-        CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " fails");
+        CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " fails");
         CheckContains(record.Message, "deliberate Check failure before the expected exception", __func__, __LINE__,
             record.TestName + "'s record carries its Check failure");
     }
@@ -6353,9 +6353,9 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessag
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -6405,14 +6405,14 @@ void TTest_ASWUnitTests_TestBase::Test_SourceLocation_ReportsCallerFunctionAndLi
     {
         if (NameEndsWith(record.TestName, "_Passes"))
         {
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
             continue;
         }
 
         if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else if (NameEndsWith(record.TestName, "_Skips"))
-            CheckTrue(record.Outcome == TTestOutcome::Skip, __func__, __LINE__, record.TestName + " should skip");
+            CheckEquals(TTestOutcome::Skip, record.Outcome, __func__, __LINE__, record.TestName + " should skip");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes, _Fails or _Skips");
 
@@ -6450,9 +6450,9 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -6525,9 +6525,9 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -6603,9 +6603,9 @@ void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -6661,9 +6661,9 @@ void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass");
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }

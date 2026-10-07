@@ -472,9 +472,9 @@ void TTest_ASWUnitTests_RTLExceptions::CheckFixtureOutcomes(std::optional<unsign
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, method, line, record.TestName + " should pass: " + record.Message);
+            CheckEquals(TTestOutcome::Pass, record.Outcome, method, line, record.TestName + " should pass: " + record.Message);
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, method, line, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, method, line, record.TestName + " should fail");
         else
             Fail(method, line, record.TestName + " name must end with _Passes or _Fails");
     }
@@ -647,10 +647,9 @@ void TTest_ASWUnitTests_RTLExceptions::Test_Throws_MatchesRTLTypeAndMessage()
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__, record.TestName + " should pass: " +
-                record.Message);
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass: " + record.Message);
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
