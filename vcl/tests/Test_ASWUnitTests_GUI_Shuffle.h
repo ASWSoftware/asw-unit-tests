@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_Handler.h
+Test_ASWUnitTests_GUI_Shuffle.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,8 +19,8 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_HandlerH
-#define Test_ASWUnitTests_HandlerH
+#ifndef Test_ASWUnitTests_GUI_ShuffleH
+#define Test_ASWUnitTests_GUI_ShuffleH
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
@@ -29,25 +29,32 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_Handler
+// TTest_ASWUnitTests_GUI_Shuffle
+//
+// Exercises the VCL GUI runner's shuffle state
+// (vcl/gui/src/ASWUnitTests_GUI_Shuffle.h). Listed in both vcl/ projects,
+// so it also runs from the VCL console runner.
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_Handler : public TTestGroupBase
+class TTest_ASWUnitTests_GUI_Shuffle : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
-    void Test_GetTests_MatchesGetAllTestFullNames();
-    void Test_Run_ShuffleKeepsOrderWhenFiltered();
-    void Test_SetRunObserver_ReceivesInitializeAndRunOutput();
-    void Test_SetRunObserver_StopsBetweenGroups();
-    void Test_WildcardMatch_CaseSensitivity();
-    void Test_WildcardMatch_ExactAndStar();
-    void Test_WildcardMatch_QuestionMark();
+    void Test_ApplyCommandLine_SeedTurnsShufflingOn();
+    void Test_ApplySeedChoice_FixedSeed();
+    void Test_ApplySeedChoice_NewSeedEachRun();
+    void Test_ApplySeedChoice_RejectsInvalidSeed();
+    void Test_NextRunSeed_FixedSeedRepeats();
+    void Test_NextRunSeed_NewSeedEachRun();
+    void Test_NextRunSeed_OffReturnsNothing();
+    void Test_SeedToShow_PrefersFixedThenLastSeed();
+    void Test_SetEnabled_KeepsSeeds();
+    void Test_StatusText_DescribesState();
 
 public:
-    TTest_ASWUnitTests_Handler();
-    ~TTest_ASWUnitTests_Handler() override;
+    TTest_ASWUnitTests_GUI_Shuffle();
+    ~TTest_ASWUnitTests_GUI_Shuffle() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -58,4 +65,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_HandlerH
+#endif // #ifndef Test_ASWUnitTests_GUI_ShuffleH

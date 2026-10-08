@@ -267,6 +267,14 @@
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>25</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_Utils.cpp">
+            <DependentOn>..\..\..\tests\Test_ASWUnitTests_Utils.h</DependentOn>
+            <BuildOrder>42</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_Version.cpp">
+            <DependentOn>..\..\..\tests\Test_ASWUnitTests_Version.h</DependentOn>
+            <BuildOrder>43</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\..\..\toTest\ASWTools_Random.h</DependentOn>
             <BuildOrder>26</BuildOrder>
@@ -304,6 +312,14 @@
             <DependentOn>..\src\ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>35</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\src\ASWUnitTests_GUI_Shuffle.h</DependentOn>
+            <BuildOrder>39</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_GUI_ShuffleSeedDialog.cpp">
+            <DependentOn>..\src\ASWUnitTests_GUI_ShuffleSeedDialog.h</DependentOn>
+            <BuildOrder>40</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\src\ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>4</BuildOrder>
@@ -331,6 +347,10 @@
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Selection.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>36</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Shuffle.h</DependentOn>
+            <BuildOrder>41</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Strings.h</DependentOn>

@@ -198,7 +198,9 @@ enabled and, if so, the seed in use.
 default (see [Registering Tests](#registering-tests)) is for readable, reproducible output day-to-day, while
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
-reproduce it exactly while debugging.
+reproduce it exactly while debugging. A seed gives the same order with every compiler and platform, and adding
+`--filter` keeps the matching tests in the order that seed gives the full suite, so you can narrow the rerun down
+to the tests involved.
 
 `--partition-index`/`--partition-count` split the suite for parallel execution across separate OS processes.
 Each invocation still runs single-threaded and writes to its own console/JUnit output. Partitioning is by each
@@ -311,6 +313,12 @@ The toolbar, whose commands are also in the Run and Tests menus:
 for when `--report-junit` wasn't given, or to keep a copy. The Help menu shows the command line options (the same
 text as `--help`) and the framework version.
 
+**Options > Run in Shuffled Order** runs the groups, and each group's tests, in a random order, like `--shuffle`.
+**Options > Shuffle Seed...** chooses between a new random seed for each run and one seed for every run, like
+`--shuffle-seed`, and clicking OK also turns shuffling on. The status bar shows the seed: the one every run uses, or
+the latest run's. Shuffle Seed... offers that seed, so choosing it reruns tests in the same order, Run Failed included,
+to track down a failure that depends on the order. Both settings start from the command line and aren't saved.
+
 When the window closes, it saves its size, position, maximized state, and panel sizes to
 `%APPDATA%\ASWUnitTests\<exe name>.ini`, and restores them the next time it opens. A position on a monitor that's no
 longer connected is ignored. An `--exit` run doesn't save the layout. **View > Reset Layout** restores the default
@@ -338,6 +346,7 @@ The GUI takes the same [command line options](#command-line-options) as the cons
   saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
   unchecked, since the box ignores case and matches anywhere in the name).
 - `--project-name` is also shown in the window's caption.
+- `--shuffle` and `--shuffle-seed` set the Options menu's shuffle settings, which can then be changed.
 - `--report-junit` writes the report after every run, including Run Failed.
 - `--list`, `--pause`, and the color options are ignored, with a note in the log.
 - `--help`, `--version`, and argument errors are shown in a dialog, and the GUI then exits without opening.

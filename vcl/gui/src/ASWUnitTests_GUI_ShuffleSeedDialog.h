@@ -1,6 +1,8 @@
 /* **************************************************************************
-Test_ASWUnitTests_Handler.h
+ASWUnitTests_GUI_ShuffleSeedDialog.h
 Author: Anthony S. West - ASW Software
+
+The VCL GUI runner's Options > Shuffle Seed... dialog.
 
 Copyright 2026 ASW Software
 
@@ -19,43 +21,21 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_HandlerH
-#define Test_ASWUnitTests_HandlerH
+#ifndef ASWUnitTests_GUI_ShuffleSeedDialogH
+#define ASWUnitTests_GUI_ShuffleSeedDialogH
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_TestBase.h"
+#include "ASWUnitTests_GUI_Shuffle.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
 
-/////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_Handler
-/////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_Handler : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private: // Test methods
-    void Test_GetTests_MatchesGetAllTestFullNames();
-    void Test_Run_ShuffleKeepsOrderWhenFiltered();
-    void Test_SetRunObserver_ReceivesInitializeAndRunOutput();
-    void Test_SetRunObserver_StopsBetweenGroups();
-    void Test_WildcardMatch_CaseSensitivity();
-    void Test_WildcardMatch_ExactAndStar();
-    void Test_WildcardMatch_QuestionMark();
-
-public:
-    TTest_ASWUnitTests_Handler();
-    ~TTest_ASWUnitTests_Handler() override;
-
-    void SetUp_Group() override;
-    void SetUp_Test(ITestCase& testCase) override;
-    void TearDown_Group() override;
-    void TearDown_Test(ITestCase& testCase) override;
-};
+// Shows a modal dialog for choosing between a new random seed for each shuffled run and one seed for every run,
+// starting from 'shuffle's current choice. Clicking OK applies the choice to 'shuffle', which also turns
+// shuffling on, and returns true; Cancel changes nothing and returns false.
+bool ShowShuffleSeedDialog(TGUIShuffle& shuffle);
 
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_HandlerH
+#endif // #ifndef ASWUnitTests_GUI_ShuffleSeedDialogH
