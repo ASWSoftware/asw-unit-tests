@@ -59,6 +59,18 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   failure shows the offset of the first differing byte and up to 16 bytes from
   there, in hex.
 
+### Changed
+
+- A `--shuffle-seed` now gives the same run order with every compiler and
+  standard library, so a seed logged by one build (e.g. MSVC on Windows)
+  reproduces the order with another (e.g. GCC on Linux). As a result, a seed
+  from an earlier version gives a different order than it did; to reproduce an
+  order from an earlier version, rerun that version.
+- With `--shuffle`, a filtered run (`--filter`, or a partition) keeps the order
+  the same seed gives the full suite, so rerunning just the tests involved in
+  an order-dependent failure, with the logged seed, runs them in the same order.
+  Before, the groups that matched were reshuffled among themselves.
+
 ### Fixed
 
 - `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` given

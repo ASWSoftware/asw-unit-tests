@@ -22,11 +22,22 @@ limitations under the License.
 #ifndef ASWUnitTests_UtilsH
 #define ASWUnitTests_UtilsH
 //---------------------------------------------------------------------------
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+// Returns the 32-bit FNV-1a hash of 'text''s bytes. Unlike std::hash, the result is the same with every compiler
+// and standard library.
+uint32_t FNV1aHash(std::string const& text);
+
+// Returns the indices 0 to 'count' - 1 in a random order determined entirely by 'seed'. Unlike std::shuffle, a
+// given seed gives the same order with every compiler and standard library. 'count' must fit in 32 bits.
+std::vector<std::size_t> ShuffledIndices(std::size_t count, unsigned int seed);
 
 // Converts wide text to UTF-8, reading it as UTF-16 where wchar_t is 16 bits (Windows) and as UTF-32 where it's
 // 32 bits (Linux). Anything that isn't a valid code point, such as an unpaired surrogate, becomes U+FFFD, the

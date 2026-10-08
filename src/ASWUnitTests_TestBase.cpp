@@ -34,7 +34,6 @@ limitations under the License.
 #include <limits>
 #include <locale>
 #include <memory>
-#include <random>
 #include <regex>
 #include <sstream>
 #include <thread>
@@ -1722,6 +1721,8 @@ TTestResults const& TTestGroupBase::Results() const
 
     'shuffleSeed', when set, runs this group's tests in a shuffled order derived from it (see
     TTestHandler::Run() for how the seed is chosen/derived); otherwise tests run in registration order.
+    Every test is shuffled before 'filter' is applied, so a filtered run keeps the relative order the
+    same seed gives an unfiltered one.
 
     'testTimeoutSeconds', when set, aborts the run (see RunWithTimeout()/ReportTimedOutTest()) if any
     single test does not finish within that many seconds. 'catchCrashes' additionally protects each
@@ -1742,14 +1743,18 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
 
     m_Results = TTestResults();
 
-    std::vector<size_t> order(m_TestCallbacks.size());
-    for (size_t i = 0; i < order.size(); ++i)
-        order[i] = i;
+    std::vector<size_t> order;
 
     if (shuffleSeed.has_value())
     {
-        std::mt19937 rng(*shuffleSeed);
-        std::shuffle(order.begin(), order.end(), rng);
+        order = ShuffledIndices(m_TestCallbacks.size(), *shuffleSeed);
+    }
+    else
+    {
+        order.resize(m_TestCallbacks.size());
+
+        for (size_t i = 0; i < order.size(); ++i)
+            order[i] = i;
     }
 
     for (size_t index : order)

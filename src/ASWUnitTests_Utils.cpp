@@ -26,6 +26,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <cstddef>
 #include <cstdint>
+#include <random>
+#include <utility>
 //---------------------------------------------------------------------------
 
 namespace
@@ -82,6 +84,51 @@ bool IsLowSurrogate(uint32_t codeUnit)
 namespace ASWUnitTests
 {
 
+//---------------------------------------------------------------------------
+uint32_t FNV1aHash(std::string const& text)
+{
+    uint32_t hash = 0x811C9DC5; // FNV offset basis
+
+    for (char c : text)
+    {
+        hash ^= static_cast<unsigned char>(c);
+        hash *= 0x01000193; // FNV prime
+    }
+
+    return hash;
+}
+//---------------------------------------------------------------------------
+/*
+    ShuffledIndices
+
+    A Fisher-Yates shuffle driven by std::mt19937, whose output the C++ standard fully specifies. std::shuffle and
+    std::uniform_int_distribution aren't used, since how they turn that output into positions is left to each
+    standard library. Each position is instead drawn by rejection sampling, which also keeps it unbiased.
+*/
+std::vector<std::size_t> ShuffledIndices(std::size_t count, unsigned int seed)
+{
+    std::vector<std::size_t> indices(count);
+
+    for (std::size_t i = 0; i < count; ++i)
+        indices[i] = i;
+
+    std::mt19937 rng(seed);
+
+    for (std::size_t i = count; i > 1; --i)
+    {
+        // Draws a position in [0, i). A draw below 2^32 mod i is rejected, so each position is equally likely.
+        uint32_t const bound = static_cast<uint32_t>(i);
+        uint32_t const rejectBelow = static_cast<uint32_t>(0u - bound) % bound;
+        uint32_t draw = static_cast<uint32_t>(rng());
+
+        while (draw < rejectBelow)
+            draw = static_cast<uint32_t>(rng());
+
+        std::swap(indices[i - 1], indices[draw % bound]);
+    }
+
+    return indices;
+}
 //---------------------------------------------------------------------------
 std::string WideToUTF8(std::wstring const& text)
 {

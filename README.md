@@ -198,7 +198,9 @@ enabled and, if so, the seed in use.
 default (see [Registering Tests](#registering-tests)) is for readable, reproducible output day-to-day, while
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
-reproduce it exactly while debugging.
+reproduce it exactly while debugging. A seed gives the same order with every compiler and platform, and adding
+`--filter` keeps the matching tests in the order that seed gives the full suite, so you can narrow the rerun down
+to the tests involved.
 
 `--partition-index`/`--partition-count` split the suite for parallel execution across separate OS processes.
 Each invocation still runs single-threaded and writes to its own console/JUnit output. Partitioning is by each

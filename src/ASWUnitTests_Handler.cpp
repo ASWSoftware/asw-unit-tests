@@ -36,6 +36,7 @@ limitations under the License.
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
+#include "ASWUnitTests_Utils.h"
 #include "ASWUnitTests_Version.h"
 //---------------------------------------------------------------------------
 
@@ -364,7 +365,12 @@ void TTestHandler::RegisterTestGroups()
     master seed and the group's name, so results stay reproducible without
     every equally-sized group shuffling identically). The master seed is
     'shuffleSeed' if given, otherwise one is generated and logged so a
-    failure caused by shuffled order can be reproduced.
+    failure caused by shuffled order can be reproduced. A seed gives the
+    same order with every compiler and standard library (see
+    ShuffledIndices() and FNV1aHash()). Groups, like each group's tests, are
+    shuffled before 'filter' is applied, so a filtered run (e.g. rerunning
+    just the failures) keeps the relative order the same seed gives an
+    unfiltered one.
 
     'testTimeoutSeconds' and 'catchCrashes' are both passed through to each group's Run(). If a
     group's Run() throws a TExceptAbortRun (TExceptTestTimedOut or TExceptTestCrashed), that group's
@@ -388,9 +394,24 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     else
         Log("No filter: running all tests.");
 
-    for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
+    std::optional<unsigned int> resolvedSeed;
+    std::vector<size_t> groupOrder;
+
+    if (shuffle)
     {
-        ITestGroup& testGroup = *it->get();
+        resolvedSeed = shuffleSeed.has_value() ? shuffleSeed : std::random_device{}();
+        groupOrder = ShuffledIndices(m_TestGroups.size(), *resolvedSeed);
+    }
+    else
+    {
+        groupOrder.resize(m_TestGroups.size());
+        for (size_t i = 0; i < groupOrder.size(); ++i)
+            groupOrder[i] = i;
+    }
+
+    for (size_t groupIndex : groupOrder)
+    {
+        ITestGroup& testGroup = *m_TestGroups[groupIndex];
 
         if (filter == nullptr)
         {
@@ -420,20 +441,10 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     if (filter != nullptr && groupsToRun.empty())
         Log("No registered tests matched the filter.");
 
-    std::optional<unsigned int> resolvedSeed;
-
-    if (shuffle)
-    {
-        resolvedSeed = shuffleSeed.has_value() ? shuffleSeed : std::random_device{}();
+    if (resolvedSeed.has_value())
         Log("Shuffle: enabled (seed " + std::to_string(*resolvedSeed) + ")");
-
-        std::mt19937 rng(*resolvedSeed);
-        std::shuffle(groupsToRun.begin(), groupsToRun.end(), rng);
-    }
     else
-    {
         Log("Shuffle: disabled");
-    }
 
     size_t groupNum = 0;
     size_t nGroups = groupsToRun.size();
@@ -473,7 +484,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
         std::optional<unsigned int> groupSeed;
         if (resolvedSeed.has_value())
-            groupSeed = *resolvedSeed + static_cast<unsigned int>(std::hash<std::string>{}(name));
+            groupSeed = *resolvedSeed + FNV1aHash(name);
 
         bool groupTimedOut = false;
         bool groupCrashed = false;
