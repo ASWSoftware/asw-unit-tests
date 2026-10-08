@@ -122,7 +122,7 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_HelpText_MatchesHelpOption()
     // Assert
     CheckEquals(helpOutput, text, __func__, __LINE__, "the same text --help shows");
     CheckContains(text, "--run ", __func__, __LINE__, "including the GUI-only options");
-    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "nothing was written to std::cout");
+    CheckEmpty(consoleOutput, __func__, __LINE__, "nothing was written to std::cout");
 }
 //---------------------------------------------------------------------------
 
@@ -184,7 +184,7 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_HelpIncludesGUIOptions()
     CheckContains(result.Message, "--run ", __func__, __LINE__, "and so are the GUI-only ones");
     CheckContains(result.Message, "--layout-ignore ", __func__, __LINE__, "including --layout-ignore");
     CheckContains(result.Message, "--layout-reset ", __func__, __LINE__, "and --layout-reset");
-    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "the parser's output was captured, not written to std::cout");
+    CheckEmpty(consoleOutput, __func__, __LINE__, "the parser's output was captured, not written to std::cout");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_LayoutOptionsAreGUIOnlyOptions()
@@ -215,12 +215,12 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_NoArgumentsUsesDefaults()
 
     // Assert
     CheckFalse(result.EarlyExitCode.has_value(), __func__, __LINE__, "the GUI opens");
-    CheckTrue(result.Message.empty(), __func__, __LINE__, "with nothing to report");
+    CheckEmpty(result.Message, __func__, __LINE__, "with nothing to report");
     CheckFalse(options.RunOnStart, __func__, __LINE__, "without running anything");
     CheckFalse(options.ExitAfterRun, __func__, __LINE__, "or exiting");
     CheckFalse(options.LayoutIgnore, __func__, __LINE__, "the saved layout is loaded and saved");
     CheckFalse(options.LayoutReset, __func__, __LINE__, "and not reset");
-    CheckTrue(options.IgnoredOptions.empty(), __func__, __LINE__, "no options were ignored");
+    CheckEmpty(options.IgnoredOptions, __func__, __LINE__, "no options were ignored");
     CheckEquals(std::string("ASWUnitTests"), options.CLI.ProjectName, __func__, __LINE__,
         "the console runner's defaults apply");
 }
@@ -243,7 +243,7 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_PassesConsoleOptionsThrough(
     CheckTrue(options.CLI.TestTimeoutSeconds.has_value() && *options.CLI.TestTimeoutSeconds == 30u, __func__,
         __LINE__, "--test-timeout-seconds too");
     CheckTrue(options.CLI.CatchCrashes, __func__, __LINE__, "--catch-crashes too");
-    CheckTrue(options.IgnoredOptions.empty(), __func__, __LINE__, "none of those is ignored");
+    CheckEmpty(options.IgnoredOptions, __func__, __LINE__, "none of those is ignored");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_RunAndExitAreGUIOnlyOptions()

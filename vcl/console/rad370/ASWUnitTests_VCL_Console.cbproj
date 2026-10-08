@@ -85,6 +85,7 @@
         <BCC_UseClassicCompiler>false</BCC_UseClassicCompiler>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <BCC_UserSuppliedOptions>-Wno-padded -Wno-format-nonliteral</BCC_UserSuppliedOptions>
+        <ILINK_DisableIncrementalLinking>true</ILINK_DisableIncrementalLinking>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <PackageImports>adortl;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXInterBaseDriver;DBXMySQLDriver;DBXSqliteDriver;dsnap;dsnapcon;dsnapxml;FireDAC;FireDACADSDriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACIBDriver;FireDACMSAccDriver;FireDACMySQLDriver;FireDACPgDriver;FireDACSqliteDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;FMXTee;FmxTeeUI;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;inetstn;RESTBackendComponents;RESTComponents;rtl;Skia;soapmidas;soaprtl;soapserver;Tee;TeeDB;TeeUI;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
@@ -265,6 +266,10 @@
             <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>34</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Shuffle.h</DependentOn>
+            <BuildOrder>39</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>24</BuildOrder>
@@ -288,6 +293,10 @@
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Selection.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>35</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Shuffle.h</DependentOn>
+            <BuildOrder>40</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Strings.h</DependentOn>

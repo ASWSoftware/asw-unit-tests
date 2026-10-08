@@ -39,6 +39,9 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_FNV1aHash_MatchesReferenceValues();
+    void Test_ShuffledIndices_GivesSameOrderEverywhere();
+    void Test_ShuffledIndices_ReturnsEachIndexOnce();
     void Test_WideToUTF8_EncodesEachSequenceLength();
     void Test_WideToUTF8_KeepsASCIIUnchanged();
 #if WCHAR_MAX > 0xFFFF

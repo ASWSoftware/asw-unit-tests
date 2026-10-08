@@ -109,6 +109,8 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
 {
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered,
+        "Run_ShuffleKeepsOrderWhenFiltered");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
         "SetRunObserver_ReceivesInitializeAndRunOutput");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups, "SetRunObserver_StopsBetweenGroups");
@@ -156,7 +158,7 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
 
     // Assert
     AssertEquals(fullNames.size(), tests.size(), __func__, __LINE__, "one entry per registered test in each");
-    CheckFalse(tests.empty(), __func__, __LINE__, "the real, self-registered suite is listed");
+    CheckNotEmpty(tests, __func__, __LINE__, "the real, self-registered suite is listed");
 
     bool foundThisTest = false;
 
@@ -171,6 +173,61 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
     }
 
     CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered()
+{
+    // Arrange: tests from three groups that only call pure functions, so they're safe to run from a nested
+    // TTestHandler. The subset drops a whole group and one test from another, as rerunning failures would.
+    TestFilter const threeGroups = [](std::string const& fullName)
+        {
+            return fullName.rfind("ASWUnitTests_Handler_Tests.WildcardMatch_", 0) == 0 ||
+                fullName.rfind("ASWUnitTests_Utils_Tests.", 0) == 0 ||
+                fullName.rfind("ASWUnitTests_Version_Tests.", 0) == 0;
+        };
+    TestFilter const subset = [&threeGroups](std::string const& fullName)
+        {
+            return threeGroups(fullName) && fullName.rfind("ASWUnitTests_Version_Tests.", 0) != 0 &&
+                fullName != "ASWUnitTests_Handler_Tests.WildcardMatch_ExactAndStar";
+        };
+    TTestHandler handler;
+    {
+        TStdOutRedirect const suppressOutput;
+        handler.Initialize("Test_Run_ShuffleKeepsOrderWhenFiltered");
+    }
+
+    // Several seeds, so the subset matching the full run's order by chance can't hide a regression.
+    for (unsigned int seed = 1; seed <= 8; ++seed)
+    {
+        // Act
+        TTestResults fullRun;
+        TTestResults subsetRun;
+        {
+            TStdOutRedirect const suppressOutput;
+            fullRun = handler.Run(threeGroups, "three groups", true, seed);
+            subsetRun = handler.Run(subset, "subset", true, seed);
+        }
+
+        // Assert
+        std::vector<std::string> expected;
+        std::vector<std::string> actual;
+
+        for (TTestCaseRecord const& record : fullRun.CaseRecords)
+        {
+            std::string const fullName = record.GroupName + "." + record.TestName;
+
+            if (subset(fullName))
+                expected.push_back(fullName);
+        }
+
+        for (TTestCaseRecord const& record : subsetRun.CaseRecords)
+            actual.push_back(record.GroupName + "." + record.TestName);
+
+        CheckNotEmpty(expected, __func__, __LINE__, "the subset has tests to compare (seed " +
+            std::to_string(seed) + ")");
+        CheckTrue(expected == actual, __func__, __LINE__, "the subset runs in the full run's order, groups and "
+            "tests alike (seed " + std::to_string(seed) + ")");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput()
@@ -197,7 +254,7 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOut
     CheckContains(observer.LogText, "registering test groups for ObserverTestProject", __func__, __LINE__,
         "Initialize()'s output went to the observer");
     CheckContains(observer.LogText, "Tests done", __func__, __LINE__, "and so did Run()'s own summary");
-    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "none of it went to std::cout");
+    CheckEmpty(consoleOutput, __func__, __LINE__, "none of it went to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
 //---------------------------------------------------------------------------

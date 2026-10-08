@@ -11,17 +11,22 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
-  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Near`/`NotNear`, `Contains`/`NotContains`,
-  `StartsWith`/`EndsWith` (and their `Not` forms), and `GreaterThan`/`LessThan` (and their `OrEqual` forms), plus
-  case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and `EndsWith` methods.
+  immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
+  `IsType`/`IsNotType`, `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms),
+  `Matches`/`NotMatches` (regular expression), `EqualsMem`/`NotEqualsMem` (bytes), and `GreaterThan`/`LessThan` (and
+  their `OrEqual` forms), plus case-insensitive `IC` variants of the string `Equals`, `Contains`, `StartsWith` and
+  `EndsWith` methods.
 - **[Automatic call site (C++20)](#omitting-the-method-and-line-c20)** - Overloads taking a `std::source_location`
   report the caller's function and line, without passing `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()` compare `float`
   and `double` values within a tolerance.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** - `SetExceptionExpected()`, with an
-  optional check of the exception's type and message.
+  optional check of the exception's type and message, and
+  [`CheckThrows()`/`CheckNoThrow()`](#checking-that-a-call-throws) for a single call.
 - **[Parameterized tests](#parameterized-tests)** - `RegisterTestCases()` registers one named test case per row of
   data.
+- **[Failing tests](#failing-a-test)** - `Fail()` fails a test unconditionally, e.g. on a code path it should never
+  reach.
 - **[Skipping tests](#skipping-a-test)** - `Skip()` reports a test as skipped, unconditionally or after a runtime
   check.
 - **Setup and teardown hooks** - `SetUp_Group()`/`TearDown_Group()` run around each group, and
@@ -193,7 +198,9 @@ enabled and, if so, the seed in use.
 default (see [Registering Tests](#registering-tests)) is for readable, reproducible output day-to-day, while
 `--shuffle` deliberately breaks that to surface tests that secretly depend on running in a particular order (e.g.
 via shared static/global state). If `--shuffle` causes a failure, rerun with the logged seed via `--shuffle-seed` to
-reproduce it exactly while debugging.
+reproduce it exactly while debugging. A seed gives the same order with every compiler and platform, and adding
+`--filter` keeps the matching tests in the order that seed gives the full suite, so you can narrow the rerun down
+to the tests involved.
 
 `--partition-index`/`--partition-count` split the suite for parallel execution across separate OS processes.
 Each invocation still runs single-threaded and writes to its own console/JUnit output. Partitioning is by each
@@ -306,6 +313,12 @@ The toolbar, whose commands are also in the Run and Tests menus:
 for when `--report-junit` wasn't given, or to keep a copy. The Help menu shows the command line options (the same
 text as `--help`) and the framework version.
 
+**Options > Run in Shuffled Order** runs the groups, and each group's tests, in a random order, like `--shuffle`.
+**Options > Shuffle Seed...** chooses between a new random seed for each run and one seed for every run, like
+`--shuffle-seed`, and clicking OK also turns shuffling on. The status bar shows the seed: the one every run uses, or
+the latest run's. Shuffle Seed... offers that seed, so choosing it reruns tests in the same order, Run Failed included,
+to track down a failure that depends on the order. Both settings start from the command line and aren't saved.
+
 When the window closes, it saves its size, position, maximized state, and panel sizes to
 `%APPDATA%\ASWUnitTests\<exe name>.ini`, and restores them the next time it opens. A position on a monitor that's no
 longer connected is ignored. An `--exit` run doesn't save the layout. **View > Reset Layout** restores the default
@@ -330,9 +343,10 @@ on a worker thread instead, so it can't be combined with tests like that; the lo
 The GUI takes the same [command line options](#command-line-options) as the console runner, with these differences:
 
 - `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, instead of the
-  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
-  unchecked, since the box ignores case and matches anywhere in the name).
+  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern
+  matches (and maybe a few more, left unchecked, since the box ignores case and matches anywhere in the name).
 - `--project-name` is also shown in the window's caption.
+- `--shuffle` and `--shuffle-seed` set the Options menu's shuffle settings, which can then be changed.
 - `--report-junit` writes the report after every run, including Run Failed.
 - `--list`, `--pause`, and the color options are ignored, with a note in the log.
 - `--help`, `--version`, and argument errors are shown in a dialog, and the GUI then exits without opening.
@@ -415,6 +429,25 @@ message rather than silently passing.
 An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails the test rather
 than counting as the expected exception, and so does a failed `Check*` earlier in the test, even if the expected
 exception then arrives.
+
+### Checking That a Call Throws
+
+`SetExceptionExpected()` covers a test that ends by throwing. To check a single call instead, so the test carries on
+afterwards, pass it as a lambda to `CheckThrows`/`AssertThrows`, with the expected exception type and, optionally, a
+substring its message must contain. `CheckNoThrow`/`AssertNoThrow` check that a call doesn't throw, and a failure
+shows what it threw:
+
+```
+CheckThrows<std::out_of_range>([&] { list.At(5); }, __func__, __LINE__, "index past the end");
+CheckThrows<std::invalid_argument>([&] { Parse("x"); }, __func__, __LINE__, "not a number", "invalid digit");
+CheckEquals(3u, list.Count(), __func__, __LINE__, "a failed call leaves the list unchanged");
+CheckNoThrow([&] { list.At(2); }, __func__, __LINE__, "last index");
+```
+
+The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, and with
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL exception types too. A failed `Assert*`, `Fail()` or
+`Skip()` inside the lambda isn't taken as the thrown exception; it ends the test as usual, unless the requested type
+is that framework exception (e.g. `CheckThrows<TExceptTrue>`).
 
 ### RAD Studio RTL Exceptions (VCL/FMX)
 
@@ -529,6 +562,44 @@ CheckEquals("abc", buffer, __func__, __LINE__, "same text in a different buffer 
 A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the value they share, for C strings,
 `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer is shown as `(null)`.
 
+### Comparing Pointers
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare any other two pointers by address, and a
+failure shows both addresses:
+
+```
+CheckEquals(expectedWidget, list.Find("button"), __func__, __LINE__, "finds the widget that was added");
+// Check failed for: "Test_Find" (42): Expected "0x1f2a40" but was "(null)". finds the widget that was added
+```
+
+Comparing two pointers to unrelated types (e.g. `int*` and `long*`) is a compile error.
+
+`CheckSame`/`AssertSame` and `CheckNotSame`/`AssertNotSame` check that two values do or don't point to the same
+object. They take raw pointers, arrays, and smart pointers (`std::unique_ptr`, `std::shared_ptr`), in any mix, and
+compare C strings by address too, unlike `CheckEquals`:
+
+```
+CheckSame(buffer, Trim(buffer), __func__, __LINE__, "trims in place, returning the same buffer");
+CheckSame(cache.Get("a"), cache.Get("a"), __func__, __LINE__, "both calls return the one shared_ptr object");
+```
+
+### Checking an Object's Type
+
+`CheckIsType<TType>`/`AssertIsType<TType>` check that an object is a `TType`, and `CheckIsNotType`/`AssertIsNotType`
+that it isn't. They take a raw pointer, a smart pointer (`std::unique_ptr`, `std::shared_ptr`) or an object, of a
+polymorphic class (one with a virtual function), including RTL classes. They use `dynamic_cast`, so a subclass of
+`TType` counts as one, and a null pointer is never one. A failure shows the expected type and the object's actual
+type:
+
+```
+std::unique_ptr<TShape> const shape = factory.Create("circle");
+CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
+// Check failed for: "Test_Create" (42): Expected type "TCircle" but was "TSquare". the factory makes a circle
+```
+
+Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form (e.g. a namespace or
+`class ` prefix) depends on the compiler.
+
 ### Comparing Strings, Ignoring Case
 
 `CheckEqualsIC`/`AssertEqualsIC` and `CheckNotEqualsIC`/`AssertNotEqualsIC` compare two `std::string` or
@@ -588,6 +659,20 @@ same way as [`CheckEqualsIC`](#comparing-strings-ignoring-case):
 CheckStartsWithIC(header, "content-type:", __func__, __LINE__, "passes for \"Content-Type: text/plain\"");
 ```
 
+### Matching a Regular Expression
+
+`CheckMatches`/`AssertMatches` pass when the *whole* of a `std::string` or `std::wstring` matches an ECMAScript
+regular expression (as `std::regex_match` does), and `CheckNotMatches`/`AssertNotMatches` when it doesn't. To match
+part of the text, start or end the pattern with `.*`. A failure shows the text and the pattern:
+
+```
+CheckMatches(stamp, R"(\d{4}-\d{2}-\d{2})", __func__, __LINE__, "an ISO 8601 date");
+// Check failed for: "Test_Stamp" (42): Expected "2026-1-7" to match "\d{4}-\d{2}-\d{2}". an ISO 8601 date
+```
+
+Wide text is matched with `std::wregex`, so `.` matches one wide character, and a failure shows it as UTF-8. An
+invalid pattern fails the check, showing `std::regex_error`'s description, rather than throwing.
+
 ### Comparing Integers of Different Types
 
 `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` accept any two integer types, not just a matching
@@ -602,6 +687,34 @@ CheckEquals(-1, 4294967295u, __func__, __LINE__, "fails, where -1 == 4294967295u
 ```
 
 `bool` is the exception: comparing a `bool` with an integer remains a compile error, since it's usually a mistake.
+
+### Comparing Enums
+
+`CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` also compare two values of the same scoped enum
+(`enum class`) type. Unlike `CheckTrue(mode == TColorMode::Always, ...)`, a failure shows both values, as their
+underlying numbers:
+
+```
+CheckEquals(TColorMode::Always, options.ColorMode, __func__, __LINE__, "--color always");
+// Check failed for: "Test_ColorOption" (42): Expected "1" but was "0". --color always
+```
+
+Comparing two different enum types, or an `enum class` with an integer, is a compile error. An unscoped `enum`
+converts to an integer, so it's compared like one, as before.
+
+### Comparing Memory
+
+`CheckEqualsMem`/`AssertEqualsMem` compare a number of bytes at two addresses, and `CheckNotEqualsMem`/
+`AssertNotEqualsMem` check that they differ. A failure shows the offset of the first differing byte, and up to 16 bytes
+from there in hex:
+
+```
+CheckEqualsMem(expected, packet.Data(), sizeof(expected), __func__, __LINE__, "encoded header");
+// Check failed for: "Test_Encode" (42): Bytes differ at offset 2 of 4: expected "03 04" but was "FF 04". encoded header
+```
+
+Zero bytes, or the same pointer twice, are always equal, without reading either. Exactly one null pointer is never
+equal to the other memory, and isn't read either.
 
 ### Comparing Floating-Point Values
 
@@ -634,6 +747,47 @@ They accept any two integer or floating-point types except `bool`. Two integers 
 [`CheckEquals`](#comparing-integers-of-different-types) does, so `-1` is less than any unsigned value. When either
 value is floating point, both are compared as their common type, as the built-in operators do, and a NaN fails every
 check.
+
+### Checking for Empty
+
+`CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take anything with an `empty()` member, such as a
+`std::string`, `std::wstring`, `std::vector` or `std::map`, and with
+[RTL support](#comparing-systemstring-vclfmx), a `System::String`. Unlike `CheckTrue(list.empty(), ...)`, a failure
+shows what was there: the text, or the element count of a container with a `size()`:
+
+```
+CheckEmpty(errors, __func__, __LINE__, "no errors reported");
+// Check failed for: "Test_Load" (42): Expected empty but had 2 elements. no errors reported
+CheckEmpty(GetWarning(), __func__, __LINE__, "no warning");
+// Check failed for: "Test_Load" (43): Expected empty but was "low disk space". no warning
+```
+
+### Checking for Null
+
+`CheckNull`/`AssertNull` and `CheckNotNull`/`AssertNotNull` compare a value with `nullptr`. They accept anything that
+can be compared with `nullptr`, such as a raw pointer, `std::unique_ptr`, `std::shared_ptr` or `std::function`:
+
+```
+std::unique_ptr<TWidget> widget = factory.Create("button");
+AssertNotNull(widget, __func__, __LINE__, "factory should create a button");
+CheckNull(factory.Find("missing"), __func__, __LINE__, "no widget has that name");
+```
+
+A C string is checked as a pointer, so an empty string such as `""` is not null.
+
+### Failing a Test
+
+Call `Fail(method, line, msg)` to fail the current test unconditionally, e.g. on a code path the test should never
+reach. Like an `Assert*` method, it aborts the test, and it fails it even while an exception is expected:
+
+```
+switch (shape.Kind())
+{
+    case TShapeKind::Circle: CheckNear(3.14159, shape.Area(), 0.0001, __func__, __LINE__, "unit circle"); break;
+    case TShapeKind::Square: CheckNear(1.0, shape.Area(), 0.0001, __func__, __LINE__, "unit square"); break;
+    default: Fail(__func__, __LINE__, "unexpected shape kind");
+}
+```
 
 ### Skipping a Test
 

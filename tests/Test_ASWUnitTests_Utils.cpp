@@ -26,7 +26,11 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
@@ -42,6 +46,11 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_Utils::TTest_ASWUnitTests_Utils()
     : inherited("ASWUnitTests_Utils_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_FNV1aHash_MatchesReferenceValues, "FNV1aHash_MatchesReferenceValues");
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_ShuffledIndices_GivesSameOrderEverywhere,
+        "ShuffledIndices_GivesSameOrderEverywhere");
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_ShuffledIndices_ReturnsEachIndexOnce,
+        "ShuffledIndices_ReturnsEachIndexOnce");
     RegisterTest(&TTest_ASWUnitTests_Utils::Test_WideToUTF8_EncodesEachSequenceLength,
         "WideToUTF8_EncodesEachSequenceLength");
     RegisterTest(&TTest_ASWUnitTests_Utils::Test_WideToUTF8_KeepsASCIIUnchanged, "WideToUTF8_KeepsASCIIUnchanged");
@@ -76,6 +85,42 @@ void TTest_ASWUnitTests_Utils::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Utils::Test_FNV1aHash_MatchesReferenceValues()
+{
+    // The published 32-bit FNV-1a test vectors.
+    CheckEquals(static_cast<uint32_t>(0x811C9DC5), FNV1aHash(""), __func__, __LINE__, "empty text");
+    CheckEquals(static_cast<uint32_t>(0xE40C292C), FNV1aHash("a"), __func__, __LINE__, "\"a\"");
+    CheckEquals(static_cast<uint32_t>(0xBF9CF968), FNV1aHash("foobar"), __func__, __LINE__, "\"foobar\"");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Utils::Test_ShuffledIndices_GivesSameOrderEverywhere()
+{
+    // These orders must not depend on the compiler or standard library, so a --shuffle-seed reproduces a run's
+    // order on any of them. A change here also changes the order every existing seed gives.
+    std::vector<std::size_t> const expectedSeed42 = { 1, 3, 9, 7, 6, 0, 8, 4, 5, 2 };
+    std::vector<std::size_t> const expectedSeedMax = { 6, 9, 7, 2, 5, 0, 8, 4, 3, 1 };
+
+    CheckTrue(ShuffledIndices(10, 42u) == expectedSeed42, __func__, __LINE__, "seed 42");
+    CheckTrue(ShuffledIndices(10, 4294967295u) == expectedSeedMax, __func__, __LINE__, "the largest seed");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Utils::Test_ShuffledIndices_ReturnsEachIndexOnce()
+{
+    CheckEmpty(ShuffledIndices(0, 1u), __func__, __LINE__, "no indices");
+    CheckTrue(ShuffledIndices(1, 1u) == std::vector<std::size_t>{ 0 }, __func__, __LINE__, "a single index");
+
+    std::vector<std::size_t> const shuffled = ShuffledIndices(100, 7u);
+    std::vector<std::size_t> sorted = shuffled;
+    std::sort(sorted.begin(), sorted.end());
+    std::vector<std::size_t> identity(100);
+
+    for (std::size_t i = 0; i < identity.size(); ++i)
+        identity[i] = i;
+
+    CheckTrue(sorted == identity, __func__, __LINE__, "each of 0 to 99 appears exactly once");
+    CheckTrue(shuffled != identity, __func__, __LINE__, "and the order is actually shuffled");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Utils::Test_WideToUTF8_EncodesEachSequenceLength()
 {

@@ -120,7 +120,7 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter()
     TestFilter const filter = TCLIParser::BuildTestFilter(tester, options, filterDescription);
 
     // Assert
-    CheckTrue(filter != nullptr, __func__, __LINE__, "filter is constructed");
+    AssertNotNull(filter, __func__, __LINE__, "filter is constructed");
     CheckTrue(filter("ASWTools_String_Tests.HexSingleToByte[A]"), __func__, __LINE__, "matches a test fitting the pattern");
     CheckFalse(filter("ASWTools_String_Tests.Compare"), __func__, __LINE__, "does not match an unrelated test");
     CheckContains(filterDescription, "HexSingleToByte", __func__, __LINE__, "description mentions the pattern");
@@ -235,8 +235,8 @@ void TTest_ASWUnitTests_CLI::Test_ParseArguments_Color()
     std::optional<int> const resultBadMode = ParseArgs({ "ASWUnitTests", "--color", "bogus" }, optionsBadMode);
 
     // Assert
-    CheckTrue(optionsMode.ColorMode == TColorMode::Always, __func__, __LINE__, "--color always");
-    CheckTrue(optionsNoColor.ColorMode == TColorMode::Never, __func__, __LINE__, "--no-color");
+    CheckEquals(TColorMode::Always, optionsMode.ColorMode, __func__, __LINE__, "--color always");
+    CheckEquals(TColorMode::Never, optionsNoColor.ColorMode, __func__, __LINE__, "--no-color");
     CheckTrue(optionsColorPass.ColorPass == TConsoleColor::BrightGreen, __func__, __LINE__, "--color-pass bright-green");
     CheckTrue(resultBadMode.has_value() && *resultBadMode == ExitCode_InvalidArguments,
         __func__, __LINE__, "--color with an unrecognized mode is rejected");
@@ -455,9 +455,9 @@ void TTest_ASWUnitTests_CLI::Test_ToJUnitTestCases_CopiesEachRecord()
     // Assert
     AssertEquals(static_cast<size_t>(3), testCases.size(), __func__, __LINE__, "one test case per record");
 
-    CheckTrue(testCases[0].Outcome == TJUnitOutcome::Pass, __func__, __LINE__, "Pass becomes Pass");
-    CheckTrue(testCases[1].Outcome == TJUnitOutcome::Fail, __func__, __LINE__, "Fail becomes Fail");
-    CheckTrue(testCases[2].Outcome == TJUnitOutcome::Skip, __func__, __LINE__, "Skip becomes Skip");
+    CheckEquals(TJUnitOutcome::Pass, testCases[0].Outcome, __func__, __LINE__, "Pass becomes Pass");
+    CheckEquals(TJUnitOutcome::Fail, testCases[1].Outcome, __func__, __LINE__, "Fail becomes Fail");
+    CheckEquals(TJUnitOutcome::Skip, testCases[2].Outcome, __func__, __LINE__, "Skip becomes Skip");
     CheckEquals(std::string("Other"), testCases[2].GroupName, __func__, __LINE__, "the group name is kept");
     CheckEquals(std::string("Fails"), testCases[1].TestName, __func__, __LINE__, "and the test name");
     CheckEquals(std::string("Check failed for: x"), testCases[1].Message, __func__, __LINE__, "and the detail");

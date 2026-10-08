@@ -48,6 +48,7 @@ limitations under the License.
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Selection.h"
+#include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
 //---------------------------------------------------------------------------
@@ -412,6 +413,24 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_SelectNoneExecute(TObject* /*Sende
     {
         m_TestList.SetAllChecked(false);
         SyncTreeChecks();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ShuffleOrderExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Run in Shuffled Order", [this]()
+    {
+        m_Shuffle.SetEnabled(!m_Shuffle.Enabled());
+        ShowShuffleState();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ShuffleSeedExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Shuffle Seed", [this]()
+    {
+        if (ShowShuffleSeedDialog(m_Shuffle))
+            ShowShuffleState();
     });
 }
 //---------------------------------------------------------------------------
@@ -1005,6 +1024,9 @@ void TFormASWUnitTestsGUIMain::RunGuarded(char const* where, std::function<void(
     Runs on this (the main) thread, so tests that create VCL forms or controls work; the observer's
     YieldCallback lets the window repaint and respond to Stop between tests. Every test's result, the
     Failures & Skips list, and the log are cleared first, so they only ever show one run.
+
+    A shuffled run's seed comes from m_Shuffle, rather than being left to TTestHandler::Run() to choose,
+    so the GUI knows it and can show it, and Shuffle Seed... can offer it to repeat this run's order.
 */
 void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string const& filterDescription)
 {
@@ -1030,12 +1052,13 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
 
     m_Observer.ResetStop();
     m_StatusMessage = "Running...";
-    SetRunning(true);
+    std::optional<unsigned int> const shuffleSeed = m_Shuffle.NextRunSeed();
+    SetRunning(true); // Also shows the seed just chosen.
 
     try
     {
-        TTestResults const results = m_Handler->Run(filter, filterDescription, m_Options.CLI.Shuffle,
-            m_Options.CLI.ShuffleSeed, m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
+        TTestResults const results = m_Handler->Run(filter, filterDescription, shuffleSeed.has_value(), shuffleSeed,
+            m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
         m_Observer.Flush();
 
         if (results.Stopped)
@@ -1139,6 +1162,10 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     Act_SelectNone->Enabled = !running;
     Act_Stop->Enabled = running;
 
+    // The run in progress already has its order, so a change now would only mislead.
+    Act_ShuffleOrder->Enabled = !running;
+    Act_ShuffleSeed->Enabled = !running;
+
     // Rebuilding the tree mid-run would discard the nodes the run is updating.
     Act_FocusFilter->Enabled = !running;
     Edt_Filter->Enabled = !running;
@@ -1146,12 +1173,19 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::ShowShuffleState()
+{
+    Act_ShuffleOrder->Checked = m_Shuffle.Enabled();
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 /*
     TFormASWUnitTestsGUIMain::Start
 
     Loads the registered tests and applies the command line's options: --project-name to the caption, and
-    --filter and the partition options to which tests start out checked, and --filter to the filter box.
-    Also restores the window layout saved when it last closed.
+    --filter and the partition options to which tests start out checked, and --filter to the filter box,
+    and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout saved when it
+    last closed.
 */
 void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
 {
@@ -1216,6 +1250,9 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
 
     UpdateCaption();
     CreateStatusImages();
+
+    m_Shuffle.ApplyCommandLine(m_Options.CLI.Shuffle, m_Options.CLI.ShuffleSeed);
+    ShowShuffleState();
 
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
@@ -1404,13 +1441,16 @@ void TFormASWUnitTestsGUIMain::UpdateStatusBar()
     setPanel(4, "Skipped: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Skipped)));
 
     std::string elapsed;
+
     if (m_RunStart.has_value())
     {
         std::chrono::steady_clock::time_point const end = m_RunEnd.value_or(std::chrono::steady_clock::now());
         elapsed = FormatSeconds(std::chrono::duration<double>(end - *m_RunStart).count());
     }
+
     setPanel(5, elapsed);
-    setPanel(6, m_StatusMessage);
+    setPanel(6, m_Shuffle.StatusText());
+    setPanel(7, m_StatusMessage);
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)

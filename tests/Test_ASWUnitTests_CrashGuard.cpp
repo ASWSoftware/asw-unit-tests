@@ -39,9 +39,13 @@ namespace
 // MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
 // permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
 // about here is the deliberate point, not a mistake, hence silencing just that one warning.
+// bcc32c is Clang-based but, unlike bcc64x, doesn't define __GNUC__, so it needs its own branch.
 #if defined(__GNUC__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Winfinite-recursion"
+#elif defined(__BORLANDC__) && defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Winfinite-recursion"
 #elif defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable: 4717)
@@ -55,6 +59,8 @@ int RecurseUntilStackOverflows(int depth)
 }
 #if defined(__GNUC__)
 #  pragma GCC diagnostic pop
+#elif defined(__BORLANDC__) && defined(__clang__)
+#  pragma clang diagnostic pop
 #elif defined(_MSC_VER)
 #  pragma warning(pop)
 #endif
@@ -155,7 +161,7 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbo
     CheckTrue(result.ShouldAbortRun, __func__, __LINE__,
         "POSIX can't tell this apart from a stack overflow, so it conservatively forces an abort");
 #endif
-    CheckFalse(result.Description.empty(), __func__, __LINE__, "a human-readable description is filled in");
+    CheckNotEmpty(result.Description, __func__, __LINE__, "a human-readable description is filled in");
 }
 //---------------------------------------------------------------------------
 /*

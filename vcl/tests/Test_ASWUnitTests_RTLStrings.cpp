@@ -84,8 +84,9 @@ System::String Text()
 // TFixture_RTLStringComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with a "_Passes" and a "_Fails" test for each
-// System::String overload, comparing Text() with a narrow literal (Check) or a wide one (Assert). Each outcome would
-// change if the overload forwarded to the wrong method: case-sensitive or IC, Not or not, start, end or anywhere.
+// System::String overload, comparing Text() with a narrow literal (Check) or a wide one (Assert), or for the Empty
+// methods, checking Text() or an empty System::String. Each outcome would change if the overload forwarded to the
+// wrong method: case-sensitive or IC, Not or not, start, end or anywhere.
 // "NonASCII" checks that a failure shows a System::String as UTF-8, and the "SourceLocation" tests, where supported,
 // use the std::source_location forms. Test names self-document expected outcome via NameEndsWith().
 /////////////////////////////////////////////////////////////////////////////
@@ -99,6 +100,8 @@ private:
     void Test_AssertContainsIC_Passes();
     void Test_AssertContains_Fails();
     void Test_AssertContains_Passes();
+    void Test_AssertEmpty_Fails();
+    void Test_AssertEmpty_Passes();
     void Test_AssertEndsWithIC_Fails();
     void Test_AssertEndsWithIC_Passes();
     void Test_AssertEndsWith_Fails();
@@ -111,6 +114,8 @@ private:
     void Test_AssertNotContainsIC_Passes();
     void Test_AssertNotContains_Fails();
     void Test_AssertNotContains_Passes();
+    void Test_AssertNotEmpty_Fails();
+    void Test_AssertNotEmpty_Passes();
     void Test_AssertNotEndsWithIC_Fails();
     void Test_AssertNotEndsWithIC_Passes();
     void Test_AssertNotEndsWith_Fails();
@@ -132,6 +137,8 @@ private:
     void Test_CheckContains_Fails();
     void Test_CheckContains_NonASCII_Fails();
     void Test_CheckContains_Passes();
+    void Test_CheckEmpty_Fails();
+    void Test_CheckEmpty_Passes();
     void Test_CheckEndsWithIC_Fails();
     void Test_CheckEndsWithIC_Passes();
     void Test_CheckEndsWith_Fails();
@@ -144,6 +151,8 @@ private:
     void Test_CheckNotContainsIC_Passes();
     void Test_CheckNotContains_Fails();
     void Test_CheckNotContains_Passes();
+    void Test_CheckNotEmpty_Fails();
+    void Test_CheckNotEmpty_Passes();
     void Test_CheckNotEndsWithIC_Fails();
     void Test_CheckNotEndsWithIC_Passes();
     void Test_CheckNotEndsWith_Fails();
@@ -185,6 +194,8 @@ TFixture_RTLStringComparisons::TFixture_RTLStringComparisons()
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertContainsIC_Passes, "AssertContainsIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertContains_Fails, "AssertContains_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertContains_Passes, "AssertContains_Passes");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_AssertEmpty_Fails, "AssertEmpty_Fails");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_AssertEmpty_Passes, "AssertEmpty_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertEndsWithIC_Fails, "AssertEndsWithIC_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertEndsWithIC_Passes, "AssertEndsWithIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertEndsWith_Fails, "AssertEndsWith_Fails");
@@ -197,6 +208,8 @@ TFixture_RTLStringComparisons::TFixture_RTLStringComparisons()
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotContainsIC_Passes, "AssertNotContainsIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotContains_Fails, "AssertNotContains_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotContains_Passes, "AssertNotContains_Passes");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotEmpty_Fails, "AssertNotEmpty_Fails");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotEmpty_Passes, "AssertNotEmpty_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotEndsWithIC_Fails, "AssertNotEndsWithIC_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotEndsWithIC_Passes, "AssertNotEndsWithIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_AssertNotEndsWith_Fails, "AssertNotEndsWith_Fails");
@@ -218,6 +231,8 @@ TFixture_RTLStringComparisons::TFixture_RTLStringComparisons()
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckContains_Fails, "CheckContains_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckContains_NonASCII_Fails, "CheckContains_NonASCII_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckContains_Passes, "CheckContains_Passes");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_CheckEmpty_Fails, "CheckEmpty_Fails");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_CheckEmpty_Passes, "CheckEmpty_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckEndsWithIC_Fails, "CheckEndsWithIC_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckEndsWithIC_Passes, "CheckEndsWithIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckEndsWith_Fails, "CheckEndsWith_Fails");
@@ -230,6 +245,8 @@ TFixture_RTLStringComparisons::TFixture_RTLStringComparisons()
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotContainsIC_Passes, "CheckNotContainsIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotContains_Fails, "CheckNotContains_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotContains_Passes, "CheckNotContains_Passes");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotEmpty_Fails, "CheckNotEmpty_Fails");
+    RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotEmpty_Passes, "CheckNotEmpty_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotEndsWithIC_Fails, "CheckNotEndsWithIC_Fails");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotEndsWithIC_Passes, "CheckNotEndsWithIC_Passes");
     RegisterTest(&TFixture_RTLStringComparisons::Test_CheckNotEndsWith_Fails, "CheckNotEndsWith_Fails");
@@ -274,6 +291,16 @@ void TFixture_RTLStringComparisons::Test_AssertContains_Fails()
 void TFixture_RTLStringComparisons::Test_AssertContains_Passes()
 {
     AssertContains(Text(), L"lo Wo", __func__, __LINE__, "passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_AssertEmpty_Fails()
+{
+    AssertEmpty(Text(), __func__, __LINE__, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_AssertEmpty_Passes()
+{
+    AssertEmpty(System::String(), __func__, __LINE__, "passes");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLStringComparisons::Test_AssertEndsWithIC_Fails()
@@ -334,6 +361,16 @@ void TFixture_RTLStringComparisons::Test_AssertNotContains_Fails()
 void TFixture_RTLStringComparisons::Test_AssertNotContains_Passes()
 {
     AssertNotContains(Text(), L"WORLD", __func__, __LINE__, "passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_AssertNotEmpty_Fails()
+{
+    AssertNotEmpty(System::String(), __func__, __LINE__, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_AssertNotEmpty_Passes()
+{
+    AssertNotEmpty(Text(), __func__, __LINE__, "passes");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLStringComparisons::Test_AssertNotEndsWithIC_Fails()
@@ -442,6 +479,16 @@ void TFixture_RTLStringComparisons::Test_CheckContains_Passes()
     CheckContains(Text(), "lo Wo", __func__, __LINE__, "passes");
 }
 //---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_CheckEmpty_Fails()
+{
+    CheckEmpty(Text(), __func__, __LINE__, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_CheckEmpty_Passes()
+{
+    CheckEmpty(System::String(), __func__, __LINE__, "passes");
+}
+//---------------------------------------------------------------------------
 void TFixture_RTLStringComparisons::Test_CheckEndsWithIC_Fails()
 {
     CheckEndsWithIC(Text(), "World", __func__, __LINE__, "deliberate failure");
@@ -500,6 +547,16 @@ void TFixture_RTLStringComparisons::Test_CheckNotContains_Fails()
 void TFixture_RTLStringComparisons::Test_CheckNotContains_Passes()
 {
     CheckNotContains(Text(), "WORLD", __func__, __LINE__, "passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_CheckNotEmpty_Fails()
+{
+    CheckNotEmpty(System::String(), __func__, __LINE__, "deliberate failure");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLStringComparisons::Test_CheckNotEmpty_Passes()
+{
+    CheckNotEmpty(Text(), __func__, __LINE__, "passes");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLStringComparisons::Test_CheckNotEndsWithIC_Fails()
@@ -697,9 +754,9 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
     // Assert
     TTestResults const& results = fixture.Results();
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
-    std::size_t const expectedCount = 68;
+    std::size_t const expectedCount = 76;
 #else
-    std::size_t const expectedCount = 65;
+    std::size_t const expectedCount = 73;
 #endif
     CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
@@ -707,13 +764,17 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
     {
         if (NameEndsWith(record.TestName, "_Passes"))
         {
-            CheckTrue(record.Outcome == TTestOutcome::Pass, __func__, __LINE__,
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__,
                 record.TestName + " should pass: " + record.Message);
         }
         else if (NameEndsWith(record.TestName, "_Fails"))
-            CheckTrue(record.Outcome == TTestOutcome::Fail, __func__, __LINE__, record.TestName + " should fail");
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        }
         else
-            AssertTrue(false, __func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
     }
 
     // Each message is "<prefix> (<line>): <detail>"; the line varies, so the parts either side of it are checked. The
@@ -729,6 +790,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
           "): Expected \"Hello World hello\" to contain \"xyz\" (ignoring case). deliberate failure" },
         { "AssertContains_Fails", "Substring not found:",
           "): Expected \"Hello World hello\" to contain \"WORLD\". deliberate failure" },
+        { "AssertEmpty_Fails", "Not empty:", "): Expected empty but was \"Hello World hello\". deliberate failure" },
         { "AssertEndsWithIC_Fails", "Suffix not found:",
           "): Expected \"Hello World hello\" to end with \"World\" (ignoring case). deliberate failure" },
         { "AssertEndsWith_Fails", "Suffix not found:",
@@ -741,6 +803,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
           "): Expected \"Hello World hello\" not to contain \"LO WO\" (ignoring case). deliberate failure" },
         { "AssertNotContains_Fails", "Substring found:",
           "): Expected \"Hello World hello\" not to contain \"lo Wo\". deliberate failure" },
+        { "AssertNotEmpty_Fails", "Empty:", "): Expected not empty but was empty. deliberate failure" },
         { "AssertNotEndsWithIC_Fails", "Suffix found:",
           "): Expected \"Hello World hello\" not to end with \"HELLO\" (ignoring case). deliberate failure" },
         { "AssertNotEndsWith_Fails", "Suffix found:",
@@ -761,6 +824,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
         { "CheckContains_Fails", "", "): Expected \"Hello World hello\" to contain \"WORLD\". deliberate failure" },
         { "CheckContains_NonASCII_Fails", "",
           "): Expected \"caf\xC3\xA9 \xF0\x9F\x98\x80\" to contain \"\xC3\xBC\". not present" },
+        { "CheckEmpty_Fails", "", "): Expected empty but was \"Hello World hello\". deliberate failure" },
         { "CheckEndsWithIC_Fails", "",
           "): Expected \"Hello World hello\" to end with \"World\" (ignoring case). deliberate failure" },
         { "CheckEndsWith_Fails", "", "): Expected \"Hello World hello\" to end with \"Hello\". deliberate failure" },
@@ -772,6 +836,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
           "): Expected \"Hello World hello\" not to contain \"LO WO\" (ignoring case). deliberate failure" },
         { "CheckNotContains_Fails", "",
           "): Expected \"Hello World hello\" not to contain \"lo Wo\". deliberate failure" },
+        { "CheckNotEmpty_Fails", "", "): Expected not empty but was empty. deliberate failure" },
         { "CheckNotEndsWithIC_Fails", "",
           "): Expected \"Hello World hello\" not to end with \"HELLO\" (ignoring case). deliberate failure" },
         { "CheckNotEndsWith_Fails", "",
@@ -792,7 +857,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
     for (TExpectedFailure const& expected : expectedFailures)
     {
         TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
-        AssertTrue(record != nullptr, __func__, __LINE__, expected.TestName + " has a record");
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
 
         std::string const prefix = expected.Category.empty() ?
                 "Check failed for: \"Test_" + expected.TestName + "\" (" :
@@ -804,7 +869,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_ForwardAndShowTheUsualMessage
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
     // function_name() is compiler-specific, but always contains the function's own name.
     TTestCaseRecord const* const sourceLocation = FindRecord(results, "SourceLocation_CheckEndsWith_Fails");
-    AssertTrue(sourceLocation != nullptr, __func__, __LINE__, "the source location test has a record");
+    AssertNotNull(sourceLocation, __func__, __LINE__, "the source location test has a record");
     CheckContains(sourceLocation->Message, "Test_SourceLocation_CheckEndsWith_Fails", __func__, __LINE__,
         "the source location form reports its caller's function");
     CheckContains(sourceLocation->Message, "(" + std::to_string(fixture.SourceLocationLine) + ")", __func__, __LINE__,
@@ -824,6 +889,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_RejectNonText()
     static_assert(TCanCheckEquals<wchar_t const*, System::String>::value, "a wide C string and System::String");
     static_assert(TCanCheckEquals<std::string, System::String>::value, "std::string and System::String");
     static_assert(TCanCheckContains<System::String, std::wstring>::value, "System::String and std::wstring");
+    static_assert(TCanCheckEmpty<System::String>::value, "a System::String");
 
     static_assert(!TCanCheckEquals<System::String, int>::value, "System::String and a number");
     static_assert(!TCanCheckEquals<double, System::String>::value, "a number and System::String");
@@ -831,6 +897,8 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_RejectNonText()
     static_assert(!TCanCheckEquals<double, double>::value, "two floating-point values, as without System::String");
     static_assert(!TCanCheckContains<System::String, int>::value, "System::String and a number");
     static_assert(!TCanCheckContains<std::string, std::wstring>::value, "narrow and wide text without System::String");
+    static_assert(!TCanCheckEmpty<char const*>::value, "a C string, which mustn't convert to System::String");
+    static_assert(!TCanCheckEmpty<int>::value, "a number");
 }
 //---------------------------------------------------------------------------
 

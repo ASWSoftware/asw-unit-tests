@@ -131,7 +131,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_CheckedFilter_MatchesExactlyTheChecke
     TestFilter const filter = list.CheckedFilter();
 
     // Assert
-    AssertTrue(filter != nullptr, __func__, __LINE__, "a filter is returned");
+    AssertNotNull(filter, __func__, __LINE__, "a filter is returned");
     CheckTrue(filter("Alpha.One"), __func__, __LINE__, "a checked test matches");
     CheckFalse(filter("Alpha.Two"), __func__, __LINE__, "an unchecked test doesn't");
     CheckFalse(filter("Beta.Three"), __func__, __LINE__, "nor does another group's unchecked test");
@@ -285,21 +285,20 @@ void TTest_ASWUnitTests_GUI_TestList::Test_GroupStatus_ShowsRunningThenWorstOutc
 
     // Act, and Assert as the group's tests progress
     list.SetStatus(0, TGUITestStatus::Passed);
-    CheckTrue(list.GroupStatus("Alpha") == TGUITestStatus::Passed, __func__, __LINE__,
+    CheckEquals(TGUITestStatus::Passed, list.GroupStatus("Alpha"), __func__, __LINE__,
         "one test passed, the other not run: passed");
 
     list.SetStatus(1, TGUITestStatus::Running);
-    CheckTrue(list.GroupStatus("Alpha") == TGUITestStatus::Running, __func__, __LINE__, "running while any test is");
+    CheckEquals(TGUITestStatus::Running, list.GroupStatus("Alpha"), __func__, __LINE__, "running while any test is");
 
     list.SetStatus(1, TGUITestStatus::Skipped);
-    CheckTrue(list.GroupStatus("Alpha") == TGUITestStatus::Skipped, __func__, __LINE__,
-        "a skip outranks a pass");
+    CheckEquals(TGUITestStatus::Skipped, list.GroupStatus("Alpha"), __func__, __LINE__, "a skip outranks a pass");
 
     list.SetStatus(0, TGUITestStatus::Failed);
-    CheckTrue(list.GroupStatus("Alpha") == TGUITestStatus::Failed, __func__, __LINE__, "a failure outranks a skip");
+    CheckEquals(TGUITestStatus::Failed, list.GroupStatus("Alpha"), __func__, __LINE__, "a failure outranks a skip");
 
-    CheckTrue(beforeRun == TGUITestStatus::NotRun, __func__, __LINE__, "nothing run yet: not run");
-    CheckTrue(list.GroupStatus("Alpha.Sub") == TGUITestStatus::NotRun, __func__, __LINE__,
+    CheckEquals(TGUITestStatus::NotRun, beforeRun, __func__, __LINE__, "nothing run yet: not run");
+    CheckEquals(TGUITestStatus::NotRun, list.GroupStatus("Alpha.Sub"), __func__, __LINE__,
         "another group, even one whose name starts with this one's, is unaffected");
 }
 //---------------------------------------------------------------------------
@@ -354,7 +353,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_ResetResults_SetsEveryTestBackToNotRu
     // Assert
     CheckEquals(static_cast<size_t>(4), list.StatusCount(TGUITestStatus::NotRun), __func__, __LINE__,
         "every test is back to not run");
-    CheckTrue(list.Result(2) == nullptr, __func__, __LINE__, "and no longer has a result");
+    CheckNull(list.Result(2), __func__, __LINE__, "and no longer has a result");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_SetAllChecked_ChecksOrUnchecksEveryTest()
@@ -386,11 +385,11 @@ void TTest_ASWUnitTests_GUI_TestList::Test_SetChecked_UpdatesItsGroupsCheckState
     TGUICheckState const bothUnchecked = list.GroupCheckState("Alpha");
 
     // Assert
-    CheckTrue(oneUnchecked == TGUICheckState::Partial, __func__, __LINE__, "some of a group's tests checked: partial");
-    CheckTrue(bothUnchecked == TGUICheckState::Unchecked, __func__, __LINE__, "none checked: unchecked");
-    CheckTrue(list.GroupCheckState("Beta") == TGUICheckState::Checked, __func__, __LINE__,
+    CheckEquals(TGUICheckState::Partial, oneUnchecked, __func__, __LINE__, "some of a group's tests checked: partial");
+    CheckEquals(TGUICheckState::Unchecked, bothUnchecked, __func__, __LINE__, "none checked: unchecked");
+    CheckEquals(TGUICheckState::Checked, list.GroupCheckState("Beta"), __func__, __LINE__,
         "another group is unaffected");
-    CheckTrue(list.GroupCheckState("Alpha.Sub") == TGUICheckState::Checked, __func__, __LINE__,
+    CheckEquals(TGUICheckState::Checked, list.GroupCheckState("Alpha.Sub"), __func__, __LINE__,
         "including one whose name starts with the changed group's");
 }
 //---------------------------------------------------------------------------
@@ -421,12 +420,12 @@ void TTest_ASWUnitTests_GUI_TestList::Test_SetResult_StoresTheResultAndSetsTheSt
     list.SetResult(2, TTestCaseRecord{ "Beta", "Three", 0.25, TTestOutcome::Skip, "not on this platform" }, "log");
 
     // Assert
-    CheckTrue(before == nullptr, __func__, __LINE__, "a test has no result before it finishes");
+    CheckNull(before, __func__, __LINE__, "a test has no result before it finishes");
     TGUITestResult const* const after = list.Result(2);
-    AssertTrue(after != nullptr, __func__, __LINE__, "it has one after");
+    AssertNotNull(after, __func__, __LINE__, "it has one after");
     CheckEquals(std::string("not on this platform"), after->Record.Message, __func__, __LINE__, "with its record");
     CheckEquals(std::string("log"), after->Log, __func__, __LINE__, "and its log");
-    CheckTrue(list.Status(2) == TGUITestStatus::Skipped, __func__, __LINE__, "its status follows the outcome");
+    CheckEquals(TGUITestStatus::Skipped, list.Status(2), __func__, __LINE__, "its status follows the outcome");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_SetVisibleFilter_HidesNonMatchingTests()
@@ -472,7 +471,7 @@ void TTest_ASWUnitTests_GUI_TestList::Test_SetVisibleFilter_LimitsCheckingToVisi
     // Assert
     CheckTrue(hiddenStillChecked, __func__, __LINE__, "unchecking everything leaves a hidden test alone");
     CheckFalse(noneChecked("Alpha.Two"), __func__, __LINE__, "a hidden checked test isn't run");
-    CheckTrue(list.GroupCheckState("Alpha") == TGUICheckState::Checked, __func__, __LINE__,
+    CheckEquals(TGUICheckState::Checked, list.GroupCheckState("Alpha"), __func__, __LINE__,
         "a group's check state only counts its visible tests");
     CheckEquals(static_cast<size_t>(1), list.CheckedCount(), __func__, __LINE__, "nor does the checked count");
 }
@@ -497,9 +496,9 @@ void TTest_ASWUnitTests_GUI_TestList::Test_StatusCount_CountsTestsWithEachStatus
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_StatusFromOutcome_MapsEachOutcome()
 {
-    CheckTrue(StatusFromOutcome(TTestOutcome::Pass) == TGUITestStatus::Passed, __func__, __LINE__, "Pass: Passed");
-    CheckTrue(StatusFromOutcome(TTestOutcome::Fail) == TGUITestStatus::Failed, __func__, __LINE__, "Fail: Failed");
-    CheckTrue(StatusFromOutcome(TTestOutcome::Skip) == TGUITestStatus::Skipped, __func__, __LINE__, "Skip: Skipped");
+    CheckEquals(TGUITestStatus::Passed, StatusFromOutcome(TTestOutcome::Pass), __func__, __LINE__, "Pass: Passed");
+    CheckEquals(TGUITestStatus::Failed, StatusFromOutcome(TTestOutcome::Fail), __func__, __LINE__, "Fail: Failed");
+    CheckEquals(TGUITestStatus::Skipped, StatusFromOutcome(TTestOutcome::Skip), __func__, __LINE__, "Skip: Skipped");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_StatusName_NamesEachStatus()
