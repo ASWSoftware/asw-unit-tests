@@ -58,6 +58,12 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   `AssertNotEqualsMem`, which compare a number of bytes at two addresses. A
   failure shows the offset of the first differing byte and up to 16 bytes from
   there, in hex.
+- The VCL GUI runner has an Options menu. **Run in Shuffled Order** turns
+  shuffling on and off, like `--shuffle`, and **Shuffle Seed...** chooses
+  between a new random seed for each run and one seed for every run, like
+  `--shuffle-seed`. Both start from the command line. The status bar shows
+  the seed, and Shuffle Seed... offers the latest run's, so tests can be rerun
+  in the same order to track down a failure that depends on the order.
 
 ### Changed
 

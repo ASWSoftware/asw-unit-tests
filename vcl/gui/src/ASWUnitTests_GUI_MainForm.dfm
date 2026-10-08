@@ -256,6 +256,9 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
         Width = 70
       end
       item
+        Width = 190
+      end
+      item
         Width = 300
       end>
   end
@@ -335,6 +338,20 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Hint = 'Check only the shown tests that failed in the last run'
       OnExecute = Act_SelectFailedExecute
     end
+    object Act_ShuffleOrder: TAction
+      Caption = 'Run in &Shuffled Order'
+      Hint =
+        'Run the groups, and each group'#39's tests, in a random order, to f' +
+        'ind tests that depend on running in a particular order (--shuffle)'
+      OnExecute = Act_ShuffleOrderExecute
+    end
+    object Act_ShuffleSeed: TAction
+      Caption = 'Shuffle S&eed...'
+      Hint =
+        'Choose a new random seed for each shuffled run, or one seed for ' +
+        'every run to repeat its order (--shuffle-seed)'
+      OnExecute = Act_ShuffleSeedExecute
+    end
   end
   object IL_Status: TImageList
     Left = 120
@@ -392,6 +409,15 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Caption = '&View'
       object MI_ViewResetLayout: TMenuItem
         Action = Act_ResetLayout
+      end
+    end
+    object MI_Options: TMenuItem
+      Caption = '&Options'
+      object MI_OptionsShuffleOrder: TMenuItem
+        Action = Act_ShuffleOrder
+      end
+      object MI_OptionsShuffleSeed: TMenuItem
+        Action = Act_ShuffleSeed
       end
     end
     object MI_Help: TMenuItem

@@ -52,6 +52,7 @@ limitations under the License.
 #include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_Layout.h"
 #include "ASWUnitTests_GUI_RunObserver.h"
+#include "ASWUnitTests_GUI_Shuffle.h"
 #include "ASWUnitTests_GUI_TestList.h"
 //---------------------------------------------------------------------------
 
@@ -76,6 +77,8 @@ __published: // IDE-managed Components
     TAction* Act_SelectAll;
     TAction* Act_SelectFailed;
     TAction* Act_SelectNone;
+    TAction* Act_ShuffleOrder;
+    TAction* Act_ShuffleSeed;
     TAction* Act_Stop;
     TActionList* AL_Main;
     TButton* Btn_CopyDetails;
@@ -97,6 +100,9 @@ __published: // IDE-managed Components
     TMenuItem* MI_Help;
     TMenuItem* MI_HelpAbout;
     TMenuItem* MI_HelpCommandLineOptions;
+    TMenuItem* MI_Options;
+    TMenuItem* MI_OptionsShuffleOrder;
+    TMenuItem* MI_OptionsShuffleSeed;
     TMenuItem* MI_Run;
     TMenuItem* MI_RunFailed;
     TMenuItem* MI_RunSelected;
@@ -135,6 +141,8 @@ __published: // IDE-managed Components
     void __fastcall Act_SelectAllExecute(TObject* Sender);
     void __fastcall Act_SelectFailedExecute(TObject* Sender);
     void __fastcall Act_SelectNoneExecute(TObject* Sender);
+    void __fastcall Act_ShuffleOrderExecute(TObject* Sender);
+    void __fastcall Act_ShuffleSeedExecute(TObject* Sender);
     void __fastcall Act_StopExecute(TObject* Sender);
     void __fastcall Edt_FilterChange(TObject* Sender);
     void __fastcall FormClose(TObject* Sender, TCloseAction& Action);
@@ -174,6 +182,8 @@ private: // User declarations
     bool m_Running;
     std::optional<std::chrono::steady_clock::time_point> m_RunStart;
     size_t m_RunTotalCount;
+    // Whether runs are shuffled, and with which seed; starts from --shuffle and --shuffle-seed.
+    ASWUnitTests::TGUIShuffle m_Shuffle;
     std::string m_StatusMessage;
     // True while the tree's check boxes are being set from m_TestList, so TV_TestsCheckStateChanging() lets
     // those changes through instead of treating them as clicks.
@@ -225,6 +235,8 @@ private:
     // Saves which tests are checked and shown for the next start, ignoring any error.
     void SaveSelection();
     void SetRunning(bool running);
+    // Shows m_Shuffle's state: Run in Shuffled Order's check mark, and the status bar.
+    void ShowShuffleState();
     void SyncTreeChecks();
     // The test's tree node, or nullptr while it's hidden.
     TTreeNode* TestNode(size_t testIndex);
