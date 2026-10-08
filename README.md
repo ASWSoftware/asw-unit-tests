@@ -343,8 +343,8 @@ on a worker thread instead, so it can't be combined with tests like that; the lo
 The GUI takes the same [command line options](#command-line-options) as the console runner, with these differences:
 
 - `--filter` and `--partition-index`/`--partition-count` choose which tests start out checked, instead of the
-  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern matches (and maybe a few more, left
-  unchecked, since the box ignores case and matches anywhere in the name).
+  saved selection, and `--filter`'s pattern also fills in the filter box. The box shows every test the pattern
+  matches (and maybe a few more, left unchecked, since the box ignores case and matches anywhere in the name).
 - `--project-name` is also shown in the window's caption.
 - `--shuffle` and `--shuffle-seed` set the Options menu's shuffle settings, which can then be changed.
 - `--report-junit` writes the report after every run, including Run Failed.
