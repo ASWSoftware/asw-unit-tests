@@ -30,6 +30,7 @@ limitations under the License.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <limits>
@@ -37,6 +38,7 @@ limitations under the License.
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -264,6 +266,27 @@ private:
         LessThanOrEqual
     };
 
+    // True when TValue has a get() member returning a pointer, like std::unique_ptr and std::shared_ptr.
+    template <typename TValue, typename = void>
+    struct THasPointerGet : std::false_type
+    {
+    };
+    template <typename TValue>
+    struct THasPointerGet<TValue, std::void_t<decltype(std::declval<TValue const&>().get())> > :
+        std::is_pointer<decltype(std::declval<TValue const&>().get())>
+    {
+    };
+
+    // True when TValue has a size() member, which DescribeContents() shows as an element count.
+    template <typename TValue, typename = void>
+    struct THasSize : std::false_type
+    {
+    };
+    template <typename TValue>
+    struct THasSize<TValue, std::void_t<decltype(std::declval<TValue const&>().size())> > : std::true_type
+    {
+    };
+
     // Used by the Assert ordering methods: throws TExceptOrdering unless 'value' has relation 'ordering' to 'bound'.
     template <typename TValue, typename TBound>
     void AssertOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
@@ -274,6 +297,45 @@ private:
             std::pair<std::string, std::string> const texts = FormatOrderingValues(value, bound);
             throw TExceptOrdering(method, line, texts.first, OrderingSymbol(ordering), texts.second, msg);
         }
+    }
+
+    // Runs 'callable' for the Throws/NoThrow methods and returns a description of what it threw (see
+    // DescribeException()), or nullopt when it threw nothing. A failure signal from this framework (a TTestException,
+    // e.g. an Assert* failure, Fail() or Skip()) passes straight through. Each exception is caught exactly once,
+    // never rethrown and caught again, since an RTL exception object is freed when the first handler that catches
+    // it ends.
+    template <typename TCallable>
+    static std::optional<std::string> CallAndDescribeException(TCallable&& callable)
+    {
+        try
+        {
+            static_cast<void>(std::forward<TCallable>(callable)());
+        }
+        catch (TTestException const&)
+        {
+            throw;
+        }
+        catch (std::exception const& ex)
+        {
+            return DescribeException(ex);
+        }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        catch (System::Sysutils::Exception& ex)
+        {
+            return DescribeException(ex);
+        }
+        catch (...)
+        {
+            return std::string("an object that is neither a std::exception nor an RTL Exception");
+        }
+#else
+        catch (...)
+        {
+            return std::string("a non-std::exception object");
+        }
+#endif
+
+        return std::nullopt;
     }
 
     // Used by the Check ordering methods: records a failure unless 'value' has relation 'ordering' to 'bound'.
@@ -319,6 +381,46 @@ private:
         }
     }
 
+    // Describes a non-empty 'value' for an Empty failure: its text (e.g. "was \"abc\""), with wide text as UTF-8, its
+    // element count (e.g. "had 3 elements") when it has a size(), or "was not empty".
+    static std::string DescribeContents(std::string const& text);
+    static std::string DescribeContents(std::wstring const& text);
+    template <typename TValue>
+    static std::string DescribeContents(TValue const& value)
+    {
+        // Text types other than std::string/std::wstring, such as std::string_view.
+        if constexpr (std::is_constructible<std::string, TValue const&>::value)
+        {
+            return DescribeContents(std::string(value));
+        }
+        else if constexpr (std::is_constructible<std::wstring, TValue const&>::value)
+        {
+            return DescribeContents(std::wstring(value));
+        }
+        else if constexpr (THasSize<TValue>::value)
+        {
+            unsigned long long const size = static_cast<unsigned long long>(value.size());
+            return "had " + std::to_string(size) + ((size == 1) ? " element" : " elements");
+        }
+        else
+        {
+            return "was not empty";
+        }
+    }
+
+    // Describes 'ex' for a Throws/NoThrow failure: what() for a std::exception, or "ClassName: Message" for an RTL
+    // exception (see DescribeRTLException()).
+    static std::string DescribeException(std::exception const& ex);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::string DescribeException(System::Sysutils::Exception& ex);
+#endif
+
+    // The message a Throws method checks for its expected substring: what(), or an RTL exception's Message.
+    static std::string ExceptionMessage(std::exception const& ex);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::string ExceptionMessage(System::Sysutils::Exception& ex);
+#endif
+
     template <typename TInteger>
     static bool FitsInInt64(TInteger value)
     {
@@ -327,6 +429,9 @@ private:
         else
             return static_cast<uint64_t>(value) <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
     }
+
+    // Formats 'address' in hexadecimal for a pointer comparison failure, e.g. "0x7ffd5a2c"; see FormatPointer().
+    static std::string FormatAddress(std::uintptr_t address);
 
     // Formats a pair of floating-point values for an ordering failure; see FormatOrderingValues().
     static std::pair<std::string, std::string> FormatFloatingPointValues(float value, float bound);
@@ -346,6 +451,26 @@ private:
         else
         {
             return std::pair<std::string, std::string>(std::to_string(value), std::to_string(bound));
+        }
+    }
+
+    // Formats 'pointer' for a pointer comparison failure: its address (see FormatAddress()), or "(null)".
+    template <typename TPointer>
+    static std::string FormatPointer(TPointer pointer)
+    {
+        if (pointer == nullptr)
+            return "(null)";
+
+        if constexpr (std::is_function<typename std::remove_pointer<TPointer>::type>::value)
+        {
+            // A function pointer can't portably be cast to an integer, so its bytes are copied instead.
+            std::uintptr_t address = 0;
+            std::memcpy(&address, &pointer, (sizeof(pointer) < sizeof(address)) ? sizeof(pointer) : sizeof(address));
+            return FormatAddress(address);
+        }
+        else
+        {
+            return FormatAddress(reinterpret_cast<std::uintptr_t>(pointer));
         }
     }
 
@@ -372,6 +497,19 @@ private:
             return true;
     }
 
+    // Runs 'callable' for the NoThrow methods (e.g. CheckNoThrow()) and returns why it failed, or an empty string when
+    // it threw nothing. A failure signal from this framework (e.g. an Assert* failure inside 'callable') passes
+    // straight through, failing the test as usual.
+    template <typename TCallable>
+    static std::string NoThrowFailure(TCallable&& callable)
+    {
+        std::optional<std::string> const thrown = CallAndDescribeException(std::forward<TCallable>(callable));
+        if (thrown != std::nullopt)
+            return "Expected no exception but caught: " + *thrown;
+
+        return std::string();
+    }
+
     // True when 'order' (from CompareForOrdering()) satisfies 'ordering'; never when it's nullopt (a NaN).
     static bool OrderingHolds(std::optional<int> order, TOrdering ordering);
     // The operator for 'ordering' in a failure message, e.g. ">=".
@@ -387,11 +525,120 @@ private:
     static std::string RTLTextToUTF8(System::String const& text);
 #endif
 
+    // The address the Same methods (e.g. CheckSame()) compare: a smart pointer's get(), or a raw pointer (or an
+    // array, or a function) as it is.
+    template <typename TValue, typename std::enable_if<
+        std::is_pointer<decltype(std::declval<TValue const&>().get())>::value, int>::type = 0>
+    static auto SameAddress(TValue const& value)
+    {
+        return value.get();
+    }
+    template <typename TValue, typename std::enable_if<
+        std::is_pointer<typename std::decay<TValue const>::type>::value, int>::type = 0>
+    static typename std::decay<TValue const>::type SameAddress(TValue const& value)
+    {
+        return value;
+    }
+
     template <typename T>
     static int ThreeWayCompare(T a, T b)
     {
         return (a < b) ? -1 : ((b < a) ? 1 : 0);
     }
+
+    // Runs 'callable' for the Throws methods (e.g. CheckThrows()) and returns why it failed, or an empty string when
+    // it threw a TException (or a subclass) whose message contains 'expectedMessage'. A failure signal from this
+    // framework (e.g. an Assert* failure inside 'callable') passes straight through, failing the test as usual,
+    // unless TException asks for one (e.g. TExceptTrue).
+    template <typename TException, typename TCallable>
+    static std::string ThrowsFailure(TCallable&& callable, std::string const& expectedMessage)
+    {
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        constexpr bool isRTLException = std::is_base_of<System::Sysutils::Exception, TException>::value;
+#else
+        constexpr bool isRTLException = false;
+#endif
+        static_assert(std::is_base_of<std::exception, TException>::value || isRTLException,
+            "TException must be a std::exception, or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception, or a subclass");
+
+        bool caught = false;
+        std::string failure;
+
+        // The TException handler is in its own try block, so anything else 'callable' throws propagates once to
+        // CallAndDescribeException()'s handlers rather than being rethrown and caught again (see there).
+        std::optional<std::string> const otherException = CallAndDescribeException([&]()
+            {
+                try
+                {
+                    static_cast<void>(std::forward<TCallable>(callable)());
+                }
+                catch (TException& ex)
+                {
+                    // A TException that is a base of TTestException (e.g. std::exception) also catches the
+                    // framework's own signals, which must still pass through.
+                    if constexpr (std::is_base_of<TException, TTestException>::value &&
+                                  !std::is_same<TException, TTestException>::value)
+                    {
+                        if (dynamic_cast<TTestException*>(&ex) != nullptr)
+                            throw;
+                    }
+
+                    caught = true;
+
+                    if (!expectedMessage.empty() && (ExceptionMessage(ex).find(expectedMessage) == std::string::npos))
+                    {
+                        failure = "Expected the exception message to contain \"" + expectedMessage + "\" but caught: " +
+                            DescribeException(ex);
+                    }
+                }
+            });
+
+        if (otherException != std::nullopt)
+            return "Expected a different exception type but caught: " + *otherException;
+
+        if (!caught)
+            return "Expected an exception but none was thrown";
+
+        return failure;
+    }
+
+    // Why 'value' fails a type check against TType (with 'expectType' false for an IsNotType method), or an empty
+    // string when it passes. The check uses dynamic_cast, so a subclass of TType counts as a TType, and a null pointer
+    // never does. A failure shows the type names (see TypeName()), with the object's dynamic type.
+    template <typename TType, typename TValue>
+    static std::string TypeCheckFailure(TValue const& value, bool expectType)
+    {
+        static_assert(std::is_class<TType>::value, "TType must be a class type, e.g. CheckIsType<TCircle>(shape, ...)");
+
+        auto const pointer = TypeCheckPointer(value);
+        typedef typename std::remove_cv<typename std::remove_pointer<decltype(pointer)>::type>::type TPointee;
+        static_assert(std::is_polymorphic<TPointee>::value,
+            "the value must point to a polymorphic class (one with a virtual function), as dynamic_cast requires");
+
+        bool const isType = (dynamic_cast<TType const*>(pointer) != nullptr);
+        if (isType == expectType)
+            return std::string();
+
+        std::string const actual = (pointer == nullptr) ? std::string("null") :
+                ("\"" + TypeName(typeid(*pointer)) + "\"");
+        return std::string(expectType ? "Expected type \"" : "Expected not type \"") + TypeName(typeid(TType)) +
+            "\" but was " + actual;
+    }
+
+    // The pointer a type check inspects: a raw pointer as it is, a smart pointer's get(), or an object's address.
+    template <typename TValue>
+    static auto TypeCheckPointer(TValue const& value)
+    {
+        if constexpr (std::is_pointer<TValue>::value)
+            return value;
+        else if constexpr (THasPointerGet<TValue>::value)
+            return value.get();
+        else
+            return std::addressof(value);
+    }
+
+    // 'type''s name for a failure message, demangled where the compiler's name() is mangled (e.g. GCC and Clang).
+    static std::string TypeName(std::type_info const& type);
 
 protected:
     bool m_ExceptionExpected;
@@ -414,6 +661,10 @@ protected:
     // True when the current test's exception expectation (see SetExceptionExpected<TException>()) also
     // requires a specific exception type, rather than accepting any thrown exception.
     virtual bool ExceptionTypeExpected() const;
+
+    // Aborts the current test and reports it as failed, like a failed Assert* method, even while an exception is
+    // expected.
+    virtual void Fail(std::string const& method, int line, std::string const& msg);
 
     virtual void Log(std::string const& msg);
     virtual void LogAppend(std::string const& msg);
@@ -560,6 +811,34 @@ protected: // Assertion/Check methods - Equals
                 AssertEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+    // Any two pointers, compared by address, except two C strings of the same character type, which the overloads
+    // above compare by content. Without these, two pointers would convert to bool and match the bool overload. Two
+    // pointers that can't be compared with each other (e.g. int* and long*) are a compile error.
+    template <typename TPointer, typename TChar>
+    using TPointsTo = std::is_same<typename std::remove_cv<typename std::remove_pointer<TPointer>::type>::type, TChar>;
+    template <typename TExpected, typename TActual>
+    using TEnableIfPointers = typename std::enable_if<std::is_pointer<TExpected>::value &&
+        std::is_pointer<TActual>::value &&
+        !(TPointsTo<TExpected, char>::value && TPointsTo<TActual, char>::value) &&
+        !(TPointsTo<TExpected, wchar_t>::value && TPointsTo<TActual, wchar_t>::value), int>::type;
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void AssertEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected != actual)
+            throw TExceptEquals(method, line, FormatPointer(expected), FormatPointer(actual), msg);
+    }
+    // Two values of the same scoped enum (enum class) type, compared by their underlying values, which a failure
+    // shows. An unscoped enum converts to an integer and matches an overload above instead.
+    template <typename TEnum>
+    using TEnableIfScopedEnum = typename std::enable_if<std::is_enum<TEnum>::value &&
+        !std::is_convertible<TEnum, int>::value, int>::type;
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void AssertEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        AssertEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
+    }
 
     virtual void AssertEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -600,6 +879,19 @@ protected: // Assertion/Check methods - Equals
             {
                 CheckEquals(expectedValue, actualValue, method, line, msg);
             });
+    }
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void CheckEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected != actual)
+            SetTestFailedCheck(method, line, FormatPointer(expected), FormatPointer(actual), msg);
+    }
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void CheckEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        CheckEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
     }
 
     virtual void CheckEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
@@ -643,6 +935,21 @@ protected: // Assertion/Check methods - Not Equals
                 AssertNotEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+    // Two pointers, compared by address; see TEnableIfPointers.
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected == actual)
+            throw TExceptNotEquals(method, line, FormatPointer(expected), msg);
+    }
+    // Two values of the same scoped enum type, compared by their underlying values; see TEnableIfScopedEnum.
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void AssertNotEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        AssertNotEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
+    }
 
     virtual void AssertNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -684,6 +991,19 @@ protected: // Assertion/Check methods - Not Equals
                 CheckNotEquals(expectedValue, actualValue, method, line, msg);
             });
     }
+    template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected expected, TActual actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (expected == actual)
+            SetTestFailedCheckNotEquals(method, line, FormatPointer(expected), msg);
+    }
+    template <typename TEnum, TEnableIfScopedEnum<TEnum> = 0>
+    void CheckNotEquals(TEnum expected, TEnum actual, std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::underlying_type<TEnum>::type TUnderlying;
+        CheckNotEquals(static_cast<TUnderlying>(expected), static_cast<TUnderlying>(actual), method, line, msg);
+    }
 
     virtual void CheckNotEqualsIC(std::string const& expected, std::string const& actual, std::string const& method,
         int line, std::string const& msg);
@@ -716,6 +1036,194 @@ protected: // Assertion/Check methods - Boolean
     virtual void AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg);
     virtual void CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg);
+
+protected: // Assertion/Check methods - Null (value compared with nullptr)
+    // Any type that can be compared with nullptr, e.g. a raw pointer, std::unique_ptr, std::shared_ptr or
+    // std::function, except an array, which is never null.
+    template <typename TValue>
+    using TEnableIfNullComparable = typename std::enable_if<!std::is_array<TValue>::value &&
+        std::is_convertible<decltype(std::declval<TValue const&>() == nullptr), bool>::value, int>::type;
+
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void AssertNotNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (isNull)
+            throw TExceptNotNull(method, line, msg);
+    }
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void AssertNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (!isNull)
+            throw TExceptNull(method, line, msg);
+    }
+
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void CheckNotNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (isNull)
+            SetTestFailedCheck(method, line, "Expected not null but was null: \"" + msg + "\"");
+    }
+    template <typename TValue, TEnableIfNullComparable<TValue> = 0>
+    void CheckNull(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        bool const isNull = (value == nullptr);
+        if (!isNull)
+            SetTestFailedCheck(method, line, "Expected null but was not null: \"" + msg + "\"");
+    }
+
+protected: // Assertion/Check methods - Same (identity, compared by address)
+    // Any two raw pointers, arrays or smart pointers (std::unique_ptr, std::shared_ptr) that point to types that can
+    // be compared with each other, mixed freely. Unlike CheckEquals(), two C strings are compared by address too.
+    template <typename TExpected, typename TActual>
+    using TEnableIfSameComparable = typename std::enable_if<std::is_convertible<
+        decltype(SameAddress(std::declval<TExpected const&>()) == SameAddress(std::declval<TActual const&>())),
+        bool>::value, int>::type;
+
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void AssertNotSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) == SameAddress(actual))
+            throw TExceptNotSame(method, line, FormatPointer(SameAddress(expected)), msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void AssertSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) != SameAddress(actual))
+            throw TExceptSame(method, line, FormatPointer(SameAddress(expected)), FormatPointer(SameAddress(actual)),
+                msg);
+    }
+
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void CheckNotSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) == SameAddress(actual))
+        {
+            SetTestFailedCheck(method, line, "Expected a different object but both are \"" +
+                FormatPointer(SameAddress(expected)) + "\". " + msg);
+        }
+    }
+    template <typename TExpected, typename TActual, TEnableIfSameComparable<TExpected, TActual> = 0>
+    void CheckSame(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if (SameAddress(expected) != SameAddress(actual))
+        {
+            SetTestFailedCheck(method, line, "Expected the same object as \"" + FormatPointer(SameAddress(expected)) +
+                "\" but was \"" + FormatPointer(SameAddress(actual)) + "\". " + msg);
+        }
+    }
+
+protected: // Assertion/Check methods - Type (dynamic type, via dynamic_cast)
+    // Each takes a raw pointer, a smart pointer (std::unique_ptr, std::shared_ptr) or an object, of a polymorphic
+    // class, and checks whether it is a TType, a subclass counting as one. A null pointer is never a TType. A failure
+    // shows the expected type and the object's actual type; see TypeCheckFailure().
+    template <typename TType, typename TValue>
+    void AssertIsNotType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, false);
+        if (!failure.empty())
+            throw TExceptIsNotType(method, line, failure, msg);
+    }
+    template <typename TType, typename TValue>
+    void AssertIsType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, true);
+        if (!failure.empty())
+            throw TExceptIsType(method, line, failure, msg);
+    }
+
+    template <typename TType, typename TValue>
+    void CheckIsNotType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, false);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+    template <typename TType, typename TValue>
+    void CheckIsType(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = TypeCheckFailure<TType>(value, true);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+
+protected: // Assertion/Check methods - Throws (exception from a callable)
+    // Each runs 'callable' (e.g. a lambda) and checks whether it throws. Unlike with SetExceptionExpected(), the test
+    // carries on afterwards (unless an Assert method fails), so it can check several calls and the state after each.
+    // The Throws methods pass when 'callable' throws a TException or a subclass (TException being a std::exception,
+    // or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception) whose message contains 'expectedMessage', when that isn't
+    // empty. A failure signal from this framework inside 'callable' (e.g. an Assert* failure, Fail() or Skip()) still
+    // ends the test as usual, unless TException asks for one.
+    template <typename TCallable>
+    void AssertNoThrow(TCallable&& callable, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = NoThrowFailure(std::forward<TCallable>(callable));
+        if (!failure.empty())
+            throw TExceptNoThrow(method, line, failure, msg);
+    }
+    template <typename TException, typename TCallable>
+    void AssertThrows(TCallable&& callable, std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        std::string const failure = ThrowsFailure<TException>(std::forward<TCallable>(callable), expectedMessage);
+        if (!failure.empty())
+            throw TExceptThrows(method, line, failure, msg);
+    }
+
+    template <typename TCallable>
+    void CheckNoThrow(TCallable&& callable, std::string const& method, int line, std::string const& msg)
+    {
+        std::string const failure = NoThrowFailure(std::forward<TCallable>(callable));
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+    template <typename TException, typename TCallable>
+    void CheckThrows(TCallable&& callable, std::string const& method, int line, std::string const& msg,
+        std::string const& expectedMessage = std::string())
+    {
+        std::string const failure = ThrowsFailure<TException>(std::forward<TCallable>(callable), expectedMessage);
+        if (!failure.empty())
+            SetTestFailedCheck(method, line, failure + ". " + msg);
+    }
+
+protected: // Assertion/Check methods - Empty (string or container)
+    // Anything with an empty() member, e.g. std::string, std::wstring, std::vector or std::map. A failure shows a
+    // non-empty value's text or element count; see DescribeContents().
+    template <typename TValue>
+    using TEnableIfHasEmpty = typename std::enable_if<
+        std::is_convertible<decltype(std::declval<TValue const&>().empty()), bool>::value, int>::type;
+
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void AssertEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (!value.empty())
+            throw TExceptEmpty(method, line, "Expected empty but " + DescribeContents(value), msg);
+    }
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void AssertNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (value.empty())
+            throw TExceptNotEmpty(method, line, msg);
+    }
+
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void CheckEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (!value.empty())
+            SetTestFailedCheck(method, line, "Expected empty but " + DescribeContents(value) + ". " + msg);
+    }
+    template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
+    void CheckNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
+    {
+        if (value.empty())
+            SetTestFailedCheck(method, line, "Expected not empty but was empty. " + msg);
+    }
 
 protected: // Assertion/Check methods - Contains (substring)
     virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
@@ -839,6 +1347,30 @@ protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
     virtual void CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Matches (regular expression)
+    // Each checks whether the whole of 'text' matches the ECMAScript regular expression 'pattern' (std::regex_match;
+    // start or end a pattern with ".*" to match part of the text). Wide text is matched with std::wregex. An invalid
+    // pattern fails the check, showing why, rather than throwing std::regex_error.
+    virtual void AssertMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void AssertNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
+    virtual void CheckNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+        int line, std::string const& msg);
+
 protected: // Assertion/Check methods - Ordering (value compared with a bound)
     // Any two integer or floating-point types except bool.
     template <typename TValue, typename TBound>
@@ -892,10 +1424,23 @@ protected: // Assertion/Check methods - Ordering (value compared with a bound)
         CheckOrdering(value, bound, TOrdering::LessThanOrEqual, method, line, msg);
     }
 
+protected: // Assertion/Check methods - Memory (bytes)
+    // Each compares the 'size' bytes at 'expected' with those at 'actual'. A failure shows the offset of the first
+    // differing byte and up to 16 bytes from there, in hex. Zero bytes, or the same pointer twice (even null), are
+    // equal; exactly one null pointer isn't equal to anything, and neither is read.
+    virtual void AssertEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& method,
+        int line, std::string const& msg);
+    virtual void AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+        std::string const& method, int line, std::string const& msg);
+    virtual void CheckEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& method,
+        int line, std::string const& msg);
+    virtual void CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+        std::string const& method, int line, std::string const& msg);
+
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 protected: // Assertion/Check methods - System::String (RTL)
     // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
-    // UTF-8. The other may also be a std::string, std::wstring or C string.
+    // UTF-8. The other may also be a std::string, std::wstring or C string. The Empty methods take one System::String.
     template <typename TText>
     using TIsRTLString = std::is_same<typename std::decay<TText>::type, System::String>;
     template <typename TText>
@@ -909,6 +1454,9 @@ protected: // Assertion/Check methods - System::String (RTL)
     template <typename TFirst, typename TSecond>
     using TEnableIfRTLText = typename std::enable_if<(TIsRTLString<TFirst>::value ||
         TIsRTLString<TSecond>::value) && TIsRTLText<TFirst>::value && TIsRTLText<TSecond>::value, int>::type;
+    // Exactly a System::String, so nothing else converts to one implicitly (e.g. a C string, only in RTL builds).
+    template <typename TText>
+    using TEnableIfRTLString = typename std::enable_if<TIsRTLString<TText>::value, int>::type;
 
     template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
     void AssertContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
@@ -921,6 +1469,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         AssertContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void AssertEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        AssertEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void AssertEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -957,6 +1510,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         AssertNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void AssertNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        AssertNotEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -1019,6 +1577,11 @@ protected: // Assertion/Check methods - System::String (RTL)
     {
         CheckContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
     }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void CheckEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        CheckEmpty(RTLTextToUTF8(text), method, line, msg);
+    }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
         std::string const& msg)
@@ -1054,6 +1617,11 @@ protected: // Assertion/Check methods - System::String (RTL)
         std::string const& msg)
     {
         CheckNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+    }
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void CheckNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        CheckNotEmpty(RTLTextToUTF8(text), method, line, msg);
     }
     template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
     void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
@@ -1123,6 +1691,11 @@ protected: // Assertion/Check methods - std::source_location
         AssertContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TValue>
+    void AssertEmpty(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TSuffix>
     void AssertEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1151,6 +1724,11 @@ protected: // Assertion/Check methods - std::source_location
         AssertEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void AssertEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void AssertFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         AssertFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -1169,6 +1747,18 @@ protected: // Assertion/Check methods - std::source_location
         AssertGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TType, typename TValue>
+    void AssertIsNotType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertIsNotType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TType, typename TValue>
+    void AssertIsType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertIsType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TValue, typename TBound>
     void AssertLessThan(TValue&& value, TBound&& bound, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1183,12 +1773,25 @@ protected: // Assertion/Check methods - std::source_location
         AssertLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TPattern>
+    void AssertMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void AssertNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {
         AssertNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TCallable>
+    void AssertNoThrow(TCallable&& callable, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNoThrow(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSubstring>
     void AssertNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
@@ -1203,6 +1806,12 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void AssertNotEmpty(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void AssertNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
@@ -1232,12 +1841,37 @@ protected: // Assertion/Check methods - std::source_location
         AssertNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPattern>
+    void AssertNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void AssertNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {
         AssertNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void AssertNotNull(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertNotSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertNotSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void AssertNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
@@ -1253,6 +1887,18 @@ protected: // Assertion/Check methods - std::source_location
         AssertNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TValue>
+    void AssertNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        AssertNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void AssertSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        AssertSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TText, typename TPrefix>
     void AssertStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1266,6 +1912,13 @@ protected: // Assertion/Check methods - std::source_location
     {
         AssertStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TException, typename TCallable>
+    void AssertThrows(TCallable&& callable, std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        AssertThrows<TException>(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()),
+            msg, expectedMessage);
     }
     void AssertTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
@@ -1285,6 +1938,11 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckEmpty(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void CheckEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
@@ -1314,6 +1972,11 @@ protected: // Assertion/Check methods - std::source_location
         CheckEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void CheckEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void CheckFalse(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckFalse(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
@@ -1332,6 +1995,17 @@ protected: // Assertion/Check methods - std::source_location
         CheckGreaterThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TType, typename TValue>
+    void CheckIsNotType(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckIsNotType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TType, typename TValue>
+    void CheckIsType(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckIsType<TType>(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     template <typename TValue, typename TBound>
     void CheckLessThan(TValue&& value, TBound&& bound, std::string const& msg,
         std::source_location loc = std::source_location::current())
@@ -1346,12 +2020,25 @@ protected: // Assertion/Check methods - std::source_location
         CheckLessThanOrEqual(std::forward<TValue>(value), std::forward<TBound>(bound), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TText, typename TPattern>
+    void CheckMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void CheckNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {
         CheckNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TCallable>
+    void CheckNoThrow(TCallable&& callable, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNoThrow(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSubstring>
     void CheckNotContains(TText&& text, TSubstring&& substring, std::string const& msg,
@@ -1366,6 +2053,12 @@ protected: // Assertion/Check methods - std::source_location
     {
         CheckNotContainsIC(std::forward<TText>(text), std::forward<TSubstring>(substring), loc.function_name(),
             static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckNotEmpty(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEmpty(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TSuffix>
     void CheckNotEndsWith(TText&& text, TSuffix&& suffix, std::string const& msg,
@@ -1395,12 +2088,37 @@ protected: // Assertion/Check methods - std::source_location
         CheckNotEqualsIC(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    void CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotEqualsMem(expected, actual, size, loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TText, typename TPattern>
+    void CheckNotMatches(TText&& text, TPattern&& pattern, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotMatches(std::forward<TText>(text), std::forward<TPattern>(pattern), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
     template <typename TExpected, typename TActual, typename TTolerance>
     void CheckNotNear(TExpected&& expected, TActual&& actual, TTolerance&& tolerance, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {
         CheckNotNear(std::forward<TExpected>(expected), std::forward<TActual>(actual),
             std::forward<TTolerance>(tolerance), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckNotNull(TValue&& value, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckNotSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckNotSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
     void CheckNotStartsWith(TText&& text, TPrefix&& prefix, std::string const& msg,
@@ -1414,6 +2132,18 @@ protected: // Assertion/Check methods - std::source_location
         std::source_location loc = std::source_location::current())
     {
         CheckNotStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
+            static_cast<int>(loc.line()), msg);
+    }
+    template <typename TValue>
+    void CheckNull(TValue&& value, std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        CheckNull(std::forward<TValue>(value), loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
+    template <typename TExpected, typename TActual>
+    void CheckSame(TExpected&& expected, TActual&& actual, std::string const& msg,
+        std::source_location loc = std::source_location::current())
+    {
+        CheckSame(std::forward<TExpected>(expected), std::forward<TActual>(actual), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
     template <typename TText, typename TPrefix>
@@ -1430,11 +2160,22 @@ protected: // Assertion/Check methods - std::source_location
         CheckStartsWithIC(std::forward<TText>(text), std::forward<TPrefix>(prefix), loc.function_name(),
             static_cast<int>(loc.line()), msg);
     }
+    template <typename TException, typename TCallable>
+    void CheckThrows(TCallable&& callable, std::string const& msg, std::string const& expectedMessage = std::string(),
+        std::source_location loc = std::source_location::current())
+    {
+        CheckThrows<TException>(std::forward<TCallable>(callable), loc.function_name(), static_cast<int>(loc.line()),
+            msg, expectedMessage);
+    }
     void CheckTrue(bool testVal, std::string const& msg, std::source_location loc = std::source_location::current())
     {
         CheckTrue(testVal, loc.function_name(), static_cast<int>(loc.line()), msg);
     }
 
+    void Fail(std::string const& msg, std::source_location loc = std::source_location::current())
+    {
+        Fail(loc.function_name(), static_cast<int>(loc.line()), msg);
+    }
     void SetExceptionExpected(bool expected, std::string const& msg,
         std::source_location loc = std::source_location::current())
     {

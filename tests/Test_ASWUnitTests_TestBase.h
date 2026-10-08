@@ -47,13 +47,21 @@ private: // Test methods
     void Test_Check_ContinuesButAssert_Aborts();
     void Test_ContainsIC_IgnoresASCIICaseOnly();
     void Test_Contains_ShowsTextAndSubstring();
+    void Test_Empty_ShowsContentsOnFailure();
     void Test_EndsWithIC_IgnoresASCIICaseOnly();
     void Test_EndsWith_ShowsTextAndSuffix();
     void Test_EqualsIC_IgnoresASCIICaseOnly();
+    void Test_EqualsMem_ShowsFirstDifferingBytes();
     void Test_Equals_ComparesCStringsByContent();
+    void Test_Equals_ComparesEnumClassByUnderlyingValue();
     void Test_Equals_ComparesMixedIntegerTypesByValue();
+    void Test_Equals_ComparesPointersByAddress();
     void Test_Equals_ShowsBoolValuesAsTrueOrFalse();
     void Test_Equals_ShowsStringValues();
+    void Test_Fail_AbortsTestAsFailed();
+    void Test_IsType_UsesDynamicTypeAndShowsNames();
+    void Test_Matches_MatchesWholeTextAndShowsPattern();
+    void Test_NullNotNull_FailureNamesTheExpectedValue();
     void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
@@ -67,6 +75,7 @@ private: // Test methods
     void Test_Run_ResetsResultsBetweenRuns();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
     void Test_Run_StopsWhenRunObserverRequests();
+    void Test_Same_ComparesAddressesNotContent();
     void Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
@@ -76,6 +85,7 @@ private: // Test methods
 #endif
     void Test_StartsWithIC_IgnoresASCIICaseOnly();
     void Test_StartsWith_ShowsTextAndPrefix();
+    void Test_Throws_ChecksTypeAndMessageAndContinues();
     void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:

@@ -10,6 +10,65 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- `CheckNull`/`AssertNull` and `CheckNotNull`/`AssertNotNull`, which compare a
+  value with `nullptr`. They accept anything that can be compared with
+  `nullptr`, such as a raw pointer, `std::unique_ptr`, `std::shared_ptr` or
+  `std::function`. A C string is checked as a pointer, so an empty string
+  such as `""` is not null. With C++20, they also have `std::source_location`
+  overloads, like the other `Check*`/`Assert*` methods.
+- `CheckSame`/`AssertSame` and `CheckNotSame`/`AssertNotSame`, which check
+  that two values do or don't point to the same object. They take raw
+  pointers, arrays, and smart pointers (`std::unique_ptr`, `std::shared_ptr`)
+  in any mix, and compare C strings by address, not content. A failure shows
+  the addresses.
+- `Fail()`, which fails the current test unconditionally, with a message, in
+  place of `AssertTrue(false, ...)`. Like an `Assert*` method, it aborts the
+  test, and it fails the test even while an exception is expected. It throws
+  the new `TExceptFail`.
+- `CheckThrows<TException>`/`AssertThrows<TException>` and
+  `CheckNoThrow`/`AssertNoThrow`, which run a callable (e.g. a lambda) and
+  check that it does or doesn't throw. Unlike `SetExceptionExpected()`, the
+  test carries on afterwards, so it can check several calls and the state
+  after each. The Throws methods take an optional substring the exception's
+  message must contain, and match the type like `SetExceptionExpected()`,
+  RTL exception types included. A failed `Assert*`, `Fail()` or `Skip()`
+  inside the callable still ends the test as usual.
+- `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` accept
+  two values of the same scoped enum (`enum class`) type, which was a compile
+  error, and a failure shows their underlying values. Comparing two different
+  enum types, or an `enum class` with an integer, is still a compile error.
+- `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty`, for
+  anything with an `empty()` member (strings, containers) and, with
+  `ASWUNITTESTS_RTL_EXCEPTIONS`, a `System::String`. Unlike
+  `CheckTrue(x.empty(), ...)`, a failure shows the text, or a container's
+  element count.
+- `CheckMatches`/`AssertMatches` and `CheckNotMatches`/`AssertNotMatches`,
+  which check whether the whole of a `std::string` or `std::wstring` matches
+  an ECMAScript regular expression (`std::regex_match`). A failure shows the
+  text and the pattern, and an invalid pattern fails the check rather than
+  throwing `std::regex_error`.
+- `CheckIsType<TType>`/`AssertIsType<TType>` and
+  `CheckIsNotType<TType>`/`AssertIsNotType<TType>`, which check with
+  `dynamic_cast` whether an object, given as a raw or smart pointer or by
+  reference, is a `TType` (a subclass counting as one). A failure shows the
+  expected type and the object's actual type. RTL classes work too.
+- `CheckEqualsMem`/`AssertEqualsMem` and `CheckNotEqualsMem`/
+  `AssertNotEqualsMem`, which compare a number of bytes at two addresses. A
+  failure shows the offset of the first differing byte and up to 16 bytes from
+  there, in hex.
+
+### Fixed
+
+- `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` given
+  two pointers compared them as `bool`, so any two non-null pointers were
+  equal: `CheckEquals(&a, &b, ...)` passed. They now compare the addresses,
+  and a failure shows both (e.g. `0x7ffd5a2c`, or `(null)`). Two C strings
+  are still compared by content. A test that passed only because of this now
+  fails, and comparing two pointers to unrelated types (e.g. `int*` and
+  `long*`) is now a compile error.
+
 ## [1.1.0] - 2026-10-04
 
 ### Added

@@ -27,6 +27,7 @@ limitations under the License.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <future>
 #include <iomanip>
 #include <iostream>
@@ -34,6 +35,7 @@ limitations under the License.
 #include <locale>
 #include <memory>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <thread>
 //---------------------------------------------------------------------------
@@ -41,6 +43,15 @@ limitations under the License.
 #include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
+// abi::__cxa_demangle(), for TypeName(), where the library has it (GCC and Clang, whose std::type_info::name() is
+// mangled). MSVC's name() is already readable.
+#if defined(__has_include)
+#  if __has_include(<cxxabi.h>)
+#    include <cxxabi.h>
+#    define ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED 1
+#  endif
+#endif
 //---------------------------------------------------------------------------
 
 namespace
@@ -109,6 +120,17 @@ bool EndsWithIgnoringASCIICase(TString const& text, TString const& suffix)
         CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
+// Returns 'text' for display in a failure message, as UTF-8.
+std::string DisplayText(std::string const& text)
+{
+    return text;
+}
+
+std::string DisplayText(std::wstring const& text)
+{
+    return ASWUnitTests::WideToUTF8(text);
+}
+
 // True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
 template <typename TString>
 bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
@@ -152,6 +174,99 @@ std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat
     }
 
     return texts;
+}
+
+// Up to 16 of the 'size' bytes at 'bytes', from 'offset', as uppercase hex pairs (e.g. "0A 1B 2C"), followed by " ..."
+// when more follow.
+std::string HexBytes(unsigned char const* bytes, std::size_t offset, std::size_t size)
+{
+    std::size_t const maxShown = 16;
+    std::size_t const end = ((size - offset) > maxShown) ? (offset + maxShown) : size;
+
+    std::ostringstream oss;
+    oss << std::uppercase << std::hex << std::setfill('0');
+    for (std::size_t i = offset; i < end; ++i)
+        oss << ((i == offset) ? "" : " ") << std::setw(2) << static_cast<unsigned int>(bytes[i]);
+
+    if (end < size)
+        oss << " ...";
+
+    return oss.str();
+}
+
+// True if the whole of 'text' matches the ECMAScript regular expression 'pattern'. When 'pattern' is invalid, or too
+// complex to match, returns false and sets 'error' to std::regex_error's description; otherwise leaves 'error' alone.
+template <typename TString>
+bool MatchesRegex(TString const& text, TString const& pattern, std::string& error)
+{
+    try
+    {
+        std::basic_regex<typename TString::value_type> const regex(pattern);
+        return std::regex_match(text, regex);
+    }
+    catch (std::regex_error const& ex)
+    {
+        error = ex.what();
+        return false;
+    }
+}
+
+// The failure detail for an EqualsMem (when 'expectEqual') or NotEqualsMem method, or an empty string when it passes.
+// Zero bytes, or the same pointer twice (even null), are equal without reading either. Exactly one null pointer is
+// never equal to the other memory, and isn't read.
+std::string MemoryFailure(void const* expected, void const* actual, std::size_t size, bool expectEqual)
+{
+    unsigned char const* const expectedBytes = static_cast<unsigned char const*>(expected);
+    unsigned char const* const actualBytes = static_cast<unsigned char const*>(actual);
+
+    if (size > 0 && ((expectedBytes == nullptr) != (actualBytes == nullptr)))
+    {
+        if (!expectEqual)
+            return std::string();
+
+        return "Cannot compare " + std::to_string(size) + " bytes: " +
+            ((expectedBytes == nullptr) ? "expected" : "actual") + " is null";
+    }
+
+    std::size_t offset = size;
+    if (expectedBytes != actualBytes)
+    {
+        offset = 0;
+        while (offset < size && expectedBytes[offset] == actualBytes[offset])
+            ++offset;
+    }
+
+    bool const equal = (offset == size);
+    if (equal == expectEqual)
+        return std::string();
+
+    if (expectEqual)
+    {
+        return "Bytes differ at offset " + std::to_string(offset) + " of " + std::to_string(size) + ": expected \"" +
+            HexBytes(expectedBytes, offset, size) + "\" but was \"" + HexBytes(actualBytes, offset, size) + "\"";
+    }
+
+    std::string const bytes = (expectedBytes == nullptr) ? std::string() : HexBytes(expectedBytes, 0, size);
+
+    return "Expected the " + std::to_string(size) + " bytes to differ, but both are \"" + bytes + "\"";
+}
+
+// The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
+// invalid pattern always fails, saying why.
+template <typename TString>
+std::string RegexMatchFailure(TString const& text, TString const& pattern, bool expectMatch)
+{
+    std::string error;
+    bool const matches = MatchesRegex(text, pattern, error);
+
+    if (!error.empty())
+        return "Invalid regular expression \"" + DisplayText(pattern) + "\": " + error;
+
+    if (matches == expectMatch)
+        return std::string();
+
+    return "Expected \"" + DisplayText(text) + "\" " + (expectMatch ? "to match" : "not to match") + " \"" +
+        DisplayText(pattern) + "\"";
 }
 
 // True if 'text' starts with 'prefix'. Every text starts with the empty string, and none with a longer prefix.
@@ -393,10 +508,34 @@ void TTestGroupBase::AssertEqualsIC(std::wstring const& expected, std::wstring c
         throw TExceptEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEqualsMem(void const* expected, void const* actual, std::size_t size,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = MemoryFailure(expected, actual, size, true);
+    if (!failure.empty())
+        throw TExceptEqualsMem(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (testVal)
         throw TExceptFalse(method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        throw TExceptMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        throw TExceptMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
@@ -597,6 +736,30 @@ void TTestGroupBase::AssertNotEqualsIC(std::wstring const& expected, std::wstrin
 {
     if (EqualsIgnoringASCIICase(expected, actual))
         throw TExceptNotEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = MemoryFailure(expected, actual, size, false);
+    if (!failure.empty())
+        throw TExceptNotEqualsMem(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        throw TExceptNotMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(std::wstring const& text, std::wstring const& pattern,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        throw TExceptNotMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
@@ -886,6 +1049,14 @@ void TTestGroupBase::CheckEqualsIC(std::wstring const& expected, std::wstring co
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckEqualsMem(void const* expected, void const* actual, std::size_t size,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = MemoryFailure(expected, actual, size, true);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int line, std::string const& msg)
 {
     if (testVal)
@@ -893,6 +1064,22 @@ void TTestGroupBase::CheckFalse(bool testVal, std::string const& method, int lin
         std::string expectedMsg = "Expected false but was true: \"" + msg + "\"";
         SetTestFailedCheck(method, line, expectedMsg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, true);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
@@ -1125,6 +1312,30 @@ void TTestGroupBase::CheckNotEqualsIC(std::wstring const& expected, std::wstring
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size,
+    std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = MemoryFailure(expected, actual, size, false);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
+    int line, std::string const& msg)
+{
+    std::string const failure = RegexMatchFailure(text, pattern, false);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -1234,6 +1445,40 @@ void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line
     }
 }
 //---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeContents(std::string const& text)
+{
+    return "was \"" + text + "\"";
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeContents(std::wstring const& text)
+{
+    return "was \"" + WideToUTF8(text) + "\"";
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::DescribeException(std::exception const& ex)
+{
+    return ex.what();
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::DescribeException(System::Sysutils::Exception& ex)
+{
+    return DescribeRTLException(ex);
+}
+//---------------------------------------------------------------------------
+#endif
+std::string TTestGroupBase::ExceptionMessage(std::exception const& ex)
+{
+    return ex.what();
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::ExceptionMessage(System::Sysutils::Exception& ex)
+{
+    return RTLExceptionMessage(ex);
+}
+//---------------------------------------------------------------------------
+#endif
 bool TTestGroupBase::ExceptionTypeExpected() const
 {
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
@@ -1242,6 +1487,18 @@ bool TTestGroupBase::ExceptionTypeExpected() const
 #endif
 
     return m_ExpectedExceptionTypeChecker != nullptr;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::Fail(std::string const& method, int line, std::string const& msg)
+{
+    throw TExceptFail(method, line, msg);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::FormatAddress(std::uintptr_t address)
+{
+    std::ostringstream stream;
+    stream << "0x" << std::hex << address;
+    return stream.str();
 }
 //---------------------------------------------------------------------------
 std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(float value, float bound)
@@ -1946,6 +2203,22 @@ void TTestGroupBase::Test(ITestCase& testCase)
 bool TTestGroupBase::TestFailedOneOrMoreChecks()
 {
     return m_TestFailedCheck;
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TypeName(std::type_info const& type)
+{
+#if defined(ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED)
+    int status = 0;
+    char* const demangled = abi::__cxa_demangle(type.name(), nullptr, nullptr, &status);
+    if (demangled != nullptr)
+    {
+        std::string const name(demangled);
+        std::free(demangled);
+        return name;
+    }
+#endif
+
+    return type.name();
 }
 //---------------------------------------------------------------------------
 

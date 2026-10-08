@@ -84,13 +84,13 @@ const char* TTestException::what() const noexcept
 
 
 /////////////////////////////////////////////////////////////////////////////
-// TExceptExpected
+// TExceptAbortRun
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
-TExceptExpected::TExceptExpected(std::string const& msg)
+TExceptAbortRun::TExceptAbortRun(std::string const& msg)
 {
-    m_Message = "Exception expected: " + msg;
+    m_Message = msg;
 }
 //---------------------------------------------------------------------------
 
@@ -105,6 +105,30 @@ TExceptContains::TExceptContains(std::string const& method, int line, std::strin
 {
     m_Message = "Substring not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptExpected
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptExpected::TExceptExpected(std::string const& msg)
+{
+    m_Message = "Exception expected: " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptEmpty
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptEmpty::TExceptEmpty(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Not empty: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -148,6 +172,31 @@ TExceptEquals::TExceptEquals(std::string const& method, int line, std::string co
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptEqualsMem
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptEqualsMem::TExceptEqualsMem(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Memory not equal: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptFail
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptFail::TExceptFail(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Failed: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptFalse
 /////////////////////////////////////////////////////////////////////////////
 
@@ -165,6 +214,55 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptIsNotType
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptIsNotType::TExceptIsNotType(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Type matched: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptIsType
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptIsType::TExceptIsType(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Type mismatch: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptMatches
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptMatches::TExceptMatches(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Pattern not matched: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNoThrow
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNoThrow::TExceptNoThrow(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Unexpected exception: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotContains
 /////////////////////////////////////////////////////////////////////////////
 
@@ -174,6 +272,18 @@ TExceptNotContains::TExceptNotContains(std::string const& method, int line, std:
 {
     m_Message = "Substring found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" not to contain \"" + substring + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotEmpty
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotEmpty::TExceptNotEmpty(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Empty: " + method + " (" + std::to_string(line) + "): Expected not empty but was empty. " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -223,6 +333,57 @@ TExceptNotEquals::TExceptNotEquals(std::string const& method, int line, std::str
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptNotEqualsMem
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotEqualsMem::TExceptNotEqualsMem(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Memory equal: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotMatches
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotMatches::TExceptNotMatches(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Pattern matched: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotNull
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotNull::TExceptNotNull(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected not null but was null: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNotSame
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNotSame::TExceptNotSame(std::string const& method, int line, std::string const& value, std::string const& msg)
+{
+    m_Message = "Same object: " + method + " (" + std::to_string(line) +
+        "): Expected a different object but both are \"" + value + "\". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptNotStartsWith
 /////////////////////////////////////////////////////////////////////////////
 
@@ -232,6 +393,18 @@ TExceptNotStartsWith::TExceptNotStartsWith(std::string const& method, int line, 
 {
     m_Message = "Prefix found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" not to start with \"" + prefix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptNull
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptNull::TExceptNull(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected null but was not null: " + method + " (" + std::to_string(line) + "): " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -251,6 +424,20 @@ TExceptOrdering::TExceptOrdering(std::string const& method, int line, std::strin
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptSame
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptSame::TExceptSame(std::string const& method, int line, std::string const& expected,
+    std::string const& actual, std::string const& msg)
+{
+    m_Message = "Not the same object: " + method + " (" + std::to_string(line) + "): Expected the same object as \"" +
+        expected + "\" but was \"" + actual + "\". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptStartsWith
 /////////////////////////////////////////////////////////////////////////////
 
@@ -260,23 +447,6 @@ TExceptStartsWith::TExceptStartsWith(std::string const& method, int line, std::s
 {
     m_Message = "Prefix not found: " + method + " (" + std::to_string(line) + "): Expected \"" + text +
         "\" to start with \"" + prefix + "\"" + (ignoreCase ? " (ignoring case)" : "") + ". " + msg;
-}
-//---------------------------------------------------------------------------
-
-
-/////////////////////////////////////////////////////////////////////////////
-// TExceptTrue
-/////////////////////////////////////////////////////////////////////////////
-
-//---------------------------------------------------------------------------
-TExceptTrue::TExceptTrue(std::string const& msg)
-{
-    m_Message = "Expected true but was false: \"" + msg + "\"";
-}
-//---------------------------------------------------------------------------
-TExceptTrue::TExceptTrue(std::string const& method, int line, std::string const& msg)
-{
-    m_Message = "Expected true but was false: " + method + " (" + std::to_string(line) + "): " + msg;
 }
 //---------------------------------------------------------------------------
 
@@ -294,18 +464,6 @@ TExceptSkipped::TExceptSkipped(std::string const& msg)
 TExceptSkipped::TExceptSkipped(std::string const& method, int line, std::string const& msg)
 {
     m_Message = "Test skipped: " + method + " (" + std::to_string(line) + "): " + msg;
-}
-//---------------------------------------------------------------------------
-
-
-/////////////////////////////////////////////////////////////////////////////
-// TExceptAbortRun
-/////////////////////////////////////////////////////////////////////////////
-
-//---------------------------------------------------------------------------
-TExceptAbortRun::TExceptAbortRun(std::string const& msg)
-{
-    m_Message = msg;
 }
 //---------------------------------------------------------------------------
 
@@ -333,6 +491,36 @@ TExceptTestCrashed::TExceptTestCrashed(std::string const& msg)
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptThrows
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptThrows::TExceptThrows(std::string const& method, int line, std::string const& detail, std::string const& msg)
+{
+    m_Message = "Expected exception not caught: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptTrue
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptTrue::TExceptTrue(std::string const& msg)
+{
+    m_Message = "Expected true but was false: \"" + msg + "\"";
+}
+//---------------------------------------------------------------------------
+TExceptTrue::TExceptTrue(std::string const& method, int line, std::string const& msg)
+{
+    m_Message = "Expected true but was false: " + method + " (" + std::to_string(line) + "): " + msg;
+}
+//---------------------------------------------------------------------------
+
+// /////// Compiler specific exceptions after this line /////////////////////
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 /////////////////////////////////////////////////////////////////////////////

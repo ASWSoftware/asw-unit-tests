@@ -63,6 +63,15 @@ private: // Helpers
         std::declval<TFirst>(), std::declval<TSecond>(), std::string(), 0, std::string()))> > : std::true_type
     {
     };
+    template <typename TText, typename TGroup = TTest_ASWUnitTests_RTLStrings, typename = void>
+    struct TCanCheckEmpty : std::false_type
+    {
+    };
+    template <typename TText, typename TGroup>
+    struct TCanCheckEmpty<TText, TGroup, std::void_t<decltype(std::declval<TGroup&>().CheckEmpty(
+        std::declval<TText>(), std::string(), 0, std::string()))> > : std::true_type
+    {
+    };
     template <typename TFirst, typename TSecond, typename TGroup = TTest_ASWUnitTests_RTLStrings, typename = void>
     struct TCanCheckEquals : std::false_type
     {

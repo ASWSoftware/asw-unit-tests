@@ -156,7 +156,7 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
 
     // Assert
     AssertEquals(fullNames.size(), tests.size(), __func__, __LINE__, "one entry per registered test in each");
-    CheckFalse(tests.empty(), __func__, __LINE__, "the real, self-registered suite is listed");
+    CheckNotEmpty(tests, __func__, __LINE__, "the real, self-registered suite is listed");
 
     bool foundThisTest = false;
 
@@ -197,7 +197,7 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOut
     CheckContains(observer.LogText, "registering test groups for ObserverTestProject", __func__, __LINE__,
         "Initialize()'s output went to the observer");
     CheckContains(observer.LogText, "Tests done", __func__, __LINE__, "and so did Run()'s own summary");
-    CheckTrue(consoleOutput.empty(), __func__, __LINE__, "none of it went to std::cout");
+    CheckEmpty(consoleOutput, __func__, __LINE__, "none of it went to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
 //---------------------------------------------------------------------------
