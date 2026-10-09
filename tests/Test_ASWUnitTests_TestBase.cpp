@@ -34,6 +34,7 @@ limitations under the License.
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -45,7 +46,9 @@ limitations under the License.
 #  include <string_view>
 #endif
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Exception.h"
+#include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
@@ -5271,6 +5274,80 @@ void TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_ThrowingSetUpTearDown
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose SetUp_Test() or TearDown_Test(), as chosen
+// by 'ThrowFrom', throws a std::runtime_error for its first test. That test expects an exception and throws one,
+// so the exception from TearDown_Test() arrives while one is expected, and must not be taken for it. The second
+// test records whether it ran. Used by Test_Run_EndsRunOnSetUpOrTearDownTestException below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ThrowingSetUpTearDown : public TTestGroupBase
+{
+public:
+    enum class TThrowFrom
+    {
+        SetUp,
+        TearDown
+    };
+
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_RunsAfterThrowingTest();
+    void Test_ThrowsExpectedException();
+
+public:
+    bool RunsAfterThrowingTestReached = false;
+    TThrowFrom const ThrowFrom;
+
+public:
+    explicit TFixture_ThrowingSetUpTearDown(TThrowFrom throwFrom);
+
+    void SetUp_Group() override {}
+    void SetUp_Test(ITestCase& testCase) override;
+    void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
+};
+
+//---------------------------------------------------------------------------
+TFixture_ThrowingSetUpTearDown::TFixture_ThrowingSetUpTearDown(TThrowFrom throwFrom)
+    : inherited("Fixture_ThrowingSetUpTearDown"),
+      ThrowFrom(throwFrom)
+{
+    SetLogSuppressed(true);
+
+    // Registration order matters here: the throwing test must run first.
+    RegisterTest(&TFixture_ThrowingSetUpTearDown::Test_ThrowsExpectedException, "ThrowsExpectedException");
+    RegisterTest(&TFixture_ThrowingSetUpTearDown::Test_RunsAfterThrowingTest, "RunsAfterThrowingTest");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowingSetUpTearDown::SetUp_Test(ITestCase& testCase)
+{
+    if (ThrowFrom == TThrowFrom::SetUp && testCase.GetName() == "ThrowsExpectedException")
+        throw std::runtime_error("SetUp_Test failed");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowingSetUpTearDown::TearDown_Test(ITestCase& testCase)
+{
+    if (ThrowFrom == TThrowFrom::TearDown && testCase.GetName() == "ThrowsExpectedException")
+        throw std::runtime_error("TearDown_Test failed");
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowingSetUpTearDown::Test_RunsAfterThrowingTest()
+{
+    RunsAfterThrowingTestReached = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_ThrowingSetUpTearDown::Test_ThrowsExpectedException()
+{
+    SetExceptionExpected(true, __func__, __LINE__, "generic expectation, matching any exception");
+    throw std::logic_error("the expected exception");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_ThrowsChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertThrows()/CheckThrows()/
@@ -5703,6 +5780,86 @@ void TFixture_TypeChecks::Test_CheckIsType_UniquePtr_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_UnexpectedExceptions
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose tests throw without expecting it: a
+// std::exception, an object that isn't an exception at all, and a std::exception after a failed Check. Each of
+// the first two is followed by a test that passes. Registration order matters: each throwing test must run before
+// the test after it. Used by the Run_*UnexpectedException* tests below to prove an unexpected exception only fails
+// the test that threw it, after which TearDown_Test() and the remaining tests still run.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_UnexpectedExceptions : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CheckFailsThenThrowsStdException();
+    void Test_RunsAfterNonException();
+    void Test_RunsAfterStdException();
+    void Test_ThrowsNonException();
+    void Test_ThrowsStdException();
+
+public:
+    std::vector<std::string> TornDownTests; // The tests TearDown_Test() ran for, in order.
+
+public:
+    TFixture_UnexpectedExceptions();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
+};
+
+//---------------------------------------------------------------------------
+TFixture_UnexpectedExceptions::TFixture_UnexpectedExceptions()
+    : inherited("Fixture_UnexpectedExceptions")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_UnexpectedExceptions::Test_ThrowsStdException, "ThrowsStdException");
+    RegisterTest(&TFixture_UnexpectedExceptions::Test_RunsAfterStdException, "RunsAfterStdException");
+    RegisterTest(&TFixture_UnexpectedExceptions::Test_ThrowsNonException, "ThrowsNonException");
+    RegisterTest(&TFixture_UnexpectedExceptions::Test_RunsAfterNonException, "RunsAfterNonException");
+    RegisterTest(&TFixture_UnexpectedExceptions::Test_CheckFailsThenThrowsStdException,
+        "CheckFailsThenThrowsStdException");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::TearDown_Test(ITestCase& testCase)
+{
+    TornDownTests.push_back(testCase.GetName());
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::Test_CheckFailsThenThrowsStdException()
+{
+    CheckTrue(false, __func__, __LINE__, "deliberate Check failure before the unexpected exception");
+    throw std::runtime_error("thrown after a failed Check");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::Test_RunsAfterNonException()
+{
+    CheckTrue(true, __func__, __LINE__, "trivially passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::Test_RunsAfterStdException()
+{
+    CheckTrue(true, __func__, __LINE__, "trivially passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::Test_ThrowsNonException()
+{
+    throw 42; // Not derived from std::exception at all.
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedExceptions::Test_ThrowsStdException()
+{
+    // Like a constructor in the code under test rejecting its argument.
+    throw std::invalid_argument("bad placeholder");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_CrashingTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
@@ -5816,11 +5973,17 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
+        "Run_EndsRunOnSetUpOrTearDownTestException");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
         "Run_RecordsCheckFailuresInFailedTestDetail");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsUnexpectedExceptionAsFailureAndContinues,
+        "Run_RecordsUnexpectedExceptionAsFailureAndContinues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsUnexpectedExceptionWithRunOptions,
+        "Run_RecordsUnexpectedExceptionWithRunOptions");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver,
         "Run_ReportsEachTestToRunObserver");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout,
@@ -5857,6 +6020,62 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_TestBase::~TTest_ASWUnitTests_TestBase()
 {
+}
+//---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::CheckUnexpectedExceptionRecords
+
+    Checks the records a run of every TFixture_UnexpectedExceptions test leaves in 'results', whatever order the
+    tests ran in: each throwing test failed with an "Unexpected exception: " detail describing what it threw, and
+    each other test passed. 'method'/'line' identify the calling test in any failure message.
+*/
+void TTest_ASWUnitTests_TestBase::CheckUnexpectedExceptionRecords(TTestResults const& results,
+    std::string const& method, int line)
+{
+    // The same description CheckNoThrow() gives an object that isn't an exception.
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::string const nonExceptionDescription = "an object that is neither a std::exception nor an RTL Exception";
+#else
+    std::string const nonExceptionDescription = "a non-std::exception object";
+#endif
+
+    struct TExpectedRecord
+    {
+        std::string TestName;
+        TTestOutcome Outcome;
+        std::string Message;
+    };
+
+    TExpectedRecord const expectedRecords[] =
+    {
+        { "ThrowsStdException", TTestOutcome::Fail, "Unexpected exception: bad placeholder" },
+        { "RunsAfterStdException", TTestOutcome::Pass, "" },
+        { "ThrowsNonException", TTestOutcome::Fail, "Unexpected exception: " + nonExceptionDescription },
+        { "RunsAfterNonException", TTestOutcome::Pass, "" },
+    };
+
+    CheckEquals(static_cast<size_t>(5), results.CaseRecords.size(), method, line,
+        "one record per test, including each that threw");
+    CheckEquals(3u, results.FailedCount, method, line, "each throwing test failed");
+    CheckEquals(2u, results.SuccessCount, method, line, "each test after one that threw still ran, and passed");
+
+    for (TExpectedRecord const& expected : expectedRecords)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, method, line, expected.TestName + " has a record");
+        CheckEquals(expected.Outcome, record->Outcome, method, line, expected.TestName + "'s outcome");
+        CheckEquals(expected.Message, record->Message, method, line, expected.TestName + "'s detail");
+    }
+
+    // The record shows the earlier Check failure first, as for any failed test (see
+    // Test_Run_RecordsCheckFailuresInFailedTestDetail()).
+    TTestCaseRecord const* const checkThenThrow = FindRecord(results, "CheckFailsThenThrowsStdException");
+    AssertNotNull(checkThenThrow, method, line, "CheckFailsThenThrowsStdException has a record");
+    CheckEquals(TTestOutcome::Fail, checkThenThrow->Outcome, method, line, "CheckFailsThenThrowsStdException failed");
+    CheckStartsWith(checkThenThrow->Message, "Check failed for: \"Test_CheckFailsThenThrowsStdException\" (", method,
+        line, "the Check failure comes first");
+    CheckEndsWith(checkThenThrow->Message, "\nUnexpected exception: thrown after a failed Check", method, line,
+        "followed by the unexpected exception");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::SetUp_Group()
@@ -6966,6 +7185,48 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
     CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException()
+{
+    // Unlike an unexpected exception from a test itself, one from SetUp_Test() or TearDown_Test() still escapes
+    // Run(), ending the run. The one from TearDown_Test() arrives after the test threw the exception it expected,
+    // and used to be taken for that exception, passing the test.
+    struct TScenario
+    {
+        TFixture_ThrowingSetUpTearDown::TThrowFrom ThrowFrom;
+        std::string ExpectedMessage;
+    };
+
+    TScenario const scenarios[] =
+    {
+        { TFixture_ThrowingSetUpTearDown::TThrowFrom::SetUp, "SetUp_Test failed" },
+        { TFixture_ThrowingSetUpTearDown::TThrowFrom::TearDown, "TearDown_Test failed" },
+    };
+
+    for (TScenario const& scenario : scenarios)
+    {
+        // Arrange
+        TFixture_ThrowingSetUpTearDown fixture(scenario.ThrowFrom);
+        std::string caughtMessage;
+
+        // Act
+        try
+        {
+            fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        }
+        catch (std::exception const& ex)
+        {
+            caughtMessage = ex.what();
+        }
+
+        // Assert
+        CheckEquals(scenario.ExpectedMessage, caughtMessage, __func__, __LINE__, "the exception escapes Run()");
+        CheckFalse(fixture.RunsAfterThrowingTestReached, __func__, __LINE__,
+            scenario.ExpectedMessage + ": no later test ran");
+        CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__,
+            scenario.ExpectedMessage + ": the test counts as failed");
+    }
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
 {
     // Arrange
@@ -7067,6 +7328,91 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
             CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " recorded as Fail");
         }
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_RecordsUnexpectedExceptionAsFailureAndContinues()
+{
+    // Arrange
+    TFixture_UnexpectedExceptions fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    // An unexpected exception used to escape Run(), ending the whole run after the test that threw it.
+    CheckNoThrow([&fixture]() {
+            fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        }, __func__, __LINE__, "an unexpected exception from a test doesn't escape Run()");
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckUnexpectedExceptionRecords(results, __func__, __LINE__);
+
+    std::vector<std::string> const allTests{ "ThrowsStdException", "RunsAfterStdException", "ThrowsNonException",
+                                             "RunsAfterNonException", "CheckFailsThenThrowsStdException" };
+    CheckTrue(fixture.TornDownTests == allTests, __func__, __LINE__,
+        "TearDown_Test() ran after every test, including each that threw");
+    CheckEquals(allTests.size(), observer.FinishedRecords.size(), __func__, __LINE__,
+        "the run observer heard about every test, including each that threw");
+    CheckEquals(ExitCode_TestsFailed, ExitCodeForResults(results), __func__, __LINE__,
+        "an unexpected exception is an ordinary test failure, with the same exit code");
+
+    std::string const xml = TJUnitReportWriter::BuildXML("Suite", ToJUnitTestCases(results.CaseRecords));
+    CheckContains(xml, "<failure message=\"Unexpected exception: bad placeholder\">", __func__, __LINE__,
+        "the JUnit report shows the test as a failure, with the exception's message");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_RecordsUnexpectedExceptionWithRunOptions()
+{
+    // Each of these runs the tests differently (in a shuffled order, on a worker thread, or under the crash guard),
+    // and an unexpected exception must be caught and recorded the same way under each.
+    struct TRunOptions
+    {
+        std::string Description;
+        std::optional<unsigned int> ShuffleSeed;
+        std::optional<unsigned int> TestTimeoutSeconds;
+        bool CatchCrashes;
+    };
+
+    TRunOptions const runs[] =
+    {
+        { "shuffled", 12345u, std::nullopt, false },
+        { "with a timeout", std::nullopt, 30u, false },
+        { "catching crashes", std::nullopt, std::nullopt, true },
+    };
+
+    for (TRunOptions const& run : runs)
+    {
+        // Arrange
+        TFixture_UnexpectedExceptions fixture;
+
+        // Act
+        CheckNoThrow([&fixture, &run]() {
+                fixture.Run(TestFilter(), run.ShuffleSeed, run.TestTimeoutSeconds, run.CatchCrashes);
+            }, __func__, __LINE__, "an unexpected exception doesn't escape Run() " + run.Description);
+
+        // Assert
+        CheckUnexpectedExceptionRecords(fixture.Results(), std::string(__func__) + ", " + run.Description, __LINE__);
+    }
+
+    // Arrange
+    TFixture_UnexpectedExceptions filtered;
+    TestFilter const filter = [](std::string const& fullName)
+        {
+            return fullName == "Fixture_UnexpectedExceptions.ThrowsStdException" ||
+                fullName == "Fixture_UnexpectedExceptions.RunsAfterStdException";
+        };
+
+    // Act
+    CheckNoThrow([&filtered, &filter]() {
+            filtered.Run(filter, std::nullopt, std::nullopt, false);
+        }, __func__, __LINE__, "an unexpected exception doesn't escape a filtered Run()");
+
+    // Assert
+    TTestResults const& filteredResults = filtered.Results();
+    CheckEquals(static_cast<size_t>(2), filteredResults.CaseRecords.size(), __func__, __LINE__,
+        "only the two tests the filter matches ran");
+    CheckEquals(1u, filteredResults.FailedCount, __func__, __LINE__, "the throwing test failed");
+    CheckEquals(1u, filteredResults.SuccessCount, __func__, __LINE__, "the test after it still ran, and passed");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ReportsEachTestToRunObserver()

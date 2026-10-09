@@ -446,35 +446,78 @@ void TFixture_RTLTypeChecks::Test_CheckIsType_Subclass_Passes()
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_UnexpectedRTLException
 //
-// A never-registered fixture group with a single test that throws an RTL exception without expecting
-// one, so the test verifying it can confirm the exception escapes Run() intact.
+// A never-registered fixture group whose first test meets an RTL exception it doesn't expect, from where
+// 'ThrowFrom' says: the test itself, SetUp_Test(), or TearDown_Test() after the test threw the RTL exception it
+// expects. The second test records whether it ran. The first only fails its own test; the other two escape
+// Run() intact, ending the run.
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_UnexpectedRTLException : public TTestGroupBase
 {
+public:
+    enum class TThrowFrom
+    {
+        Test,
+        SetUp,
+        TearDownAfterExpectedException
+    };
+
 private:
     typedef TTestGroupBase inherited;
 
 private:
-    void Test_ThrowsUnexpectedly();
+    void Test_RunsAfterThrowingTest();
+    void Test_Throws();
 
 public:
-    TFixture_UnexpectedRTLException();
+    bool RunsAfterThrowingTestReached = false;
+    TThrowFrom const ThrowFrom;
+
+public:
+    explicit TFixture_UnexpectedRTLException(TThrowFrom throwFrom);
 
     void SetUp_Group() override {}
+    void SetUp_Test(ITestCase& testCase) override;
     void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
 };
 
 //---------------------------------------------------------------------------
-TFixture_UnexpectedRTLException::TFixture_UnexpectedRTLException()
-    : inherited("Fixture_UnexpectedRTLException")
+TFixture_UnexpectedRTLException::TFixture_UnexpectedRTLException(TThrowFrom throwFrom)
+    : inherited("Fixture_UnexpectedRTLException"),
+      ThrowFrom(throwFrom)
 {
     SetLogSuppressed(true);
 
-    RegisterTest(&TFixture_UnexpectedRTLException::Test_ThrowsUnexpectedly, "ThrowsUnexpectedly");
+    // Registration order matters here: the throwing test must run first.
+    RegisterTest(&TFixture_UnexpectedRTLException::Test_Throws, "Throws");
+    RegisterTest(&TFixture_UnexpectedRTLException::Test_RunsAfterThrowingTest, "RunsAfterThrowingTest");
 }
 //---------------------------------------------------------------------------
-void TFixture_UnexpectedRTLException::Test_ThrowsUnexpectedly()
+void TFixture_UnexpectedRTLException::SetUp_Test(ITestCase& testCase)
 {
+    if (ThrowFrom == TThrowFrom::SetUp && testCase.GetName() == "Throws")
+        throw System::Sysutils::EConvertError(L"set-up boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedRTLException::TearDown_Test(ITestCase& testCase)
+{
+    if (ThrowFrom == TThrowFrom::TearDownAfterExpectedException && testCase.GetName() == "Throws")
+        throw System::Sysutils::EConvertError(L"tear-down boom");
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedRTLException::Test_RunsAfterThrowingTest()
+{
+    RunsAfterThrowingTestReached = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_UnexpectedRTLException::Test_Throws()
+{
+    if (ThrowFrom == TThrowFrom::TearDownAfterExpectedException)
+    {
+        SetExceptionExpected(true, __func__, __LINE__, "generic expectation, matching any exception");
+        throw System::Sysutils::EConvertError(L"the expected exception");
+    }
+
     throw System::Sysutils::EConvertError(L"unexpected boom");
 }
 //---------------------------------------------------------------------------
@@ -499,10 +542,14 @@ TTest_ASWUnitTests_RTLExceptions::TTest_ASWUnitTests_RTLExceptions()
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses, "IsType_MatchesRTLClasses");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_RTLExceptionMessage_ConvertsToUTF8,
         "RTLExceptionMessage_ConvertsToUTF8");
-    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesUnexpectedRTLException,
-        "Run_PropagatesUnexpectedRTLException");
-    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_WrapsUnexpectedRTLExceptionFromWorkerThread,
-        "Run_WrapsUnexpectedRTLExceptionFromWorkerThread");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesRTLExceptionFromSetUpTest,
+        "Run_PropagatesRTLExceptionFromSetUpTest");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesRTLExceptionFromTearDownTest,
+        "Run_PropagatesRTLExceptionFromTearDownTest");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_RecordsUnexpectedRTLExceptionAndContinues,
+        "Run_RecordsUnexpectedRTLExceptionAndContinues");
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_Run_WrapsRTLExceptionFromSetUpTestOnWorkerThread,
+        "Run_WrapsRTLExceptionFromSetUpTestOnWorkerThread");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_SetExceptionExpected_MatchesRTLTypeAndMessage,
         "SetExceptionExpected_MatchesRTLTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_SetExceptionExpected_MatchesRTLTypeAndMessageOnWorkerThread,
@@ -643,10 +690,10 @@ void TTest_ASWUnitTests_RTLExceptions::Test_RTLExceptionMessage_ConvertsToUTF8()
     CheckEquals(std::string("caf\xC3\xA9"), message, __func__, __LINE__, "U+00E9 becomes its two UTF-8 bytes");
 }
 //---------------------------------------------------------------------------
-void TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesUnexpectedRTLException()
+void TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesRTLExceptionFromSetUpTest()
 {
     // Arrange
-    TFixture_UnexpectedRTLException fixture;
+    TFixture_UnexpectedRTLException fixture(TFixture_UnexpectedRTLException::TThrowFrom::SetUp);
     std::string caughtMessage;
     bool caught = false;
 
@@ -662,17 +709,78 @@ void TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesUnexpectedRTLException
     }
 
     // Assert
-    CheckTrue(caught, __func__, __LINE__, "the unexpected EConvertError escapes Run() as an EConvertError");
-    CheckEquals(std::string("unexpected boom"), caughtMessage, __func__, __LINE__, "its message is intact");
-    CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__, "the throwing test counts as failed");
+    CheckTrue(caught, __func__, __LINE__, "SetUp_Test()'s EConvertError escapes Run() as an EConvertError");
+    CheckEquals(std::string("set-up boom"), caughtMessage, __func__, __LINE__, "its message is intact");
+    CheckFalse(fixture.RunsAfterThrowingTestReached, __func__, __LINE__, "no later test ran");
+    CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__, "the test counts as failed");
 }
 //---------------------------------------------------------------------------
-void TTest_ASWUnitTests_RTLExceptions::Test_Run_WrapsUnexpectedRTLExceptionFromWorkerThread()
+void TTest_ASWUnitTests_RTLExceptions::Test_Run_PropagatesRTLExceptionFromTearDownTest()
 {
     // Arrange
-    // A timeout runs the test on a worker thread. std::exception_ptr can't carry an RTL exception back from
-    // it (see TTestGroupBase::RunWithTimeout()), so it arrives wrapped in a TExceptRTLException instead.
-    TFixture_UnexpectedRTLException fixture;
+    // TearDown_Test() throws after the test threw the RTL exception it expected, so this also covers an RTL
+    // exception thrown while another one is being handled. TearDown_Test()'s used to be taken for the expected one.
+    TFixture_UnexpectedRTLException fixture(
+        TFixture_UnexpectedRTLException::TThrowFrom::TearDownAfterExpectedException);
+    std::string caughtMessage;
+    bool caught = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+    }
+    catch (System::Sysutils::EConvertError& ex)
+    {
+        caught = true;
+        caughtMessage = RTLExceptionMessage(ex);
+    }
+
+    // Assert
+    CheckTrue(caught, __func__, __LINE__, "TearDown_Test()'s EConvertError escapes Run() as an EConvertError");
+    CheckEquals(std::string("tear-down boom"), caughtMessage, __func__, __LINE__, "its message is intact");
+    CheckFalse(fixture.RunsAfterThrowingTestReached, __func__, __LINE__, "no later test ran");
+    CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__, "the test counts as failed");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_Run_RecordsUnexpectedRTLExceptionAndContinues()
+{
+    // With a timeout, the test runs on a worker thread, and the exception must be caught and recorded there too.
+    std::optional<unsigned int> const timeouts[] = { std::nullopt, 30u };
+
+    for (std::optional<unsigned int> const& timeout : timeouts)
+    {
+        // Arrange
+        TFixture_UnexpectedRTLException fixture(TFixture_UnexpectedRTLException::TThrowFrom::Test);
+        std::string const when = timeout.has_value() ? "with a timeout" : "without a timeout";
+
+        // Act
+        // An unexpected exception used to escape Run(), ending the whole run after the test that threw it.
+        CheckNoThrow([&fixture, &timeout]() {
+                fixture.Run(TestFilter(), std::nullopt, timeout, false);
+            }, __func__, __LINE__, "an unexpected EConvertError doesn't escape Run() " + when);
+
+        // Assert
+        TTestResults const& results = fixture.Results();
+        AssertEquals(static_cast<size_t>(2), results.CaseRecords.size(), __func__, __LINE__,
+            "one record per test, " + when);
+
+        TTestCaseRecord const& thrown = results.CaseRecords.front();
+        CheckEquals(TTestOutcome::Fail, thrown.Outcome, __func__, __LINE__, "the throwing test failed, " + when);
+        CheckEquals(std::string("Unexpected exception: EConvertError: unexpected boom"), thrown.Message, __func__,
+            __LINE__, "its detail shows the RTL exception as ClassName: Message, " + when);
+        CheckTrue(fixture.RunsAfterThrowingTestReached, __func__, __LINE__, "the next test still ran, " + when);
+        CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "and passed, " + when);
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_Run_WrapsRTLExceptionFromSetUpTestOnWorkerThread()
+{
+    // Arrange
+    // A timeout runs the test, with its SetUp_Test(), on a worker thread. std::exception_ptr can't carry an RTL
+    // exception back from it (see TTestGroupBase::RunWithTimeout()), so it arrives wrapped in a
+    // TExceptRTLException instead.
+    TFixture_UnexpectedRTLException fixture(TFixture_UnexpectedRTLException::TThrowFrom::SetUp);
     std::string caughtWhat;
     System::TClass caughtClass = nullptr;
     bool caught = false;
@@ -690,12 +798,12 @@ void TTest_ASWUnitTests_RTLExceptions::Test_Run_WrapsUnexpectedRTLExceptionFromW
     }
 
     // Assert
-    AssertTrue(caught, __func__, __LINE__, "the unexpected EConvertError escapes Run() as a TExceptRTLException");
-    CheckEquals(std::string("EConvertError: unexpected boom"), caughtWhat, __func__, __LINE__,
+    AssertTrue(caught, __func__, __LINE__, "SetUp_Test()'s EConvertError escapes Run() as a TExceptRTLException");
+    CheckEquals(std::string("EConvertError: set-up boom"), caughtWhat, __func__, __LINE__,
         "what() is the DescribeRTLException() text");
     CheckTrue(caughtClass == __classid(System::Sysutils::EConvertError), __func__, __LINE__,
         "RTLClass() is the original exception's exact class");
-    CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__, "the throwing test counts as failed");
+    CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__, "the test counts as failed");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_RTLExceptions::Test_SetExceptionExpected_MatchesRTLTypeAndMessage()

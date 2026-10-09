@@ -42,6 +42,9 @@ class TTest_ASWUnitTests_TestBase : public TTestGroupBase
 private:
     typedef TTestGroupBase inherited;
 
+private: // Helpers
+    void CheckUnexpectedExceptionRecords(TTestResults const& results, std::string const& method, int line);
+
 private: // Test methods
     void Test_CheckNear_ToleranceBoundaryIsInclusive();
     void Test_Check_ContinuesButAssert_Aborts();
@@ -66,9 +69,12 @@ private: // Test methods
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
+    void Test_Run_EndsRunOnSetUpOrTearDownTestException();
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
+    void Test_Run_RecordsUnexpectedExceptionAsFailureAndContinues();
+    void Test_Run_RecordsUnexpectedExceptionWithRunOptions();
     void Test_Run_ReportsEachTestToRunObserver();
     void Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout();
     void Test_Run_ReportsTimedOutTestToRunObserver();

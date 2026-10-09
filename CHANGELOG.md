@@ -10,6 +10,33 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Changed
+
+- An exception a test throws without expecting it (outside a `Check*` or
+  `Assert*` call, with no `SetExceptionExpected()`) now fails only that test,
+  and the run carries on. The failure detail is `Unexpected exception: `
+  followed by the exception's message (`ClassName: Message` for an RTL
+  exception). `TearDown_Test()`, the remaining tests and groups, the totals
+  and the `--report-junit` report all follow as usual, with the test shown as
+  a `<failure>`, and the VCL GUI runner shows it like any other failure,
+  including with `--shuffle`, `--filter`, `--test-timeout-seconds` and
+  `--catch-crashes`. Such an exception used to end the whole run, with no
+  totals or JUnit report, and exit with code `2` (`3` if it wasn't a
+  `std::exception`). It's now an ordinary test failure, with exit code `1`,
+  so a script that checked for `2` or `3` to detect it must check for `1`.
+  Codes `2` and `3` now only mean that an exception from `SetUp_Test()`,
+  `TearDown_Test()`, `SetUp_Group()` or `TearDown_Group()` ended the run,
+  which is unchanged. Code that calls a group's `Run()` directly no longer
+  sees a test's unexpected exception escape; it's in `Results()` instead.
+
+### Fixed
+
+- An exception from `TearDown_Test()` after the test threw the exception it
+  expected was taken for the expected exception, so the test passed. It now
+  ends the run with `!!FATAL ERROR!!`, like any other `TearDown_Test()`
+  exception, including one after a test's unexpected exception, which
+  previously wasn't logged as `!!FATAL ERROR!!`.
+
 ## [1.2.0] - 2026-10-08
 
 ### Added

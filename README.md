@@ -44,6 +44,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   blocking forever.
 - **Crash protection** - `--catch-crashes` records a native crash (e.g. an access violation) as a failed test
   instead of losing the whole process.
+- **Unexpected exceptions** - An exception a test throws without expecting it fails only that test, with the
+  exception's message, and the run carries on.
 - **[VCL GUI runner](#vcl-gui-runner)** - A RAD Studio VCL app that runs the same tests, with a checkbox tree to
   choose them, live pass/fail/skip status, and each failure's details and log.
 
@@ -273,11 +275,14 @@ group, with `<failure>`/`<skipped>` elements carrying the same detail message sh
 sets both the console's `Initializing...` line and the report's `<testsuites name="...">` attribute.
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed), `1` one or more
-tests failed, `2` an unhandled `std::exception` (or, with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx)
-enabled, an RTL `Exception`) escaped a test, `3` an unhandled exception of any other type escaped a test,
-`4` invalid command line arguments, `5` a test exceeded `--test-timeout-seconds` and the run was aborted, `6` a test
-crashed severely enough (with `--catch-crashes` given) that the run was aborted. A crash caught by
-`--catch-crashes` that didn't force an abort is just an ordinary test failure (exit code `1`), not `6`. Skipped
+tests failed, `2` a `std::exception` (or, with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled,
+an RTL `Exception`) from `SetUp_Test()`/`TearDown_Test()` or `SetUp_Group()`/`TearDown_Group()` ended the run, `3` an
+exception of any other type from one of those ended the run, `4` invalid command line arguments, `5` a test exceeded
+`--test-timeout-seconds` and the run was aborted, `6` a test crashed severely enough (with `--catch-crashes` given)
+that the run was aborted. An exception a test throws without expecting it (outside a `Check*`/`Assert*` call, with no
+`SetExceptionExpected()`) only fails that test, with `Unexpected exception: ` and the exception's message as its
+detail, and the run carries on, so it's an ordinary test failure (exit code `1`), not `2` or `3`. Likewise, a crash
+caught by `--catch-crashes` that didn't force an abort is an ordinary test failure (exit code `1`), not `6`. Skipped
 tests never affect the exit code.
 
 ## VCL GUI Runner
@@ -453,7 +458,7 @@ is that framework exception (e.g. `CheckThrows<TExceptTrue>`).
 
 RAD Studio's RTL exceptions (`System::Sysutils::Exception` and its subclasses, such as `EConvertError`) are shared by
 VCL and FMX, and don't derive from `std::exception`. By default, only the generic `SetExceptionExpected(true, ...)`
-matches one, and one that escapes a test unexpectedly is reported as `Unhandled exception: Unknown`.
+matches one, and one a test throws unexpectedly fails it as `Unexpected exception: a non-std::exception object`.
 
 A C++Builder project that links the RTL can opt in by defining `ASWUNITTESTS_RTL_EXCEPTIONS` in its project options
 (Building > C++ Shared Options > Conditional defines). This requires RAD Studio's Clang-based compilers
@@ -470,12 +475,13 @@ StrToInt(L"abc");
 ```
 
 A requested RTL type never matches a `std::exception`, and a requested `std::exception` type never matches an RTL
-exception. Failure details and unhandled exceptions show RTL exceptions as `ClassName: Message` (e.g.
-`EConvertError: 'abc' is not a valid integer value`), and an unhandled one exits with code `2`, like an unhandled
-`std::exception`.
+exception. Failure details, including a test's unexpected exception, and exceptions that end the run show RTL
+exceptions as `ClassName: Message` (e.g. `EConvertError: 'abc' is not a valid integer value`), and one that ends the
+run (e.g. from `SetUp_Test()`) exits with code `2`, like a `std::exception`.
 
-`--test-timeout-seconds` runs each test on a worker thread. Expected exceptions work exactly the same there, because
-they're caught and checked on that thread. An *unexpected* RTL exception has to cross back to the main thread, which
+`--test-timeout-seconds` runs each test on a worker thread. Expected and unexpected exceptions from the test itself
+work exactly the same there, because they're caught and checked on that thread. An RTL exception from `SetUp_Test()`
+or `TearDown_Test()`, which ends the run, has to cross back to the main thread, which
 `std::exception_ptr` can't do for RTL exceptions (rethrowing one after its handler has exited terminates the
 process). It therefore arrives as a `TExceptRTLException`, a `std::runtime_error` whose `what()` is the same
 `ClassName: Message` text, so the console output and exit code are unchanged. Code that calls a group's `Run()`
