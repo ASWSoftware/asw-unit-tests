@@ -72,6 +72,7 @@ private: // Test methods
     void Test_Run_EndsRunOnSetUpOrTearDownTestException();
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
+    void Test_Run_RecordsDurationOfShortTest();
     void Test_Run_RecordsOutcomeCountsAndCaseRecords();
     void Test_Run_RecordsUnexpectedExceptionAsFailureAndContinues();
     void Test_Run_RecordsUnexpectedExceptionWithRunOptions();

@@ -138,10 +138,10 @@ bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
         std::equal(a.begin(), a.end(), b.begin(), CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
-std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
+std::string FormatDurationMs(std::chrono::steady_clock::time_point start)
 {
     double const elapsedMs = std::chrono::duration<double, std::milli>(
-        std::chrono::high_resolution_clock::now() - start).count();
+        std::chrono::steady_clock::now() - start).count();
 
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
@@ -1995,7 +1995,7 @@ void TTestGroupBase::TearDown_Test(ITestCase& /*testCase*/)
 void TTestGroupBase::Test(ITestCase& testCase)
 {
     std::string const testFullName = m_Name + "." + testCase.GetName();
-    std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point const testStart = std::chrono::steady_clock::now();
 
     // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
     // for the console, never in the stored message/record), and logs the "Finished test" timing line.
@@ -2029,7 +2029,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             }
 
             double const durationSeconds = std::chrono::duration<double>(
-                std::chrono::high_resolution_clock::now() - testStart).count();
+                std::chrono::steady_clock::now() - testStart).count();
             m_Results.CaseRecords.push_back(
                 TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, recordDetail });
 

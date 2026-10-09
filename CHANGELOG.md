@@ -44,6 +44,17 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   "unrecognized option". The runner (`src/main.cpp`) now turns that expansion
   off, so the pattern arrives as typed. A project with its own `main()` can do
   the same by defining `extern "C" { int _dowildcard = 0; }` for MinGW.
+- With RAD Studio's 32-bit compiler (`bcc32c`), almost every test was timed
+  as `0.000 ms`, with `time="0.000000"` in the `--report-junit` report, in
+  both the console and VCL GUI runners. Durations were measured with
+  `std::chrono::high_resolution_clock`, which that compiler's library
+  implements as the system clock, advancing only about every 10 ms. Test
+  durations and the total elapsed time now use `std::chrono::steady_clock`.
+  It's also monotonic, so with GCC's standard library (MinGW, Linux), where
+  `high_resolution_clock` is the system clock too, a change to the system
+  clock during a run no longer distorts them. Nothing changes with MSVC or
+  RAD Studio's Win64x compiler, where `high_resolution_clock` already was
+  `steady_clock`.
 
 ## [1.2.0] - 2026-10-08
 

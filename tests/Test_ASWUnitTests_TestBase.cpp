@@ -3699,6 +3699,51 @@ void TFixture_SameChecks::Test_CheckSame_UniquePtrs_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_ShortTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that busy-waits for
+// BusyWaitDuration, far less than a millisecond, timed with std::chrono::steady_clock. Logging is left on, for a
+// run observer to collect. Used by Test_Run_RecordsDurationOfShortTest below to prove a short test's duration is
+// measured, rather than read from a clock too coarse to see it (RAD Studio's 32-bit high_resolution_clock only
+// advances about every 10 ms).
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ShortTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_BusyWaits();
+
+public:
+    static constexpr std::chrono::microseconds BusyWaitDuration{ 200 };
+
+public:
+    TFixture_ShortTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_ShortTest::TFixture_ShortTest()
+    : inherited("Fixture_ShortTest")
+{
+    RegisterTest(&TFixture_ShortTest::Test_BusyWaits, "BusyWaits");
+}
+//---------------------------------------------------------------------------
+void TFixture_ShortTest::Test_BusyWaits()
+{
+    // Busy-waits rather than sleeping, since a sleep can last a whole scheduler tick, which would hide the problem.
+    std::chrono::steady_clock::time_point const start = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - start < BusyWaitDuration)
+    {
+    }
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
@@ -5978,6 +6023,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
         "Run_RecordsCheckFailuresInFailedTestDetail");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsDurationOfShortTest,
+        "Run_RecordsDurationOfShortTest");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords,
         "Run_RecordsOutcomeCountsAndCaseRecords");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsUnexpectedExceptionAsFailureAndContinues,
@@ -7294,6 +7341,31 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetai
     CheckNotContains(failViaAssert->Message, "Check failed for", __func__, __LINE__,
         "a test with no Check failures gets none in its detail");
     CheckEmpty(pass->Message, __func__, __LINE__, "a passing test's detail stays empty");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_RecordsDurationOfShortTest()
+{
+    // Arrange
+    // The recorded duration encloses the test's own busy-wait, so it can't be shorter, with a clock fine enough to
+    // see it. RAD Studio's 32-bit high_resolution_clock wasn't, and used to record almost every short test as 0.
+    TFixture_ShortTest fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    double const busyWaitSeconds = std::chrono::duration<double>(TFixture_ShortTest::BusyWaitDuration).count();
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    AssertEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__, "one record");
+    CheckGreaterThanOrEqual(results.CaseRecords.front().DurationSeconds, busyWaitSeconds, __func__, __LINE__,
+        "the recorded duration includes the test's busy-wait");
+
+    std::string const logText = observer.LogText();
+    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - passed (", __func__, __LINE__,
+        "the test's timing line is logged");
+    CheckNotContains(logText, "- passed (0.000 ms)", __func__, __LINE__, "and doesn't show it as taking no time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
