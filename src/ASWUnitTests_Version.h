@@ -31,9 +31,9 @@ limitations under the License.
 // them together (a unit test checks that they match).
 #define ASWUNITTESTS_VERSION_MAJOR 1
 #define ASWUNITTESTS_VERSION_MINOR 2
-#define ASWUNITTESTS_VERSION_PATCH 0
+#define ASWUNITTESTS_VERSION_PATCH 1
 #define ASWUNITTESTS_VERSION_PRERELEASE ""
-#define ASWUNITTESTS_VERSION_STRING "1.2.0"
+#define ASWUNITTESTS_VERSION_STRING "1.2.1"
 
 namespace ASWUnitTests
 {
