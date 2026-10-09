@@ -49,6 +49,9 @@ private:
 private: // Test methods
     void Test_BuildTestFilter_Filter();
     void Test_BuildTestFilter_Partition();
+#if defined(__MINGW32__)
+    void Test_CommandLine_NotWildcardExpandedOnMinGW();
+#endif
     void Test_ExitCodeForResults_MapsEachOutcome();
     void Test_ParseArguments_CatchCrashes();
     void Test_ParseArguments_Color();
