@@ -32,6 +32,11 @@ limitations under the License.
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
 
+#if defined(__MINGW32__)
+// MinGW-w64's C runtime setting for command-line wildcard expansion; src/main.cpp sets it to 0.
+extern "C" int _dowildcard;
+#endif
+
 namespace ASWUnitTests
 {
 
@@ -45,6 +50,10 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
 {
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter, "BuildTestFilter_Filter");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition, "BuildTestFilter_Partition");
+#if defined(__MINGW32__)
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_CommandLine_NotWildcardExpandedOnMinGW,
+        "CommandLine_NotWildcardExpandedOnMinGW");
+#endif
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ExitCodeForResults_MapsEachOutcome, "ExitCodeForResults_MapsEachOutcome");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_CatchCrashes, "ParseArguments_CatchCrashes");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Color, "ParseArguments_Color");
@@ -176,6 +185,16 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Partition()
     CheckContains(description2, "partition 2 of 2", __func__, __LINE__, "partition 2 description");
 }
 //---------------------------------------------------------------------------
+#if defined(__MINGW32__)
+void TTest_ASWUnitTests_CLI::Test_CommandLine_NotWildcardExpandedOnMinGW()
+{
+    // MinGW-w64's C runtime expands wildcards in the command line before main() runs unless _dowildcard is 0, which
+    // turns a --filter pattern such as "*String*" into the names of matching files in the current directory. That
+    // happens before any test can run, so this checks the setting that controls it (see src/main.cpp).
+    CheckEquals(0, _dowildcard, __func__, __LINE__, "command-line wildcard expansion is turned off");
+}
+//---------------------------------------------------------------------------
+#endif
 void TTest_ASWUnitTests_CLI::Test_ExitCodeForResults_MapsEachOutcome()
 {
     // Arrange

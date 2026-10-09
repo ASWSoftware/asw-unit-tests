@@ -138,10 +138,10 @@ bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
         std::equal(a.begin(), a.end(), b.begin(), CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
 
-std::string FormatDurationMs(std::chrono::high_resolution_clock::time_point start)
+std::string FormatDurationMs(std::chrono::steady_clock::time_point start)
 {
     double const elapsedMs = std::chrono::duration<double, std::milli>(
-        std::chrono::high_resolution_clock::now() - start).count();
+        std::chrono::steady_clock::now() - start).count();
 
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
@@ -1776,7 +1776,8 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
             break;
         }
 
-        // Reports this test's record, if it recorded one (a test whose unexpected exception propagates doesn't).
+        // Reports this test's record, if it recorded one (a test whose SetUp_Test() or TearDown_Test() exception
+        // propagates doesn't).
         size_t const recordsBefore = m_Results.CaseRecords.size();
         auto notifyFinished = [&]()
             {
@@ -1986,11 +1987,15 @@ void TTestGroupBase::TearDown_Test(ITestCase& /*testCase*/)
     TTestGroupBase::Test
 
     Runs the test call back and sets success/error counts and messages.
+
+    An exception the test didn't expect only fails that test, with an "Unexpected exception: " detail describing
+    it, after which TearDown_Test() and the rest of the run go on as usual. One from SetUp_Test() or TearDown_Test()
+    is fatal instead: it's logged as a "!!FATAL ERROR!!" and escapes, ending the run.
 */
 void TTestGroupBase::Test(ITestCase& testCase)
 {
     std::string const testFullName = m_Name + "." + testCase.GetName();
-    std::chrono::high_resolution_clock::time_point const testStart = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point const testStart = std::chrono::steady_clock::now();
 
     // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
     // for the console, never in the stored message/record), and logs the "Finished test" timing line.
@@ -2024,7 +2029,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             }
 
             double const durationSeconds = std::chrono::duration<double>(
-                std::chrono::high_resolution_clock::now() - testStart).count();
+                std::chrono::steady_clock::now() - testStart).count();
             m_Results.CaseRecords.push_back(
                 TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, recordDetail });
 
@@ -2075,6 +2080,26 @@ void TTestGroupBase::Test(ITestCase& testCase)
             finish(TTestOutcome::Fail, "failed", detail);
         };
 
+    // Set when SetUp_Test() or TearDown_Test() throws, making that exception fatal rather than an unexpected
+    // exception from the test (see the handlers below). Either one also clears m_ExceptionExpected: the exception
+    // isn't the test's own, so it's never taken for the one the test expects.
+    bool setUpOrTearDownThrew = false;
+
+    auto tearDown = [&]()
+        {
+            try
+            {
+                TearDown_Test(testCase);
+            }
+            catch (...)
+            {
+                setUpOrTearDownThrew = true;
+                m_ExceptionExpected = false;
+                Log("!!FATAL ERROR!!: TearDown_Test() exception for \"" + testFullName + "\"");
+                throw;
+            }
+        };
+
     try
     {
         // Reset for test
@@ -2092,6 +2117,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
             }
             catch (...)
             {
+                setUpOrTearDownThrew = true;
                 m_ExceptionExpected = false;
                 Log("!!FATAL ERROR!!: SetUp_Test() exception for \"" + testFullName + "\"");
                 throw;
@@ -2103,20 +2129,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
             }
             catch (...)
             {
-                TearDown_Test(testCase);
+                tearDown();
                 throw;
             }
 
-            try
-            {
-                TearDown_Test(testCase);
-            }
-            catch (...)
-            {
-                m_ExceptionExpected = false;
-                Log("!!FATAL ERROR!!: TearDown_Test() exception for \"" + testFullName + "\"");
-                throw;
-            }
+            tearDown();
         }
 
         // Check for failures (for 'Exception expected' and 'Check' cases)
@@ -2155,7 +2172,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
         else
         {
             m_Results.FailedCount++;
-            throw; // Unexpected failure
+
+            if (setUpOrTearDownThrew)
+                throw; // Fatal
+
+            finish(TTestOutcome::Fail, "failed", "Unexpected exception: " + DescribeException(ex));
         }
     }
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
@@ -2171,7 +2192,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
         else
         {
             m_Results.FailedCount++;
-            throw; // Unexpected failure
+
+            if (setUpOrTearDownThrew)
+                throw; // Fatal
+
+            finish(TTestOutcome::Fail, "failed", "Unexpected exception: " + DescribeException(ex));
         }
     }
 #endif
@@ -2200,7 +2225,17 @@ void TTestGroupBase::Test(ITestCase& testCase)
         else
         {
             m_Results.FailedCount++;
-            throw; // Unexpected failure
+
+            if (setUpOrTearDownThrew)
+                throw; // Fatal
+
+            // The same description CallAndDescribeException() gives it.
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+            finish(TTestOutcome::Fail, "failed",
+                "Unexpected exception: an object that is neither a std::exception nor an RTL Exception");
+#else
+            finish(TTestOutcome::Fail, "failed", "Unexpected exception: a non-std::exception object");
+#endif
         }
     }
 }

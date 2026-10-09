@@ -448,7 +448,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
     size_t groupNum = 0;
     size_t nGroups = groupsToRun.size();
-    std::chrono::high_resolution_clock::time_point const start = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point const start = std::chrono::steady_clock::now();
 
     Log("\n[" + GetUTCTimeISO8601() + "] Tests started.\n");
 
@@ -532,7 +532,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         }
     }
 
-    std::chrono::high_resolution_clock::time_point const end = std::chrono::high_resolution_clock::now();
+    std::chrono::steady_clock::time_point const end = std::chrono::steady_clock::now();
 
     Log("--------------------------------------------------------------------------------");
 

@@ -10,6 +10,54 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-08
+
+### Changed
+
+- An exception a test throws without expecting it (outside a `Check*` or
+  `Assert*` call, with no `SetExceptionExpected()`) now fails only that test,
+  and the run carries on. The failure detail is `Unexpected exception: `
+  followed by the exception's message (`ClassName: Message` for an RTL
+  exception). `TearDown_Test()`, the remaining tests and groups, the totals
+  and the `--report-junit` report all follow as usual, with the test shown as
+  a `<failure>`, and the VCL GUI runner shows it like any other failure,
+  including with `--shuffle`, `--filter`, `--test-timeout-seconds` and
+  `--catch-crashes`. Such an exception used to end the whole run, with no
+  totals or JUnit report, and exit with code `2` (`3` if it wasn't a
+  `std::exception`). It's now an ordinary test failure, with exit code `1`,
+  so a script that checked for `2` or `3` to detect it must check for `1`.
+  Codes `2` and `3` now only mean that an exception from `SetUp_Test()`,
+  `TearDown_Test()`, `SetUp_Group()` or `TearDown_Group()` ended the run,
+  which is unchanged. Code that calls a group's `Run()` directly no longer
+  sees a test's unexpected exception escape; it's in `Results()` instead.
+
+### Fixed
+
+- An exception from `TearDown_Test()` after the test threw the exception it
+  expected was taken for the expected exception, so the test passed. It now
+  ends the run with `!!FATAL ERROR!!`, like any other `TearDown_Test()`
+  exception, including one after a test's unexpected exception, which
+  previously wasn't logged as `!!FATAL ERROR!!`.
+- With a MinGW build of the console runner, a `--filter` pattern was replaced
+  by the names of any files in the current directory it matched, however it
+  was quoted, because MinGW-w64's C runtime can expand wildcards in the
+  command line (WinLibs' builds do by default). Matching one file selected no
+  tests and still exited with code `0`; matching several failed with
+  "unrecognized option". The runner (`src/main.cpp`) now turns that expansion
+  off, so the pattern arrives as typed. A project with its own `main()` can do
+  the same by defining `extern "C" { int _dowildcard = 0; }` for MinGW.
+- With RAD Studio's 32-bit compiler (`bcc32c`), almost every test was timed
+  as `0.000 ms`, with `time="0.000000"` in the `--report-junit` report, in
+  both the console and VCL GUI runners. Durations were measured with
+  `std::chrono::high_resolution_clock`, which that compiler's library
+  implements as the system clock, advancing only about every 10 ms. Test
+  durations and the total elapsed time now use `std::chrono::steady_clock`.
+  It's also monotonic, so with GCC's standard library (MinGW, Linux), where
+  `high_resolution_clock` is the system clock too, a change to the system
+  clock during a run no longer distorts them. Nothing changes with MSVC or
+  RAD Studio's Win64x compiler, where `high_resolution_clock` already was
+  `steady_clock`.
+
 ## [1.2.0] - 2026-10-08
 
 ### Added
@@ -378,7 +426,8 @@ framework at this point (test group registration, `Check`/`Assert` methods,
 RAD Studio and CMake build support, etc.) is treated as the baseline and is not
 itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.5...v1.0.0

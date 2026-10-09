@@ -62,8 +62,10 @@ private: // Test methods
     void Test_DescribeRTLException_IncludesClassNameAndMessage();
     void Test_IsType_MatchesRTLClasses();
     void Test_RTLExceptionMessage_ConvertsToUTF8();
-    void Test_Run_PropagatesUnexpectedRTLException();
-    void Test_Run_WrapsUnexpectedRTLExceptionFromWorkerThread();
+    void Test_Run_PropagatesRTLExceptionFromSetUpTest();
+    void Test_Run_PropagatesRTLExceptionFromTearDownTest();
+    void Test_Run_RecordsUnexpectedRTLExceptionAndContinues();
+    void Test_Run_WrapsRTLExceptionFromSetUpTestOnWorkerThread();
     void Test_SetExceptionExpected_MatchesRTLTypeAndMessage();
     void Test_SetExceptionExpected_MatchesRTLTypeAndMessageOnWorkerThread();
     void Test_SetExceptionExpected_MatchesRTLTypeAndMessageUnderCatchCrashes();
