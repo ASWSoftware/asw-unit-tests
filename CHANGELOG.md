@@ -36,6 +36,14 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
   ends the run with `!!FATAL ERROR!!`, like any other `TearDown_Test()`
   exception, including one after a test's unexpected exception, which
   previously wasn't logged as `!!FATAL ERROR!!`.
+- With a MinGW build of the console runner, a `--filter` pattern was replaced
+  by the names of any files in the current directory it matched, however it
+  was quoted, because MinGW-w64's C runtime can expand wildcards in the
+  command line (WinLibs' builds do by default). Matching one file selected no
+  tests and still exited with code `0`; matching several failed with
+  "unrecognized option". The runner (`src/main.cpp`) now turns that expansion
+  off, so the pattern arrives as typed. A project with its own `main()` can do
+  the same by defining `extern "C" { int _dowildcard = 0; }` for MinGW.
 
 ## [1.2.0] - 2026-10-08
 
