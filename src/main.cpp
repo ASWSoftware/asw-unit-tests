@@ -37,6 +37,19 @@ limitations under the License.
 using namespace ASWUnitTests;
 //---------------------------------------------------------------------------
 
+#if defined(__MINGW32__)
+// MinGW-w64's C runtime can expand wildcards in the command line before main() runs (WinLibs' builds do by default),
+// turning a --filter pattern such as "*String*" into the names of matching files in the current directory, however
+// it was quoted. Defining _dowildcard as 0 here takes the place of the runtime library's own definition and turns
+// that off, so arguments arrive as given, as they do with MSVC and a quoted argument in a POSIX shell. RAD Studio's
+// Win64x compiler (bcc64x) also uses the MinGW-w64 runtime, so it compiles this too, though its runtime already
+// leaves wildcards alone; its Win32 compiler (bcc32c) doesn't need it.
+extern "C"
+{
+int _dowildcard = 0;
+}
+#endif
+
 namespace
 {
 
