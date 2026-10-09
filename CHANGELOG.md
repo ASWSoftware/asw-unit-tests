@@ -10,6 +10,8 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-08
+
 ### Changed
 
 - An exception a test throws without expecting it (outside a `Check*` or
@@ -424,7 +426,8 @@ framework at this point (test group registration, `Check`/`Assert` methods,
 RAD Studio and CMake build support, etc.) is treated as the baseline and is not
 itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v0.26.5...v1.0.0

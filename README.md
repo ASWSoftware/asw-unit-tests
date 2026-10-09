@@ -481,11 +481,11 @@ run (e.g. from `SetUp_Test()`) exits with code `2`, like a `std::exception`.
 
 `--test-timeout-seconds` runs each test on a worker thread. Expected and unexpected exceptions from the test itself
 work exactly the same there, because they're caught and checked on that thread. An RTL exception from `SetUp_Test()`
-or `TearDown_Test()`, which ends the run, has to cross back to the main thread, which
-`std::exception_ptr` can't do for RTL exceptions (rethrowing one after its handler has exited terminates the
-process). It therefore arrives as a `TExceptRTLException`, a `std::runtime_error` whose `what()` is the same
-`ClassName: Message` text, so the console output and exit code are unchanged. Code that calls a group's `Run()`
-directly with a timeout can still check the original type through `RTLClass()`:
+or `TearDown_Test()`, which ends the run, has to cross back to the main thread, which `std::exception_ptr` can't do
+for RTL exceptions (rethrowing one after its handler has exited terminates the process). It therefore arrives as a
+`TExceptRTLException`, a `std::runtime_error` whose `what()` is the same `ClassName: Message` text, so the console
+output and exit code are unchanged. Code that calls a group's `Run()` directly with a timeout can still check the
+original type through `RTLClass()`:
 
 ```
 catch (TExceptRTLException const& ex)
