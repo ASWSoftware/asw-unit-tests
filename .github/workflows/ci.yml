@@ -25,7 +25,7 @@ jobs:
     # burning the runner's full time allotment. The framework has no
     # in-process per-test timeout of its own yet; this is a coarse stand-in
     # for CI specifically.
-    timeout-minutes: 3
+    timeout-minutes: 6
     strategy:
       fail-fast: false
       matrix:
