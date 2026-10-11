@@ -85,4 +85,6 @@ Use the repository's `.uncrustify.cfg` configuration. The README documents how t
 git config --local core.hooksPath .githooks/
 ```
 
+Wrap Markdown prose at 100 columns in `README.md`, `CONTRIBUTING.md` and `CHANGELOG.md`, re-wrapping the edited paragraph when a change makes a line too long. Don't split inline code or a link's text across lines. Code blocks and tables are exempt, and so is a line that only overflows because a single link or URL can't be split.
+
 Review the final diff for accidental file changes, ordering regressions, missing includes, platform assumptions, and tests that do not actually exercise the changed behavior. Do not commit changes unless the user explicitly requests a commit.
