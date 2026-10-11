@@ -99,13 +99,35 @@ public:
 #  define ASWUnitTests_UNIQUE_NAME(base) ASWUnitTests_CONCAT(base, __LINE__)
 #endif
 
+// __COUNTER__ isn't standard C++ (C2y adopts it), so newer Clang versions
+// report each use under -Wpedantic as -Wc2y-extensions. The registration
+// macro silences that warning around its own declaration only. The
+// __has_warning check keeps Clang versions without that warning group from
+// reporting an unknown warning option.
+#if defined(__clang__) && defined(__has_warning)
+#  if __has_warning("-Wc2y-extensions")
+#    define ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wc2y-extensions\"")
+#    define ASWUnitTests_SUPPRESS_COUNTER_WARNING_END \
+    _Pragma("clang diagnostic pop")
+#  endif
+#endif
+
+#if !defined(ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN)
+#  define ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN
+#  define ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
+#endif
+
 #define ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order) \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
     static int const ASWUnitTests_UNIQUE_NAME(g_ASWUnitTests_Registered_) = \
         ::ASWUnitTests::TTestGroupRegistry::Register( \
             []() -> std::unique_ptr<::ASWUnitTests::ITestGroup> \
             { \
                 return std::make_unique<ClassName>(); \
-            }, (order));
+            }, (order)); \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
 
 #define ASW_REGISTER_TEST_GROUP(ClassName) \
     ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, 0)
