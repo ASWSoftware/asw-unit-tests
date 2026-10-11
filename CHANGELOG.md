@@ -32,6 +32,9 @@ versioned baseline.
   with `Test group "Name" registers more than one test named "Test"` and exit code `2`. Both tests
   used to be registered and run, but `--filter`, `--list`, the JUnit report and the VCL GUI runner
   couldn't tell them apart. A group that did this must give each test its own name.
+- `Deploy.bat` now also copies `.gitattributes`, so a deployed copy committed into another
+  repository keeps this repository's line-ending rules for its own files, such as storing the RAD
+  Studio `.cbproj` files exactly as they are.
 
 ### Fixed
 
