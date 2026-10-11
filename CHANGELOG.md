@@ -10,6 +10,32 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- Self-registering test methods. A group derived from
+  `TAutoTestGroup<itself>` (instead of `TTestGroupBase`) can define each test
+  method with `ASW_TEST(ClassName, TestName) { ... }`, from
+  `ASWUnitTests_Registry.h`, which defines `ClassName::Test_TestName()` and
+  registers it as the test `TestName`, so a test can no longer be written but
+  left out of the group's constructor. The method's declaration in the class
+  must be `public`. A group runs its `ASW_TEST` tests first, in alphabetical
+  order by name, then any tests its constructor registers with
+  `RegisterTest()` or `RegisterTestCases()`, in the order registered, so the
+  two styles can be mixed. Keep a group's `ASW_TEST` tests in the same `.cpp`
+  file as its `ASW_REGISTER_TEST_GROUP`. Existing groups don't need to
+  change. `tests/Test_ASWTools_Random.cpp` now uses it.
+
+### Changed
+
+- A group that registers the same test name twice, whether with
+  `RegisterTest()`, `RegisterTestCases()` (e.g. a name generator that gives
+  two rows the same label) or `ASW_TEST`, now throws the new
+  `TExceptDuplicateTestName` from its constructor, so the run stops at startup
+  with `Test group "Name" registers more than one test named "Test"` and exit
+  code `2`. Both tests used to be registered and run, but `--filter`, `--list`,
+  the JUnit report and the VCL GUI runner couldn't tell them apart. A group
+  that did this must give each test its own name.
+
 ### Fixed
 
 - `ASW_REGISTER_TEST_GROUP` and `ASW_REGISTER_TEST_GROUP_ORDERED` no longer

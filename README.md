@@ -10,6 +10,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 
 - **[Self-registering test groups](#registering-tests)** - `ASW_REGISTER_TEST_GROUP` adds a test module without
   editing any framework file.
+- **[Self-registering test methods](#self-registering-test-methods)** - `ASW_TEST` defines a test method and
+  registers it with its group, so a test can't be written but left out of the group's constructor.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*` fails the test
   immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`, `Same`/`NotSame`, `Empty`/`NotEmpty`,
   `IsType`/`IsNotType`, `Near`/`NotNear`, `Contains`/`NotContains`, `StartsWith`/`EndsWith` (and their `Not` forms),
@@ -815,8 +817,9 @@ This keeps a known-broken, environment-specific, or not-yet-implemented test's r
 `--list` output) intact, instead of commenting out or deleting its `RegisterTest()` call and losing the reminder
 that it exists. The reason is required, so future readers always know *why* a test is being skipped.
 
-Test modules themselves inherit from `TTestGroupBase` and each method that needs to be tested for a module must
-be explicitely registered within that module's constructor. For example:
+Test modules themselves inherit from `TTestGroupBase`, and each test method is registered within that module's
+constructor, as below, or registers itself where it's defined (see
+[Self-Registering Test Methods](#self-registering-test-methods)). For example:
 
 ```
 // Whatever include at the top of the file for your `TMyClassToTest` class, etc.
@@ -865,6 +868,75 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 }
 //---------------------------------------------------------------------------
 ```
+
+A test name can be registered only once per group. Registering one again (with `RegisterTest()`,
+`RegisterTestCases()` or `ASW_TEST`) throws `TExceptDuplicateTestName` from the group's constructor, which stops the
+run at startup with a message naming the group and the test, since `--filter`, `--list`, the JUnit report and the
+VCL GUI runner couldn't tell the two tests apart.
+
+### Self-Registering Test Methods
+
+A test registered in the constructor is easy to forget: the method compiles and the group runs, just without it.
+`ASW_TEST` (declared in `src\ASWUnitTests_Registry.h`) instead defines the test method and registers it with its
+group in one step, so writing the test is registering it. To use it, derive the group from
+`TAutoTestGroup<itself>` instead of `TTestGroupBase`, and declare its test methods `public`:
+
+```
+// Test_TMyClassToTest.h
+class TTest_TMyClassToTest : public TAutoTestGroup<TTest_TMyClassToTest>
+{
+private:
+    typedef TAutoTestGroup<TTest_TMyClassToTest> inherited;
+
+public: // Test methods, each defined with ASW_TEST
+    void Test_NameOfMethodBeingTested_WhatIsBeingTested();
+    void Test_NameOfMethod2BeingTested_WhatIsBeingTested();
+
+public:
+    TTest_TMyClassToTest();
+    // ... SetUp_Group(), TearDown_Group(), etc., as before ...
+};
+
+// Test_TMyClassToTest.cpp
+TTest_TMyClassToTest::TTest_TMyClassToTest()
+    : inherited("Name_of_My_Module_Unit_For_TMyClassToTest")
+{
+    // No RegisterTest() calls needed for the ASW_TEST tests below.
+}
+
+ASW_TEST(TTest_TMyClassToTest, NameOfMethodBeingTested_WhatIsBeingTested)
+{
+    // ... test body, exactly as in a Test_ method; __func__ is still the method's name ...
+}
+
+ASW_TEST(TTest_TMyClassToTest, NameOfMethod2BeingTested_WhatIsBeingTested)
+{
+    // ... test body ...
+}
+```
+
+`ASW_TEST(ClassName, TestName)` defines `ClassName::Test_TestName()` and registers it as the test `TestName`. The
+method still needs its declaration in the class, since C++ can't add a member from outside the class definition,
+and that declaration must be `public`, since `ASW_TEST` takes the method's address from outside the class. Getting
+either wrong is a compile error, never a test that silently doesn't run: a private method fails to compile, and so
+does `ASW_TEST` on a class that doesn't derive from `TAutoTestGroup<ClassName>`.
+
+The order is deterministic: a group runs its `ASW_TEST` tests first, in alphabetical order by name (whatever order
+they're defined in), then any tests its constructor registers with `RegisterTest()` or `RegisterTestCases()`, in the
+order it registers them, so the two styles can be mixed in one group. `--shuffle`, `--filter`, `--list`, the JUnit
+report and the VCL GUI runner treat `ASW_TEST` tests exactly like any other. Parameterized tests are still
+registered in the constructor with `RegisterTestCases()`, next to their data.
+
+Keep a group's `ASW_TEST` tests in the same `.cpp` file as its `ASW_REGISTER_TEST_GROUP`. A test registered in the
+constructor is linked in because the constructor refers to it, but nothing refers to an `ASW_TEST` test, so a `.cpp`
+file holding only `ASW_TEST` tests could be left out by a linker pulling the test code from a static library, just as
+a group's own file could. Compiling the test files directly into the test executable, as the projects here do,
+avoids both.
+
+A group that overrides `RegisterTest(TTestCase const&)` doesn't see its `ASW_TEST` tests pass through that override,
+since they're registered from the `TAutoTestGroup` constructor, before the derived class is constructed.
+
+See `tests\Test_ASWTools_Random.cpp` for a working example.
 
 ### Parameterized Tests
 

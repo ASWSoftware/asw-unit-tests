@@ -1625,9 +1625,20 @@ std::string TTestGroupBase::RTLTextToUTF8(System::String const& text)
     TTestGroupBase::RegisterTest
 
     Developer: Call this method from the child of 'TTestGroupBase', in the constructor.
+
+    Every way of registering a test (ASW_TEST, the other RegisterTest() overloads, and RegisterTestCases()) ends
+    here, so this is where a test name the group has already registered is caught: it throws
+    TExceptDuplicateTestName, since --filter, --list, the JUnit report and the VCL GUI runner all identify a test
+    by its name and couldn't tell the two apart.
 */
 void TTestGroupBase::RegisterTest(TTestCase const& testCase)
 {
+    for (std::unique_ptr<ITestCase> const& registered : m_TestCallbacks)
+    {
+        if (registered->GetName() == testCase.GetName())
+            throw TExceptDuplicateTestName(m_Name, testCase.GetName());
+    }
+
     m_TestCallbacks.push_back(std::make_unique<TTestCase>(testCase));
 }
 //---------------------------------------------------------------------------

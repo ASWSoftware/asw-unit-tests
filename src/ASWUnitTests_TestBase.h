@@ -27,6 +27,7 @@ limitations under the License.
 #ifndef ASWUnitTests_TestBaseH
 #define ASWUnitTests_TestBaseH
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -2204,6 +2205,80 @@ public:
         std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes) override;
     virtual void SetLogSuppressed(bool suppressed);
     void SetRunObserver(ITestRunObserver* observer) override;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TAutoTestGroup
+//
+// A TTestGroupBase whose test methods register themselves where they're
+// defined, with the ASW_TEST macro (see ASWUnitTests_Registry.h), so a test
+// can't be written but left out of the constructor. To use ASW_TEST, derive
+// the group from TAutoTestGroup<itself>, and declare its Test_ methods
+// public, since ASW_TEST takes their addresses from outside the class:
+//
+//     class TTest_TMyClass : public TAutoTestGroup<TTest_TMyClass>
+//
+// Each ASW_TEST adds its method to this class's list during static
+// initialization. This constructor registers that list's tests in
+// alphabetical order by name, before the derived constructor runs, so any
+// tests the derived constructor registers itself (with RegisterTest() or
+// RegisterTestCases()) follow them, in the order it registers them. A name
+// registered twice throws TExceptDuplicateTestName.
+//
+// The ASW_TEST tests are registered with TTestGroupBase::RegisterTest(),
+// since a virtual call from this constructor can't reach a derived class's
+// override of it.
+/////////////////////////////////////////////////////////////////////////////
+template <typename TDerived>
+class TAutoTestGroup : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+public:
+    typedef void (TDerived::*TestMethod)();
+
+private:
+    struct TAutoTest
+    {
+        std::string Name;
+        TestMethod Method;
+    };
+
+    // Constructed on first use, so an ASW_TEST in any translation unit can add to it during static initialization,
+    // whatever order those units are initialized in.
+    static std::vector<TAutoTest>& AutoTests()
+    {
+        static std::vector<TAutoTest> tests;
+        return tests;
+    }
+
+protected:
+    explicit TAutoTestGroup(std::string const& name)
+        : inherited(name)
+    {
+        std::vector<TAutoTest> tests = AutoTests();
+
+        std::stable_sort(tests.begin(), tests.end(), [](TAutoTest const& a, TAutoTest const& b)
+            {
+                return a.Name < b.Name;
+            });
+
+        for (TAutoTest const& test : tests)
+            RegisterTest(test.Method, test.Name);
+    }
+
+public:
+    // Called by ASW_TEST. Returns a value for the static variable that ASW_TEST initializes with it.
+    static int AddAutoTest(TestMethod method, char const* name)
+    {
+        static_assert(std::is_base_of<TAutoTestGroup<TDerived>, TDerived>::value,
+            "ASW_TEST requires its class to derive from TAutoTestGroup<that class>");
+
+        AutoTests().push_back(TAutoTest{ name, method });
+        return 0;
+    }
 };
 
 } // namespace ASWUnitTests
