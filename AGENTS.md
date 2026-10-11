@@ -31,7 +31,9 @@ Do not hide unrelated failures by changing tests or weakening diagnostics. Do no
 
 ## Language and Toolchain Compatibility
 
-New and modified code must be compatible with C++ console projects using C++20 and with:
+New and modified code must compile as C++17, the minimum the framework supports; RAD Studio's 32-bit compiler (bcc32c) only supports C++17. C++20 features are allowed only as optional additions behind a feature-test check, with the C++17 path still complete, as `ASWUnitTests_TestBase.h` does for `std::source_location` by defining `ASWUNITTESTS_SOURCE_LOCATION_ENABLED`. Test the library feature-test macro (e.g. `__cpp_lib_source_location`) rather than `__has_include`, since a header can be present but unusable. The CMake and RAD Studio Win64x builds compile at C++20, so validate code with a C++20 path on both a C++17 build (such as RAD Studio Win32) and a C++20 build.
+
+New and modified code must also be compatible with C++ console projects and with:
 
 - RAD Studio 13.1 and later
 - CMake
