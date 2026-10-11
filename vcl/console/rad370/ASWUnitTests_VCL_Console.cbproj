@@ -202,6 +202,10 @@
             <DependentOn>..\..\..\tests\Test_ASWTools_String.h</DependentOn>
             <BuildOrder>12</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_AutoTest.cpp">
+            <DependentOn>..\..\..\tests\Test_ASWUnitTests_AutoTest.h</DependentOn>
+            <BuildOrder>41</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_CLI.cpp">
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_CLI.h</DependentOn>
             <BuildOrder>13</BuildOrder>

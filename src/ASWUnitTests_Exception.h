@@ -425,6 +425,23 @@ public:
     TExceptTestCrashed(std::string const& msg);
 };
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptDuplicateTestName
+//
+// Thrown by TTestGroupBase::RegisterTest() when a group registers a test
+// name it has already registered, whether with ASW_TEST, RegisterTest() or
+// RegisterTestCases(). Thrown while the group is being constructed, so it
+// escapes TTestHandler::Initialize() and stops the run before any test runs.
+// A registration mistake rather than a test's outcome, so it isn't a
+// TTestException.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptDuplicateTestName : public std::logic_error
+{
+public:
+    TExceptDuplicateTestName(std::string const& groupName, std::string const& testName);
+};
+
 // /////// Compiler specific exceptions after this line /////////////////////
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)

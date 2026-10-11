@@ -30,12 +30,12 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TTest_TMersenneTwisterRandom
 /////////////////////////////////////////////////////////////////////////////
-class TTest_TMersenneTwisterRandom : public TTestGroupBase
+class TTest_TMersenneTwisterRandom : public TAutoTestGroup<TTest_TMersenneTwisterRandom>
 {
 private:
-    typedef TTestGroupBase inherited;
+    typedef TAutoTestGroup<TTest_TMersenneTwisterRandom> inherited;
 
-private: // Test methods
+public: // Test methods, each defined with ASW_TEST (requires public)
     void Test_Constructor_DefaultSeed();
     void Test_Random_FloatRange();
     void Test_Random_UIntRange();
