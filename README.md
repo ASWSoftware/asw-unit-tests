@@ -387,7 +387,8 @@ and can stop a run between tests, so it can drive other kinds of runners too.
 Test modules self-register with `TTestHandler` using the `ASW_REGISTER_TEST_GROUP` macro (declared in
 `src\ASWUnitTests_Registry.h`). No file in `src` ever needs to be modified to add, remove, or rename a test
 module. This makes it easy to drop ASWUnitTests into another repository (e.g. as a git submodule).
-Place the macro at file scope, after the closing brace of the `ASWUnitTests` namespace, in the test module's `.cpp` file:
+Place the macro at file scope, after the closing brace of the `ASWUnitTests` namespace, in the test module's `.cpp`
+file:
 
 ```
 // Whatever includes at the top of the file for your `TMyClassToTest` class, etc.
