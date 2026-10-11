@@ -10,6 +10,13 @@ see [0.26.1](#0261---2026-09-12) for the initial versioned baseline.
 
 ## [Unreleased]
 
+### Fixed
+
+- `ASW_REGISTER_TEST_GROUP` and `ASW_REGISTER_TEST_GROUP_ORDERED` no longer
+  cause a `'__COUNTER__' is a C2y extension [-Wc2y-extensions]` warning in
+  every test module when building with Clang 22 or later and `-Wpedantic`
+  (an error with `-Werror`). Test modules don't need to change.
+
 ## [1.2.1] - 2026-10-08
 
 ### Changed
