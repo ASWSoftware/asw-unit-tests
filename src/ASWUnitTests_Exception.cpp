@@ -110,6 +110,18 @@ TExceptContains::TExceptContains(std::string const& method, int line, std::strin
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptDuplicateTestName
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptDuplicateTestName::TExceptDuplicateTestName(std::string const& groupName, std::string const& testName)
+    : std::logic_error("Test group \"" + groupName + "\" registers more than one test named \"" + testName + "\"")
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptExpected
 /////////////////////////////////////////////////////////////////////////////
 

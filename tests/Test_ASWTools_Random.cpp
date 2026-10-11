@@ -42,18 +42,8 @@ namespace ASWUnitTests
 TTest_TMersenneTwisterRandom::TTest_TMersenneTwisterRandom()
     : inherited("ASWTools_Random_TMersenneTwisterRandom_Tests")
 {
-    // Can register this way
-    RegisterTest([this]()
-        {
-            Test_Constructor_DefaultSeed();
-        }, "Constructor_DefaultSeed");
-
-
-    // Or you can register this way
-    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Random_FloatRange, "Random_FloatRange");
-    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Random_UIntRange, "Random_UIntRange");
-    RegisterTest(&TTest_TMersenneTwisterRandom::Test_Randomize_ChangesSeed, "Randomize_ChangesSeed");
-    RegisterTest(&TTest_TMersenneTwisterRandom::Test_SetAndGetSeed, "SetAndGetSeed");
+    // Nothing to register here: each test below is defined with ASW_TEST, which registers it with this group.
+    // (See Test_ASWTools_String.cpp for a group that registers its tests here instead.)
 }
 //---------------------------------------------------------------------------
 TTest_TMersenneTwisterRandom::~TTest_TMersenneTwisterRandom()
@@ -83,7 +73,7 @@ void TTest_TMersenneTwisterRandom::TearDown_Test(ITestCase& /*testCase*/)
 
 //---------------------------------------------------------------------------
 // Test: Constructor sets default seed
-void TTest_TMersenneTwisterRandom::Test_Constructor_DefaultSeed()
+ASW_TEST(TTest_TMersenneTwisterRandom, Constructor_DefaultSeed)
 {
     // Arrange
     TMersenneTwisterRandom rNumGen;
@@ -96,7 +86,7 @@ void TTest_TMersenneTwisterRandom::Test_Constructor_DefaultSeed()
 }
 //---------------------------------------------------------------------------
 // Test: Random() returns float in [0.0, 1.0]
-void TTest_TMersenneTwisterRandom::Test_Random_FloatRange()
+ASW_TEST(TTest_TMersenneTwisterRandom, Random_FloatRange)
 {
     // Arrange
     TMersenneTwisterRandom rNumGen;
@@ -119,7 +109,7 @@ void TTest_TMersenneTwisterRandom::Test_Random_FloatRange()
 }
 //---------------------------------------------------------------------------
 // Test: Random(uint32_t n) returns values in [0, n)
-void TTest_TMersenneTwisterRandom::Test_Random_UIntRange()
+ASW_TEST(TTest_TMersenneTwisterRandom, Random_UIntRange)
 {
     // Arrange
     TMersenneTwisterRandom rNumGen;
@@ -143,7 +133,7 @@ void TTest_TMersenneTwisterRandom::Test_Random_UIntRange()
 }
 //---------------------------------------------------------------------------
 // Test: Randomize changes the seed
-void TTest_TMersenneTwisterRandom::Test_Randomize_ChangesSeed()
+ASW_TEST(TTest_TMersenneTwisterRandom, Randomize_ChangesSeed)
 {
     // Arrange
     TMersenneTwisterRandom rNumGen;
@@ -159,7 +149,7 @@ void TTest_TMersenneTwisterRandom::Test_Randomize_ChangesSeed()
 }
 //---------------------------------------------------------------------------
 // Test: Set and Get Seed
-void TTest_TMersenneTwisterRandom::Test_SetAndGetSeed()
+ASW_TEST(TTest_TMersenneTwisterRandom, SetAndGetSeed)
 {
     // Arrange
     TMersenneTwisterRandom rNumGen;

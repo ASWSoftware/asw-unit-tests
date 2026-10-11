@@ -33,6 +33,8 @@ for %%D in (build cmake rad370 src tests toTest vcl\console\rad370 vcl\gui\rad37
     )
 )
 
+call :CopyFile ".gitattributes" ".gitattributes"
+if errorlevel 1 exit /b 1
 call :CopyFile "CHANGELOG.md" "CHANGELOG.md"
 if errorlevel 1 exit /b 1
 call :CopyFile "LICENSE" "LICENSE"
@@ -108,6 +110,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWTools_String.cpp" "tests\Test_ASWTools_String.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWTools_String.h" "tests\Test_ASWTools_String.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_AutoTest.cpp" "tests\Test_ASWUnitTests_AutoTest.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_AutoTest.h" "tests\Test_ASWUnitTests_AutoTest.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_CLI.cpp" "tests\Test_ASWUnitTests_CLI.cpp"
 if errorlevel 1 exit /b 1

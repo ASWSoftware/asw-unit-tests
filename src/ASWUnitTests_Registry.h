@@ -2,10 +2,12 @@
 ASWUnitTests_Registry.h
 Author: Anthony S. West - ASW Software
 
-Self-registration support for test groups.
+Self-registration support for test groups and their tests.
 
 Use the ASW_REGISTER_TEST_GROUP macro in a test module's .cpp file to
-register the test group with TTestHandler.
+register the test group with TTestHandler, and optionally the ASW_TEST
+macro to define a TAutoTestGroup's test methods so they register
+themselves with their group.
 
 Copyright 2026 ASW Software
 
@@ -99,16 +101,69 @@ public:
 #  define ASWUnitTests_UNIQUE_NAME(base) ASWUnitTests_CONCAT(base, __LINE__)
 #endif
 
+// __COUNTER__ isn't standard C++ (C2y adopts it), so newer Clang versions
+// report each use under -Wpedantic as -Wc2y-extensions. The registration
+// macro silences that warning around its own declaration only. The
+// __has_warning check keeps Clang versions without that warning group from
+// reporting an unknown warning option.
+#if defined(__clang__) && defined(__has_warning)
+#  if __has_warning("-Wc2y-extensions")
+#    define ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wc2y-extensions\"")
+#    define ASWUnitTests_SUPPRESS_COUNTER_WARNING_END \
+    _Pragma("clang diagnostic pop")
+#  endif
+#endif
+
+#if !defined(ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN)
+#  define ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN
+#  define ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
+#endif
+
 #define ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order) \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
     static int const ASWUnitTests_UNIQUE_NAME(g_ASWUnitTests_Registered_) = \
         ::ASWUnitTests::TTestGroupRegistry::Register( \
             []() -> std::unique_ptr<::ASWUnitTests::ITestGroup> \
             { \
                 return std::make_unique<ClassName>(); \
-            }, (order));
+            }, (order)); \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
 
 #define ASW_REGISTER_TEST_GROUP(ClassName) \
     ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, 0)
+
+//---------------------------------------------------------------------------
+// ASW_TEST
+//
+// Defines a TAutoTestGroup test method and registers it with its group, so
+// the group's constructor doesn't call RegisterTest() for it. Use it in
+// place of the method's usual definition line, in the group's .cpp file:
+//
+//     ASW_TEST(TTest_TMyClassToTest, SetAndGetSeed)
+//     {
+//         // ... test body ...
+//     }
+//
+// This defines TTest_TMyClassToTest::Test_SetAndGetSeed() and registers it
+// as the test "SetAndGetSeed". The class must derive from
+// TAutoTestGroup<TTest_TMyClassToTest> and declare
+// 'void Test_SetAndGetSeed();' as a public member. The group runs its
+// ASW_TEST tests in alphabetical order by name, before any it registers in
+// its constructor.
+//
+// Keep a group's ASW_TEST tests in the same .cpp file as its
+// ASW_REGISTER_TEST_GROUP. Nothing else refers to a .cpp file that only
+// holds ASW_TEST tests, so a linker could leave it out when the test code is
+// built into a static library, just as it could the group's own file.
+//---------------------------------------------------------------------------
+#define ASW_TEST(ClassName, TestName) \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
+    static int const ASWUnitTests_UNIQUE_NAME(g_ASWUnitTests_AutoTest_) = \
+        ::ASWUnitTests::TAutoTestGroup<ClassName>::AddAutoTest(&ClassName::Test_ ## TestName, #TestName); \
+    ASWUnitTests_SUPPRESS_COUNTER_WARNING_END \
+    void ClassName::Test_ ## TestName()
 
 //---------------------------------------------------------------------------
 

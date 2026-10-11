@@ -47,6 +47,7 @@ limitations under the License.
 #endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_Registry.h"
@@ -7362,10 +7363,14 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsDurationOfShortTest()
     CheckGreaterThanOrEqual(results.CaseRecords.front().DurationSeconds, busyWaitSeconds, __func__, __LINE__,
         "the recorded duration includes the test's busy-wait");
 
+    // "passed" is wrapped in ANSI color codes when color is enabled, e.g. when stdout is an interactive terminal,
+    // so the expected text is colorized the same way.
     std::string const logText = observer.LogText();
-    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - passed (", __func__, __LINE__,
+    std::string const passed = TConsole::Colorize("passed", TLogKind::Pass);
+    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - " + passed + " (", __func__, __LINE__,
         "the test's timing line is logged");
-    CheckNotContains(logText, "- passed (0.000 ms)", __func__, __LINE__, "and doesn't show it as taking no time");
+    CheckNotContains(logText, "- " + passed + " (0.000 ms)", __func__, __LINE__,
+        "and doesn't show it as taking no time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()

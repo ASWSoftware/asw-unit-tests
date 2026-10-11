@@ -12,6 +12,7 @@ add_executable(ASWUnitTests
     ${ASWUNITTESTS_SOURCES}
     ../tests/Test_ASWTools_Random.cpp
     ../tests/Test_ASWTools_String.cpp
+    ../tests/Test_ASWUnitTests_AutoTest.cpp
     ../tests/Test_ASWUnitTests_CLI.cpp
     ../tests/Test_ASWUnitTests_Console.cpp
     ../tests/Test_ASWUnitTests_CrashGuard.cpp
