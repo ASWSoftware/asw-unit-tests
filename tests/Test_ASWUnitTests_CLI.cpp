@@ -130,8 +130,10 @@ void TTest_ASWUnitTests_CLI::Test_BuildTestFilter_Filter()
 
     // Assert
     AssertNotNull(filter, __func__, __LINE__, "filter is constructed");
-    CheckTrue(filter("ASWTools_String_Tests.HexSingleToByte[A]"), __func__, __LINE__, "matches a test fitting the pattern");
-    CheckFalse(filter("ASWTools_String_Tests.Compare"), __func__, __LINE__, "does not match an unrelated test");
+    CheckTrue(filter("ASWExamples.ASWTools_String_Tests.HexSingleToByte[A]"), __func__, __LINE__,
+        "matches a test fitting the pattern");
+    CheckFalse(filter("ASWExamples.ASWTools_String_Tests.Compare"), __func__, __LINE__,
+        "does not match an unrelated test");
     CheckContains(filterDescription, "HexSingleToByte", __func__, __LINE__, "description mentions the pattern");
 }
 //---------------------------------------------------------------------------

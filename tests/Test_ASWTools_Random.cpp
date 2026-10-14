@@ -40,7 +40,7 @@ namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
 TTest_TMersenneTwisterRandom::TTest_TMersenneTwisterRandom()
-    : inherited("ASWTools_Random_TMersenneTwisterRandom_Tests")
+    : inherited(TSuitePath("ASWExamples"), "ASWTools_Random_TMersenneTwisterRandom_Tests")
 {
     // Nothing to register here: each test below is defined with ASW_TEST, which registers it with this group.
     // (See Test_ASWTools_String.cpp for a group that registers its tests here instead.)
