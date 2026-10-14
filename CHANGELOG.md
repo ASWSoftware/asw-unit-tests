@@ -78,6 +78,10 @@ versioned baseline.
   `TJUnitReportWriter::Write()`, had CRLF line ends, unlike the VCL GUI runner's and those written
   on Linux. Every report is now `TJUnitReportWriter::BuildXML()`'s text byte for byte, with LF line
   ends.
+- After a test timed out (exit code `5`) or crashed (exit code `6`), the console runner destroyed
+  its test groups before ending, while the timed-out test's abandoned thread could still be running
+  one of their tests, so a test that was busy rather than hung could use a destroyed group and crash
+  the runner with another exit code. The runner now ends without destroying them.
 
 ## [1.3.0] - 2026-10-11
 
