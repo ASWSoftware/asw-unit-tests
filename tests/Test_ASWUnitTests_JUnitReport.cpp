@@ -28,6 +28,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <fstream>
 #include <iterator>
+#include <string>
 #include <vector>
 #if defined(_WIN32)
 #  include <windows.h>
@@ -53,6 +54,25 @@ unsigned long GetCurrentProcessIdPortable()
 #endif
 }
 
+// 'xml' with each timestamp attribute's value removed, so two reports built in different seconds compare equal.
+std::string WithoutTimestamps(std::string xml)
+{
+    std::string const attribute = "timestamp=\"";
+    std::string::size_type pos = 0;
+
+    while ((pos = xml.find(attribute, pos)) != std::string::npos)
+    {
+        pos += attribute.size();
+        std::string::size_type const end = xml.find('"', pos);
+        if (end == std::string::npos)
+            break;
+
+        xml.erase(pos, end - pos);
+    }
+
+    return xml;
+}
+
 } // namespace
 
 namespace ASWUnitTests
@@ -72,6 +92,7 @@ TTest_ASWUnitTests_JUnitReport::TTest_ASWUnitTests_JUnitReport()
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_PlainTextUnchanged, "EscapeXml_PlainTextUnchanged");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_SpecialCharacters, "EscapeXml_SpecialCharacters");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport, "Write_ProducesReadableReport");
+    RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_WritesBuildXMLUnchanged, "Write_WritesBuildXMLUnchanged");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_JUnitReport::~TTest_ASWUnitTests_JUnitReport()
@@ -191,6 +212,33 @@ void TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport()
     CheckContains(content, "name=\"TestPass\"", __func__, __LINE__, "TestPass present");
     CheckContains(content, "<failure", __func__, __LINE__, "failure element present for TestFail");
     CheckContains(content, "<skipped", __func__, __LINE__, "skipped element present for TestSkip");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_JUnitReport::Test_Write_WritesBuildXMLUnchanged()
+{
+    // Arrange
+    std::filesystem::path const reportPath = m_TestTempDir / "report.xml";
+
+    std::vector<TJUnitTestCase> const testCases =
+    {
+        { "GroupA", "TestPass", 0.0, TJUnitOutcome::Pass, "" },
+        { "GroupA", "TestFail", 0.0, TJUnitOutcome::Fail, "line 1\nline 2" },
+    };
+
+    // Act
+    bool const written = TJUnitReportWriter::Write(reportPath.string(), "MyProject", testCases);
+    std::string const expected = TJUnitReportWriter::BuildXML("MyProject", testCases);
+
+    // Assert
+    AssertTrue(written, __func__, __LINE__, "Write() reports success");
+
+    // Read in binary, so a CRLF the file holds isn't turned back into LF on Windows.
+    std::ifstream reportFile(reportPath, std::ios::in | std::ios::binary);
+    std::string const content((std::istreambuf_iterator<char>(reportFile)), std::istreambuf_iterator<char>());
+
+    CheckEquals(WithoutTimestamps(expected), WithoutTimestamps(content), __func__, __LINE__,
+        "the file holds BuildXML()'s bytes (timestamps aside, which can differ by a second)");
+    CheckTrue(content.find('\r') == std::string::npos, __func__, __LINE__, "no CR added to the line ends");
 }
 //---------------------------------------------------------------------------
 

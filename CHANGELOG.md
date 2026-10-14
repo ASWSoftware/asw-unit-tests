@@ -74,6 +74,10 @@ versioned baseline.
   `4294967291`. They now take decimal digits only, and so does the VCL GUI runner's shuffle seed
   box, which still ignores spaces around the number. `TCLIParser::ParseUnsignedInt()` changes the
   same way.
+- On Windows, the console runner's `--report-junit` report, and any written with
+  `TJUnitReportWriter::Write()`, had CRLF line ends, unlike the VCL GUI runner's and those written
+  on Linux. Every report is now `TJUnitReportWriter::BuildXML()`'s text byte for byte, with LF line
+  ends.
 
 ## [1.3.0] - 2026-10-11
 
