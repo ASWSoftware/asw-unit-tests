@@ -109,6 +109,13 @@ private:
     void RegisterTestGroups();
 
 public:
+    // Puts 'group' in suite 'registeredPath', the suite its registration names (see
+    // ASW_REGISTER_TEST_GROUP_IN_SUITE); does nothing when that's empty, or already the group's own suite path. Only
+    // a TTestGroupBase without a suite of its own can be put in one. Throws TExceptInvalidSuitePath for an invalid
+    // 'registeredPath' (see TSuitePath), or TExceptInvalidSuitePath::Conflicting() when the group's own suite path
+    // differs: one its constructor gives, or, for an ITestGroup that doesn't derive from TTestGroupBase, any its
+    // GetSuitePath() gives, including none.
+    static void ApplyRegisteredSuitePath(ITestGroup& group, std::string const& registeredPath);
     // Returns the indexes of 'groups' in their canonical (unshuffled) run order. Within each suite, and at the
     // top level, the groups and suites in it run in ascending order of their registered order, then by name,
     // with a suite treated as order 0 and named by its own suite name. A suite's groups, and the suites inside

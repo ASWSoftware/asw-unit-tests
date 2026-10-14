@@ -307,6 +307,8 @@ class TTestGroupBase : public ITestGroup
 private:
     typedef ITestGroup inherited;
 
+    friend class TTestHandler; // For SetSuitePath()
+
     // The relation an ordering method (e.g. CheckGreaterThan()) checks 'value' has to 'bound'.
     enum class TOrdering
     {
@@ -651,6 +653,10 @@ private:
 
         return failure;
     }
+
+    // Puts the group in suite 'suitePath', for TTestHandler when the group's registration names its suite (see
+    // ASW_REGISTER_TEST_GROUP_IN_SUITE).
+    void SetSuitePath(std::string const& suitePath);
 
     // Why 'value' fails a type check against TType (with 'expectType' false for an IsNotType method), or an empty
     // string when it passes. The check uses dynamic_cast, so a subclass of TType counts as a TType, and a null pointer

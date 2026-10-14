@@ -26,6 +26,15 @@ versioned baseline.
   `"Framework..Console"`, throws the new `TExceptInvalidSuitePath`, stopping the run at startup with
   exit code `2`. Groups that aren't in a suite run in the same order as before, including the order
   a given `--shuffle-seed` produces.
+- `ASW_REGISTER_TEST_GROUP_IN_SUITE(ClassName, suitePath)` and
+  `ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, order)` put a group in a suite
+  from its registration, e.g.
+  `ASW_REGISTER_TEST_GROUP_IN_SUITE(TTest_TConsole, "Framework.Console")`, so its constructor
+  needn't name the suite. A group whose constructor names a different suite, or an `ITestGroup`
+  implemented without `TTestGroupBase` whose own `GetSuitePath()` doesn't give that suite, stops the
+  run at startup with `TExceptInvalidSuitePath`. `TTestGroupRegistry::Register()`
+  takes the suite path as a new last parameter, and `TRegisteredTestGroupFactory` gains a
+  `SuitePath` member, which defaults to empty as `TTestCaseRecord`'s does.
 - `ITestGroup::GetSuitePath()` and `ITestGroup::GetQualifiedTestGroupName()`, and a `SuitePath`
   member in `TTestCaseRecord` and `TTestId`, for code that reports or displays tests by suite.
   `GetSuitePath()` isn't pure virtual, so an `ITestGroup` implemented without `TTestGroupBase`

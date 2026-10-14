@@ -64,6 +64,25 @@ TTestHandler::~TTestHandler()
 {
 }
 //---------------------------------------------------------------------------
+void TTestHandler::ApplyRegisteredSuitePath(ITestGroup& group, std::string const& registeredPath)
+{
+    if (registeredPath.empty())
+        return;
+
+    TSuitePath const checked(registeredPath); // Throws TExceptInvalidSuitePath for an invalid path.
+    std::string const groupPath = group.GetSuitePath();
+
+    if (groupPath == registeredPath)
+        return;
+
+    TTestGroupBase* const groupBase = dynamic_cast<TTestGroupBase*>(&group);
+
+    if (!groupPath.empty() || groupBase == nullptr)
+        throw TExceptInvalidSuitePath::Conflicting(group.GetTestGroupName(), registeredPath, groupPath);
+
+    groupBase->SetSuitePath(registeredPath);
+}
+//---------------------------------------------------------------------------
 /*
     TTestHandler::CanonicalGroupOrder
 
@@ -437,8 +456,9 @@ void TTestHandler::LogAppend(std::string const& msg)
     TTestHandler::RegisterTestGroups
 
     Instantiates every test group that self-registered via the
-    ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED macro (see
-    ASWUnitTests_Registry.h). Test modules are added or removed from their
+    ASW_REGISTER_TEST_GROUP macros (see ASWUnitTests_Registry.h), and puts
+    each in the suite its registration names, if any (see
+    ApplyRegisteredSuitePath()). Test modules are added or removed from their
     own .cpp files; this method never needs to change.
 
     Groups are kept in their canonical order (see CanonicalGroupOrder()):
@@ -453,6 +473,7 @@ void TTestHandler::RegisterTestGroups()
     for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
     {
         groups.push_back(registered.Factory());
+        ApplyRegisteredSuitePath(*groups.back(), registered.SuitePath);
         orderKeys.push_back(TTestGroupOrderKey{ groups.back()->GetSuitePath(), groups.back()->GetTestGroupName(),
                                                 registered.Order });
     }

@@ -43,12 +43,17 @@ private:
     typedef TAutoTestGroup<TTest_ASWUnitTests_Suite> inherited;
 
 public: // Test methods, each defined with ASW_TEST
+    void Test_ApplyRegisteredSuitePath_KeepsMatchingOrNoSuite();
+    void Test_ApplyRegisteredSuitePath_PutsGroupInSuite();
+    void Test_ApplyRegisteredSuitePath_RejectsConflictingSuite();
+    void Test_ApplyRegisteredSuitePath_RejectsInvalidPath();
     void Test_AutoTestGroup_InSuite();
     void Test_DuplicateName_ReportsQualifiedName();
     void Test_GroupInSuite_FilterMatchesQualifiedName();
     void Test_GroupInSuite_ReportsQualifiedName();
     void Test_GroupWithoutSuite_KeepsItsOwnName();
     void Test_Handler_ListsGroupUnderItsSuite();
+    void Test_Handler_PutsGroupInItsRegisteredSuite();
     void Test_Handler_RunsSuiteByFilter();
     void Test_ITestGroup_DefaultsToNoSuite();
     void Test_TSuitePath_RejectsEmptyNames();

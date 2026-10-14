@@ -297,6 +297,82 @@ void TTest_ASWUnitTests_Suite::TearDown_Test(ITestCase& /*testCase*/)
 // /////// Begin tests after this line ///////////////////////
 
 //---------------------------------------------------------------------------
+ASW_TEST(TTest_ASWUnitTests_Suite, ApplyRegisteredSuitePath_KeepsMatchingOrNoSuite)
+{
+    // Arrange
+    TFixture_PlainGroup plain;
+    TFixture_SuiteGroup inSuite;
+    TFixture_MinimalGroup minimal;
+
+    // Act
+    TTestHandler::ApplyRegisteredSuitePath(plain, "");
+    TTestHandler::ApplyRegisteredSuitePath(inSuite, "Outer.Inner");
+    TTestHandler::ApplyRegisteredSuitePath(minimal, "");
+
+    // Assert
+    CheckEmpty(plain.GetSuitePath(), __func__, __LINE__, "a registration naming no suite leaves the group as it is");
+    CheckEquals(std::string("Outer.Inner.Fixture_SuiteGroup"), inSuite.GetQualifiedTestGroupName(), __func__,
+        __LINE__, "a registration may name the suite the constructor gives too");
+    CheckEmpty(minimal.GetSuitePath(), __func__, __LINE__,
+        "an ITestGroup not derived from TTestGroupBase is fine while its registration names no suite");
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TTest_ASWUnitTests_Suite, ApplyRegisteredSuitePath_PutsGroupInSuite)
+{
+    // Arrange
+    TFixture_PlainGroup fixture;
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    TTestHandler::ApplyRegisteredSuitePath(fixture, "Outer.Inner");
+    fixture.Run(WildcardFilter("Outer.*"), std::nullopt, std::nullopt, false);
+
+    // Assert
+    CheckEquals(std::string("Outer.Inner"), fixture.GetSuitePath(), __func__, __LINE__,
+        "the group is in the registration's suite");
+    CheckEquals(std::string("Fixture_PlainGroup"), fixture.GetTestGroupName(), __func__, __LINE__,
+        "its own name is unchanged");
+    CheckEquals(std::string("Outer.Inner.Fixture_PlainGroup"), fixture.GetQualifiedTestGroupName(), __func__,
+        __LINE__, "its qualified name starts with the registration's suite path");
+    AssertEquals(static_cast<std::size_t>(1), fixture.Results().CaseRecords.size(), __func__, __LINE__,
+        "the suite's filter runs its test");
+    CheckEquals(std::string("Outer.Inner.Fixture_PlainGroup"), fixture.Results().CaseRecords[0].GroupName, __func__,
+        __LINE__, "the record names the group by its qualified name");
+    CheckEquals(std::string("Outer.Inner"), fixture.Results().CaseRecords[0].SuitePath, __func__, __LINE__,
+        "the record carries the suite path");
+    CheckEquals(std::string("Outer.Inner.Fixture_PlainGroup"), JoinNames(observer.StartedGroupNames), __func__,
+        __LINE__, "OnTestStarted() is given the qualified name");
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TTest_ASWUnitTests_Suite, ApplyRegisteredSuitePath_RejectsConflictingSuite)
+{
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            TFixture_SuiteGroup fixture;
+            TTestHandler::ApplyRegisteredSuitePath(fixture, "Other");
+        }, __func__, __LINE__, "the constructor gives a different suite",
+        "Test group \"Fixture_SuiteGroup\" is registered in suite \"Other\", but is in suite \"Outer.Inner\" by its "
+        "own definition");
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            TFixture_MinimalGroup fixture;
+            TTestHandler::ApplyRegisteredSuitePath(fixture, "Outer");
+        }, __func__, __LINE__, "an ITestGroup not derived from TTestGroupBase can't be put in a suite",
+        "Test group \"Fixture_MinimalGroup\" is registered in suite \"Outer\", but is in suite \"\" by its own "
+        "definition");
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TTest_ASWUnitTests_Suite, ApplyRegisteredSuitePath_RejectsInvalidPath)
+{
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            TFixture_PlainGroup fixture;
+            TTestHandler::ApplyRegisteredSuitePath(fixture, "Outer.");
+        }, __func__, __LINE__, "a registration's suite path is checked like any other",
+        "Suite path \"Outer.\" has an empty suite name");
+}
+//---------------------------------------------------------------------------
 ASW_TEST(TTest_ASWUnitTests_Suite, AutoTestGroup_InSuite)
 {
     // Arrange
@@ -432,6 +508,33 @@ ASW_TEST(TTest_ASWUnitTests_Suite, Handler_ListsGroupUnderItsSuite)
         "GetTests() lists every test in this group under its qualified name");
     CheckContains(observer.LogText, std::string("\n") + ThisQualifiedName + ".TSuitePath_SplitsNames\n", __func__,
         __LINE__, "--list shows a test by its full name, suite path first");
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TTest_ASWUnitTests_Suite, Handler_PutsGroupInItsRegisteredSuite)
+{
+    // Arrange: the example group TTest_TMersenneTwisterRandom names its suite only in its registration (see
+    // Test_ASWTools_Random.cpp).
+    TTestHandler handler;
+    TRecordingObserver observer;
+    handler.SetRunObserver(&observer);
+    handler.Initialize("Test_Handler_PutsGroupInItsRegisteredSuite");
+
+    // Act
+    std::vector<TTestId> const tests = handler.GetTests();
+
+    // Assert
+    std::size_t found = 0;
+    for (TTestId const& test : tests)
+    {
+        if (test.GroupName != "ASWExamples.ASWTools_Random_TMersenneTwisterRandom_Tests")
+            continue;
+
+        ++found;
+        CheckEquals(std::string("ASWExamples"), test.SuitePath, __func__, __LINE__,
+            "ASW_REGISTER_TEST_GROUP_IN_SUITE put the group in its suite");
+    }
+
+    CheckTrue(found > 0, __func__, __LINE__, "the group's tests are listed under its qualified name");
 }
 //---------------------------------------------------------------------------
 ASW_TEST(TTest_ASWUnitTests_Suite, Handler_RunsSuiteByFilter)

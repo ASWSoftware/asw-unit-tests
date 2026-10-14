@@ -2000,6 +2000,12 @@ void TTestGroupBase::SetRunObserver(ITestRunObserver* observer)
     m_RunObserver = observer;
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::SetSuitePath(std::string const& suitePath)
+{
+    m_SuitePath = suitePath;
+    m_QualifiedName = suitePath.empty() ? m_Name : (suitePath + "." + m_Name);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
 {
     m_TestFailedCheck = true;

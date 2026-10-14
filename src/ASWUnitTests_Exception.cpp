@@ -230,10 +230,22 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
+TExceptInvalidSuitePath::TExceptInvalidSuitePath(std::string const& msg, bool /*isMessage*/)
+    : std::logic_error(msg)
+{
+}
+//---------------------------------------------------------------------------
 TExceptInvalidSuitePath::TExceptInvalidSuitePath(std::string const& suitePath)
     : std::logic_error("Suite path \"" + suitePath + "\" has an empty suite name; separate its names with single "
           "'.' characters, with none at the start or end")
 {
+}
+//---------------------------------------------------------------------------
+TExceptInvalidSuitePath TExceptInvalidSuitePath::Conflicting(std::string const& groupName,
+    std::string const& registeredPath, std::string const& groupPath)
+{
+    return TExceptInvalidSuitePath("Test group \"" + groupName + "\" is registered in suite \"" + registeredPath +
+        "\", but is in suite \"" + groupPath + "\" by its own definition", true);
 }
 //---------------------------------------------------------------------------
 
