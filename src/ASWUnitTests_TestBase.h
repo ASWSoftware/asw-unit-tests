@@ -687,9 +687,34 @@ private:
             return std::string();
 
         std::string const actual = (pointer == nullptr) ? std::string("null") :
-                ("\"" + TypeName(typeid(*pointer)) + "\"");
-        return std::string(expectType ? "Expected type \"" : "Expected not type \"") + TypeName(typeid(TType)) +
+                ("\"" + TypeCheckObjectName(pointer) + "\"");
+        return std::string(expectType ? "Expected type \"" : "Expected not type \"") + TypeCheckName<TType>() +
             "\" but was " + actual;
+    }
+
+    // The name a type check failure shows for TType: in RTL builds, a TObject descendant's ClassName() (e.g.
+    // "TStringList"), the same with every compiler; otherwise TypeName().
+    template <typename TType>
+    static std::string TypeCheckName()
+    {
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        if constexpr (std::is_base_of<System::TObject, TType>::value)
+            return RTLTextToUTF8(__classid(TType)->ClassName());
+        else
+#endif
+        return TypeName(typeid(TType));
+    }
+
+    // The same for the object 'pointer' points to, by its dynamic type: its ClassName() or TypeName().
+    template <typename TPointee>
+    static std::string TypeCheckObjectName(TPointee const* pointer)
+    {
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        if constexpr (std::is_base_of<System::TObject, TPointee>::value)
+            return RTLTextToUTF8(const_cast<TPointee*>(pointer)->ClassName());
+        else
+#endif
+        return TypeName(typeid(*pointer));
     }
 
     // The pointer a type check inspects: a raw pointer as it is, a smart pointer's get(), or an object's address.

@@ -733,7 +733,9 @@ CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
 ```
 
 Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form
-(e.g. a namespace or `class ` prefix) depends on the compiler.
+(e.g. a namespace or `class ` prefix) depends on the compiler. With
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, a `TObject` descendant is named
+by its `ClassName()` instead (e.g. `TStringList`), the same with every compiler.
 
 ### Comparing Strings, Ignoring Case
 

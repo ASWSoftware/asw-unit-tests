@@ -124,6 +124,11 @@ versioned baseline.
   closing the window destroyed the test groups while it might still be running. Both are now
   disabled until the GUI is restarted, as the status bar says, and closing the window ends the
   process without destroying the groups, as the console runner does.
+- With RTL exception support enabled, a failed `CheckIsType`/`CheckIsNotType` (or `Assert` form)
+  named a `TObject` descendant by its `typeid().name()`, which the RAD Studio compilers give as
+  `System.Classes.TStringList`, or as raw text such as `@:MyUnit.TMyObject` for a class declared in
+  C++. It's now named by its `ClassName()`, e.g. `TStringList` or `TMyObject`, the same with every
+  compiler. Other classes are named as before.
 
 ## [1.3.0] - 2026-10-11
 
