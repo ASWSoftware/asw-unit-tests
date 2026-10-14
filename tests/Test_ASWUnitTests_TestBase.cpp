@@ -2759,7 +2759,7 @@ void TFixture_MixedOutcomes::Test_Skip()
 // TFixture_NearComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckNear()/AssertNear()/
-// CheckNotNear()'s tolerance boundary: the implementation fails only when diff > tolerance, so a
+// CheckNotNear()'s tolerance boundary: the implementation passes only when diff <= tolerance, so a
 // diff exactly equal to tolerance must still count as "near". Test names self-document expected
 // outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
@@ -2831,6 +2831,178 @@ void TFixture_NearComparisons::Test_CheckNotNear_AtToleranceBoundary_Fails()
 void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 {
     CheckNotNear(1.0f, 1.51f, 0.5f, __func__, __LINE__, "diff (0.51) exceeds tolerance: correctly 'not near'");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearNonFiniteValues
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods, float and
+// double, with NaNs and infinities, so Test_Near_HandlesNaNAndInfinity below can check that a NaN is near nothing (not
+// even another NaN, however large the tolerance) and that equal infinities are near each other, though a NaN
+// difference or an infinite one compares false with any tolerance. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearNonFiniteValues : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_NaN_Fails();
+    void Test_AssertNotNear_EqualInfinities_Fails();
+    void Test_AssertNotNear_NaN_Passes();
+    void Test_CheckNear_BothNaN_Fails();
+    void Test_CheckNear_EqualInfinities_Passes();
+    void Test_CheckNear_EqualNegativeInfinities_Passes();
+    void Test_CheckNear_Float_EqualInfinities_Passes();
+    void Test_CheckNear_Float_NaN_Fails();
+    void Test_CheckNear_InfinityAndFinite_Fails();
+    void Test_CheckNear_NaNActual_Fails();
+    void Test_CheckNear_NaNExpected_Fails();
+    void Test_CheckNear_OppositeInfinities_Fails();
+    void Test_CheckNotNear_BothNaN_Passes();
+    void Test_CheckNotNear_EqualInfinities_Fails();
+    void Test_CheckNotNear_Float_NaN_Passes();
+    void Test_CheckNotNear_InfinityAndFinite_Passes();
+    void Test_CheckNotNear_NaN_Passes();
+
+public:
+    TFixture_NearNonFiniteValues();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_NearNonFiniteValues::TFixture_NearNonFiniteValues()
+    : inherited("Fixture_NearNonFiniteValues")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNear_NaN_Fails, "AssertNear_NaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNotNear_EqualInfinities_Fails,
+        "AssertNotNear_EqualInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNotNear_NaN_Passes, "AssertNotNear_NaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_BothNaN_Fails, "CheckNear_BothNaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_EqualInfinities_Passes,
+        "CheckNear_EqualInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_EqualNegativeInfinities_Passes,
+        "CheckNear_EqualNegativeInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_Float_EqualInfinities_Passes,
+        "CheckNear_Float_EqualInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_Float_NaN_Fails, "CheckNear_Float_NaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_InfinityAndFinite_Fails,
+        "CheckNear_InfinityAndFinite_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_NaNActual_Fails, "CheckNear_NaNActual_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_NaNExpected_Fails, "CheckNear_NaNExpected_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_OppositeInfinities_Fails,
+        "CheckNear_OppositeInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_BothNaN_Passes, "CheckNotNear_BothNaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_EqualInfinities_Fails,
+        "CheckNotNear_EqualInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_Float_NaN_Passes, "CheckNotNear_Float_NaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_InfinityAndFinite_Passes,
+        "CheckNotNear_InfinityAndFinite_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes, "CheckNotNear_NaN_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNear_NaN_Fails()
+{
+    AssertNear(1.0, std::numeric_limits<double>::quiet_NaN(), 0.1, __func__, __LINE__, "a NaN is near nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNotNear_EqualInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    AssertNotNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near each other");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNotNear_NaN_Passes()
+{
+    AssertNotNear(1.0, std::numeric_limits<double>::quiet_NaN(), 0.1, __func__, __LINE__, "a NaN is near nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_BothNaN_Fails()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckNear(nan, nan, 0.1, __func__, __LINE__, "a NaN isn't near another NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_EqualInfinities_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near, though their difference is a NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_EqualNegativeInfinities_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(-inf, -inf, 0.1, __func__, __LINE__, "equal negative infinities are near too");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_Float_EqualInfinities_Passes()
+{
+    float const inf = std::numeric_limits<float>::infinity();
+    CheckNear(inf, inf, 0.1f, __func__, __LINE__, "float overload, equal infinities are near");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_Float_NaN_Fails()
+{
+    CheckNear(1.0f, std::numeric_limits<float>::quiet_NaN(), 0.1f, __func__, __LINE__, "float overload, NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_InfinityAndFinite_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, 1.0, std::numeric_limits<double>::max(), __func__, __LINE__, "an infinite difference");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_NaNActual_Fails()
+{
+    CheckNear(1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "no tolerance accepts a NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_NaNExpected_Fails()
+{
+    CheckNear(std::numeric_limits<double>::quiet_NaN(), 1.0, 0.1, __func__, __LINE__, "a NaN as the expected value");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_OppositeInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, -inf, 0.1, __func__, __LINE__, "opposite infinities are far apart");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_BothNaN_Passes()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckNotNear(nan, nan, 0.1, __func__, __LINE__, "a NaN isn't near another NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_EqualInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNotNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near each other");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_Float_NaN_Passes()
+{
+    CheckNotNear(1.0f, std::numeric_limits<float>::quiet_NaN(), 0.1f, __func__, __LINE__, "float overload, NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_InfinityAndFinite_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNotNear(inf, 1.0, std::numeric_limits<double>::max(), __func__, __LINE__, "an infinite difference");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes()
+{
+    CheckNotNear(1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "no tolerance makes a NaN near");
 }
 //---------------------------------------------------------------------------
 
@@ -6009,6 +6181,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "IsType_UsesDynamicTypeAndShowsNames");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity, "Near_HandlesNaNAndInfinity");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
         "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
@@ -7027,6 +7200,29 @@ void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
         AssertNotNull(record, __func__, __LINE__, invalid.first + " has a record");
         CheckContains(record->Message, "): Invalid regular expression \"" + invalid.second + "\": ", __func__,
             __LINE__, invalid.first + " says the pattern is invalid");
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity()
+{
+    // Arrange
+    TFixture_NearNonFiniteValues fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(17), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
     }
 }
 //---------------------------------------------------------------------------

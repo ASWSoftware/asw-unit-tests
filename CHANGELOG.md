@@ -57,6 +57,14 @@ versioned baseline.
   tests' full names, as renaming the group would, so `--filter` patterns and saved VCL GUI runner
   selections that named its tests no longer match them.
 
+### Fixed
+
+- `CheckNear`/`AssertNear` passed when either value was a NaN, whatever the tolerance, and so did
+  `CheckNotNear`/`AssertNotNear`. A NaN is now near nothing, not even another NaN, so `CheckNear`
+  fails and `CheckNotNear` passes. Equal infinities are near each other, as before, and
+  `CheckNotNear` now fails for them. A test that passed only because the value it checked was a NaN
+  now fails.
+
 ## [1.3.0] - 2026-10-11
 
 ### Added

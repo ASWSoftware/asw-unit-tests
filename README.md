@@ -849,6 +849,9 @@ CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
 Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a
 sensible tolerance depends heavily on the magnitude and accumulated error of the values involved.
 
+A NaN is near nothing, not even another NaN, so `CheckNear` fails and `CheckNotNear` passes when
+either value is a NaN, whatever the tolerance. Equal infinities are near each other.
+
 ### Comparing Greater Than and Less Than
 
 `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and `CheckLessThanOrEqual`, and their

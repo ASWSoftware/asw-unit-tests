@@ -250,6 +250,18 @@ std::string MemoryFailure(void const* expected, void const* actual, std::size_t 
     return "Expected the " + std::to_string(size) + " bytes to differ, but both are \"" + bytes + "\"";
 }
 
+// The absolute difference between 'expected' and 'actual' for the Near and NotNear methods: zero when they're equal,
+// so equal infinities (whose difference is a NaN) are near each other, and a NaN when either is a NaN, which a
+// "diff <= tolerance" test never accepts, so a NaN is near nothing, not even another NaN.
+template <typename TFloat>
+TFloat NearDifference(TFloat expected, TFloat actual)
+{
+    if (expected == actual)
+        return 0;
+
+    return std::fabs(expected - actual);
+}
+
 // The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
 // invalid pattern always fails, saying why.
 template <typename TString>
@@ -606,9 +618,9 @@ void TTestGroupBase::AssertMatches(std::wstring const& text, std::wstring const&
 void TTestGroupBase::AssertNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = std::fabs(expected - actual);
+    float const diff = NearDifference(expected, actual);
 
-    if (diff > tolerance)
+    if (!(diff <= tolerance))
     {
         std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
         std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
@@ -619,9 +631,9 @@ void TTestGroupBase::AssertNear(
 void TTestGroupBase::AssertNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = std::fabs(expected - actual);
+    double const diff = NearDifference(expected, actual);
 
-    if (diff > tolerance)
+    if (!(diff <= tolerance))
     {
         std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
         std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
@@ -830,7 +842,7 @@ void TTestGroupBase::AssertNotMatches(std::wstring const& text, std::wstring con
 void TTestGroupBase::AssertNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = std::fabs(expected - actual);
+    float const diff = NearDifference(expected, actual);
 
     if (diff <= tolerance)
     {
@@ -843,7 +855,7 @@ void TTestGroupBase::AssertNotNear(
 void TTestGroupBase::AssertNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = std::fabs(expected - actual);
+    double const diff = NearDifference(expected, actual);
 
     if (diff <= tolerance)
     {
@@ -1150,9 +1162,9 @@ void TTestGroupBase::CheckMatches(std::wstring const& text, std::wstring const& 
 void TTestGroupBase::CheckNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = std::fabs(expected - actual);
+    float const diff = NearDifference(expected, actual);
 
-    if (diff > tolerance)
+    if (!(diff <= tolerance))
     {
         std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
         std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
@@ -1163,9 +1175,9 @@ void TTestGroupBase::CheckNear(
 void TTestGroupBase::CheckNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = std::fabs(expected - actual);
+    double const diff = NearDifference(expected, actual);
 
-    if (diff > tolerance)
+    if (!(diff <= tolerance))
     {
         std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
         std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
@@ -1404,7 +1416,7 @@ void TTestGroupBase::CheckNotMatches(std::wstring const& text, std::wstring cons
 void TTestGroupBase::CheckNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = std::fabs(expected - actual);
+    float const diff = NearDifference(expected, actual);
 
     if (diff <= tolerance)
     {
@@ -1417,7 +1429,7 @@ void TTestGroupBase::CheckNotNear(
 void TTestGroupBase::CheckNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = std::fabs(expected - actual);
+    double const diff = NearDifference(expected, actual);
 
     if (diff <= tolerance)
     {
