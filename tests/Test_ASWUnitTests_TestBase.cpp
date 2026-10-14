@@ -7713,29 +7713,8 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         "CaseRecords has an entry only for the tests that ran, not the full registered set");
 }
 //---------------------------------------------------------------------------
-/*
-    TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet
-
-    Skip()ped on RAD Studio's 32-bit compiler (bcc32c) specifically: the crash here is caught and
-    reported correctly (this is not the same failure as Test_ASWUnitTests_CrashGuard.cpp's Skip()ped
-    tests, which involve much deeper recursion), but the process still crashes moments later, before
-    ever reaching this method's own assertions - confirmed to happen even with nothing else running
-    before or after the one crashing test, so it is not about cumulative state or later tests
-    specifically. This means --catch-crashes' core "catch and continue" behavior, run through the
-    real test-execution pipeline (TTestGroupBase::Run() and beyond) rather than a bare, isolated
-    TCrashGuard::Run() call, is not currently safe to rely on for real use on 32-bit RAD Studio at
-    all, not just for the deep/stack-overflow edge cases 64-bit and bcc32c share - see the commit
-    that added this Skip() for the full investigation. 64-bit RAD Studio and MinGW are unaffected.
-*/
 void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet()
 {
-#if defined(__BORLANDC__) && defined(_WIN32) && !defined(_WIN64)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's 32-bit compiler (bcc32c): the crash is caught correctly, but the "
-        "process crashes moments later regardless, even with nothing else running before or after. "
-        "MinGW and 64-bit RAD Studio are unaffected; investigation ongoing.");
-#endif
-
     // Arrange
     TFixture_CrashingTest fixture;
 

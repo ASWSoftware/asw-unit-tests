@@ -129,6 +129,12 @@ versioned baseline.
   `System.Classes.TStringList`, or as raw text such as `@:MyUnit.TMyObject` for a class declared in
   C++. It's now named by its `ClassName()`, e.g. `TStringList` or `TMyObject`, the same with every
   compiler. Other classes are named as before.
+- With RAD Studio's 32-bit compiler (bcc32c), a crash caught by `--catch-crashes` was logged and
+  failed its test, but the next exception thrown on that thread ended the process with an access
+  violation (exit code `-1073741819`) or as an unhandled exception, typically before the run's
+  totals. The recovery left Win32's chain of exception handlers pointing into the crashed test's
+  abandoned stack. `TCrashGuard::Run()` now restores it, so the run carries on with the next test,
+  as with every other compiler.
 
 ## [1.3.0] - 2026-10-11
 

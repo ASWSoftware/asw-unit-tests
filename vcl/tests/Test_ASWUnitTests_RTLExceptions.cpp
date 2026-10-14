@@ -35,6 +35,7 @@ limitations under the License.
 #include <System.Classes.hpp>
 #include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -573,6 +574,8 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_RTLExceptions::TTest_ASWUnitTests_RTLExceptions()
     : inherited("ASWUnitTests_RTLExceptions_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_CrashGuardRun_LaterRTLExceptionStillCaught,
+        "CrashGuardRun_LaterRTLExceptionStillCaught");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNameAndMessage,
         "DescribeRTLException_IncludesClassNameAndMessage");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses, "IsType_MatchesRTLClasses");
@@ -656,6 +659,48 @@ void TTest_ASWUnitTests_RTLExceptions::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_CrashGuardRun_LaterRTLExceptionStillCaught()
+{
+    // The RTL counterpart of TTest_ASWUnitTests_CrashGuard's Test_Run_AccessViolation_LaterExceptionStillCaught(): with
+    // bcc32c, recovering from a crash inside a try block once left the next exception on the thread uncatchable.
+
+    // Arrange
+    bool caught = false;
+
+    // Act
+    TCrashGuardResult const result = TCrashGuard::Run([]()
+        {
+            // Called through a volatile pointer so the compiler can't drop the try block around it.
+            using TCrash = void (*)();
+            TCrash volatile crash = []()
+                {
+                    int* volatile nullPointer = nullptr;
+                    *nullPointer = 1;
+                };
+
+            try
+            {
+                crash();
+            }
+            catch (System::Sysutils::Exception const&)
+            {
+            }
+        });
+
+    try
+    {
+        throw System::Sysutils::EConvertError(L"thrown after the crash");
+    }
+    catch (System::Sysutils::EConvertError const&)
+    {
+        caught = true;
+    }
+
+    // Assert
+    CheckTrue(result.Crashed, __func__, __LINE__, "the access violation is caught");
+    CheckTrue(caught, __func__, __LINE__, "an RTL exception raised on the same thread afterwards is caught normally");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNameAndMessage()
 {

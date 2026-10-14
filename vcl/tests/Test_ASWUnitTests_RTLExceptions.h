@@ -59,6 +59,7 @@ private: // Helpers
         std::string const& method, int line);
 
 private: // Test methods
+    void Test_CrashGuardRun_LaterRTLExceptionStillCaught();
     void Test_DescribeRTLException_IncludesClassNameAndMessage();
     void Test_IsType_MatchesRTLClasses();
     void Test_RTLExceptionMessage_ConvertsToUTF8();
