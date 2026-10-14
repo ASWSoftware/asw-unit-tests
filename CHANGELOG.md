@@ -82,6 +82,15 @@ versioned baseline.
   its test groups before ending, while the timed-out test's abandoned thread could still be running
   one of their tests, so a test that was busy rather than hung could use a destroyed group and crash
   the runner with another exit code. The runner now ends without destroying them.
+- A null C string passed to `CheckEqualsIC`, `CheckNotEqualsIC`, `CheckContains`,
+  `CheckStartsWith` or `CheckEndsWith`, or their `IC`, `Not` or `Assert` forms, was converted to a
+  `std::string` or `std::wstring`, which is undefined behavior: typically a crash, or with some
+  standard libraries an unexpected exception. Two C strings now go to new `char const*` and
+  `wchar_t const*` overloads. In the IC Equals methods, a null pointer equals only another null
+  one, as in `CheckEquals`. In the others, a null text or part matches nothing, so the check fails,
+  showing it as `(null)`, and its `Not` form passes. A C string compared with a `std::string` is
+  still converted to one, so a null one is still undefined behavior there, and in RTL builds one
+  compared with a `System::String` is still empty text.
 
 ## [1.3.0] - 2026-10-11
 

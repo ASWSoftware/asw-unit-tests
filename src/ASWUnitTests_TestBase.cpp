@@ -262,6 +262,15 @@ TFloat NearDifference(TFloat expected, TFloat actual)
     return std::fabs(expected - actual);
 }
 
+// The detail for a text check that fails because 'text' or 'part' is a null C string, worded as the check's other
+// failures are, e.g. Expected "(null)" to contain "abc". followed by the caller's message.
+template <typename TChar>
+std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase)
+{
+    return "Expected \"" + CStringDisplayText(text) + "\" " + relation + " \"" + CStringDisplayText(part) + "\"" +
+        (ignoreCase ? " (ignoring case)" : "") + ". ";
+}
+
 // The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
 // invalid pattern always fails, saying why.
 template <typename TString>
@@ -430,6 +439,24 @@ void TTestGroupBase::AssertContains(std::wstring const& text, std::wstring const
         throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertContains(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+        throw TExceptContains(method, line, CStringDisplayText(text), CStringDisplayText(substring), msg);
+
+    AssertContains(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContains(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+        throw TExceptContains(method, line, CStringDisplayText(text), CStringDisplayText(substring), msg);
+
+    AssertContains(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertContainsIC(std::string const& text, std::string const& substring,
     std::string const& method, int line, std::string const& msg)
 {
@@ -442,6 +469,24 @@ void TTestGroupBase::AssertContainsIC(std::wstring const& text, std::wstring con
 {
     if (!ContainsIgnoringASCIICase(text, substring))
         throw TExceptContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContainsIC(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+        throw TExceptContains(method, line, CStringDisplayText(text), CStringDisplayText(substring), msg, true);
+
+    AssertContainsIC(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+        throw TExceptContains(method, line, CStringDisplayText(text), CStringDisplayText(substring), msg, true);
+
+    AssertContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEndsWith(std::string const& text, std::string const& suffix,
@@ -458,6 +503,24 @@ void TTestGroupBase::AssertEndsWith(std::wstring const& text, std::wstring const
         throw TExceptEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWith(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+        throw TExceptEndsWith(method, line, CStringDisplayText(text), CStringDisplayText(suffix), msg);
+
+    AssertEndsWith(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+        throw TExceptEndsWith(method, line, CStringDisplayText(text), CStringDisplayText(suffix), msg);
+
+    AssertEndsWith(std::wstring(text), std::wstring(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertEndsWithIC(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -470,6 +533,24 @@ void TTestGroupBase::AssertEndsWithIC(std::wstring const& text, std::wstring con
 {
     if (!EndsWithIgnoringASCIICase(text, suffix))
         throw TExceptEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWithIC(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+        throw TExceptEndsWith(method, line, CStringDisplayText(text), CStringDisplayText(suffix), msg, true);
+
+    AssertEndsWithIC(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+        throw TExceptEndsWith(method, line, CStringDisplayText(text), CStringDisplayText(suffix), msg, true);
+
+    AssertEndsWithIC(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEquals(
@@ -585,6 +666,24 @@ void TTestGroupBase::AssertEqualsIC(std::wstring const& expected, std::wstring c
         throw TExceptEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEqualsIC(char const* expected, char const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        throw TExceptEquals(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg, true);
+
+    AssertEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        throw TExceptEquals(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg, true);
+
+    AssertEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertEqualsMem(void const* expected, void const* actual, std::size_t size,
     std::string const& method, int line, std::string const& msg)
 {
@@ -655,6 +754,24 @@ void TTestGroupBase::AssertNotContains(std::wstring const& text, std::wstring co
         throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContains(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotContains(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContains(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotContains(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotContainsIC(std::string const& text, std::string const& substring,
     std::string const& method, int line, std::string const& msg)
 {
@@ -667,6 +784,24 @@ void TTestGroupBase::AssertNotContainsIC(std::wstring const& text, std::wstring 
 {
     if (ContainsIgnoringASCIICase(text, substring))
         throw TExceptNotContains(method, line, WideToUTF8(text), WideToUTF8(substring), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContainsIC(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotContainsIC(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEndsWith(std::string const& text, std::string const& suffix,
@@ -683,6 +818,24 @@ void TTestGroupBase::AssertNotEndsWith(std::wstring const& text, std::wstring co
         throw TExceptNotEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWith(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotEndsWith(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotEndsWith(std::wstring(text), std::wstring(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEndsWithIC(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -695,6 +848,24 @@ void TTestGroupBase::AssertNotEndsWithIC(std::wstring const& text, std::wstring 
 {
     if (EndsWithIgnoringASCIICase(text, suffix))
         throw TExceptNotEndsWith(method, line, WideToUTF8(text), WideToUTF8(suffix), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWithIC(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotEndsWithIC(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotEndsWithIC(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEquals(
@@ -815,6 +986,30 @@ void TTestGroupBase::AssertNotEqualsIC(std::wstring const& expected, std::wstrin
         throw TExceptNotEquals(method, line, WideToUTF8(expected), WideToUTF8(actual), msg, true);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEqualsIC(char const* expected, char const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    if (expected == nullptr) // Both null, shown as "(null)" rather than as an empty string.
+        throw TExceptNotEquals(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg, true);
+
+    AssertNotEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    if (expected == nullptr) // Both null, shown as "(null)" rather than as an empty string.
+        throw TExceptNotEquals(method, line, CStringDisplayText(expected), CStringDisplayText(actual), msg, true);
+
+    AssertNotEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEqualsMem(void const* expected, void const* actual, std::size_t size,
     std::string const& method, int line, std::string const& msg)
 {
@@ -879,6 +1074,24 @@ void TTestGroupBase::AssertNotStartsWith(std::wstring const& text, std::wstring 
         throw TExceptNotStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWith(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotStartsWith(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotStartsWith(std::wstring(text), std::wstring(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotStartsWithIC(std::string const& text, std::string const& prefix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -891,6 +1104,24 @@ void TTestGroupBase::AssertNotStartsWithIC(std::wstring const& text, std::wstrin
 {
     if (StartsWithIgnoringASCIICase(text, prefix))
         throw TExceptNotStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWithIC(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotStartsWithIC(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    AssertNotStartsWithIC(std::wstring(text), std::wstring(prefix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertStartsWith(std::string const& text, std::string const& prefix,
@@ -907,6 +1138,24 @@ void TTestGroupBase::AssertStartsWith(std::wstring const& text, std::wstring con
         throw TExceptStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWith(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+        throw TExceptStartsWith(method, line, CStringDisplayText(text), CStringDisplayText(prefix), msg);
+
+    AssertStartsWith(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+        throw TExceptStartsWith(method, line, CStringDisplayText(text), CStringDisplayText(prefix), msg);
+
+    AssertStartsWith(std::wstring(text), std::wstring(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertStartsWithIC(std::string const& text, std::string const& prefix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -919,6 +1168,24 @@ void TTestGroupBase::AssertStartsWithIC(std::wstring const& text, std::wstring c
 {
     if (!StartsWithIgnoringASCIICase(text, prefix))
         throw TExceptStartsWith(method, line, WideToUTF8(text), WideToUTF8(prefix), msg, true);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWithIC(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+        throw TExceptStartsWith(method, line, CStringDisplayText(text), CStringDisplayText(prefix), msg, true);
+
+    AssertStartsWithIC(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+        throw TExceptStartsWith(method, line, CStringDisplayText(text), CStringDisplayText(prefix), msg, true);
+
+    AssertStartsWithIC(std::wstring(text), std::wstring(prefix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int line, std::string const& msg)
@@ -944,6 +1211,30 @@ void TTestGroupBase::CheckContains(std::wstring const& text, std::wstring const&
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckContains(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, substring, "to contain", false) + msg);
+        return;
+    }
+
+    CheckContains(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContains(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, substring, "to contain", false) + msg);
+        return;
+    }
+
+    CheckContains(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckContainsIC(std::string const& text, std::string const& substring,
     std::string const& method, int line, std::string const& msg)
 {
@@ -964,6 +1255,30 @@ void TTestGroupBase::CheckContainsIC(std::wstring const& text, std::wstring cons
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckContainsIC(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, substring, "to contain", true) + msg);
+        return;
+    }
+
+    CheckContainsIC(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, substring, "to contain", true) + msg);
+        return;
+    }
+
+    CheckContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckEndsWith(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -979,6 +1294,30 @@ void TTestGroupBase::CheckEndsWith(std::wstring const& text, std::wstring const&
         SetTestFailedCheck(method, line,
             "Expected \"" + WideToUTF8(text) + "\" to end with \"" + WideToUTF8(suffix) + "\". " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWith(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, suffix, "to end with", false) + msg);
+        return;
+    }
+
+    CheckEndsWith(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, suffix, "to end with", false) + msg);
+        return;
+    }
+
+    CheckEndsWith(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckEndsWithIC(std::string const& text, std::string const& suffix,
@@ -999,6 +1338,30 @@ void TTestGroupBase::CheckEndsWithIC(std::wstring const& text, std::wstring cons
         SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to end with \"" +
             WideToUTF8(suffix) + "\" (ignoring case). " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWithIC(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, suffix, "to end with", true) + msg);
+        return;
+    }
+
+    CheckEndsWithIC(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, suffix, "to end with", true) + msg);
+        return;
+    }
+
+    CheckEndsWithIC(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckEquals(
@@ -1126,6 +1489,30 @@ void TTestGroupBase::CheckEqualsIC(std::wstring const& expected, std::wstring co
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckEqualsIC(char const* expected, char const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(expected, actual, "but was", true) + msg);
+        return;
+    }
+
+    CheckEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(expected, actual, "but was", true) + msg);
+        return;
+    }
+
+    CheckEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckEqualsMem(void const* expected, void const* actual, std::size_t size,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1202,6 +1589,24 @@ void TTestGroupBase::CheckNotContains(std::wstring const& text, std::wstring con
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContains(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotContains(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContains(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotContains(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotContainsIC(std::string const& text, std::string const& substring,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1222,6 +1627,24 @@ void TTestGroupBase::CheckNotContainsIC(std::wstring const& text, std::wstring c
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContainsIC(char const* text, char const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotContainsIC(std::string(text), std::string(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || substring == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEndsWith(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1237,6 +1660,24 @@ void TTestGroupBase::CheckNotEndsWith(std::wstring const& text, std::wstring con
         SetTestFailedCheck(method, line,
             "Expected \"" + WideToUTF8(text) + "\" not to end with \"" + WideToUTF8(suffix) + "\". " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWith(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotEndsWith(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotEndsWith(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEndsWithIC(std::string const& text, std::string const& suffix,
@@ -1257,6 +1698,24 @@ void TTestGroupBase::CheckNotEndsWithIC(std::wstring const& text, std::wstring c
         SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" not to end with \"" +
             WideToUTF8(suffix) + "\" (ignoring case). " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWithIC(char const* text, char const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotEndsWithIC(std::string(text), std::string(suffix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || suffix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotEndsWithIC(std::wstring(text), std::wstring(suffix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEquals(
@@ -1389,6 +1848,36 @@ void TTestGroupBase::CheckNotEqualsIC(std::wstring const& expected, std::wstring
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEqualsIC(char const* expected, char const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    if (expected == nullptr) // Both null, shown as "(null)" rather than as an empty string.
+    {
+        SetTestFailedCheck(method, line, "Both values equal: \"(null)\" and \"(null)\" (ignoring case). " + msg);
+        return;
+    }
+
+    CheckNotEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method,
+    int line, std::string const& msg)
+{
+    if ((expected == nullptr) != (actual == nullptr))
+        return;
+
+    if (expected == nullptr) // Both null, shown as "(null)" rather than as an empty string.
+    {
+        SetTestFailedCheck(method, line, "Both values equal: \"(null)\" and \"(null)\" (ignoring case). " + msg);
+        return;
+    }
+
+    CheckNotEqualsIC(CStringOrEmpty(expected), CStringOrEmpty(actual), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1456,6 +1945,24 @@ void TTestGroupBase::CheckNotStartsWith(std::wstring const& text, std::wstring c
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWith(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotStartsWith(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotStartsWith(std::wstring(text), std::wstring(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotStartsWithIC(std::string const& text, std::string const& prefix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1476,6 +1983,24 @@ void TTestGroupBase::CheckNotStartsWithIC(std::wstring const& text, std::wstring
     }
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWithIC(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotStartsWithIC(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr) // Null text never matches, so it never fails.
+        return;
+
+    CheckNotStartsWithIC(std::wstring(text), std::wstring(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckStartsWith(std::string const& text, std::string const& prefix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1491,6 +2016,30 @@ void TTestGroupBase::CheckStartsWith(std::wstring const& text, std::wstring cons
         SetTestFailedCheck(method, line,
             "Expected \"" + WideToUTF8(text) + "\" to start with \"" + WideToUTF8(prefix) + "\". " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWith(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, prefix, "to start with", false) + msg);
+        return;
+    }
+
+    CheckStartsWith(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, prefix, "to start with", false) + msg);
+        return;
+    }
+
+    CheckStartsWith(std::wstring(text), std::wstring(prefix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckStartsWithIC(std::string const& text, std::string const& prefix,
@@ -1511,6 +2060,30 @@ void TTestGroupBase::CheckStartsWithIC(std::wstring const& text, std::wstring co
         SetTestFailedCheck(method, line, "Expected \"" + WideToUTF8(text) + "\" to start with \"" +
             WideToUTF8(prefix) + "\" (ignoring case). " + msg);
     }
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWithIC(char const* text, char const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, prefix, "to start with", true) + msg);
+        return;
+    }
+
+    CheckStartsWithIC(std::string(text), std::string(prefix), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method,
+    int line, std::string const& msg)
+{
+    if (text == nullptr || prefix == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullTextFailure(text, prefix, "to start with", true) + msg);
+        return;
+    }
+
+    CheckStartsWithIC(std::wstring(text), std::wstring(prefix), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckTrue(bool testVal, std::string const& method, int line, std::string const& msg)

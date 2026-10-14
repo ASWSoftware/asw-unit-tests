@@ -902,6 +902,11 @@ protected: // Assertion/Check methods - Equals
         int line, std::string const& msg);
     virtual void AssertEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    // A null C string equals only another null one, as in CheckEquals(), and a failure shows it as "(null)".
+    void AssertEqualsIC(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -956,6 +961,10 @@ protected: // Assertion/Check methods - Equals
         int line, std::string const& msg);
     virtual void CheckEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void CheckEqualsIC(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Not Equals
     virtual void AssertNotEquals(
@@ -1013,6 +1022,11 @@ protected: // Assertion/Check methods - Not Equals
         int line, std::string const& msg);
     virtual void AssertNotEqualsIC(std::wstring const& expected, std::wstring const& actual,
         std::string const& method, int line, std::string const& msg);
+    // A null C string equals only another null one, as in CheckNotEquals().
+    void AssertNotEqualsIC(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotEquals(
         bool expected, bool actual, std::string const& method, int line, std::string const& msg);
@@ -1067,6 +1081,10 @@ protected: // Assertion/Check methods - Not Equals
         int line, std::string const& msg);
     virtual void CheckNotEqualsIC(std::wstring const& expected, std::wstring const& actual, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotEqualsIC(char const* expected, char const* actual, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
     virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,
@@ -1284,126 +1302,226 @@ protected: // Assertion/Check methods - Empty (string or container)
     }
 
 protected: // Assertion/Check methods - Contains (substring)
+    // A null C string, as the text or the substring, matches nothing: the Contains methods fail, showing it as
+    // "(null)", and the NotContains ones pass.
     virtual void AssertContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void AssertContains(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void AssertContains(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertContainsIC(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void AssertContainsIC(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void AssertContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotContains(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotContains(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotContainsIC(std::wstring const& text, std::wstring const& substring,
         std::string const& method, int line, std::string const& msg);
+    void AssertNotContainsIC(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void CheckContains(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void CheckContains(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckContainsIC(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void CheckContainsIC(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void CheckContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotContains(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotContains(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotContains(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotContains(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotContainsIC(std::string const& text, std::string const& substring, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotContainsIC(std::wstring const& text, std::wstring const& substring, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotContainsIC(char const* text, char const* substring, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotContainsIC(wchar_t const* text, wchar_t const* substring, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
+    // A null C string, as the text or the prefix or suffix, matches nothing: the StartsWith and EndsWith methods
+    // fail, showing it as "(null)", and their Not forms pass.
     virtual void AssertEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void AssertEndsWith(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void AssertEndsWithIC(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotEndsWith(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotEndsWithIC(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotStartsWith(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotStartsWithIC(std::wstring const& text, std::wstring const& prefix,
         std::string const& method, int line, std::string const& msg);
+    void AssertNotStartsWithIC(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void AssertStartsWith(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void AssertStartsWithIC(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void AssertStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void CheckEndsWith(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void CheckEndsWithIC(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotEndsWith(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotEndsWith(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotEndsWith(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotEndsWith(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotEndsWithIC(std::string const& text, std::string const& suffix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotEndsWithIC(std::wstring const& text, std::wstring const& suffix, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotEndsWithIC(char const* text, char const* suffix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotEndsWithIC(wchar_t const* text, wchar_t const* suffix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotStartsWith(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotStartsWithIC(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckStartsWith(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckStartsWith(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void CheckStartsWith(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckStartsWith(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckStartsWithIC(std::string const& text, std::string const& prefix, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckStartsWithIC(std::wstring const& text, std::wstring const& prefix, std::string const& method,
         int line, std::string const& msg);
+    void CheckStartsWithIC(char const* text, char const* prefix, std::string const& method, int line,
+        std::string const& msg);
+    void CheckStartsWithIC(wchar_t const* text, wchar_t const* prefix, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Matches (regular expression)
     // Each checks whether the whole of 'text' matches the ECMAScript regular expression 'pattern' (std::regex_match;

@@ -3008,6 +3008,197 @@ void TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_NullCStringTextChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the C string overloads of the IC Equals,
+// Contains, StartsWith and EndsWith methods, Check and Assert, narrow and wide, and their Not forms, each with a null
+// text, a null part, both null, and a matching non-null pair, so Test_NullCStrings_MatchNothingInTextChecks below
+// can check that a null C string matches nothing in the text checks and equals only another null one in the IC
+// Equals ones. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations
+// above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NullCStringTextChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    // How a method treats a null C string, which decides each case's expected outcome.
+    enum class TNullRule
+    {
+        NeverMatches,    // Contains, StartsWith, EndsWith: fails for any null
+        NotNeverMatches, // their Not forms: passes for any null
+        EqualsOnlyNull,  // EqualsIC: fails for one null, passes for two
+        NotEqualsOnlyNull // NotEqualsIC: passes for one null, fails for two
+    };
+
+    char const* const m_NullNarrow = nullptr;
+    wchar_t const* const m_NullWide = nullptr;
+
+    // Registers 'name''s eight cases: null text, null part, both null and a matching pair, narrow and wide. 'call'
+    // takes the text and the part, as two char const* or two wchar_t const*, and calls the method with them. The
+    // matching pair is "ABC" and "abc" for an IC method and "abc" and "abc" otherwise, which every method matches.
+    template <typename TCall>
+    void RegisterCases(std::string const& name, TNullRule rule, bool ignoreCase, TCall call)
+    {
+        bool const negated = rule == TNullRule::NotNeverMatches || rule == TNullRule::NotEqualsOnlyNull;
+        char const* const outcomeWithOneNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::EqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWithBothNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::NotEqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWhenMatching = negated ? "_Fails" : "_Passes";
+        char const* const text = ignoreCase ? "ABC" : "abc";
+        wchar_t const* const wideText = ignoreCase ? L"ABC" : L"abc";
+
+        RegisterTest([this, call]() { call(m_NullNarrow, "abc"); }, name + "_Narrow_NullText" + outcomeWithOneNull);
+        RegisterTest([call, text]() { call(text, static_cast<char const*>(nullptr)); },
+            name + "_Narrow_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullNarrow, m_NullNarrow); }, name + "_Narrow_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, text]() { call(text, "abc"); }, name + "_Narrow_Matching" + outcomeWhenMatching);
+        RegisterTest([this, call]() { call(m_NullWide, L"abc"); }, name + "_Wide_NullText" + outcomeWithOneNull);
+        RegisterTest([call, wideText]() { call(wideText, static_cast<wchar_t const*>(nullptr)); },
+            name + "_Wide_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullWide, m_NullWide); }, name + "_Wide_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, wideText]() { call(wideText, L"abc"); }, name + "_Wide_Matching" + outcomeWhenMatching);
+    }
+
+public:
+    TFixture_NullCStringTextChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_NullCStringTextChecks::TFixture_NullCStringTextChecks()
+    : inherited("Fixture_NullCStringTextChecks")
+{
+    SetLogSuppressed(true);
+
+    TNullRule const never = TNullRule::NeverMatches;
+    TNullRule const notNever = TNullRule::NotNeverMatches;
+
+    RegisterCases("AssertContains", never, false,
+        [this](auto text, auto part) {
+            AssertContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertContainsIC", never, true,
+        [this](auto text, auto part) {
+            AssertContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEndsWith", never, false,
+        [this](auto text, auto part) {
+            AssertEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEndsWithIC", never, true,
+        [this](auto text, auto part) {
+            AssertEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEqualsIC", TNullRule::EqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            AssertEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotContains", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotContainsIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEndsWith", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEndsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEqualsIC", TNullRule::NotEqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            AssertNotEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotStartsWith", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotStartsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertStartsWith", never, false,
+        [this](auto text, auto part) {
+            AssertStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertStartsWithIC", never, true,
+        [this](auto text, auto part) {
+            AssertStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckContains", never, false,
+        [this](auto text, auto part) {
+            CheckContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckContainsIC", never, true,
+        [this](auto text, auto part) {
+            CheckContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEndsWith", never, false,
+        [this](auto text, auto part) {
+            CheckEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEndsWithIC", never, true,
+        [this](auto text, auto part) {
+            CheckEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEqualsIC", TNullRule::EqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            CheckEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotContains", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotContainsIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEndsWith", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEndsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEqualsIC", TNullRule::NotEqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            CheckNotEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotStartsWith", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotStartsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckStartsWith", never, false,
+        [this](auto text, auto part) {
+            CheckStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckStartsWithIC", never, true,
+        [this](auto text, auto part) {
+            CheckStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest([this]() {
+            CheckContains(m_NullNarrow, "abc", "msg");
+        }, "CheckContains_SourceLocation_NullText_Fails");
+#endif
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_NullChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertNull()/CheckNull()/AssertNotNull()/
@@ -6182,6 +6373,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity, "Near_HandlesNaNAndInfinity");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks,
+        "NullCStrings_MatchNothingInTextChecks");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
         "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
@@ -7223,6 +7416,67 @@ void TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity()
             CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
         else
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks()
+{
+    // Arrange
+    TFixture_NullCStringTextChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    size_t const expectedCount = 28 * 8 + 1;
+#else
+    size_t const expectedCount = 28 * 8;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        }
+        else if (NameEndsWith(record.TestName, "_Fails"))
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+
+            if (record.TestName.find("Null") != std::string::npos)
+            {
+                CheckContains(record.Message, "\"(null)\"", __func__, __LINE__,
+                    record.TestName + " shows the null C string as (null)");
+            }
+        }
+        else
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
+    }
+
+    // A few failures in full, Check and Assert, narrow and wide, worded as the methods' other failures are.
+    std::vector<std::pair<std::string, std::string> > const failures =
+    {
+        { "CheckContains_Narrow_NullText_Fails", "Expected \"(null)\" to contain \"abc\". msg" },
+        { "CheckEndsWithIC_Wide_NullPart_Fails", "Expected \"ABC\" to end with \"(null)\" (ignoring case). msg" },
+        { "CheckEqualsIC_Narrow_NullPart_Fails", "Expected \"ABC\" but was \"(null)\" (ignoring case). msg" },
+        { "CheckNotEqualsIC_Wide_BothNull_Fails", "Both values equal: \"(null)\" and \"(null)\" (ignoring case). msg" },
+        { "CheckStartsWith_Narrow_BothNull_Fails", "Expected \"(null)\" to start with \"(null)\". msg" },
+        { "AssertContainsIC_Wide_NullText_Fails", "Substring not found: " },
+        { "AssertContainsIC_Wide_NullText_Fails", ": Expected \"(null)\" to contain \"abc\" (ignoring case). msg" },
+        { "AssertEqualsIC_Wide_NullText_Fails", ": Expected: \"(null)\" but was \"abc\" (ignoring case). msg" },
+        { "AssertStartsWith_Narrow_NullPart_Fails", ": Expected \"abc\" to start with \"(null)\". msg" },
+    };
+
+    for (std::pair<std::string, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertNotNull(record, __func__, __LINE__, failure.first + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, failure.first + "'s failure");
     }
 }
 //---------------------------------------------------------------------------

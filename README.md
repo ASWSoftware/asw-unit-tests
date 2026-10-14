@@ -670,6 +670,18 @@ A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the val
 strings, `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer
 is shown as `(null)`.
 
+The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring)
+and [prefix and suffix](#checking-the-start-or-end-of-a-string) checks take two C strings too. In
+`CheckEqualsIC` and `CheckNotEqualsIC`, a null pointer only matches another null pointer, as in
+`CheckEquals`. In `CheckContains`, `CheckStartsWith` and `CheckEndsWith`, and their `IC` forms, a
+null pointer, as either the text or the part, matches nothing, so they fail and their `Not` forms
+pass:
+
+```
+char const* const name = FindName(); // null if not found
+CheckStartsWith(name, "ASW", __func__, __LINE__, "fails, rather than crashing, when not found");
+```
+
 ### Comparing Pointers
 
 `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare any other two pointers
