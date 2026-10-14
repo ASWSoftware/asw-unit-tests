@@ -64,6 +64,10 @@ versioned baseline.
   fails and `CheckNotNear` passes. Equal infinities are near each other, as before, and
   `CheckNotNear` now fails for them. A test that passed only because the value it checked was a NaN
   now fails.
+- A `*` in a `--filter` pattern, or in the VCL GUI runner's filter box, failed to match where the
+  test's full name had a `*` of its own, which a group name or a parameterized test's label can
+  have: `--filter "*"` didn't match a group named `*Group`. A `*` in the pattern is now always a
+  wildcard.
 
 ## [1.3.0] - 2026-10-11
 

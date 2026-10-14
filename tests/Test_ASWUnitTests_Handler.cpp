@@ -460,6 +460,11 @@ void TTest_ASWUnitTests_Handler::Test_WildcardMatch_ExactAndStar()
         __func__, __LINE__, "a substring alone does not match - the whole name must match");
     CheckTrue(TTestHandler::WildcardMatch("*String*", "Test_ASWTools_String.cpp"),
         __func__, __LINE__, "explicit substring search via surrounding stars");
+    CheckTrue(TTestHandler::WildcardMatch("*", "*abc"), __func__, __LINE__, "bare star matches text starting with a star");
+    CheckTrue(TTestHandler::WildcardMatch("*c", "*abc"), __func__, __LINE__, "leading star matches a star in the text");
+    CheckTrue(TTestHandler::WildcardMatch("a*", "a*"), __func__, __LINE__, "trailing star matches a star in the text");
+    CheckTrue(TTestHandler::WildcardMatch("*b*", "a*b*c"), __func__, __LINE__, "stars around a name holding stars");
+    CheckFalse(TTestHandler::WildcardMatch("*d", "*abc"), __func__, __LINE__, "a star in the text is still just a char");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark()

@@ -322,16 +322,17 @@ bool TTestHandler::WildcardMatch(std::string const& pattern, std::string const& 
 
     while (t < text.size())
     {
-        if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
-        {
-            ++p;
-            ++t;
-        }
-        else if (p < pattern.size() && pattern[p] == '*')
+        // A '*' is checked first, so it's always a wildcard, even where the text has a '*' too.
+        if (p < pattern.size() && pattern[p] == '*')
         {
             starIdx = p;
             matchIdx = t;
             ++p;
+        }
+        else if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
+        {
+            ++p;
+            ++t;
         }
         else if (starIdx != std::string::npos)
         {
