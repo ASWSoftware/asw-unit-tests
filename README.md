@@ -482,6 +482,16 @@ group's qualified name, `Framework.Console.TTest_TConsole`, starts all of its te
   `Framework.Console.TTest_TConsole.TestName`, and the [VCL GUI runner](#vcl-gui-runner)'s test tree
   shows each suite as a node, whose check box checks or unchecks all of its tests.
 
+The registration can name the suite instead, leaving the constructor as it is:
+
+```
+ASW_REGISTER_TEST_GROUP_IN_SUITE(TTest_TConsole, "Framework.Console")
+```
+
+`ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, order)` takes an order too. A group
+whose constructor names a different suite stops the run at startup, and so does an `ITestGroup`
+implemented without `TTestGroupBase` unless its own `GetSuitePath()` gives the registration's suite.
+
 A suite's groups always run together. Within a suite, or at the top level, groups and suites run in
 alphabetical order by their own names. `ASW_REGISTER_TEST_GROUP_ORDERED`'s order only places a group
 among the groups and suites beside it, where a suite counts as order `0`, so it never moves a group
@@ -489,9 +499,9 @@ out of its suite.
 
 Suites only organize groups: they have no `SetUp_Group`/`TearDown_Group` of their own. A suite name
 can't be empty, so a path can't start or end with `.` or contain `..`; constructing a group with
-such a path throws `TExceptInvalidSuitePath`, which stops the run at startup. Moving a group into a
-suite changes its tests' full names, as renaming the group would, so update any `--filter` pattern
-that names them.
+such a path, or registering one in it, throws `TExceptInvalidSuitePath`, which stops the run at
+startup. Moving a group into a suite changes its tests' full names, as renaming the group would, so
+update any `--filter` pattern that names them.
 
 ### Expecting a Specific Exception Type or Message
 

@@ -45,9 +45,9 @@ TTestGroupRegistry::TestGroupFactoryList& TTestGroupRegistry::Factories()
     return factories;
 }
 //---------------------------------------------------------------------------
-int TTestGroupRegistry::Register(TestGroupFactory factory, int order)
+int TTestGroupRegistry::Register(TestGroupFactory factory, int order, std::string const& suitePath)
 {
-    Factories().push_back(TRegisteredTestGroupFactory{ factory, order });
+    Factories().push_back(TRegisteredTestGroupFactory{ factory, order, suitePath });
     return 0;
 }
 //---------------------------------------------------------------------------

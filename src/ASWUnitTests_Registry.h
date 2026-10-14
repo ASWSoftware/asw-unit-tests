@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_TestBase.h"
@@ -42,7 +43,8 @@ namespace ASWUnitTests
 // TRegisteredTestGroupFactory
 //
 // A self-registered test group's factory function, plus its optional
-// ordering hint (see ASW_REGISTER_TEST_GROUP_ORDERED). Groups left at the
+// suite path (see ASW_REGISTER_TEST_GROUP_IN_SUITE) and ordering hint (see
+// ASW_REGISTER_TEST_GROUP_ORDERED). Groups left at the
 // default order of 0 are run in alphabetical order by group name; an
 // explicit lower/higher order runs a group before/after that block. Order
 // is compared before name, so ties fall back to alphabetical order. For a
@@ -53,6 +55,11 @@ struct TRegisteredTestGroupFactory
 {
     std::function<std::unique_ptr<ITestGroup> ()> Factory;
     int Order;
+    // The suite the registration puts the group in, e.g. "Framework.Console"; empty when it names none. Checked
+    // and applied by TTestHandler::Initialize() (see TTestHandler::ApplyRegisteredSuitePath()). Defaulted, so a
+    // brace initializer written before this member existed still compiles without a -Wmissing-field-initializers
+    // warning.
+    std::string SuitePath = std::string();
 };
 
 
@@ -60,10 +67,9 @@ struct TRegisteredTestGroupFactory
 // TTestGroupRegistry
 //
 // Holds the factory functions for self-registered test groups. Test
-// modules register themselves via the ASW_REGISTER_TEST_GROUP or
-// ASW_REGISTER_TEST_GROUP_ORDERED macro rather than being listed in
-// TTestHandler::RegisterTestGroups(), so no framework source file needs to
-// change when a test module is added or removed.
+// modules register themselves via the ASW_REGISTER_TEST_GROUP macros rather
+// than being listed in TTestHandler::RegisterTestGroups(), so no framework
+// source file needs to change when a test module is added or removed.
 /////////////////////////////////////////////////////////////////////////////
 class TTestGroupRegistry
 {
@@ -73,7 +79,7 @@ public:
 
 public:
     static TestGroupFactoryList& Factories();
-    static int Register(TestGroupFactory factory, int order = 0);
+    static int Register(TestGroupFactory factory, int order = 0, std::string const& suitePath = std::string());
 };
 
 } // namespace ASWUnitTests
@@ -82,6 +88,7 @@ public:
 
 //---------------------------------------------------------------------------
 // ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED
+// ASW_REGISTER_TEST_GROUP_IN_SUITE / ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED
 //
 // Place at namespace or file scope in a test module's .cpp file to
 // self-register that test group's class with TTestHandler.
@@ -92,9 +99,17 @@ public:
 // A group in a suite (see TSuitePath) is ordered among that suite's groups
 // and suites only, and a suite sorts as order 0, by its own name.
 //
+// The _IN_SUITE forms also put the group in suite 'suitePath' (e.g.
+// "Framework.Console"), as passing a TSuitePath to the TTestGroupBase (or
+// TAutoTestGroup) constructor does, so the constructor needn't name it. A
+// group whose own suite path differs (one its constructor gives, or an
+// ITestGroup not derived from TTestGroupBase, whose suite only its own
+// GetSuitePath() can give) stops the run at startup.
+//
 // Examples:
 //     ASW_REGISTER_TEST_GROUP(TTest_TMyClassToTest)
 //     ASW_REGISTER_TEST_GROUP_ORDERED(TTest_TMyClassToTest, -1) // runs first
+//     ASW_REGISTER_TEST_GROUP_IN_SUITE(TTest_TMyClassToTest, "Framework.Console")
 //---------------------------------------------------------------------------
 #define ASWUnitTests_CONCAT_INNER(a, b) a ## b
 #define ASWUnitTests_CONCAT(a, b) ASWUnitTests_CONCAT_INNER(a, b)
@@ -125,18 +140,24 @@ public:
 #  define ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
 #endif
 
-#define ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order) \
+#define ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, order) \
     ASWUnitTests_SUPPRESS_COUNTER_WARNING_BEGIN \
     static int const ASWUnitTests_UNIQUE_NAME(g_ASWUnitTests_Registered_) = \
         ::ASWUnitTests::TTestGroupRegistry::Register( \
             []() -> std::unique_ptr<::ASWUnitTests::ITestGroup> \
             { \
                 return std::make_unique<ClassName>(); \
-            }, (order)); \
+            }, (order), (suitePath)); \
     ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
 
+#define ASW_REGISTER_TEST_GROUP_IN_SUITE(ClassName, suitePath) \
+    ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, 0)
+
+#define ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, order) \
+    ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, "", order)
+
 #define ASW_REGISTER_TEST_GROUP(ClassName) \
-    ASW_REGISTER_TEST_GROUP_ORDERED(ClassName, 0)
+    ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, "", 0)
 
 //---------------------------------------------------------------------------
 // ASW_TEST

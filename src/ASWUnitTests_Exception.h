@@ -452,12 +452,23 @@ public:
 // TExceptDuplicateTestName, this escapes TTestHandler::Initialize() and
 // stops the run before any test runs. TTestHandler::Initialize() also
 // checks each group's GetSuitePath() this way, for an ITestGroup that
-// doesn't derive from TTestGroupBase.
+// doesn't derive from TTestGroupBase, and throws it when a group's
+// registration (see ASW_REGISTER_TEST_GROUP_IN_SUITE) names a suite path
+// that's invalid or that the group isn't in (see Conflicting()).
 /////////////////////////////////////////////////////////////////////////////
 class TExceptInvalidSuitePath : public std::logic_error
 {
+private:
+    // 'msg' is the whole message; 'isMessage' only tells this constructor apart from the public one.
+    TExceptInvalidSuitePath(std::string const& msg, bool isMessage);
+
 public:
     explicit TExceptInvalidSuitePath(std::string const& suitePath);
+
+    // A group registered in suite 'registeredPath' whose own suite path (from its constructor, or its
+    // GetSuitePath() for an ITestGroup that doesn't derive from TTestGroupBase) is 'groupPath'.
+    static TExceptInvalidSuitePath Conflicting(std::string const& groupName, std::string const& registeredPath,
+        std::string const& groupPath);
 };
 
 // /////// Compiler specific exceptions after this line /////////////////////
