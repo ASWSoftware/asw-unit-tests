@@ -39,6 +39,7 @@ namespace
 using namespace ASWUnitTests;
 
 std::vector<TTestId> SampleTests();
+std::vector<TTestId> SuiteTests();
 
 //---------------------------------------------------------------------------
 
@@ -47,6 +48,16 @@ std::vector<TTestId> SampleTests();
 std::vector<TTestId> SampleTests()
 {
     return { { "Alpha", "One" }, { "Alpha", "Two" }, { "Beta", "Three" }, { "Alpha.Sub", "Four" } };
+}
+
+// Six tests, with groups in suites: index 0 in top-level group "Top"; 1 and 2 in group
+// "Deep" in suite "Outer.Inner"; 3 in group "Mid" in suite "Outer"; 4 in group "Solo" in suite "Other"; and
+// 5 in group "Near" in suite "Outermost", whose path starts with "Outer" but isn't inside it.
+std::vector<TTestId> SuiteTests()
+{
+    return { { "Top", "One", "" }, { "Outer.Inner.Deep", "Two", "Outer.Inner" },
+        { "Outer.Inner.Deep", "Three", "Outer.Inner" }, { "Outer.Mid", "Four", "Outer" },
+        { "Other.Solo", "Five", "Other" }, { "Outermost.Near", "Six", "Outermost" } };
 }
 
 //---------------------------------------------------------------------------
@@ -79,9 +90,16 @@ TTest_ASWUnitTests_GUI_TestList::TTest_ASWUnitTests_GUI_TestList()
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_GroupDetailText_CountsEachStatus, "GroupDetailText_CountsEachStatus");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_GroupStatus_ShowsRunningThenWorstOutcome,
         "GroupStatus_ShowsRunningThenWorstOutcome");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_GroupSuitePath_GivesEachGroupsSuite,
+        "GroupSuitePath_GivesEachGroupsSuite");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_IndexOf_FindsTestsByGroupAndTestName, "IndexOf_FindsTestsByGroupAndTestName");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_Load_ChecksEveryTestAndListsGroupsInOrder,
         "Load_ChecksEveryTestAndListsGroupsInOrder");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_Load_ListsEachSuiteAfterTheSuitesHoldingIt,
+        "Load_ListsEachSuiteAfterTheSuitesHoldingIt");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_NameInSuite_DropsTheSuitePath, "NameInSuite_DropsTheSuitePath");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_ParentSuitePath_DropsTheLastSuiteName,
+        "ParentSuitePath_DropsTheLastSuiteName");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_ResetResults_SetsEveryTestBackToNotRun,
         "ResetResults_SetsEveryTestBackToNotRun");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetAllChecked_ChecksOrUnchecksEveryTest,
@@ -90,6 +108,8 @@ TTest_ASWUnitTests_GUI_TestList::TTest_ASWUnitTests_GUI_TestList()
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetGroupChecked_ChangesOnlyThatGroup, "SetGroupChecked_ChangesOnlyThatGroup");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetResult_StoresTheResultAndSetsTheStatus,
         "SetResult_StoresTheResultAndSetsTheStatus");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetSuiteChecked_ChangesTheSuiteAndTheSuitesInIt,
+        "SetSuiteChecked_ChangesTheSuiteAndTheSuitesInIt");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetVisibleFilter_HidesNonMatchingTests,
         "SetVisibleFilter_HidesNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SetVisibleFilter_LimitsCheckingToVisibleTests,
@@ -97,6 +117,10 @@ TTest_ASWUnitTests_GUI_TestList::TTest_ASWUnitTests_GUI_TestList()
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_StatusCount_CountsTestsWithEachStatus, "StatusCount_CountsTestsWithEachStatus");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_StatusFromOutcome_MapsEachOutcome, "StatusFromOutcome_MapsEachOutcome");
     RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_StatusName_NamesEachStatus, "StatusName_NamesEachStatus");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SuiteDetailText_CountsEachStatus, "SuiteDetailText_CountsEachStatus");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_SuiteStatus_IncludesTheSuitesInIt, "SuiteStatus_IncludesTheSuitesInIt");
+    RegisterTest(&TTest_ASWUnitTests_GUI_TestList::Test_TestsInSuite_IncludesNestedSuitesOnly,
+        "TestsInSuite_IncludesNestedSuitesOnly");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_GUI_TestList::~TTest_ASWUnitTests_GUI_TestList()
@@ -302,6 +326,21 @@ void TTest_ASWUnitTests_GUI_TestList::Test_GroupStatus_ShowsRunningThenWorstOutc
         "another group, even one whose name starts with this one's, is unaffected");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_GroupSuitePath_GivesEachGroupsSuite()
+{
+    // Arrange
+    TGUITestList list;
+    list.Load(SuiteTests());
+
+    // Act and Assert
+    CheckEquals(std::string("Outer.Inner"), list.GroupSuitePath("Outer.Inner.Deep"), __func__, __LINE__,
+        "a group in a nested suite gives the whole suite path");
+    CheckEquals(std::string("Outer"), list.GroupSuitePath("Outer.Mid"), __func__, __LINE__,
+        "a group in a top-level suite gives that suite");
+    CheckEmpty(list.GroupSuitePath("Top"), __func__, __LINE__, "a group in no suite gives an empty path");
+    CheckEmpty(list.GroupSuitePath("Missing"), __func__, __LINE__, "so does a group that isn't in the list");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_IndexOf_FindsTestsByGroupAndTestName()
 {
     // Arrange
@@ -337,6 +376,45 @@ void TTest_ASWUnitTests_GUI_TestList::Test_Load_ChecksEveryTestAndListsGroupsInO
     CheckEquals(std::string("Three"), list.Test(2).TestName, __func__, __LINE__, "tests keep their order");
     CheckEquals(static_cast<size_t>(4), list.StatusCount(TGUITestStatus::NotRun), __func__, __LINE__,
         "none has run yet");
+    CheckEmpty(list.SuitePaths(), __func__, __LINE__, "groups in no suite list no suites");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_Load_ListsEachSuiteAfterTheSuitesHoldingIt()
+{
+    // Arrange
+    TGUITestList list;
+
+    // Act
+    list.Load(SuiteTests());
+
+    // Assert
+    CheckTrue(list.SuitePaths() == std::vector<std::string>{ "Outer", "Outer.Inner", "Other", "Outermost" },
+        __func__, __LINE__, "each suite is listed once, after the suite holding it, in the order its first test "
+        "appears, including \"Outer\", whose first test is in a suite inside it");
+
+    std::optional<size_t> const inner = list.SuiteIndexOf("Outer.Inner");
+    CheckTrue(inner.has_value() && *inner == 1, __func__, __LINE__, "a suite is found by its path");
+    CheckFalse(list.SuiteIndexOf("Inner").has_value(), __func__, __LINE__, "but not by its own name alone");
+    CheckFalse(list.SuiteIndexOf("Top").has_value(), __func__, __LINE__, "and a group isn't a suite");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_NameInSuite_DropsTheSuitePath()
+{
+    CheckEquals(std::string("Deep"), NameInSuite("Outer.Inner.Deep", "Outer.Inner"), __func__, __LINE__,
+        "a group's own name, without its suite path");
+    CheckEquals(std::string("Inner"), NameInSuite("Outer.Inner", "Outer"), __func__, __LINE__,
+        "a suite's own name, without the path of the suite holding it");
+    CheckEquals(std::string("Alpha.Sub"), NameInSuite("Alpha.Sub", ""), __func__, __LINE__,
+        "the whole name when it isn't in a suite, even one containing '.'");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_ParentSuitePath_DropsTheLastSuiteName()
+{
+    CheckEquals(std::string("Outer.Inner"), ParentSuitePath("Outer.Inner.Deep"), __func__, __LINE__,
+        "a nested suite's parent is the path before its last '.'");
+    CheckEquals(std::string("Outer"), ParentSuitePath("Outer.Inner"), __func__, __LINE__,
+        "likewise one level up");
+    CheckEmpty(ParentSuitePath("Outer"), __func__, __LINE__, "a top-level suite has no parent");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_ResetResults_SetsEveryTestBackToNotRun()
@@ -428,6 +506,35 @@ void TTest_ASWUnitTests_GUI_TestList::Test_SetResult_StoresTheResultAndSetsTheSt
     CheckEquals(TGUITestStatus::Skipped, list.Status(2), __func__, __LINE__, "its status follows the outcome");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_SetSuiteChecked_ChangesTheSuiteAndTheSuitesInIt()
+{
+    // Arrange
+    TGUITestList list;
+    list.Load(SuiteTests());
+
+    // Act
+    list.SetSuiteChecked("Outer", false);
+
+    // Assert
+    CheckFalse(list.IsChecked(1) || list.IsChecked(2) || list.IsChecked(3), __func__, __LINE__,
+        "the suite's own group and the groups in the suite inside it are unchecked");
+    CheckTrue(list.IsChecked(0) && list.IsChecked(4) && list.IsChecked(5), __func__, __LINE__,
+        "tests outside it, including a suite whose path only starts with its path, are unchanged");
+    CheckEquals(TGUICheckState::Unchecked, list.SuiteCheckState("Outer"), __func__, __LINE__,
+        "the suite shows unchecked");
+    CheckEquals(TGUICheckState::Unchecked, list.SuiteCheckState("Outer.Inner"), __func__, __LINE__,
+        "and so does the suite inside it");
+    CheckEquals(TGUICheckState::Checked, list.SuiteCheckState("Outermost"), __func__, __LINE__,
+        "while a suite with a similar path stays checked");
+
+    // Act and Assert: one test inside the nested suite checked again.
+    list.SetChecked(1, true);
+    CheckEquals(TGUICheckState::Partial, list.SuiteCheckState("Outer"), __func__, __LINE__,
+        "the outer suite is partly checked");
+    CheckEquals(TGUICheckState::Partial, list.SuiteCheckState("Outer.Inner"), __func__, __LINE__,
+        "and so is the suite holding that test");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_TestList::Test_SetVisibleFilter_HidesNonMatchingTests()
 {
     // Arrange
@@ -508,6 +615,72 @@ void TTest_ASWUnitTests_GUI_TestList::Test_StatusName_NamesEachStatus()
     CheckEquals(std::string("Passed"), StatusName(TGUITestStatus::Passed), __func__, __LINE__, "Passed");
     CheckEquals(std::string("Failed"), StatusName(TGUITestStatus::Failed), __func__, __LINE__, "Failed");
     CheckEquals(std::string("Skipped"), StatusName(TGUITestStatus::Skipped), __func__, __LINE__, "Skipped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_SuiteDetailText_CountsEachStatus()
+{
+    // Arrange
+    TGUITestList list;
+    list.Load(SuiteTests());
+    list.SetStatus(1, TGUITestStatus::Failed);
+    list.SetStatus(3, TGUITestStatus::Passed);
+
+    // Act
+    std::string const text = list.SuiteDetailText("Outer");
+
+    // Assert
+    CheckEquals(std::string("Outer\n3 tests: 1 passed, 1 failed, 0 skipped, 1 not run\n"), text, __func__,
+        __LINE__, "the suite's path, then counts over its tests, including those in the suite inside it");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_SuiteStatus_IncludesTheSuitesInIt()
+{
+    // Arrange
+    TGUITestList list;
+    list.Load(SuiteTests());
+    TGUITestStatus const beforeRun = list.SuiteStatus("Outer");
+
+    // Act, and Assert as the suite's tests progress
+    list.SetStatus(3, TGUITestStatus::Passed);
+    CheckEquals(TGUITestStatus::Passed, list.SuiteStatus("Outer"), __func__, __LINE__,
+        "its own group's test passed, the others not run: passed");
+
+    list.SetStatus(1, TGUITestStatus::Failed);
+    CheckEquals(TGUITestStatus::Failed, list.SuiteStatus("Outer"), __func__, __LINE__,
+        "a failure in the suite inside it fails it too");
+    CheckEquals(TGUITestStatus::Failed, list.SuiteStatus("Outer.Inner"), __func__, __LINE__,
+        "as it does the suite holding the failed test");
+
+    list.SetStatus(2, TGUITestStatus::Running);
+    CheckEquals(TGUITestStatus::Running, list.SuiteStatus("Outer"), __func__, __LINE__,
+        "running while any test in it is");
+
+    CheckEquals(TGUITestStatus::NotRun, beforeRun, __func__, __LINE__, "nothing run yet: not run");
+    CheckEquals(TGUITestStatus::NotRun, list.SuiteStatus("Outermost"), __func__, __LINE__,
+        "a suite whose path only starts with this one's is unaffected");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_TestList::Test_TestsInSuite_IncludesNestedSuitesOnly()
+{
+    // Arrange
+    TGUITestList list;
+    list.Load(SuiteTests());
+
+    // Act and Assert
+    CheckTrue(list.TestsInSuite("Outer") == std::vector<size_t>{ 1, 2, 3 }, __func__, __LINE__,
+        "a suite's tests include those in the suite inside it, in order");
+    CheckTrue(list.TestsInSuite("Outer.Inner") == std::vector<size_t>{ 1, 2 }, __func__, __LINE__,
+        "a nested suite's tests are only its own");
+    CheckTrue(list.TestsInSuite("Outermost") == std::vector<size_t>{ 5 }, __func__, __LINE__,
+        "a suite whose path starts with another's isn't inside it");
+    CheckEmpty(list.TestsInSuite("Out"), __func__, __LINE__, "a partial suite name matches nothing");
+
+    list.SetVisibleFilter([](std::string const& fullName)
+        {
+            return fullName != "Outer.Inner.Deep.Two";
+        });
+    CheckTrue(list.TestsInSuite("Outer") == std::vector<size_t>{ 2, 3 }, __func__, __LINE__,
+        "only visible tests are included");
 }
 //---------------------------------------------------------------------------
 

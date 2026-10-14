@@ -32,6 +32,11 @@ versioned baseline.
   still compiles unchanged, outside any suite. `SuitePath` is the last member and defaults to
   empty, so existing brace initializers of either struct still compile, without a
   `-Wmissing-field-initializers` warning.
+- The VCL GUI runner's test tree shows each suite as a node holding the groups and suites in it,
+  with group and suite nodes showing just their own names. A suite node's check box checks or
+  unchecks every test in it, including those in the suites inside it, its status image and detail
+  pane sum up those tests like a group's, and it's shown only while the filter box leaves some of
+  its tests visible.
 
 ### Changed
 

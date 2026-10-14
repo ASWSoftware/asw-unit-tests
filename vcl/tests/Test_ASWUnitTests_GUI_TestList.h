@@ -50,18 +50,26 @@ private: // Test methods
     void Test_FailedFilter_MatchesEveryFailedTestEvenHiddenOnes();
     void Test_GroupDetailText_CountsEachStatus();
     void Test_GroupStatus_ShowsRunningThenWorstOutcome();
+    void Test_GroupSuitePath_GivesEachGroupsSuite();
     void Test_IndexOf_FindsTestsByGroupAndTestName();
     void Test_Load_ChecksEveryTestAndListsGroupsInOrder();
+    void Test_Load_ListsEachSuiteAfterTheSuitesHoldingIt();
+    void Test_NameInSuite_DropsTheSuitePath();
+    void Test_ParentSuitePath_DropsTheLastSuiteName();
     void Test_ResetResults_SetsEveryTestBackToNotRun();
     void Test_SetAllChecked_ChecksOrUnchecksEveryTest();
     void Test_SetChecked_UpdatesItsGroupsCheckState();
     void Test_SetGroupChecked_ChangesOnlyThatGroup();
     void Test_SetResult_StoresTheResultAndSetsTheStatus();
+    void Test_SetSuiteChecked_ChangesTheSuiteAndTheSuitesInIt();
     void Test_SetVisibleFilter_HidesNonMatchingTests();
     void Test_SetVisibleFilter_LimitsCheckingToVisibleTests();
     void Test_StatusCount_CountsTestsWithEachStatus();
     void Test_StatusFromOutcome_MapsEachOutcome();
     void Test_StatusName_NamesEachStatus();
+    void Test_SuiteDetailText_CountsEachStatus();
+    void Test_SuiteStatus_IncludesTheSuitesInIt();
+    void Test_TestsInSuite_IncludesNestedSuitesOnly();
 
 public:
     TTest_ASWUnitTests_GUI_TestList();
