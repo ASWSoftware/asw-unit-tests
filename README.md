@@ -466,6 +466,14 @@ ASW_REGISTER_TEST_GROUP_ORDERED(ASWUnitTests::TTest_TMyClassToTest, -1) // runs 
 Run order is purely for readable, reproducible output. A group's `SetUp_Group`/`TearDown_Group`
 should still make no assumption about which other groups have or haven't already run.
 
+A group whose constructor throws doesn't stop the run. It's logged at startup as `!!ERROR!!`, and a
+group named after its class as the registration macro gives it (e.g.
+`ASWUnitTests::TTest_TMyClassToTest`), in the suite the registration names, stands in for it, with
+one test, `(construction)`, which fails with `Test group class "..." could not be created: ` and the
+exception's message. The rest of the run goes on as usual, and it ends with exit code `1`. The
+exceptions to this are a duplicate test name and an invalid suite path, which still stop the run at
+startup.
+
 ### Organizing Groups into Suites
 
 To organize many groups, put each in a suite by passing a `TSuitePath` to its base class

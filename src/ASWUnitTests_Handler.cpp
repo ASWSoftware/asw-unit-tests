@@ -84,6 +84,38 @@ std::optional<std::string> CallAndDescribeException(std::function<void()> const&
     return std::nullopt;
 }
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TUncreatableTestGroup
+//
+// Stands in for a registered test group whose constructor threw (see TTestHandler::CreateTestGroup()), so the run
+// reports that as a failure rather than ending before it starts: one test, "(construction)", which fails with
+// 'detail'.
+/////////////////////////////////////////////////////////////////////////////
+class TUncreatableTestGroup : public ASWUnitTests::TTestGroupBase
+{
+private:
+    typedef ASWUnitTests::TTestGroupBase inherited;
+
+public:
+    TUncreatableTestGroup(std::string const& name, std::string const& detail)
+        : inherited(name)
+    {
+        RegisterTest([detail]()
+            {
+                throw ASWUnitTests::TTestException(detail);
+            }, "(construction)");
+    }
+
+    void SetUp_Group() override
+    {
+    }
+
+    void TearDown_Group() override
+    {
+    }
+};
+
 } // namespace
 
 namespace ASWUnitTests
@@ -161,6 +193,57 @@ std::vector<size_t> TTestHandler::CanonicalGroupOrder(std::vector<TTestGroupOrde
         });
 
     return order;
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::CreateTestGroup
+
+    Creates the group 'registered' registers. If its constructor throws, logs that and returns a
+    group standing in for it, named after its class, whose one test, "(construction)", fails saying
+    why, so the run carries on and reports it. A TExceptDuplicateTestName or TExceptInvalidSuitePath,
+    a mistake in how the group names its tests or its suite, still stops the run at startup.
+*/
+std::unique_ptr<ITestGroup> TTestHandler::CreateTestGroup(TRegisteredTestGroupFactory const& registered)
+{
+    std::string description;
+
+    try
+    {
+        return registered.Factory();
+    }
+    catch (TExceptDuplicateTestName const&)
+    {
+        throw;
+    }
+    catch (TExceptInvalidSuitePath const&)
+    {
+        throw;
+    }
+    catch (std::exception const& ex)
+    {
+        description = ex.what();
+    }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        description = DescribeRTLException(ex);
+    }
+    catch (...)
+    {
+        description = "an object that is neither a std::exception nor an RTL Exception";
+    }
+#else
+    catch (...)
+    {
+        description = "a non-std::exception object";
+    }
+#endif
+
+    std::string const className = registered.ClassName.empty() ? std::string("(unnamed)") : registered.ClassName;
+    std::string const detail = "Test group class \"" + className + "\" could not be created: " + description;
+    Log("!!ERROR!!: " + detail);
+
+    return std::make_unique<TUncreatableTestGroup>(className, detail);
 }
 //---------------------------------------------------------------------------
 /*
@@ -537,7 +620,9 @@ void TTestHandler::LogAppend(std::string const& msg)
     ASW_REGISTER_TEST_GROUP macros (see ASWUnitTests_Registry.h), and puts
     each in the suite its registration names, if any (see
     ApplyRegisteredSuitePath()). Test modules are added or removed from their
-    own .cpp files; this method never needs to change.
+    own .cpp files; this method never needs to change. A group whose
+    constructor throws is replaced by one that reports it (see
+    CreateTestGroup()).
 
     Groups are kept in their canonical order (see CanonicalGroupOrder()):
     by default alphabetical, with each suite's groups together, and
@@ -550,7 +635,7 @@ void TTestHandler::RegisterTestGroups()
 
     for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
     {
-        groups.push_back(registered.Factory());
+        groups.push_back(CreateTestGroup(registered));
         ApplyRegisteredSuitePath(*groups.back(), registered.SuitePath);
         orderKeys.push_back(TTestGroupOrderKey{ groups.back()->GetSuitePath(), groups.back()->GetTestGroupName(),
                                                 registered.Order });

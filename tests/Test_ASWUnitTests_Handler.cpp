@@ -78,6 +78,65 @@ TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests)
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupConstructorThrows
+//
+// A group registered in suite "HandlerFixtures", so a nested TTestHandler creates it, whose constructor throws what
+// ConstructorThrows says, for Test_Initialize_ReplacesGroupWhoseConstructorThrows below. Otherwise (as in every
+// ordinary run) it's created as usual and its one test passes.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_GroupConstructorThrows : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_Passes();
+
+public:
+    enum class TThrow
+    {
+        Nothing,
+        StdException,     // A std::runtime_error.
+        RTLException,     // An EConvertError, in RTL builds.
+        DuplicateTestName // Registers its test twice, so RegisterTest() throws TExceptDuplicateTestName.
+    };
+
+    static TThrow ConstructorThrows;
+
+public:
+    TFixture_GroupConstructorThrows();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+TFixture_GroupConstructorThrows::TThrow TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+
+//---------------------------------------------------------------------------
+TFixture_GroupConstructorThrows::TFixture_GroupConstructorThrows()
+    : inherited("ASWUnitTests_Handler_ConstructorFixture")
+{
+    if (ConstructorThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate constructor failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (ConstructorThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate constructor failure");
+#endif
+
+    RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+
+    if (ConstructorThrows == TThrow::DuplicateTestName)
+        RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupConstructorThrows::Test_Passes()
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_GroupSetUpThrows
 //
 // A registered group, so a nested TTestHandler creates and runs it, whose SetUp_Group() throws what SetUpGroupThrows
@@ -211,6 +270,8 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
         "CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows,
+        "Initialize_ReplacesGroupWhoseConstructorThrows");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows,
         "Run_FailsGroupTestsWhenSetUpGroupThrows");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered,
@@ -340,6 +401,104 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
     }
 
     CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows()
+{
+    typedef TFixture_GroupConstructorThrows::TThrow TThrow;
+
+    // Cleared again however each scenario ends, so the group's own run in this suite isn't affected.
+    struct TResetThrow
+    {
+        ~TResetThrow()
+        {
+            TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+        }
+    } const resetThrow;
+
+    // What the constructor throws, and how the failure describes it.
+    std::vector<std::pair<TThrow, std::string> > const scenarios =
+    {
+        { TThrow::StdException, "deliberate constructor failure" },
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        {
+            TThrow::RTLException, "EConvertError: deliberate constructor failure"
+        },
+#endif
+    };
+
+    for (std::pair<TThrow, std::string> const& scenario : scenarios)
+    {
+        std::string const& description = scenario.second;
+        std::string const detail = "Test group class \"TFixture_GroupConstructorThrows\" could not be created: " +
+            description;
+
+        // Act
+        TTestHandler handler;
+        std::string log;
+        TTestResults results;
+        {
+            TFixture_GroupConstructorThrows::ConstructorThrows = scenario.first;
+            TStdOutRedirect const captureOutput;
+            handler.Initialize("Test_Initialize_ReplacesGroupWhoseConstructorThrows");
+            log = captureOutput.Str();
+            TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+            results = handler.Run([](std::string const& fullName)
+                {
+                    return fullName.rfind("HandlerFixtures.", 0) == 0;
+                }, "the HandlerFixtures suite");
+        }
+
+        // Assert
+        CheckContains(log, "!!ERROR!!: " + detail, __func__, __LINE__, description + ": the failure is logged");
+
+        bool foundStandIn = false;
+        for (TTestId const& test : handler.GetTests())
+        {
+            CheckNotEquals(std::string("HandlerFixtures.ASWUnitTests_Handler_ConstructorFixture"), test.GroupName,
+                __func__, __LINE__, description + ": the group itself wasn't created");
+
+            if (test.GroupName == "HandlerFixtures.TFixture_GroupConstructorThrows")
+            {
+                foundStandIn = true;
+                CheckEquals(std::string("(construction)"), test.TestName, __func__, __LINE__,
+                    description + ": the stand-in's one test");
+                CheckEquals(std::string("HandlerFixtures"), test.SuitePath, __func__, __LINE__,
+                    description + ": the stand-in is in the registration's suite");
+            }
+        }
+
+        CheckTrue(foundStandIn, __func__, __LINE__, description + ": a group named after the class stands in for it");
+        CheckEquals(1u, results.FailedCount, __func__, __LINE__, description + ": the stand-in's test fails");
+        CheckEquals(0u, results.SuccessCount, __func__, __LINE__, description + ": and nothing else in the suite ran");
+        AssertEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__,
+            description + ": one record");
+        CheckEquals(std::string("(construction)"), results.CaseRecords.front().TestName, __func__, __LINE__,
+            description + ": for the stand-in's test");
+        CheckEquals(detail, results.CaseRecords.front().Message, __func__, __LINE__,
+            description + ": saying why the group couldn't be created");
+    }
+
+    // A mistake in how a group registers its tests still stops the run at startup.
+    TTestHandler handler;
+    bool duplicateThrown = false;
+    {
+        TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::DuplicateTestName;
+        TStdOutRedirect const suppressOutput;
+
+        try
+        {
+            handler.Initialize("Test_Initialize_ReplacesGroupWhoseConstructorThrows");
+        }
+        catch (TExceptDuplicateTestName const&)
+        {
+            duplicateThrown = true;
+        }
+
+        TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+    }
+
+    CheckTrue(duplicateThrown, __func__, __LINE__, "a TExceptDuplicateTestName from a constructor isn't replaced");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows()
@@ -646,4 +805,5 @@ void TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark()
 
 //---------------------------------------------------------------------------
 ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_ASWUnitTests_Handler)
+ASW_REGISTER_TEST_GROUP_IN_SUITE(TFixture_GroupConstructorThrows, "HandlerFixtures")
 ASW_REGISTER_TEST_GROUP(TFixture_GroupSetUpThrows)

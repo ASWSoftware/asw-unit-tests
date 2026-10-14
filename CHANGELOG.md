@@ -33,7 +33,7 @@ versioned baseline.
   needn't name the suite. A group whose constructor names a different suite, or an `ITestGroup`
   implemented without `TTestGroupBase` whose own `GetSuitePath()` doesn't give that suite, stops the
   run at startup with `TExceptInvalidSuitePath`. `TTestGroupRegistry::Register()`
-  takes the suite path as a new last parameter, and `TRegisteredTestGroupFactory` gains a
+  takes the suite path as a new parameter after the order, and `TRegisteredTestGroupFactory` gains a
   `SuitePath` member, which defaults to empty as `TTestCaseRecord`'s does.
 - `ITestGroup::GetSuitePath()` and `ITestGroup::GetQualifiedTestGroupName()`, and a `SuitePath`
   member in `TTestCaseRecord` and `TTestId`, for code that reports or displays tests by suite.
@@ -62,6 +62,15 @@ versioned baseline.
   detail, `TearDown_Group()` still runs, and the run carries on with the next group, so it ends with
   exit code `1`. A run observer gets `OnTestStarted()` and `OnTestFinished()` for each of those
   tests, as for any other.
+- An exception from a test group's constructor no longer ends the run at startup with exit code `2`
+  or `3`. It's logged as `!!ERROR!!`, and a group named after the class, as the registration macro
+  gives it, stands in for the group, in the suite the registration names, with one test,
+  `(construction)`, which fails with `Test group class "..." could not be created: ` and the
+  exception's message, so the run ends with exit code `1`. A `TExceptDuplicateTestName` or
+  `TExceptInvalidSuitePath` from a constructor still stops the run at startup.
+  `TTestGroupRegistry::Register()` takes the class name as a new last parameter, which the
+  registration macros pass, and `TRegisteredTestGroupFactory` gains a `ClassName` member, which
+  defaults to empty as `SuitePath` does.
 
 ### Fixed
 
