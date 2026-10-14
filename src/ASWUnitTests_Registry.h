@@ -45,7 +45,9 @@ namespace ASWUnitTests
 // ordering hint (see ASW_REGISTER_TEST_GROUP_ORDERED). Groups left at the
 // default order of 0 are run in alphabetical order by group name; an
 // explicit lower/higher order runs a group before/after that block. Order
-// is compared before name, so ties fall back to alphabetical order.
+// is compared before name, so ties fall back to alphabetical order. For a
+// group in a suite, the order only places it among that suite's groups and
+// suites (see TTestHandler::CanonicalGroupOrder()).
 /////////////////////////////////////////////////////////////////////////////
 struct TRegisteredTestGroupFactory
 {
@@ -87,6 +89,8 @@ public:
 // name, alongside every other group that doesn't specify an order.
 // ASW_REGISTER_TEST_GROUP_ORDERED overrides that with an explicit order:
 // groups run in ascending order, with ties broken alphabetically by name.
+// A group in a suite (see TSuitePath) is ordered among that suite's groups
+// and suites only, and a suite sorts as order 0, by its own name.
 //
 // Examples:
 //     ASW_REGISTER_TEST_GROUP(TTest_TMyClassToTest)

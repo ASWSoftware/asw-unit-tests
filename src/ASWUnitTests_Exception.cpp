@@ -226,6 +226,19 @@ TExceptFalse::TExceptFalse(std::string const& method, int line, std::string cons
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TExceptInvalidSuitePath
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TExceptInvalidSuitePath::TExceptInvalidSuitePath(std::string const& suitePath)
+    : std::logic_error("Suite path \"" + suitePath + "\" has an empty suite name; separate its names with single "
+          "'.' characters, with none at the start or end")
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TExceptIsNotType
 /////////////////////////////////////////////////////////////////////////////
 

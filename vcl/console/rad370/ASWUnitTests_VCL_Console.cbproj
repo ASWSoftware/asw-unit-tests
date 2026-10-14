@@ -230,6 +230,10 @@
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_StdOutRedirect.h</DependentOn>
             <BuildOrder>18</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_Suite.cpp">
+            <DependentOn>..\..\..\tests\Test_ASWUnitTests_Suite.h</DependentOn>
+            <BuildOrder>42</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\tests\Test_ASWUnitTests_TestBase.cpp">
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_TestBase.h</DependentOn>
             <BuildOrder>19</BuildOrder>

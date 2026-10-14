@@ -28,10 +28,17 @@ limitations under the License.
 #include <cctype>
 #include <chrono>
 #include <ctime>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <map>
+#include <memory>
 #include <random>
 #include <sstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
@@ -55,6 +62,47 @@ TTestHandler::TTestHandler()
 //---------------------------------------------------------------------------
 TTestHandler::~TTestHandler()
 {
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::CanonicalGroupOrder
+
+    Gives each group a sort key with one entry per level of its path: one for each suite it's in, outermost
+    first, then one for the group itself. Each entry is (order, name, kind), where a suite's entry is
+    (0, its suite name, 1) and the group's is (its order, its name, 0), so comparing two keys entry by entry
+    compares the groups, or the suites holding them, at the first level where their paths differ. A group and a
+    suite that tie on order and name at the same level sort the group first. Without suites, each key is a
+    single (order, name, 0) entry, which sorts exactly as order then name did before suites existed.
+*/
+std::vector<size_t> TTestHandler::CanonicalGroupOrder(std::vector<TTestGroupOrderKey> const& groups)
+{
+    typedef std::tuple<int, std::string, int> TLevelKey;
+
+    std::vector<std::vector<TLevelKey> > sortKeys;
+
+    for (TTestGroupOrderKey const& group : groups)
+    {
+        TSuitePath const suitePath(group.SuitePath);
+        std::vector<TLevelKey> sortKey;
+
+        for (std::string const& suiteName : suitePath.GetNames())
+            sortKey.push_back(TLevelKey(0, suiteName, 1));
+
+        sortKey.push_back(TLevelKey(group.Order, group.Name, 0));
+        sortKeys.push_back(sortKey);
+    }
+
+    std::vector<size_t> order(groups.size());
+
+    for (size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+
+    std::stable_sort(order.begin(), order.end(), [&sortKeys](size_t a, size_t b)
+        {
+            return sortKeys[a] < sortKeys[b];
+        });
+
+    return order;
 }
 //---------------------------------------------------------------------------
 /*
@@ -97,13 +145,13 @@ std::vector<TTestId> TTestHandler::GetTests()
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
              testIt != testGroup.GetTestCallbackList().end(); testIt++)
         {
             ITestCase& testCase = *testIt->get();
-            tests.push_back(TTestId{ groupName, testCase.GetName() });
+            tests.push_back(TTestId{ groupName, testCase.GetName(), testGroup.GetSuitePath() });
         }
     }
 
@@ -146,6 +194,81 @@ std::string TTestHandler::GetVersionStr()
 std::string TTestHandler::GetVersionFullStr()
 {
     return "ASWUnitTests - Version " + GetVersionStr();
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::ShuffledGroupOrder
+
+    Builds the suite tree from the groups' suite paths: each suite's children are its groups and the suites
+    inside it, in the order they first appear in 'suitePaths', with the top level as the root. Then walks the
+    tree, visiting each node's children in an order from ShuffledIndices(), so each suite's groups come out
+    together.
+*/
+std::vector<size_t> TTestHandler::ShuffledGroupOrder(std::vector<std::string> const& suitePaths, unsigned int seed)
+{
+    // A child of a suite (or of the top level): a group, by its index into 'suitePaths', or a suite, by its index
+    // into 'suites'.
+    struct TChild
+    {
+        bool IsSuite;
+        size_t Index;
+    };
+
+    struct TSuite
+    {
+        std::string Path; // Empty for the top level.
+        std::vector<TChild> Children;
+    };
+
+    std::vector<TSuite> suites(1); // suites[0] is the top level.
+    std::map<std::string, size_t> suiteIndexByPath;
+
+    for (size_t groupIndex = 0; groupIndex < suitePaths.size(); ++groupIndex)
+    {
+        TSuitePath const suitePath(suitePaths[groupIndex]);
+        size_t parent = 0;
+        std::string path;
+
+        for (std::string const& suiteName : suitePath.GetNames())
+        {
+            path += (path.empty() ? std::string() : std::string(".")) + suiteName;
+
+            std::map<std::string, size_t>::const_iterator const found = suiteIndexByPath.find(path);
+            if (found != suiteIndexByPath.end())
+            {
+                parent = found->second;
+                continue;
+            }
+
+            size_t const suiteIndex = suites.size();
+            suites.push_back(TSuite{ path, std::vector<TChild>() });
+            suites[parent].Children.push_back(TChild{ true, suiteIndex });
+            suiteIndexByPath[path] = suiteIndex;
+            parent = suiteIndex;
+        }
+
+        suites[parent].Children.push_back(TChild{ false, groupIndex });
+    }
+
+    std::vector<size_t> order;
+    std::function<void (size_t)> appendShuffled = [&](size_t suiteIndex)
+        {
+            TSuite const& suite = suites[suiteIndex];
+            unsigned int const suiteSeed = suite.Path.empty() ? seed : (seed + FNV1aHash(suite.Path));
+
+            for (size_t childIndex : ShuffledIndices(suite.Children.size(), suiteSeed))
+            {
+                TChild const& child = suite.Children[childIndex];
+
+                if (child.IsSuite)
+                    appendShuffled(child.Index);
+                else
+                    order.push_back(child.Index);
+            }
+        };
+
+    appendShuffled(0);
+    return order;
 }
 //---------------------------------------------------------------------------
 /*
@@ -253,7 +376,7 @@ void TTestHandler::ListTests(TestFilter const& filter, std::string const& filter
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
         bool groupHasMatch = false;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
@@ -318,35 +441,26 @@ void TTestHandler::LogAppend(std::string const& msg)
     ASWUnitTests_Registry.h). Test modules are added or removed from their
     own .cpp files; this method never needs to change.
 
-    Groups run in ascending order by their registered order (default 0),
-    with ties broken alphabetically by group name, so the default run
-    order is alphabetical and deterministic across compilers/linkers.
+    Groups are kept in their canonical order (see CanonicalGroupOrder()):
+    by default alphabetical, with each suite's groups together, and
+    deterministic across compilers/linkers.
 */
 void TTestHandler::RegisterTestGroups()
 {
-    struct TOrderedGroup
-    {
-        int Order;
-        std::unique_ptr<ITestGroup> Group;
-    };
-
-    std::vector<TOrderedGroup> orderedGroups;
+    std::vector<std::unique_ptr<ITestGroup> > groups;
+    std::vector<TTestGroupOrderKey> orderKeys;
 
     for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
-        orderedGroups.push_back(TOrderedGroup{ registered.Order, registered.Factory() });
-
-    std::stable_sort(orderedGroups.begin(), orderedGroups.end(),
-        [](TOrderedGroup const& a, TOrderedGroup const& b)
-        {
-            if (a.Order != b.Order)
-                return a.Order < b.Order;
-            return a.Group->GetTestGroupName() < b.Group->GetTestGroupName();
-        });
-
-    for (TOrderedGroup& orderedGroup : orderedGroups)
     {
-        orderedGroup.Group->SetRunObserver(m_RunObserver);
-        m_TestGroups.push_back(std::move(orderedGroup.Group));
+        groups.push_back(registered.Factory());
+        orderKeys.push_back(TTestGroupOrderKey{ groups.back()->GetSuitePath(), groups.back()->GetTestGroupName(),
+                                                registered.Order });
+    }
+
+    for (size_t index : CanonicalGroupOrder(orderKeys))
+    {
+        groups[index]->SetRunObserver(m_RunObserver);
+        m_TestGroups.push_back(std::move(groups[index]));
     }
 }
 //---------------------------------------------------------------------------
@@ -360,9 +474,11 @@ void TTestHandler::RegisterTestGroups()
     groups that actually run. The active filter (or lack of one) is always
     logged, so redirected output still explains why fewer tests ran.
 
-    When 'shuffle' is set, group order is randomized, and each group's test
-    order is independently randomized too (each from a seed derived from the
-    master seed and the group's name, so results stay reproducible without
+    When 'shuffle' is set, group order is randomized (see
+    ShuffledGroupOrder(), which keeps each suite's groups together), and
+    each group's test order is independently randomized too (each from a
+    seed derived from the master seed and the group's qualified name, so
+    results stay reproducible without
     every equally-sized group shuffling identically). The master seed is
     'shuffleSeed' if given, otherwise one is generated and logged so a
     failure caused by shuffled order can be reproduced. A seed gives the
@@ -399,8 +515,13 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
     if (shuffle)
     {
+        std::vector<std::string> suitePaths;
+
+        for (std::unique_ptr<ITestGroup> const& testGroup : m_TestGroups)
+            suitePaths.push_back(testGroup->GetSuitePath());
+
         resolvedSeed = shuffleSeed.has_value() ? shuffleSeed : std::random_device{}();
-        groupOrder = ShuffledIndices(m_TestGroups.size(), *resolvedSeed);
+        groupOrder = ShuffledGroupOrder(suitePaths, *resolvedSeed);
     }
     else
     {
@@ -419,7 +540,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
             continue;
         }
 
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
         bool anyMatch = false;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
@@ -455,7 +576,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     for (std::vector<ITestGroup*>::iterator it = groupsToRun.begin(); it != groupsToRun.end(); it++)
     {
         ITestGroup& testGroup = **it;
-        std::string const& name = testGroup.GetTestGroupName();
+        std::string const name = testGroup.GetQualifiedTestGroupName();
         size_t nTestsInGroup = 0;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();

@@ -442,6 +442,24 @@ public:
     TExceptDuplicateTestName(std::string const& groupName, std::string const& testName);
 };
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TExceptInvalidSuitePath
+//
+// Thrown by the TSuitePath constructor when a suite path has an empty
+// suite name: one that starts or ends with '.', or has two in a row. A test
+// group is given its suite path while it's being constructed, so like
+// TExceptDuplicateTestName, this escapes TTestHandler::Initialize() and
+// stops the run before any test runs. TTestHandler::Initialize() also
+// checks each group's GetSuitePath() this way, for an ITestGroup that
+// doesn't derive from TTestGroupBase.
+/////////////////////////////////////////////////////////////////////////////
+class TExceptInvalidSuitePath : public std::logic_error
+{
+public:
+    explicit TExceptInvalidSuitePath(std::string const& suitePath);
+};
+
 // /////// Compiler specific exceptions after this line /////////////////////
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)

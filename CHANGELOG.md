@@ -10,6 +10,39 @@ versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- Test suites, for organizing test groups into a hierarchy of any depth. Pass a `TSuitePath` to
+  the new `TTestGroupBase(TSuitePath const& suitePath, std::string const& name)` constructor, or
+  the matching `TAutoTestGroup` one, e.g.
+  `inherited(TSuitePath("Framework.Console"), "TTest_TConsole")` for suite `Console` inside suite
+  `Framework`. A suite's groups run together, and the suite path starts its tests' full names, so
+  `--filter "Framework.*"` runs every test in suite `Framework`, and `--list`, the console log and
+  the `--report-junit` report's `classname` show `Framework.Console.TTest_TConsole`. Suites only
+  organize groups: they have no set-up or tear-down of their own. The order given to
+  `ASW_REGISTER_TEST_GROUP_ORDERED` places a group among its own suite's groups and suites, where a
+  suite sorts as order `0` by its own name, and `--shuffle` shuffles each suite's contents
+  separately, so they still run together. A suite path with an empty suite name, such as
+  `"Framework..Console"`, throws the new `TExceptInvalidSuitePath`, stopping the run at startup with
+  exit code `2`. Groups that aren't in a suite run in the same order as before, including the order
+  a given `--shuffle-seed` produces.
+- `ITestGroup::GetSuitePath()` and `ITestGroup::GetQualifiedTestGroupName()`, and a `SuitePath`
+  member in `TTestCaseRecord` and `TTestId`, for code that reports or displays tests by suite.
+  `GetSuitePath()` isn't pure virtual, so an `ITestGroup` implemented without `TTestGroupBase`
+  still compiles unchanged, outside any suite. `SuitePath` is the last member and defaults to
+  empty, so existing brace initializers of either struct still compile, without a
+  `-Wmissing-field-initializers` warning.
+
+### Changed
+
+- `TTestCaseRecord::GroupName`, `TTestId::GroupName` and the group name passed to
+  `ITestRunObserver::OnTestStarted()` are now the group's qualified name, its suite path then its
+  own name (e.g. `Framework.Console.TTest_TConsole`), so groups with the same name in different
+  suites can be told apart. For a group that isn't in a suite, that's its own name, as before.
+  `GetTestGroupName()` is still just the group's own name. Moving a group into a suite changes its
+  tests' full names, as renaming the group would, so `--filter` patterns and saved VCL GUI runner
+  selections that named its tests no longer match them.
+
 ## [1.3.0] - 2026-10-11
 
 ### Added

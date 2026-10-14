@@ -675,7 +675,8 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
     {
         TTestId const& test = m_TestList.Test(*m_CurrentTestIndex);
         m_TestList.SetResult(*m_CurrentTestIndex, TTestCaseRecord{ test.GroupName, test.TestName, 0.0,
-                                                                   TTestOutcome::Fail, "Unhandled exception: " + description }, std::string());
+                                                                   TTestOutcome::Fail, "Unhandled exception: " + description,
+                                                                   test.SuitePath }, std::string());
         UpdateTestNodeImages(*m_CurrentTestIndex);
         AddFailureItem(*m_CurrentTestIndex);
         m_CurrentTestIndex.reset();

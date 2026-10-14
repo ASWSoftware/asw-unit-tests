@@ -26,11 +26,15 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_StdOutRedirect.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -38,7 +42,21 @@ namespace
 
 using namespace ASWUnitTests;
 
+std::string JoinIndices(std::vector<size_t> const& indices);
 TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests);
+
+//---------------------------------------------------------------------------
+
+// 'indices' joined with ",", so a whole order can be compared, and shown on failure, as one string.
+std::string JoinIndices(std::vector<size_t> const& indices)
+{
+    std::string joined;
+
+    for (size_t i = 0; i < indices.size(); ++i)
+        joined += (i == 0 ? std::string() : std::string(",")) + std::to_string(indices[i]);
+
+    return joined;
+}
 
 //---------------------------------------------------------------------------
 
@@ -107,6 +125,12 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
     : inherited("ASWUnitTests_Handler_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_KeepsSuitesTogether,
+        "CanonicalGroupOrder_KeepsSuitesTogether");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_RejectsInvalidSuitePath,
+        "CanonicalGroupOrder_RejectsInvalidSuitePath");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName,
+        "CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered,
@@ -114,6 +138,10 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
         "SetRunObserver_ReceivesInitializeAndRunOutput");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups, "SetRunObserver_StopsBetweenGroups");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_KeepsSuitesTogether,
+        "ShuffledGroupOrder_KeepsSuitesTogether");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices,
+        "ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_CaseSensitivity, "WildcardMatch_CaseSensitivity");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_ExactAndStar, "WildcardMatch_ExactAndStar");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark, "WildcardMatch_QuestionMark");
@@ -142,6 +170,65 @@ void TTest_ASWUnitTests_Handler::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_KeepsSuitesTogether()
+{
+    // Arrange: groups at the top level, in suite "S", and in suite "S.T", plus a group named "T" in "S" beside
+    // suite "S.T", given out of order.
+    std::vector<TTestGroupOrderKey> const groups = {
+        TTestGroupOrderKey{ "", "Zed", 0 },     // 0
+        TTestGroupOrderKey{ "S", "G2", 0 },     // 1
+        TTestGroupOrderKey{ "", "Alpha", 0 },   // 2
+        TTestGroupOrderKey{ "S.T", "G3", 0 },   // 3
+        TTestGroupOrderKey{ "S", "G1", 0 },     // 4
+        TTestGroupOrderKey{ "", "Early", -1 },  // 5
+        TTestGroupOrderKey{ "S", "Late", 1 },   // 6
+        TTestGroupOrderKey{ "S", "T", 0 },      // 7
+        TTestGroupOrderKey{ "S", "First", -5 }  // 8
+    };
+
+    // Act
+    std::vector<size_t> const order = TTestHandler::CanonicalGroupOrder(groups);
+
+    // Assert
+    CheckEquals(std::string("5,2,8,4,1,7,3,6,0"), JoinIndices(order), __func__, __LINE__,
+        "Early (order -1) first, then Alpha, then all of suite S before Zed; within S, First (order -5), G1, G2, "
+        "group T before suite T's G3, then Late (order 1). An order only sorts a group among its siblings, so "
+        "First doesn't move S ahead of Alpha");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_RejectsInvalidSuitePath()
+{
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            return TTestHandler::CanonicalGroupOrder({ TTestGroupOrderKey{ "S..T", "G", 0 } });
+        }, __func__, __LINE__, "a suite path with an empty suite name, from an ITestGroup's GetSuitePath()",
+        "Suite path \"S..T\" has an empty suite name");
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            return TTestHandler::ShuffledGroupOrder({ "", "S." }, 1);
+        }, __func__, __LINE__, "ShuffledGroupOrder() checks suite paths the same way",
+        "Suite path \"S.\" has an empty suite name");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName()
+{
+    // Arrange
+    std::vector<TTestGroupOrderKey> const groups = {
+        TTestGroupOrderKey{ "", "Bravo", 0 },    // 0
+        TTestGroupOrderKey{ "", "Alpha", 0 },    // 1
+        TTestGroupOrderKey{ "", "Charlie", -1 }, // 2
+        TTestGroupOrderKey{ "", "Alpha", 0 },    // 3
+        TTestGroupOrderKey{ "", "Delta", 1 }     // 4
+    };
+
+    // Act
+    std::vector<size_t> const order = TTestHandler::CanonicalGroupOrder(groups);
+
+    // Assert
+    CheckEquals(std::string("2,1,3,0,4"), JoinIndices(order), __func__, __LINE__,
+        "by order, then name, with tied groups kept in registration order, as before suites existed");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
 {
@@ -278,6 +365,74 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups()
     CheckNotContains(observer.LogText, "\"ASWUnitTests_StdOutRedirect_Tests\"", __func__, __LINE__,
         "the second group was never even set up");
     CheckContains(observer.LogText, "Run stopped on request", __func__, __LINE__, "the log says the run was stopped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_KeepsSuitesTogether()
+{
+    // Arrange: groups in canonical order, with suite "A" (holding suite "A.B") and suite "C" among top-level ones.
+    std::vector<std::string> const suitePaths = { "", "A", "A", "A.B", "A.B", "A", "", "C", "C" };
+    std::vector<std::string> const suites = { "A", "A.B", "C" };
+    std::vector<std::string> const oneSuite(5, "A");
+    bool anyReordered = false;
+
+    for (unsigned int seed = 1; seed <= 20; ++seed)
+    {
+        // Act
+        std::vector<size_t> const order = TTestHandler::ShuffledGroupOrder(suitePaths, seed);
+
+        // Assert
+        std::vector<size_t> sorted = order;
+        std::sort(sorted.begin(), sorted.end());
+        CheckEquals(std::string("0,1,2,3,4,5,6,7,8"), JoinIndices(sorted), __func__, __LINE__,
+            "every group appears exactly once (seed " + std::to_string(seed) + ")");
+        CheckEquals(JoinIndices(order), JoinIndices(TTestHandler::ShuffledGroupOrder(suitePaths, seed)), __func__,
+            __LINE__, "the same seed gives the same order (seed " + std::to_string(seed) + ")");
+
+        for (std::string const& suite : suites)
+        {
+            size_t first = order.size();
+            size_t last = 0;
+            size_t count = 0;
+
+            for (size_t position = 0; position < order.size(); ++position)
+            {
+                std::string const& path = suitePaths[order[position]];
+
+                if (path == suite || path.rfind(suite + ".", 0) == 0)
+                {
+                    first = std::min(first, position);
+                    last = std::max(last, position);
+                    ++count;
+                }
+            }
+
+            CheckEquals(count, last - first + 1, __func__, __LINE__, "suite " + suite + "'s groups run together (seed " +
+                std::to_string(seed) + ")");
+        }
+
+        if (JoinIndices(order) != "0,1,2,3,4,5,6,7,8")
+            anyReordered = true;
+
+        CheckEquals(JoinIndices(ShuffledIndices(oneSuite.size(), seed + FNV1aHash("A"))),
+            JoinIndices(TTestHandler::ShuffledGroupOrder(oneSuite, seed)), __func__, __LINE__,
+            "a suite's groups are shuffled with the seed plus the FNV-1a hash of its path (seed " +
+            std::to_string(seed) + ")");
+    }
+
+    CheckTrue(anyReordered, __func__, __LINE__, "some seed actually shuffles the groups");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices()
+{
+    std::vector<std::string> const suitePaths(7, std::string());
+
+    for (unsigned int seed = 1; seed <= 8; ++seed)
+    {
+        CheckEquals(JoinIndices(ShuffledIndices(suitePaths.size(), seed)),
+            JoinIndices(TTestHandler::ShuffledGroupOrder(suitePaths, seed)), __func__, __LINE__,
+            "without suites, a seed gives the same group order as before suites existed (seed " +
+            std::to_string(seed) + ")");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_WildcardMatch_CaseSensitivity()
