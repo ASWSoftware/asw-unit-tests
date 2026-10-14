@@ -46,6 +46,9 @@ versioned baseline.
   unchecks every test in it, including those in the suites inside it, its status image and detail
   pane sum up those tests like a group's, and it's shown only while the filter box leaves some of
   its tests visible.
+- VCL GUI runner: **Expand All** and **Collapse All** (View menu), which expand every suite and
+  group in the test tree, or collapse it to its top-level suites and groups. Changing the filter
+  box's text still expands the whole tree.
 - `TConsole::StripColor()`, which removes the ANSI color codes `TConsole::Colorize()` adds, and
   `TConsole::GetColorMode()`, which returns the mode `TConsole::SetColorMode()` set.
 

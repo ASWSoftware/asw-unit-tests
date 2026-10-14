@@ -326,7 +326,8 @@ The window shows:
   [suite](#organizing-groups-into-suites), if any, with a check box to choose what runs (all are
   checked at first) and a colored dot for its status: gray not run, blue running, green passed, red
   failed, amber skipped. A group's or suite's check box and dot summarize its tests, including those
-  in the suites inside it.
+  in the suites inside it. **View > Expand All** and **View > Collapse All** expand every suite and
+  group, or collapse the tree to its top-level ones; changing the filter expands it all again.
 - **Detail pane** - The selected test's result, duration, failure or skip detail, and its own log
   output, or how many of a selected group's or suite's tests have each status.
 - **Failures & Skips** - Every failed or skipped test in the latest run. Double-click one to select

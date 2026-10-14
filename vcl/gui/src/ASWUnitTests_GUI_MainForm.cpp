@@ -305,6 +305,21 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_CollapseAllExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Collapse All", [this]()
+    {
+        {
+            TTreeUpdateScope const updating(TV_Tests->Items);
+            TV_Tests->FullCollapse();
+        }
+
+        // A selected node that's now hidden passes the selection to the top-level node above it, which the
+        // detail pane was found not to follow on its own.
+        UpdateDetail();
+    });
+}
+//---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Act_CommandLineOptionsExecute(TObject* /*Sender*/)
 {
     RunGuarded("Command Line Options", []()
@@ -330,6 +345,20 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_ExitExecute(TObject* /*Sender*/)
     RunGuarded("Exit", [this]()
     {
         Close();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ExpandAllExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Expand All", [this]()
+    {
+        {
+            TTreeUpdateScope const updating(TV_Tests->Items);
+            TV_Tests->FullExpand();
+        }
+
+        if (TV_Tests->Selected != nullptr)
+            TV_Tests->Selected->MakeVisible();
     });
 }
 //---------------------------------------------------------------------------
@@ -631,6 +660,10 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
 
     RefreshAllNodeImages();
     SyncTreeChecks();
+
+    // e.g. while the filter hides every test.
+    Act_CollapseAll->Enabled = (TV_Tests->Items->Count > 0);
+    Act_ExpandAll->Enabled = (TV_Tests->Items->Count > 0);
 
     if (TV_Tests->Items->Count > 0)
         TV_Tests->Items->GetFirstNode()->MakeVisible();
