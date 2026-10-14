@@ -378,6 +378,11 @@ Tests run on the main (VCL) thread, so a test can create forms and controls.
 `--test-timeout-seconds` runs each test on a worker thread instead, so it can't be combined with
 tests like that; the log says so when it's given.
 
+A run that a test's timeout or crash abandoned leaves **Run Selected** and **Run Failed** disabled
+until the GUI is restarted, since the timed-out test may still be running, and a crash may have left
+the tests' state corrupted. Closing the window then ends the process without destroying the test
+groups, as the console runner does.
+
 The GUI takes the same [command line options](#command-line-options) as the console runner, with
 these differences:
 

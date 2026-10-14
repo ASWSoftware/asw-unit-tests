@@ -249,6 +249,7 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_CloseAfterRun(false),
       m_KeepSelection(false),
       m_LastRunExitCode(ExitCode_Success),
+      m_RunAborted(false),
       m_RunFinishedCount(0),
       m_Running(false),
       m_RunTotalCount(0),
@@ -1062,7 +1063,7 @@ void TFormASWUnitTestsGUIMain::RunGuarded(char const* where, std::function<void(
 */
 void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string const& filterDescription)
 {
-    if (m_Running)
+    if (m_Running || m_RunAborted)
         return;
 
     m_TestList.ResetResults();
@@ -1093,12 +1094,16 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
             m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
         m_Observer.Flush();
 
+        // A timed-out test's abandoned thread may still be running one of the groups' tests, and a crash may have
+        // left their state corrupted, so nothing runs again until the GUI is restarted (see WasRunAborted()).
+        m_RunAborted = results.TimedOut || results.Crashed;
+
         if (results.Stopped)
             m_StatusMessage = "Stopped before every test ran.";
         else if (results.TimedOut)
-            m_StatusMessage = "A test timed out, so the rest of the run was abandoned.";
+            m_StatusMessage = "A test timed out, so the rest of the run was abandoned. Restart to run tests again.";
         else if (results.Crashed)
-            m_StatusMessage = "A test crashed, so the rest of the run was abandoned.";
+            m_StatusMessage = "A test crashed, so the rest of the run was abandoned. Restart to run tests again.";
         else
             m_StatusMessage = "Done.";
 
@@ -1212,8 +1217,9 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     Act_CommandLineOptions->Enabled = !running;
     Act_ExportJUnitReport->Enabled = !running && m_LastRunJUnitTestCases.has_value();
 
-    Act_RunFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_RunSelected->Enabled = !running;
+    // Nor once a run has been aborted; see RunTests().
+    Act_RunFailed->Enabled = !running && !m_RunAborted && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
+    Act_RunSelected->Enabled = !running && !m_RunAborted;
     Act_SelectAll->Enabled = !running;
     Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_SelectNone->Enabled = !running;
@@ -1553,6 +1559,11 @@ void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)
     // The test's own image, then those of its group and the suites holding it, whose status depends on it.
     for (TTreeNode* node = testNode; node != nullptr; node = node->Parent)
         SetNodeImage(node);
+}
+//---------------------------------------------------------------------------
+bool TFormASWUnitTestsGUIMain::WasRunAborted() const
+{
+    return m_RunAborted;
 }
 //---------------------------------------------------------------------------
 /*

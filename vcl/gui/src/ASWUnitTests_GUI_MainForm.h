@@ -174,6 +174,9 @@ private: // User declarations
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
     // finishes, and after a run an unhandled exception ended, which has no report, as in the console runner.
     std::optional<std::vector<ASWUnitTests::TJUnitTestCase> > m_LastRunJUnitTestCases;
+    // Set when a run ends with a test that timed out or crashed, after which no further run can start; see
+    // WasRunAborted().
+    bool m_RunAborted;
     std::optional<std::chrono::steady_clock::time_point> m_RunEnd;
     size_t m_RunFinishedCount;
     bool m_Running;
@@ -260,6 +263,10 @@ public: // User declarations
     int ExitCode() const;
     // Loads the registered tests and applies 'options' (see WinMain()). Call once, right after creating the form.
     void Start(ASWUnitTests::TGUIOptions const& options);
+    // True once a run has ended with a test that timed out or crashed. A timed-out test's abandoned thread may then
+    // still be running, using its group, so WinMain() ends the process without destroying the groups, as the console
+    // runner does.
+    bool WasRunAborted() const;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TFormASWUnitTestsGUIMain* FormASWUnitTestsGUIMain;

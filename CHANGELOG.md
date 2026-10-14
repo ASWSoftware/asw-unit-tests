@@ -97,6 +97,11 @@ versioned baseline.
   run's totals. Once a test is abandoned, none of that reaches the results, the log or a run
   observer any more. A test that has already begun recording its outcome when the timeout comes
   counts as finished in time, rather than also being reported as timed out.
+- After a run in the VCL GUI runner ended with a test that timed out or crashed, Run Selected and
+  Run Failed could start another run, rerunning groups the timed-out test could still be using, and
+  closing the window destroyed the test groups while it might still be running. Both are now
+  disabled until the GUI is restarted, as the status bar says, and closing the window ends the
+  process without destroying the groups, as the console runner does.
 
 ## [1.3.0] - 2026-10-11
 
