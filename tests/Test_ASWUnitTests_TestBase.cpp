@@ -25,6 +25,7 @@ limitations under the License.
 #include "Test_ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -160,6 +161,27 @@ public:
         EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
         ++StopRequestedCalls;
         return FinishedRecords.size() >= StopAfterFinishedCount;
+    }
+};
+
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TSlowFinishObserver
+//
+// A TRecordingObserver that takes 1.5 seconds over a test's "Finished test" log line, which a test logs while
+// recording its outcome, so a one second timeout fires during that, for
+// Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished below.
+/////////////////////////////////////////////////////////////////////////////
+class TSlowFinishObserver : public TRecordingObserver
+{
+public:
+    void OnLog(std::string const& text) override
+    {
+        TRecordingObserver::OnLog(text);
+
+        if (text.find("Finished test") != std::string::npos)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
 };
 
@@ -2379,6 +2401,56 @@ void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUint64Max_Passe
 void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Passes()
 {
     CheckNotEquals(-1, std::numeric_limits<unsigned int>::max(), __func__, __LINE__, "-1 must not wrap around");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_LateFinish
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that sleeps past a one second
+// timeout, then fails a Check, logs a line and ends, followed by one that must never run. Logging is left on, for a
+// run observer to collect. Used by Test_Run_IgnoresTestThatEndsAfterItsTimeout below to prove an abandoned test that
+// ends after all changes neither the results nor the log.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_LateFinish : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_EndsJustAfterTimeout();
+    void Test_NeverRuns();
+
+public:
+    std::atomic<bool> Ended{ false }; // Set as the first test ends, after its Check failure and its log line.
+
+public:
+    TFixture_LateFinish();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_LateFinish::TFixture_LateFinish()
+    : inherited("Fixture_LateFinish")
+{
+    // Registration order matters: the late test must run first, so the other is still pending at the timeout.
+    RegisterTest(&TFixture_LateFinish::Test_EndsJustAfterTimeout, "EndsJustAfterTimeout");
+    RegisterTest(&TFixture_LateFinish::Test_NeverRuns, "NeverRuns");
+}
+//---------------------------------------------------------------------------
+void TFixture_LateFinish::Test_EndsJustAfterTimeout()
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(1300));
+    CheckTrue(false, __func__, __LINE__, "late Check failure");
+    Log("late log line");
+    Ended = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_LateFinish::Test_NeverRuns()
+{
 }
 //---------------------------------------------------------------------------
 
@@ -6385,8 +6457,12 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished,
+        "Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
         "Run_EndsRunOnSetUpOrTearDownTestException");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout,
+        "Run_IgnoresTestThatEndsAfterItsTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
         "Run_RecordsCheckFailuresInFailedTestDetail");
@@ -7683,6 +7759,35 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
     CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished()
+{
+    // Arrange
+    // Static, not locals: were the test abandoned after all (the failure this checks for), its worker thread would
+    // still use both after Run() returns.
+    static TFixture_ShortTest fixture;
+    static TSlowFinishObserver observer;
+    fixture.SetRunObserver(&observer);
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // Its "Finished test" line takes 1.5 seconds to log.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Assert
+    CheckFalse(timedOutThrown, __func__, __LINE__, "a test recording its outcome when the timeout comes isn't abandoned");
+
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__, "one record, the test's own");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "it passed, as it finished in time");
+    CheckEquals(0u, results.FailedCount, __func__, __LINE__, "and nothing failed");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException()
 {
     // Unlike an unexpected exception from a test itself, one from SetUp_Test() or TearDown_Test() still escapes
@@ -7723,6 +7828,54 @@ void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException
         CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__,
             scenario.ExpectedMessage + ": the test counts as failed");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout()
+{
+    // Arrange
+    // Static, not locals: the abandoned test's worker thread still uses both after Run() returns.
+    static TFixture_LateFinish fixture;
+    static TRecordingObserver observer;
+    fixture.Ended = false;
+    fixture.SetRunObserver(&observer);
+    size_t const logStart = observer.LogText().size();
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // 1 second timeout; the test ends 0.3 seconds later.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Waits for the abandoned test to end, then a little longer for its thread to try recording its outcome.
+    std::chrono::steady_clock::time_point const waitStart = std::chrono::steady_clock::now();
+    while (!fixture.Ended && std::chrono::steady_clock::now() - waitStart < std::chrono::seconds(10))
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Assert
+    AssertTrue(timedOutThrown, __func__, __LINE__, "Run() throws TExceptTestTimedOut once the timeout is exceeded");
+    AssertTrue(fixture.Ended, __func__, __LINE__, "the abandoned test ended after all");
+
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__,
+        "only the timeout's record, none from the test ending later");
+    CheckEquals(1u, results.FailedCount, __func__, __LINE__, "the timeout counts as the one failure");
+    CheckEquals(0u, results.SuccessCount, __func__, __LINE__, "nothing passed");
+
+    for (std::string const& message : results.Messages)
+        CheckNotContains(message, "late Check failure", __func__, __LINE__, "the late Check failure isn't recorded");
+
+    std::string const log = observer.LogText().substr(logStart);
+    CheckContains(log, "!!TIMEOUT!!", __func__, __LINE__, "the timeout is logged");
+    CheckNotContains(log, "late Check failure", __func__, __LINE__, "the late Check failure isn't logged");
+    CheckNotContains(log, "late log line", __func__, __LINE__, "nor the test's own late log line");
+    CheckNotContains(log, "Finished test", __func__, __LINE__, "nor a \"Finished test\" line for it");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()

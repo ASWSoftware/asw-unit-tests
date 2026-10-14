@@ -56,6 +56,18 @@ limitations under the License.
 namespace
 {
 
+// What a test's worker thread (see TTestGroupBase::RunWithTimeout()) shares with the thread waiting for it. Only
+// read or changed while holding 'Group''s m_RecordingMutex.
+struct TWorkerState
+{
+    ASWUnitTests::TTestGroupBase const* Group = nullptr; // The group whose test the worker runs.
+    bool Abandoned = false; // Set when the test timed out: the worker must leave the results and the log alone.
+    bool RecordingOutcome = false; // Set once the test records its outcome, after which it can't be abandoned.
+};
+
+// The worker state of the test this thread runs, or nullptr on a thread that isn't a test's worker.
+thread_local TWorkerState* t_WorkerState = nullptr;
+
 // Returns 'str' for display in a failure message, or "(null)" when it's nullptr.
 std::string CStringDisplayText(char const* str)
 {
@@ -1194,6 +1206,25 @@ void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int lin
         throw TExceptTrue(method, line, msg);
 }
 //---------------------------------------------------------------------------
+bool TTestGroupBase::BeginRecording(std::unique_lock<std::recursive_mutex>& lock)
+{
+    if (!lock.owns_lock())
+        lock = std::unique_lock<std::recursive_mutex>(m_RecordingMutex);
+
+    return t_WorkerState == nullptr || t_WorkerState->Group != this || !t_WorkerState->Abandoned;
+}
+//---------------------------------------------------------------------------
+bool TTestGroupBase::BeginRecordingOutcome(std::unique_lock<std::recursive_mutex>& lock)
+{
+    if (!BeginRecording(lock))
+        return false;
+
+    if (t_WorkerState != nullptr && t_WorkerState->Group == this)
+        t_WorkerState->RecordingOutcome = true;
+
+    return true;
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckContains(std::string const& text, std::string const& substring,
     std::string const& method, int line, std::string const& msg)
 {
@@ -2186,6 +2217,10 @@ void TTestGroupBase::Log(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
+    std::unique_lock<std::recursive_mutex> lock;
+    if (!BeginRecording(lock))
+        return;
+
     if (m_RunObserver != nullptr)
     {
         m_RunObserver->OnLog(msg + "\n");
@@ -2198,6 +2233,10 @@ void TTestGroupBase::Log(std::string const& msg)
 void TTestGroupBase::LogAppend(std::string const& msg)
 {
     if (m_LogSuppressed)
+        return;
+
+    std::unique_lock<std::recursive_mutex> lock;
+    if (!BeginRecording(lock))
         return;
 
     if (m_RunObserver != nullptr)
@@ -2322,6 +2361,11 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     std::string const detail = "Test crashed: " + description + ".";
     std::string const tag = "***Test failed";
     std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
+
+    // On a worker thread, a crash that comes after its test timed out is ignored, like the rest of what it does then.
+    std::unique_lock<std::recursive_mutex> lock;
+    if (!BeginRecordingOutcome(lock))
+        return;
 
     m_Results.FailedCount++;
     m_Results.Messages.push_back(plainMsg);
@@ -2505,7 +2549,10 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
 
     Otherwise, runs it on a worker thread and waits on it with a timeout. The worker thread is the
     only one that ever touches 'testCase' or this group's members while it's running, so there's no
-    data race with the waiting thread here. If it finishes in time, whatever it threw (if anything)
+    data race with the waiting thread here. Once the test has been abandoned (below), the worker
+    records nothing more and logs nothing more, should it end after all (see BeginRecording()); a
+    test that had begun recording its outcome when the timeout came counts as finished in time
+    instead. If it finishes in time, whatever it threw (if anything)
     is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
     directly. The one exception, with ASWUNITTESTS_RTL_EXCEPTIONS enabled: an RTL exception arrives
     as a TExceptRTLException carrying its description and class (see the worker's catch). If it
@@ -2526,9 +2573,14 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     // function has returned or thrown, and would otherwise write to a promise whose stack storage no longer exists.
     std::shared_ptr<std::promise<void> > done = std::make_shared<std::promise<void> >();
     std::future<void> future = done->get_future();
+    // Held by shared_ptr for the same reason: the worker reads it, through t_WorkerState, for as long as it runs.
+    std::shared_ptr<TWorkerState> const state = std::make_shared<TWorkerState>();
+    state->Group = this;
 
-    std::thread worker([this, &testCase, done, catchCrashes]()
+    std::thread worker([this, &testCase, done, state, catchCrashes]()
             {
+        t_WorkerState = state.get();
+
         try
         {
             RunCatchingCrashes(testCase, catchCrashes);
@@ -2551,8 +2603,17 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
 
     if (future.wait_for(std::chrono::seconds(*testTimeoutSeconds)) == std::future_status::timeout)
     {
-        worker.detach();
-        ReportTimedOutTest(testCase, *testTimeoutSeconds);
+        // Waits for a Check failure or a log line the worker is recording, then abandons the test, unless it has
+        // begun recording its outcome, in which case it counts as finished in time and is waited for below.
+        std::unique_lock<std::recursive_mutex> lock(m_RecordingMutex);
+        if (!state->RecordingOutcome)
+        {
+            state->Abandoned = true;
+            lock.unlock();
+
+            worker.detach();
+            ReportTimedOutTest(testCase, *testTimeoutSeconds);
+        }
     }
 
     worker.join();
@@ -2593,6 +2654,10 @@ void TTestGroupBase::SetSuitePath(std::string const& suitePath)
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
 {
+    std::unique_lock<std::recursive_mutex> lock;
+    if (!BeginRecording(lock))
+        return;
+
     m_TestFailedCheck = true;
 
     std::string const checkFailure = "Check failed for: \"" + method + "\" (" + std::to_string(line) + "): " + msg;
@@ -2760,6 +2825,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
     // isn't the test's own, so it's never taken for the one the test expects.
     bool setUpOrTearDownThrew = false;
 
+    // Held from when the test, its SetUp_Test() and its TearDown_Test() are over until Test() returns or throws, while
+    // the outcome is recorded. On a worker thread whose test has timed out (see RunWithTimeout()), nothing is recorded:
+    // Test() just returns, even for a fatal exception.
+    std::unique_lock<std::recursive_mutex> outcomeLock;
+
     auto tearDown = [&]()
         {
             try
@@ -2811,6 +2881,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
             tearDown();
         }
 
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         // Check for failures (for 'Exception expected' and 'Check' cases)
         if (m_ExceptionExpected)
         {
@@ -2822,11 +2895,17 @@ void TTestGroupBase::Test(ITestCase& testCase)
     }
     catch (TExceptSkipped const& ex)
     {
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         m_Results.SkippedCount++;
         finish(TTestOutcome::Skip, "skipped", ex.what());
     }
     catch (TTestException const& ex)
     {
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         // This framework's own failure signal (an Assert* failure, or TExceptExpected when an expected exception
         // never came), never the exception a test is waiting for, so it fails the test even while an exception
         // is expected, without checking the type or message the test asked for.
@@ -2835,6 +2914,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
     }
     catch (std::exception const& ex)
     {
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         if (m_ExceptionExpected)
         {
             // A type/message check is only requested via the templated SetExceptionExpected<TException>()
@@ -2857,6 +2939,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     catch (System::Sysutils::Exception& ex)
     {
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         if (m_ExceptionExpected)
         {
             // Mirrors the std::exception case above: a requested std::exception type never matches here.
@@ -2877,6 +2962,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
 #endif
     catch (...)
     {
+        if (!BeginRecordingOutcome(outcomeLock))
+            return;
+
         if (m_ExceptionExpected)
         {
             if (ExceptionTypeExpected())

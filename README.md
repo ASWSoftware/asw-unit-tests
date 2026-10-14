@@ -238,11 +238,10 @@ there: no further tests or groups run, and the process exits with a dedicated ex
 distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the report still
 gets written, covering every test that completed before the timeout, plus the timed-out test's own
 synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped,
-since there is no safe, portable way to interrupt a thread that may be stuck in an infinite loop; if
-a test finishes only moments after being abandoned rather than truly hanging forever, its outcome
-may be recorded inconsistently, since nothing synchronizes it with the timeout-handling thread at
-that point. In practice this only matters for a "barely" timed-out test, not a genuinely hung one,
-and the process exits immediately afterward regardless.
+since there is no safe, portable way to interrupt a thread that may be stuck in an infinite loop. If
+the test ends after all, moments later, its Check failures, its `Log()` lines and its outcome from
+then on never reach the results, the log or a run observer. A test that has already begun recording
+its outcome when the timeout comes counts as finished in time instead.
 
 `--catch-crashes` guards against a single test crashing (e.g. dereferencing a null pointer) and
 taking down the whole process with it. There is no default; without it, a crashing test still

@@ -91,6 +91,12 @@ versioned baseline.
   showing it as `(null)`, and its `Not` form passes. A C string compared with a `std::string` is
   still converted to one, so a null one is still undefined behavior there, and in RTL builds one
   compared with a `System::String` is still empty text.
+- With `--test-timeout-seconds`, a test that ended just after its timeout still recorded its Check
+  failures and its outcome in its group's results, while the run was already reporting them (a data
+  race, which could corrupt them), and logged its `Log()` lines and a "Finished test" line after the
+  run's totals. Once a test is abandoned, none of that reaches the results, the log or a run
+  observer any more. A test that has already begun recording its outcome when the timeout comes
+  counts as finished in time, rather than also being reported as timed out.
 
 ## [1.3.0] - 2026-10-11
 

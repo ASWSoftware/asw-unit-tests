@@ -36,6 +36,7 @@ limitations under the License.
 #include <functional>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -350,6 +351,14 @@ private:
             throw TExceptOrdering(method, line, texts.first, OrderingSymbol(ordering), texts.second, msg);
         }
     }
+
+    // Locks m_RecordingMutex in 'lock', for a change to this group's results or log, and returns true, unless the
+    // calling thread runs a test of this group that timed out and was abandoned (see RunWithTimeout()), which must
+    // leave both alone; it then returns false, with 'lock' still locked.
+    bool BeginRecording(std::unique_lock<std::recursive_mutex>& lock);
+    // The same, for recording a test's outcome, after which a test running on a worker thread counts as finished in
+    // time, however long its thread then takes to end.
+    bool BeginRecordingOutcome(std::unique_lock<std::recursive_mutex>& lock);
 
     // Runs 'callable' for the Throws/NoThrow methods and returns a description of what it threw (see
     // DescribeException()), or nullopt when it threw nothing. A failure signal from this framework (a TTestException,
@@ -711,6 +720,9 @@ protected:
 #endif
     std::string m_Name;
     std::string m_QualifiedName; // See GetQualifiedTestGroupName().
+    // Held while a test records a result or logs, and while RunWithTimeout() decides to abandon a test that timed out,
+    // so an abandoned test can't change the results or the log; see BeginRecording().
+    std::recursive_mutex m_RecordingMutex;
     TTestResults m_Results;
     ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
     std::string m_SuitePath;
