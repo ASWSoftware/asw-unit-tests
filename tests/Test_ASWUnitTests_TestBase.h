@@ -84,6 +84,7 @@ private: // Test methods
     void Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout();
     void Test_Run_ReportsTimedOutTestToRunObserver();
     void Test_Run_ResetsResultsBetweenRuns();
+    void Test_Run_SendsLogToRunObserverWithoutColor();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
     void Test_Run_StopsWhenRunObserverRequests();
     void Test_Same_ComparesAddressesNotContent();

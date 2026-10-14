@@ -46,6 +46,8 @@ versioned baseline.
   unchecks every test in it, including those in the suites inside it, its status image and detail
   pane sum up those tests like a group's, and it's shown only while the filter box leaves some of
   its tests visible.
+- `TConsole::StripColor()`, which removes the ANSI color codes `TConsole::Colorize()` adds, and
+  `TConsole::GetColorMode()`, which returns the mode `TConsole::SetColorMode()` set.
 
 ### Changed
 
@@ -71,6 +73,11 @@ versioned baseline.
   `TTestGroupRegistry::Register()` takes the class name as a new last parameter, which the
   registration macros pass, and `TRegisteredTestGroupFactory` gains a `ClassName` member, which
   defaults to empty as `SuitePath` does.
+- A run observer's `OnLog()` now always gets plain text. It used to get the console's ANSI color
+  codes whenever color was enabled, e.g. with `--color always`, or in auto mode in a terminal, so an
+  observer that showed the log had to call `TConsole::SetColorMode(TColorMode::Never)` first, as the
+  VCL GUI runner did. Only the console gets color now, whatever the color mode, and an observer
+  that removed the codes itself still works.
 
 ### Fixed
 

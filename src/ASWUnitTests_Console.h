@@ -97,6 +97,7 @@ enum class TLogKind
 class TConsole
 {
 public:
+    static TColorMode GetColorMode();
     static void SetColorMode(TColorMode mode);
     static void SetColor(TLogKind kind, TConsoleColor color);
     static bool IsColorEnabled();
@@ -108,6 +109,10 @@ public:
     // Parses a color name (e.g. "red", "bright-green") as accepted by --color-pass/--color-fail/
     // --color-skip; returns std::nullopt if 'name' isn't recognized.
     static std::optional<TConsoleColor> ParseColorName(std::string const& name);
+
+    // Returns 'text' without the ANSI color sequences Colorize() adds (ESC '[', digits and ';', then 'm'), as a
+    // run observer gets the log. Any other text, an incomplete sequence included, is left as it is.
+    static std::string StripColor(std::string const& text);
 };
 
 } // namespace ASWUnitTests

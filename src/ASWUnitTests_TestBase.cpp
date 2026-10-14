@@ -2223,7 +2223,7 @@ void TTestGroupBase::Log(std::string const& msg)
 
     if (m_RunObserver != nullptr)
     {
-        m_RunObserver->OnLog(msg + "\n");
+        m_RunObserver->OnLog(TConsole::StripColor(msg) + "\n");
         return;
     }
 
@@ -2241,7 +2241,7 @@ void TTestGroupBase::LogAppend(std::string const& msg)
 
     if (m_RunObserver != nullptr)
     {
-        m_RunObserver->OnLog(msg);
+        m_RunObserver->OnLog(TConsole::StripColor(msg));
         return;
     }
 

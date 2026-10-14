@@ -426,8 +426,8 @@ starts the main form.
 
 The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
 `TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
-`std::cout`, is told as each test starts and finishes, and can stop a run between tests, so it can
-drive other kinds of runners too.
+`std::cout`, as plain text without the console's color codes, is told as each test starts and
+finishes, and can stop a run between tests, so it can drive other kinds of runners too.
 
 ## Registering Tests
 

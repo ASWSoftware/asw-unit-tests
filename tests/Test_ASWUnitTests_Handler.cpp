@@ -33,6 +33,7 @@ limitations under the License.
 #include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_StdOutRedirect.h"
@@ -278,6 +279,8 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
         "Run_ShuffleKeepsOrderWhenFiltered");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
         "SetRunObserver_ReceivesInitializeAndRunOutput");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesLogWithoutColor,
+        "SetRunObserver_ReceivesLogWithoutColor");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups, "SetRunObserver_StopsBetweenGroups");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_KeepsSuitesTogether,
         "ShuffledGroupOrder_KeepsSuitesTogether");
@@ -666,6 +669,26 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOut
     CheckContains(observer.LogText, "Tests done", __func__, __LINE__, "and so did Run()'s own summary");
     CheckEmpty(consoleOutput, __func__, __LINE__, "none of it went to std::cout");
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesLogWithoutColor()
+{
+    // Arrange
+    TTestHandler handler;
+    TRecordingObserver observer;
+    handler.SetRunObserver(&observer);
+    TColorMode const savedMode = TConsole::GetColorMode();
+    TConsole::SetColorMode(TColorMode::Always); // So the console would get color codes.
+
+    // Act
+    handler.Initialize("ObserverTestProject");
+    handler.Run(WildcardMatchTestsFilter(false), "WildcardMatch_* tests only");
+    TConsole::SetColorMode(savedMode);
+
+    // Assert
+    CheckContains(observer.LogText, "Done. Succeeded: 3", __func__, __LINE__, "the group's colored totals are logged");
+    CheckContains(observer.LogText, "Totals: succeeded: 3", __func__, __LINE__, "and so are the run's");
+    CheckTrue(observer.LogText.find('\x1b') == std::string::npos, __func__, __LINE__, "with no color codes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups()

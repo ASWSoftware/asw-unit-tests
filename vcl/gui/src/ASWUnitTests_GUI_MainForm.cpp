@@ -44,7 +44,6 @@ limitations under the License.
 #include <Vcl.Clipbrd.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
-#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
@@ -1253,9 +1252,6 @@ void TFormASWUnitTestsGUIMain::ShowShuffleState()
 void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
 {
     m_Options = options;
-
-    // The GUI shows the framework's log output as plain text, so it must never contain ANSI color codes.
-    TConsole::SetColorMode(TColorMode::Never);
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {

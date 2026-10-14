@@ -160,7 +160,8 @@ class ITestRunObserver
 public:
     virtual ~ITestRunObserver() = default;
 
-    // Receives the text that would otherwise be written to std::cout, including any line break.
+    // Receives the text that would otherwise be written to std::cout, including any line break, as plain text: without
+    // the ANSI color codes the console gets, whatever the color mode (see TConsole::StripColor()).
     virtual void OnLog(std::string const& text) = 0;
     // Called once for every test that records an outcome, including the failure recorded for a test that
     // timed out, crashed, or threw an exception it didn't expect, or whose group's SetUp_Group() threw (which

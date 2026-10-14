@@ -6481,6 +6481,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver,
         "Run_ReportsTimedOutTestToRunObserver");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns, "Run_ResetsResultsBetweenRuns");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_SendsLogToRunObserverWithoutColor,
+        "Run_SendsLogToRunObserverWithoutColor");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests,
@@ -7966,14 +7968,10 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsDurationOfShortTest()
     CheckGreaterThanOrEqual(results.CaseRecords.front().DurationSeconds, busyWaitSeconds, __func__, __LINE__,
         "the recorded duration includes the test's busy-wait");
 
-    // "passed" is wrapped in ANSI color codes when color is enabled, e.g. when stdout is an interactive terminal,
-    // so the expected text is colorized the same way.
     std::string const logText = observer.LogText();
-    std::string const passed = TConsole::Colorize("passed", TLogKind::Pass);
-    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - " + passed + " (", __func__, __LINE__,
+    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - passed (", __func__, __LINE__,
         "the test's timing line is logged");
-    CheckNotContains(logText, "- " + passed + " (0.000 ms)", __func__, __LINE__,
-        "and doesn't show it as taking no time");
+    CheckNotContains(logText, "- passed (0.000 ms)", __func__, __LINE__, "and doesn't show it as taking no time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
@@ -8203,6 +8201,26 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns()
         "the second run's messages don't include the first run's");
     CheckEquals(firstRun.CaseRecords.size(), secondRun.CaseRecords.size(), __func__, __LINE__,
         "one record per test, not one per test per run");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_SendsLogToRunObserverWithoutColor()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, with a pass, failures and Check failures to log.
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    TColorMode const savedMode = TConsole::GetColorMode();
+    TConsole::SetColorMode(TColorMode::Always); // So the console would get color codes.
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+    TConsole::SetColorMode(savedMode);
+
+    // Assert
+    std::string const logText = observer.LogText();
+    CheckContains(logText, "***Test failed: ", __func__, __LINE__, "a failure is logged");
+    CheckContains(logText, " - passed (", __func__, __LINE__, "and a pass");
+    CheckTrue(logText.find('\x1b') == std::string::npos, __func__, __LINE__, "with no color codes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder()
