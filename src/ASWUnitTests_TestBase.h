@@ -80,6 +80,11 @@ enum class TTestOutcome
 // Deliberately format-agnostic (no ANSI color codes, no XML/JSON, etc.), so a
 // caller can build a structured report from it without TTestResults itself
 // depending on any particular report format.
+//
+// GroupName is the group's qualified name (see
+// ITestGroup::GetQualifiedTestGroupName()), which is just the group's own
+// name when it isn't in a suite. SuitePath is the suite part on its own, so
+// a caller can split the two even when a name contains '.'.
 /////////////////////////////////////////////////////////////////////////////
 struct TTestCaseRecord
 {
@@ -88,6 +93,9 @@ struct TTestCaseRecord
     double DurationSeconds;
     TTestOutcome Outcome;
     std::string Message; // Failure/skip detail; empty for Pass.
+    // Empty when the group isn't in a suite. Defaulted, so a brace initializer written before this member existed
+    // still compiles without a -Wmissing-field-initializers warning.
+    std::string SuitePath = std::string();
 };
 
 
@@ -122,8 +130,9 @@ public:
 /////////////////////////////////////////////////////////////////////////////
 // TestFilter
 //
-// A predicate matched against each test's "GroupName.TestName" full name.
-// An empty (default-constructed) TestFilter means "run everything." Used
+// A predicate matched against each test's "GroupName.TestName" full name,
+// where GroupName is the group's qualified name (see
+// ITestGroup::GetQualifiedTestGroupName()). An empty (default-constructed) TestFilter means "run everything." Used
 // by TTestHandler::Run() and ITestGroup::Run() to support CLI filtering
 // (see main.cpp's --filter option) without either needing to know how the
 // pattern itself is matched.
@@ -156,6 +165,7 @@ public:
     // timed out, crashed, or threw an exception it didn't expect. Not called for a test whose SetUp_Test() or
     // TearDown_Test() threw, since that exception escapes TTestHandler::Run().
     virtual void OnTestFinished(TTestCaseRecord const& record) = 0;
+    // 'groupName' is the group's qualified name, as in TTestCaseRecord::GroupName.
     virtual void OnTestStarted(std::string const& groupName, std::string const& testName) = 0;
     // Checked before each test and each group. Returning true ends the run there, with the returned
     // TTestResults::Stopped set; a test that's already running is never interrupted.
@@ -212,6 +222,33 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TSuitePath
+//
+// The suite a test group belongs to, given to the TTestGroupBase (or
+// TAutoTestGroup) constructor, e.g. TSuitePath("Framework.Console") for
+// suite "Console" inside suite "Framework". Suites only organize groups:
+// they have no set-up or tear-down of their own, a suite's groups run
+// together, and the suite path prefixes each of its tests' full names, so
+// --filter "Framework.*" selects every test in suite "Framework". An empty
+// path means the group isn't in a suite. Throws TExceptInvalidSuitePath if
+// any suite name is empty, e.g. "Framework..Console" or ".Framework".
+/////////////////////////////////////////////////////////////////////////////
+class TSuitePath
+{
+private:
+    std::string m_Path;
+    std::vector<std::string> m_Names;
+
+public:
+    explicit TSuitePath(std::string const& path);
+
+    // The suite names in order, outermost first; empty for an empty path.
+    std::vector<std::string> const& GetNames() const;
+    std::string const& GetPath() const;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // ITestGroup
 //
 // Interface for a test group.
@@ -224,6 +261,17 @@ public:
 public:
     virtual ~ITestGroup()
     {
+    }
+
+    // GetTestGroupName(), prefixed by GetSuitePath() and a '.' when the group is in a suite, e.g.
+    // "Framework.Console.TTest_TConsole". Identifies the group in its tests' full names, records and reports.
+    std::string GetQualifiedTestGroupName() const;
+    // The suite this group belongs to, e.g. "Framework.Console" (see TSuitePath); empty when it isn't in one.
+    // Not pure, so an ITestGroup implementation that predates suites still works, outside any suite.
+    virtual std::string const& GetSuitePath() const
+    {
+        static std::string const noSuitePath;
+        return noSuitePath;
     }
 
     virtual TestCallbackList& GetTestCallbackList() = 0;
@@ -656,8 +704,10 @@ protected:
     std::function<bool (System::Sysutils::Exception&)> m_ExpectedRTLExceptionTypeChecker;
 #endif
     std::string m_Name;
+    std::string m_QualifiedName; // See GetQualifiedTestGroupName().
     TTestResults m_Results;
     ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.
+    std::string m_SuitePath;
     TestCallbackList m_TestCallbacks;
 
     // True when the current test's exception expectation (see SetExceptionExpected<TException>()) also
@@ -2197,7 +2247,10 @@ protected: // Assertion/Check methods - std::source_location
 
 public:
     TTestGroupBase(std::string const& name);
+    // For a group in a suite, e.g. inherited(TSuitePath("Framework.Console"), "TTest_TConsole").
+    TTestGroupBase(TSuitePath const& suitePath, std::string const& name);
 
+    std::string const& GetSuitePath() const override;
     TestCallbackList& GetTestCallbackList() override;
     std::string const& GetTestGroupName() const override;
     TTestResults const& Results() const override;
@@ -2256,7 +2309,13 @@ private:
 
 protected:
     explicit TAutoTestGroup(std::string const& name)
-        : inherited(name)
+        : TAutoTestGroup(TSuitePath(std::string()), name)
+    {
+    }
+
+    // For a group in a suite; see TTestGroupBase's matching constructor.
+    TAutoTestGroup(TSuitePath const& suitePath, std::string const& name)
+        : inherited(suitePath, name)
     {
         std::vector<TAutoTest> tests = AutoTests();
 

@@ -31,6 +31,7 @@ limitations under the License.
 #include <algorithm>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -61,19 +62,41 @@ using namespace ASWUnitTests;
 TColor const FailureColor = static_cast<TColor>(RGB(200, 0, 0));
 TColor const SkipColor = static_cast<TColor>(RGB(190, 120, 0));
 
+// What a test tree node stands for. A node's Data holds its kind and an index (see NodeData()): a suite
+// node's into TGUITestList::SuitePaths(), a group node's into its GroupNames(), and a test node's into the
+// list itself.
+enum class TNodeKind
+{
+    Suite,
+    Group,
+    Test,
+};
+
+TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
 size_t DataToIndex(void* data);
 std::string FirstLine(std::string const& text);
 std::string FormatSeconds(double seconds);
 void* IndexToData(size_t index);
 TColor LogLineColor(std::string const& line);
 std::vector<TRect> MonitorWorkAreas();
+void* NodeData(TNodeKind kind, size_t index);
+size_t NodeIndex(void* data);
+TNodeKind NodeKind(void* data);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// A tree node's Data holds an index: a test node's, into TGUITestList; a group node's, into its GroupNames().
-// The node's Level tells which (0 for a group).
+// Adds a node as the last child of 'parent', or as the last top-level node when 'parent' is nullptr.
+TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data)
+{
+    if (parent == nullptr)
+        return nodes->AddObject(nullptr, FromUTF8(text), data);
+
+    return nodes->AddChildObject(parent, FromUTF8(text), data);
+}
+//---------------------------------------------------------------------------
+// A Failures & Skips list item's Data holds its test's index into TGUITestList.
 size_t DataToIndex(void* data)
 {
     return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data));
@@ -121,6 +144,22 @@ std::vector<TRect> MonitorWorkAreas()
         workAreas.push_back(Screen->Monitors[i]->WorkareaRect);
 
     return workAreas;
+}
+//---------------------------------------------------------------------------
+// A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
+void* NodeData(TNodeKind kind, size_t index)
+{
+    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index) * 4 + static_cast<std::uintptr_t>(kind));
+}
+//---------------------------------------------------------------------------
+size_t NodeIndex(void* data)
+{
+    return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data) / 4);
+}
+//---------------------------------------------------------------------------
+TNodeKind NodeKind(void* data)
+{
+    return static_cast<TNodeKind>(reinterpret_cast<std::uintptr_t>(data) % 4);
 }
 //---------------------------------------------------------------------------
 TNodeCheckState ToNodeCheckState(TGUICheckState state)
@@ -530,7 +569,9 @@ void TFormASWUnitTestsGUIMain::ApplyPanelSizes(TGUILayout const& layout)
 /*
     TFormASWUnitTestsGUIMain::BuildTestTree
 
-    Rebuilds the tree from m_TestList: one node per group, in order, each with one child node per test.
+    Rebuilds the tree from m_TestList: one node per group, in order, each with one child node per test, and
+    one node per suite, holding the nodes of the groups and suites in it. A group's and a suite's node show
+    just its own name.
 */
 void TFormASWUnitTestsGUIMain::BuildTestTree()
 {
@@ -538,10 +579,30 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
         TTreeUpdateScope const updating(TV_Tests->Items);
 
         TV_Tests->Items->Clear();
-        m_GroupNodes.assign(m_TestList.GroupNames().size(), nullptr);
         m_TestNodes.assign(m_TestList.Count(), nullptr);
 
-        // Only visible tests get nodes, and a group only gets one if any of its tests are visible.
+        // By index into m_TestList.SuitePaths(). A suite's node, and those of the suites holding it, are added
+        // just before its first group's, so suites and groups keep m_TestList's order, where each suite's
+        // groups are together.
+        std::vector<TTreeNode*> suiteNodes(m_TestList.SuitePaths().size(), nullptr);
+        std::function<TTreeNode* (std::string const&)> suiteNode = [&](std::string const& suitePath) -> TTreeNode*
+            {
+                if (suitePath.empty())
+                    return nullptr;
+
+                size_t const suiteIndex = m_TestList.SuiteIndexOf(suitePath).value();
+
+                if (suiteNodes[suiteIndex] == nullptr)
+                {
+                    std::string const parentPath = ParentSuitePath(suitePath);
+                    suiteNodes[suiteIndex] = AddTreeNode(TV_Tests->Items, suiteNode(parentPath),
+                        NameInSuite(suitePath, parentPath), NodeData(TNodeKind::Suite, suiteIndex));
+                }
+
+                return suiteNodes[suiteIndex];
+            };
+
+        // Only visible tests get nodes, and a group or suite only gets one if any of its tests are visible.
         std::vector<std::string> const& groupNames = m_TestList.GroupNames();
         for (size_t groupIndex = 0; groupIndex < groupNames.size(); ++groupIndex)
         {
@@ -549,14 +610,14 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
             if (testIndexes.empty())
                 continue;
 
-            TTreeNode* const groupNode = TV_Tests->Items->AddObject(nullptr, FromUTF8(groupNames[groupIndex]),
-                IndexToData(groupIndex));
-            m_GroupNodes[groupIndex] = groupNode;
+            std::string const suitePath = m_TestList.GroupSuitePath(groupNames[groupIndex]);
+            TTreeNode* const groupNode = AddTreeNode(TV_Tests->Items, suiteNode(suitePath),
+                NameInSuite(groupNames[groupIndex], suitePath), NodeData(TNodeKind::Group, groupIndex));
 
             for (size_t testIndex : testIndexes)
             {
-                m_TestNodes[testIndex] = TV_Tests->Items->AddChildObject(groupNode,
-                    FromUTF8(m_TestList.Test(testIndex).TestName), IndexToData(testIndex));
+                m_TestNodes[testIndex] = AddTreeNode(TV_Tests->Items, groupNode, m_TestList.Test(testIndex).TestName,
+                    NodeData(TNodeKind::Test, testIndex));
             }
         }
 
@@ -675,7 +736,8 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
     {
         TTestId const& test = m_TestList.Test(*m_CurrentTestIndex);
         m_TestList.SetResult(*m_CurrentTestIndex, TTestCaseRecord{ test.GroupName, test.TestName, 0.0,
-                                                                   TTestOutcome::Fail, "Unhandled exception: " + description }, std::string());
+                                                                   TTestOutcome::Fail, "Unhandled exception: " + description,
+                                                                   test.SuitePath }, std::string());
         UpdateTestNodeImages(*m_CurrentTestIndex);
         AddFailureItem(*m_CurrentTestIndex);
         m_CurrentTestIndex.reset();
@@ -719,14 +781,6 @@ void __fastcall TFormASWUnitTestsGUIMain::FormCloseQuery(TObject* /*Sender*/, bo
         m_StatusMessage = "Closing after the current test...";
         UpdateStatusBar();
     });
-}
-//---------------------------------------------------------------------------
-TTreeNode* TFormASWUnitTestsGUIMain::GroupNode(size_t groupIndex)
-{
-    if (m_TreeNodesStale)
-        RebuildNodeCache();
-
-    return groupIndex < m_GroupNodes.size() ? m_GroupNodes[groupIndex] : nullptr;
 }
 //---------------------------------------------------------------------------
 /*
@@ -896,21 +950,19 @@ void TFormASWUnitTestsGUIMain::OnTestStarted(std::string const& groupName, std::
     TFormASWUnitTestsGUIMain::RebuildNodeCache
 
     A recreated window loads its nodes back from what the old one saved, each with the Data BuildTestTree()
-    gave it: a group node's index into m_TestList.GroupNames(), or a test node's into m_TestList. Reading
-    the nodes also creates the window, if it hasn't been yet, so it always sees the loaded ones.
+    gave it, which says whether it's a test node, and its index into m_TestList. Reading the nodes also
+    creates the window, if it hasn't been yet, so it always sees the loaded ones.
 */
 void TFormASWUnitTestsGUIMain::RebuildNodeCache()
 {
-    m_GroupNodes.assign(m_TestList.GroupNames().size(), nullptr);
     m_TestNodes.assign(m_TestList.Count(), nullptr);
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
     {
-        std::vector<TTreeNode*>& nodes = (node->Level == 0) ? m_GroupNodes : m_TestNodes;
-        size_t const index = DataToIndex(node->Data);
+        size_t const index = NodeIndex(node->Data);
 
-        if (index < nodes.size())
-            nodes[index] = node;
+        if (NodeKind(node->Data) == TNodeKind::Test && index < m_TestNodes.size())
+            m_TestNodes[index] = node;
     }
 
     m_TreeNodesStale = false;
@@ -920,28 +972,8 @@ void TFormASWUnitTestsGUIMain::RefreshAllNodeImages()
 {
     TTreeUpdateScope const updating(TV_Tests->Items);
 
-    std::vector<std::string> const& groupNames = m_TestList.GroupNames();
-    for (size_t groupIndex = 0; groupIndex < groupNames.size(); ++groupIndex)
-    {
-        TTreeNode* const node = GroupNode(groupIndex);
-        if (node == nullptr)
-            continue;
-
-        int const image = static_cast<int>(m_TestList.GroupStatus(groupNames[groupIndex]));
-        node->ImageIndex = image;
-        node->SelectedIndex = image;
-    }
-
-    for (size_t testIndex = 0; testIndex < m_TestList.Count(); ++testIndex)
-    {
-        TTreeNode* const node = TestNode(testIndex);
-        if (node == nullptr)
-            continue;
-
-        int const image = static_cast<int>(m_TestList.Status(testIndex));
-        node->ImageIndex = image;
-        node->SelectedIndex = image;
-    }
+    for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
+        SetNodeImage(node);
 }
 //---------------------------------------------------------------------------
 /*
@@ -1145,6 +1177,31 @@ void TFormASWUnitTestsGUIMain::SaveSelection()
     }
 }
 //---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
+{
+    size_t const index = NodeIndex(node->Data);
+    TGUITestStatus status = TGUITestStatus::NotRun;
+
+    switch (NodeKind(node->Data))
+    {
+        case TNodeKind::Suite:
+            status = m_TestList.SuiteStatus(m_TestList.SuitePaths()[index]);
+            break;
+
+        case TNodeKind::Group:
+            status = m_TestList.GroupStatus(m_TestList.GroupNames()[index]);
+            break;
+
+        case TNodeKind::Test:
+            status = m_TestList.Status(index);
+            break;
+    }
+
+    int const image = static_cast<int>(status);
+    node->ImageIndex = image;
+    node->SelectedIndex = image;
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetRunning(bool running)
 {
     m_Running = running;
@@ -1295,8 +1352,8 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
 /*
     TFormASWUnitTestsGUIMain::SyncTreeChecks
 
-    Sets every node's check box from m_TestList: a test's to whether it's checked, and a group's to whether
-    all, none, or only some of its tests are.
+    Sets every node's check box from m_TestList: a test's to whether it's checked, and a group's or suite's
+    to whether all, none, or only some of its tests are.
 */
 void TFormASWUnitTestsGUIMain::SyncTreeChecks()
 {
@@ -1304,12 +1361,22 @@ void TFormASWUnitTestsGUIMain::SyncTreeChecks()
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
     {
-        size_t const index = DataToIndex(node->Data);
+        size_t const index = NodeIndex(node->Data);
 
-        if (node->Level == 0)
-            node->CheckState = ToNodeCheckState(m_TestList.GroupCheckState(m_TestList.GroupNames()[index]));
-        else
-            node->CheckState = m_TestList.IsChecked(index) ? ncsChecked : ncsUnchecked;
+        switch (NodeKind(node->Data))
+        {
+            case TNodeKind::Suite:
+                node->CheckState = ToNodeCheckState(m_TestList.SuiteCheckState(m_TestList.SuitePaths()[index]));
+                break;
+
+            case TNodeKind::Group:
+                node->CheckState = ToNodeCheckState(m_TestList.GroupCheckState(m_TestList.GroupNames()[index]));
+                break;
+
+            case TNodeKind::Test:
+                node->CheckState = m_TestList.IsChecked(index) ? ncsChecked : ncsUnchecked;
+                break;
+        }
     }
 
     UpdateStatusBar(); // For its checked count.
@@ -1335,9 +1402,9 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsChange(TObject* /*Sender*/, TT
     TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging
 
     With partial check boxes enabled, a click can cycle a check box into its partial state, which only a
-    group's own tests should decide. So every click is taken over here: it toggles the clicked test, or all
-    of the clicked group's tests, in m_TestList, and the tree is then updated from m_TestList, which also
-    works out each group's partial state.
+    group's or suite's own tests should decide. So every click is taken over here: it toggles the clicked
+    test, or all of the clicked group's or suite's tests, in m_TestList, and the tree is then updated from
+    m_TestList, which also works out each group's and suite's partial state.
 */
 void __fastcall TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging(TCustomTreeView* /*Sender*/, TTreeNode* Node,
     TNodeCheckState /*NewCheckState*/, TNodeCheckState OldCheckState, bool& AllowChange)
@@ -1354,12 +1421,22 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging(TCustomTree
             return;
 
         bool const check = (OldCheckState != ncsChecked);
-        size_t const index = DataToIndex(Node->Data);
+        size_t const index = NodeIndex(Node->Data);
 
-        if (Node->Level == 0)
-            m_TestList.SetGroupChecked(m_TestList.GroupNames()[index], check);
-        else
-            m_TestList.SetChecked(index, check);
+        switch (NodeKind(Node->Data))
+        {
+            case TNodeKind::Suite:
+                m_TestList.SetSuiteChecked(m_TestList.SuitePaths()[index], check);
+                break;
+
+            case TNodeKind::Group:
+                m_TestList.SetGroupChecked(m_TestList.GroupNames()[index], check);
+                break;
+
+            case TNodeKind::Test:
+                m_TestList.SetChecked(index, check);
+                break;
+        }
 
         // Changing check boxes from inside the tree's own change notification isn't safe, so the update
         // waits until this click has been fully handled.
@@ -1415,9 +1492,23 @@ void TFormASWUnitTestsGUIMain::UpdateDetail()
         return;
     }
 
-    size_t const index = DataToIndex(node->Data);
-    std::string const text = (node->Level == 0) ? m_TestList.GroupDetailText(m_TestList.GroupNames()[index]) :
-            m_TestList.DetailText(index);
+    size_t const index = NodeIndex(node->Data);
+    std::string text;
+
+    switch (NodeKind(node->Data))
+    {
+        case TNodeKind::Suite:
+            text = m_TestList.SuiteDetailText(m_TestList.SuitePaths()[index]);
+            break;
+
+        case TNodeKind::Group:
+            text = m_TestList.GroupDetailText(m_TestList.GroupNames()[index]);
+            break;
+
+        case TNodeKind::Test:
+            text = m_TestList.DetailText(index);
+            break;
+    }
 
     Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(text));
 }
@@ -1459,15 +1550,9 @@ void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)
     if (testNode == nullptr)
         return; // Hidden by the filter box, e.g. a hidden failure rerun by Run Failed.
 
-    int const testImage = static_cast<int>(m_TestList.Status(testIndex));
-    testNode->ImageIndex = testImage;
-    testNode->SelectedIndex = testImage;
-
-    TTreeNode* const groupNode = testNode->Parent;
-    int const groupImage = static_cast<int>(m_TestList.GroupStatus(m_TestList.GroupNames()[DataToIndex(
-        groupNode->Data)]));
-    groupNode->ImageIndex = groupImage;
-    groupNode->SelectedIndex = groupImage;
+    // The test's own image, then those of its group and the suites holding it, whose status depends on it.
+    for (TTreeNode* node = testNode; node != nullptr; node = node->Parent)
+        SetNodeImage(node);
 }
 //---------------------------------------------------------------------------
 /*

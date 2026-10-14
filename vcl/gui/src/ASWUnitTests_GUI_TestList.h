@@ -65,6 +65,13 @@ enum class TGUITestStatus
     Skipped
 };
 
+// 'qualifiedName' (a group's qualified name, or a suite's path) without the 'suitePath' it's in and the '.'
+// after it, e.g. "TTest_TConsole" for "Framework.Console.TTest_TConsole" in "Framework.Console"; all of it
+// when 'suitePath' is empty.
+std::string NameInSuite(std::string const& qualifiedName, std::string const& suitePath);
+// The path of the suite holding suite 'suitePath', e.g. "Framework" for "Framework.Console"; empty for a
+// top-level suite.
+std::string ParentSuitePath(std::string const& suitePath);
 // The status a finished test's recorded outcome corresponds to.
 TGUITestStatus StatusFromOutcome(TTestOutcome outcome);
 // A status as shown to the user, e.g. "Not run".
@@ -90,9 +97,12 @@ struct TGUITestResult
 // The VCL GUI runner's list of registered tests and which of them are
 // checked to run, and each one's status and result, independent of how the
 // tree displays them. Tests are identified by their index, in the canonical order
-// TTestHandler::GetTests() returns them, and groups appear in the order
-// their first test does. Contains no VCL code, so it's unit tested from the
-// VCL console runner (see vcl/tests/Test_ASWUnitTests_GUI_TestList.cpp).
+// TTestHandler::GetTests() returns them, and groups (by qualified name) and
+// suites (by path, including suites that only hold other suites) appear in
+// the order their first test does. A suite's tests are those of every group
+// in it or in the suites inside it. Contains no VCL code, so it's unit
+// tested from the VCL console runner (see
+// vcl/tests/Test_ASWUnitTests_GUI_TestList.cpp).
 //
 // Tests can be hidden by the filter box (see SetVisibleFilter()). While
 // some are, everything about checking and grouping applies only to the
@@ -105,11 +115,22 @@ class TGUITestList
 private:
     std::vector<bool> m_Checked;
     std::vector<std::string> m_GroupNames;
+    std::map<std::string, std::string> m_GroupSuitePaths;
     std::map<std::pair<std::string, std::string>, size_t> m_IndexByName;
     std::vector<std::optional<TGUITestResult> > m_Results;
     std::vector<TGUITestStatus> m_Statuses;
+    std::map<std::string, size_t> m_SuiteIndexByPath;
+    std::vector<std::string> m_SuitePaths;
     std::vector<TTestId> m_Tests;
     std::vector<bool> m_Visible;
+
+private:
+    // The check state of the tests at 'indexes': all, none, or only some of them checked.
+    TGUICheckState CheckStateOf(std::vector<size_t> const& indexes) const;
+    // A group's or suite's detail pane text: its name, then how many of the tests at 'indexes' have each status.
+    std::string DetailTextOf(std::string const& name, std::vector<size_t> const& indexes) const;
+    // The status shown for the tests at 'indexes' together; see GroupStatus().
+    TGUITestStatus StatusOf(std::vector<size_t> const& indexes) const;
 
 public:
     // Number of visible tests that are checked.
@@ -137,6 +158,8 @@ public:
     // The status shown for a group, from its visible tests: Running while any of them is; otherwise the worst
     // outcome among those that ran (Failed, then Skipped, then Passed); NotRun if none did.
     TGUITestStatus GroupStatus(std::string const& groupName) const;
+    // The path of the suite a group is in; empty if it isn't in one, or isn't a group in the list.
+    std::string GroupSuitePath(std::string const& groupName) const;
     // The index of the test with these names, or std::nullopt if there isn't one.
     std::optional<size_t> IndexOf(std::string const& groupName, std::string const& testName) const;
     bool IsChecked(size_t index) const;
@@ -155,14 +178,28 @@ public:
     // Stores a finished test's result, and sets its status from the record's outcome.
     void SetResult(size_t index, TTestCaseRecord const& record, std::string const& log);
     void SetStatus(size_t index, TGUITestStatus status);
+    // Checks or unchecks a suite's visible tests, including those in the suites inside it.
+    void SetSuiteChecked(std::string const& suitePath, bool checked);
     // Shows only the tests 'filter' matches by full name, or all of them if it's empty.
     void SetVisibleFilter(TestFilter const& filter);
     TGUITestStatus Status(size_t index) const;
     // Number of tests with this status, visible or not.
     size_t StatusCount(TGUITestStatus status) const;
+    // A suite's check state, from its visible tests, like GroupCheckState().
+    TGUICheckState SuiteCheckState(std::string const& suitePath) const;
+    // The detail pane's text for a suite: its path and how many of its visible tests have each status.
+    std::string SuiteDetailText(std::string const& suitePath) const;
+    // The index of a suite in SuitePaths(), or std::nullopt if there isn't one with this path.
+    std::optional<size_t> SuiteIndexOf(std::string const& suitePath) const;
+    // Every suite's path, each after the suite holding it.
+    std::vector<std::string> const& SuitePaths() const;
+    // The status shown for a suite, from its visible tests, like GroupStatus().
+    TGUITestStatus SuiteStatus(std::string const& suitePath) const;
     TTestId const& Test(size_t index) const;
     // Indexes of 'groupName's visible tests, in order.
     std::vector<size_t> TestsInGroup(std::string const& groupName) const;
+    // Indexes of a suite's visible tests, including those in the suites inside it, in order.
+    std::vector<size_t> TestsInSuite(std::string const& suitePath) const;
     // Number of visible tests.
     size_t VisibleCount() const;
 };

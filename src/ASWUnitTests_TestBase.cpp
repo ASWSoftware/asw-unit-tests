@@ -289,6 +289,65 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// ITestGroup
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+std::string ITestGroup::GetQualifiedTestGroupName() const
+{
+    std::string const& suitePath = GetSuitePath();
+
+    if (suitePath.empty())
+        return GetTestGroupName();
+
+    return suitePath + "." + GetTestGroupName();
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TSuitePath
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TSuitePath::TSuitePath(std::string const& path)
+    : m_Path(path)
+{
+    if (path.empty())
+        return;
+
+    size_t start = 0;
+
+    while (true)
+    {
+        size_t const dot = path.find('.', start);
+        std::string const name = path.substr(start, (dot == std::string::npos) ? std::string::npos : dot - start);
+
+        if (name.empty())
+            throw TExceptInvalidSuitePath(path);
+
+        m_Names.push_back(name);
+
+        if (dot == std::string::npos)
+            break;
+
+        start = dot + 1;
+    }
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> const& TSuitePath::GetNames() const
+{
+    return m_Names;
+}
+//---------------------------------------------------------------------------
+std::string const& TSuitePath::GetPath() const
+{
+    return m_Path;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TTestCase
 /////////////////////////////////////////////////////////////////////////////
 
@@ -330,11 +389,18 @@ ITestCase::TestCallback TTestCase::GetTestCallback() const
 
 //---------------------------------------------------------------------------
 TTestGroupBase::TTestGroupBase(std::string const& name)
+    : TTestGroupBase(TSuitePath(std::string()), name)
+{
+}
+//---------------------------------------------------------------------------
+TTestGroupBase::TTestGroupBase(TSuitePath const& suitePath, std::string const& name)
     : m_ExceptionExpected(false),
       m_LogSuppressed(false),
       m_TestFailedCheck(false),
       m_Name(name),
-      m_RunObserver(nullptr)
+      m_QualifiedName(suitePath.GetPath().empty() ? name : (suitePath.GetPath() + "." + name)),
+      m_RunObserver(nullptr),
+      m_SuitePath(suitePath.GetPath())
 {
 }
 //---------------------------------------------------------------------------
@@ -1515,6 +1581,11 @@ std::pair<std::string, std::string> TTestGroupBase::FormatFloatingPointValues(lo
     return FormatFloatingPointPair(value, bound);
 }
 //---------------------------------------------------------------------------
+std::string const& TTestGroupBase::GetSuitePath() const
+{
+    return m_SuitePath;
+}
+//---------------------------------------------------------------------------
 TTestGroupBase::TestCallbackList& TTestGroupBase::GetTestCallbackList()
 {
     return m_TestCallbacks;
@@ -1636,7 +1707,7 @@ void TTestGroupBase::RegisterTest(TTestCase const& testCase)
     for (std::unique_ptr<ITestCase> const& registered : m_TestCallbacks)
     {
         if (registered->GetName() == testCase.GetName())
-            throw TExceptDuplicateTestName(m_Name, testCase.GetName());
+            throw TExceptDuplicateTestName(m_QualifiedName, testCase.GetName());
     }
 
     m_TestCallbacks.push_back(std::make_unique<TTestCase>(testCase));
@@ -1662,7 +1733,7 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
 */
 void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& description, bool abortRun)
 {
-    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const testFullName = m_QualifiedName + "." + testCase.GetName();
     std::string const detail = "Test crashed: " + description + ".";
     std::string const tag = "***Test failed";
     std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
@@ -1670,7 +1741,7 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     m_Results.FailedCount++;
     m_Results.Messages.push_back(plainMsg);
     m_Results.CaseRecords.push_back(
-        TTestCaseRecord{ m_Name, testCase.GetName(), 0.0, TTestOutcome::Fail, detail });
+        TTestCaseRecord{ m_QualifiedName, testCase.GetName(), 0.0, TTestOutcome::Fail, detail, m_SuitePath });
 
     Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
 
@@ -1694,7 +1765,7 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
 */
 void TTestGroupBase::ReportTimedOutTest(ITestCase& testCase, unsigned int testTimeoutSeconds)
 {
-    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const testFullName = m_QualifiedName + "." + testCase.GetName();
     std::string const detail = "Test exceeded its " + std::to_string(testTimeoutSeconds) +
         " second timeout and was abandoned.";
     std::string const tag = "***Test failed";
@@ -1703,7 +1774,8 @@ void TTestGroupBase::ReportTimedOutTest(ITestCase& testCase, unsigned int testTi
     m_Results.FailedCount++;
     m_Results.Messages.push_back(plainMsg);
     m_Results.CaseRecords.push_back(TTestCaseRecord{
-            m_Name, testCase.GetName(), static_cast<double>(testTimeoutSeconds), TTestOutcome::Fail, detail });
+            m_QualifiedName, testCase.GetName(), static_cast<double>(testTimeoutSeconds), TTestOutcome::Fail, detail,
+            m_SuitePath });
 
     Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
     Log("!!TIMEOUT!!: \"" + testFullName + "\" exceeded " + std::to_string(testTimeoutSeconds) +
@@ -1772,7 +1844,7 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
     {
         ITestCase& testCase = *m_TestCallbacks[index].get();
 
-        if (filter != nullptr && !filter(m_Name + "." + testCase.GetName()))
+        if (filter != nullptr && !filter(m_QualifiedName + "." + testCase.GetName()))
             continue;
 
         if (m_RunObserver == nullptr)
@@ -1796,7 +1868,7 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
                     m_RunObserver->OnTestFinished(m_Results.CaseRecords.back());
             };
 
-        m_RunObserver->OnTestStarted(m_Name, testCase.GetName());
+        m_RunObserver->OnTestStarted(m_QualifiedName, testCase.GetName());
 
         try
         {
@@ -2005,7 +2077,7 @@ void TTestGroupBase::TearDown_Test(ITestCase& /*testCase*/)
 */
 void TTestGroupBase::Test(ITestCase& testCase)
 {
-    std::string const testFullName = m_Name + "." + testCase.GetName();
+    std::string const testFullName = m_QualifiedName + "." + testCase.GetName();
     std::chrono::steady_clock::time_point const testStart = std::chrono::steady_clock::now();
 
     // Records the outcome, logs the plain "***Test failed"/"***Test skipped" detail line (colorized only
@@ -2042,7 +2114,8 @@ void TTestGroupBase::Test(ITestCase& testCase)
             double const durationSeconds = std::chrono::duration<double>(
                 std::chrono::steady_clock::now() - testStart).count();
             m_Results.CaseRecords.push_back(
-                TTestCaseRecord{ m_Name, testCase.GetName(), durationSeconds, outcome, recordDetail });
+                TTestCaseRecord{ m_QualifiedName, testCase.GetName(), durationSeconds, outcome, recordDetail,
+                                 m_SuitePath });
 
             Log("Finished test: \"" + testFullName + "\" - " + TConsole::Colorize(status, kind) + " (" +
                 FormatDurationMs(testStart) + ")");
