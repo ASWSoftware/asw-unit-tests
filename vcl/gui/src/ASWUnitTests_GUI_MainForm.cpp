@@ -120,12 +120,14 @@ void* IndexToData(size_t index)
 }
 //---------------------------------------------------------------------------
 // The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
-// check, an unhandled exception, or a fatal SetUp_Test()/TearDown_Test() error) and its skip lines stand out.
+// check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
+// or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
 TColor LogLineColor(std::string const& line)
 {
     if (line.find("***Test failed") != std::string::npos || line.find("**Check failed") != std::string::npos ||
         line.find("\" - failed (") != std::string::npos || line.find("Unhandled exception") != std::string::npos ||
-        line.find("!!FATAL ERROR!!") != std::string::npos)
+        line.find("!!FATAL ERROR!!") != std::string::npos || line.find("!!ERROR!!") != std::string::npos ||
+        line.find("!!TIMEOUT!!") != std::string::npos || line.find("!!CRASH!!") != std::string::npos)
         return FailureColor;
 
     if (line.find("***Test skipped") != std::string::npos || line.find("\" - skipped (") != std::string::npos)
