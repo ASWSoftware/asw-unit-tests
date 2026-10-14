@@ -41,6 +41,7 @@ private: // Test methods
     void Test_CanonicalGroupOrder_RejectsInvalidSuitePath();
     void Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName();
     void Test_GetTests_MatchesGetAllTestFullNames();
+    void Test_Run_FailsGroupTestsWhenSetUpGroupThrows();
     void Test_Run_ShuffleKeepsOrderWhenFiltered();
     void Test_SetRunObserver_ReceivesInitializeAndRunOutput();
     void Test_SetRunObserver_StopsBetweenGroups();

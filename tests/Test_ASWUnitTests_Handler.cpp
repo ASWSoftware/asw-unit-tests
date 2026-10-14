@@ -28,7 +28,9 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <cstddef>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
@@ -72,6 +74,82 @@ TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests)
         };
 }
 
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupSetUpThrows
+//
+// A registered group, so a nested TTestHandler creates and runs it, whose SetUp_Group() throws what SetUpGroupThrows
+// says, for Test_Run_FailsGroupTestsWhenSetUpGroupThrows below. Otherwise (as in every ordinary run) its set-up does
+// nothing and its two tests pass.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_GroupSetUpThrows : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_First();
+    void Test_Second();
+
+public:
+    enum class TThrow
+    {
+        Nothing,
+        StdException, // A std::runtime_error.
+        RTLException  // An EConvertError, in RTL builds.
+    };
+
+    static TThrow SetUpGroupThrows;
+    // Counts set by the latest instance, for the test to check.
+    static size_t TearDownGroupCalls;
+    static size_t TestsRun;
+
+public:
+    TFixture_GroupSetUpThrows();
+
+    void SetUp_Group() override;
+    void TearDown_Group() override;
+};
+
+TFixture_GroupSetUpThrows::TThrow TFixture_GroupSetUpThrows::SetUpGroupThrows = TThrow::Nothing;
+size_t TFixture_GroupSetUpThrows::TearDownGroupCalls = 0;
+size_t TFixture_GroupSetUpThrows::TestsRun = 0;
+
+//---------------------------------------------------------------------------
+TFixture_GroupSetUpThrows::TFixture_GroupSetUpThrows()
+    : inherited("ASWUnitTests_Handler_GroupSetUpFixture")
+{
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_First, "First");
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_Second, "Second");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::SetUp_Group()
+{
+    if (SetUpGroupThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate SetUp_Group() failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (SetUpGroupThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate SetUp_Group() failure");
+#endif
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::TearDown_Group()
+{
+    ++TearDownGroupCalls;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_First()
+{
+    ++TestsRun;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_Second()
+{
+    ++TestsRun;
+}
 //---------------------------------------------------------------------------
 
 
@@ -133,6 +211,8 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
         "CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows,
+        "Run_FailsGroupTestsWhenSetUpGroupThrows");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered,
         "Run_ShuffleKeepsOrderWhenFiltered");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
@@ -260,6 +340,90 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
     }
 
     CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows()
+{
+    // Arrange: the fixture group's first test only, so its other test checks the filter still applies, then a
+    // group of pure-function tests that must still run after it.
+    TestFilter const filter = [](std::string const& fullName)
+        {
+            return fullName == "ASWUnitTests_Handler_GroupSetUpFixture.First" ||
+                fullName.rfind("ASWUnitTests_Version_Tests.", 0) == 0;
+        };
+    TTestHandler handler;
+    {
+        TStdOutRedirect const suppressOutput;
+        handler.Initialize("Test_Run_FailsGroupTestsWhenSetUpGroupThrows");
+    }
+
+    // What SetUp_Group() throws, and how the failure describes it.
+    std::vector<std::pair<TFixture_GroupSetUpThrows::TThrow, std::string> > const scenarios =
+    {
+        { TFixture_GroupSetUpThrows::TThrow::StdException, "deliberate SetUp_Group() failure" },
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        {
+            TFixture_GroupSetUpThrows::TThrow::RTLException, "EConvertError: deliberate SetUp_Group() failure"
+        },
+#endif
+    };
+
+    for (std::pair<TFixture_GroupSetUpThrows::TThrow, std::string> const& scenario : scenarios)
+    {
+        std::string const& description = scenario.second;
+        TFixture_GroupSetUpThrows::TearDownGroupCalls = 0;
+        TFixture_GroupSetUpThrows::TestsRun = 0;
+
+        // Act
+        TTestResults results;
+        std::string log;
+        {
+            // Cleared again however Run() ends, so the group's own run in this suite isn't affected.
+            struct TResetThrow
+            {
+                ~TResetThrow()
+                {
+                    TFixture_GroupSetUpThrows::SetUpGroupThrows = TFixture_GroupSetUpThrows::TThrow::Nothing;
+                }
+            } const resetThrow;
+
+            TFixture_GroupSetUpThrows::SetUpGroupThrows = scenario.first;
+            TStdOutRedirect const captureOutput;
+            results = handler.Run(filter, "the fixture group and the version tests");
+            log = captureOutput.Str();
+        }
+
+        // Assert
+        CheckEquals(static_cast<size_t>(0), TFixture_GroupSetUpThrows::TestsRun, __func__, __LINE__,
+            description + ": none of the group's tests ran");
+        CheckEquals(static_cast<size_t>(1), TFixture_GroupSetUpThrows::TearDownGroupCalls, __func__, __LINE__,
+            description + ": TearDown_Group() still ran");
+        CheckEquals(1u, results.FailedCount, __func__, __LINE__,
+            description + ": one failure, for the one test the filter matches");
+        CheckGreaterThan(results.SuccessCount, 0u, __func__, __LINE__,
+            description + ": the next group's tests still ran and passed");
+
+        size_t fixtureRecords = 0;
+        for (TTestCaseRecord const& record : results.CaseRecords)
+        {
+            if (record.GroupName != "ASWUnitTests_Handler_GroupSetUpFixture")
+                continue;
+
+            ++fixtureRecords;
+            CheckEquals(std::string("First"), record.TestName, __func__, __LINE__,
+                description + ": the test the filter matches");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, description + ": recorded as failed");
+            CheckEquals("SetUp_Group() exception: " + description, record.Message, __func__, __LINE__,
+                description + ": its detail names SetUp_Group() and the exception");
+        }
+
+        CheckEquals(static_cast<size_t>(1), fixtureRecords, __func__, __LINE__,
+            description + ": one record for the group");
+        CheckContains(log, "!!ERROR!!: SetUp_Group() exception for group \"ASWUnitTests_Handler_GroupSetUpFixture\": " +
+            description, __func__, __LINE__, description + ": the exception is logged");
+        CheckContains(log, "\"ASWUnitTests_Handler_GroupSetUpFixture.First\": SetUp_Group() exception: ", __func__,
+            __LINE__, description + ": and so is the test's failure");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered()
@@ -482,3 +646,4 @@ void TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark()
 
 //---------------------------------------------------------------------------
 ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_ASWUnitTests_Handler)
+ASW_REGISTER_TEST_GROUP(TFixture_GroupSetUpThrows)

@@ -299,7 +299,7 @@ sets both the console's `Initializing...` line and the report's `<testsuites nam
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed),
 `1` one or more tests failed, `2` a `std::exception` (or, with
 [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, an RTL `Exception`) from
-`SetUp_Test()`/`TearDown_Test()` or `SetUp_Group()`/`TearDown_Group()` ended the run, `3` an
+`SetUp_Test()`, `TearDown_Test()` or `TearDown_Group()` ended the run, `3` an
 exception of any other type from one of those ended the run, `4` invalid command line arguments, `5`
 a test exceeded `--test-timeout-seconds` and the run was aborted, `6` a test crashed severely enough
 (with `--catch-crashes` given) that the run was aborted. An exception a test throws without
@@ -307,6 +307,9 @@ expecting it (outside a `Check*`/`Assert*` call, with no `SetExceptionExpected()
 test, with `Unexpected exception: ` and the exception's message as its detail, and the run carries
 on, so it's an ordinary test failure (exit code `1`), not `2` or `3`. Likewise, a crash caught by
 `--catch-crashes` that didn't force an abort is an ordinary test failure (exit code `1`), not `6`.
+An exception from a group's `SetUp_Group()` doesn't end the run either: each of the group's tests
+that would have run fails, with `SetUp_Group() exception: ` and the exception's message as its
+detail, `TearDown_Group()` still runs, and the run carries on with the next group (exit code `1`).
 Skipped tests never affect the exit code.
 
 ## VCL GUI Runner

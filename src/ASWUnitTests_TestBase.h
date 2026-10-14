@@ -163,7 +163,8 @@ public:
     // Receives the text that would otherwise be written to std::cout, including any line break.
     virtual void OnLog(std::string const& text) = 0;
     // Called once for every test that records an outcome, including the failure recorded for a test that
-    // timed out, crashed, or threw an exception it didn't expect. Not called for a test whose SetUp_Test() or
+    // timed out, crashed, or threw an exception it didn't expect, or whose group's SetUp_Group() threw (which
+    // OnTestStarted() is called for too, though the test doesn't run). Not called for a test whose SetUp_Test() or
     // TearDown_Test() threw, since that exception escapes TTestHandler::Run().
     virtual void OnTestFinished(TTestCaseRecord const& record) = 0;
     // 'groupName' is the group's qualified name, as in TTestCaseRecord::GroupName.

@@ -106,6 +106,7 @@ private:
     ITestGroups m_TestGroups;
 
 private:
+    TTestResults FailGroupTests(ITestGroup& group, TestFilter const& filter, std::string const& detail);
     void RegisterTestGroups();
 
 public:

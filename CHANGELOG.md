@@ -56,6 +56,12 @@ versioned baseline.
   `GetTestGroupName()` is still just the group's own name. Moving a group into a suite changes its
   tests' full names, as renaming the group would, so `--filter` patterns and saved VCL GUI runner
   selections that named its tests no longer match them.
+- An exception from a group's `SetUp_Group()` no longer ends the run with exit code `2` or `3`,
+  without totals or a `--report-junit` report. It's logged as `!!ERROR!!`, each of the group's tests
+  that would have run fails with `SetUp_Group() exception: ` and the exception's message as its
+  detail, `TearDown_Group()` still runs, and the run carries on with the next group, so it ends with
+  exit code `1`. A run observer gets `OnTestStarted()` and `OnTestFinished()` for each of those
+  tests, as for any other.
 
 ### Fixed
 

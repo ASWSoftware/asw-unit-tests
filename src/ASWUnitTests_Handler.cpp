@@ -33,6 +33,7 @@ limitations under the License.
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <string>
@@ -46,6 +47,44 @@ limitations under the License.
 #include "ASWUnitTests_Utils.h"
 #include "ASWUnitTests_Version.h"
 //---------------------------------------------------------------------------
+
+namespace
+{
+
+// Calls 'callable' and returns a description of what it threw: what() for a std::exception (this framework's own
+// failure signals, such as an Assert* failure, included), or "ClassName: Message" for an RTL exception (see
+// DescribeRTLException()); or nullopt when it threw nothing. Each exception is caught exactly once, never rethrown
+// and caught again, since an RTL exception object is freed when the first handler that catches it ends.
+std::optional<std::string> CallAndDescribeException(std::function<void()> const& callable)
+{
+    try
+    {
+        callable();
+    }
+    catch (std::exception const& ex)
+    {
+        return std::string(ex.what());
+    }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        return ASWUnitTests::DescribeRTLException(ex);
+    }
+    catch (...)
+    {
+        return std::string("an object that is neither a std::exception nor an RTL Exception");
+    }
+#else
+    catch (...)
+    {
+        return std::string("a non-std::exception object");
+    }
+#endif
+
+    return std::nullopt;
+}
+
+} // namespace
 
 namespace ASWUnitTests
 {
@@ -122,6 +161,44 @@ std::vector<size_t> TTestHandler::CanonicalGroupOrder(std::vector<TTestGroupOrde
         });
 
     return order;
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::FailGroupTests
+
+    Returns a failure with detail 'detail' for each of 'group''s tests that 'filter' matches, logged
+    and reported to the run observer as each would be had it run and failed. Used for a group whose
+    SetUp_Group() threw, whose tests can't run without it.
+*/
+TTestResults TTestHandler::FailGroupTests(ITestGroup& group, TestFilter const& filter, std::string const& detail)
+{
+    TTestResults results;
+    std::string const groupName = group.GetQualifiedTestGroupName();
+    std::string const tag = "***Test failed";
+
+    for (std::unique_ptr<ITestCase> const& testCase : group.GetTestCallbackList())
+    {
+        std::string const& testName = testCase->GetName();
+        std::string const fullName = groupName + "." + testName;
+
+        if (filter != nullptr && !filter(fullName))
+            continue;
+
+        if (m_RunObserver != nullptr)
+            m_RunObserver->OnTestStarted(groupName, testName);
+
+        std::string const plainMsg = tag + ": \"" + fullName + "\": " + detail;
+        results.FailedCount++;
+        results.Messages.push_back(plainMsg);
+        results.CaseRecords.push_back(
+            TTestCaseRecord{ groupName, testName, 0.0, TTestOutcome::Fail, detail, group.GetSuitePath() });
+        Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+
+        if (m_RunObserver != nullptr)
+            m_RunObserver->OnTestFinished(results.CaseRecords.back());
+    }
+
+    return results;
 }
 //---------------------------------------------------------------------------
 /*
@@ -620,31 +697,47 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         Log("--------------------------------------------------------------------------------");
         Log("[" + GetUTCTimeISO8601() + "] Setting up group " + std::to_string(++groupNum) + " of " +
             std::to_string(nGroups) + ": \"" + name + "\"");
-        testGroup.SetUp_Group();
-
-        // run
-        Log("Running " + std::to_string(nTestsInGroup) + " test" + std::string((nTestsInGroup == 1) ? "." : "s."));
-
-        std::optional<unsigned int> groupSeed;
-        if (resolvedSeed.has_value())
-            groupSeed = *resolvedSeed + FNV1aHash(name);
+        std::optional<std::string> const setUpFailure = CallAndDescribeException([&testGroup]()
+            {
+                testGroup.SetUp_Group();
+            });
 
         bool groupTimedOut = false;
         bool groupCrashed = false;
-        try
+        TTestResults setUpFailureResults;
+
+        if (setUpFailure.has_value())
         {
-            testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
+            // The group's tests can't run without their set-up, so each one fails instead, and the run carries on
+            // with the next group, after tearing this one down as usual.
+            Log("!!ERROR!!: SetUp_Group() exception for group \"" + name + "\": " + *setUpFailure);
+            setUpFailureResults = FailGroupTests(testGroup, filter, "SetUp_Group() exception: " + *setUpFailure);
         }
-        catch (TExceptTestTimedOut const&)
+        else
         {
-            groupTimedOut = true;
-        }
-        catch (TExceptTestCrashed const&)
-        {
-            groupCrashed = true;
+            // run
+            Log("Running " + std::to_string(nTestsInGroup) + " test" +
+                std::string((nTestsInGroup == 1) ? "." : "s."));
+
+            std::optional<unsigned int> groupSeed;
+            if (resolvedSeed.has_value())
+                groupSeed = *resolvedSeed + FNV1aHash(name);
+
+            try
+            {
+                testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
+            }
+            catch (TExceptTestTimedOut const&)
+            {
+                groupTimedOut = true;
+            }
+            catch (TExceptTestCrashed const&)
+            {
+                groupCrashed = true;
+            }
         }
 
-        TTestResults const& testGroupResults = testGroup.Results();
+        TTestResults const& testGroupResults = setUpFailure.has_value() ? setUpFailureResults : testGroup.Results();
         Log("Done. " +
             TConsole::Colorize("Succeeded: " + std::to_string(testGroupResults.SuccessCount), TLogKind::Pass) +
             ", " + TConsole::Colorize("failed: " + std::to_string(testGroupResults.FailedCount), TLogKind::Fail) +
