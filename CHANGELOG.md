@@ -68,6 +68,12 @@ versioned baseline.
   test's full name had a `*` of its own, which a group name or a parameterized test's label can
   have: `--filter "*"` didn't match a group named `*Group`. A `*` in the pattern is now always a
   wildcard.
+- `--shuffle-seed`, `--partition-index`, `--partition-count` and `--test-timeout-seconds` accepted
+  a number with leading white space or a `+` sign, and on Windows also one with a `-` sign after
+  white space, which wrapped around to a large number: `--shuffle-seed " -5"` used seed
+  `4294967291`. They now take decimal digits only, and so does the VCL GUI runner's shuffle seed
+  box, which still ignores spaces around the number. `TCLIParser::ParseUnsignedInt()` changes the
+  same way.
 
 ## [1.3.0] - 2026-10-11
 

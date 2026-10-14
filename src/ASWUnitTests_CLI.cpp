@@ -24,7 +24,6 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_CLI.h"
 //---------------------------------------------------------------------------
-#include <exception>
 #include <iostream>
 #include <limits>
 #include <string_view>
@@ -509,23 +508,27 @@ std::optional<TColorMode> TCLIParser::ParseColorMode(std::string const& text)
 //---------------------------------------------------------------------------
 std::optional<unsigned int> TCLIParser::ParseUnsignedInt(std::string const& text)
 {
-    if (text.empty() || text[0] == '-')
+    if (text.empty())
         return std::nullopt;
 
-    try
-    {
-        size_t charsConsumed = 0;
-        unsigned long const value = std::stoul(text, &charsConsumed);
+    // Digit by digit, not with std::stoul(), which skips leading white space and accepts a sign, turning " -5" into
+    // a large unsigned value.
+    unsigned int const maxValue = std::numeric_limits<unsigned int>::max();
+    unsigned int value = 0;
 
-        if (charsConsumed != text.size() || value > std::numeric_limits<unsigned int>::max())
+    for (char const ch : text)
+    {
+        if (ch < '0' || ch > '9')
             return std::nullopt;
 
-        return static_cast<unsigned int>(value);
+        unsigned int const digit = static_cast<unsigned int>(ch - '0');
+        if (value > (maxValue - digit) / 10)
+            return std::nullopt;
+
+        value = value * 10 + digit;
     }
-    catch (std::exception const&)
-    {
-        return std::nullopt;
-    }
+
+    return value;
 }
 //---------------------------------------------------------------------------
 
