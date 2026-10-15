@@ -27,6 +27,7 @@ limitations under the License.
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <stdexcept>
 #include <string>
@@ -269,8 +270,11 @@ TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
         "CanonicalGroupOrder_RejectsInvalidSuitePath");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName,
         "CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetAppBitsStr_MatchesPointerSize, "GetAppBitsStr_MatchesPointerSize");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetBuildOS_MatchesPlatform, "GetBuildOS_MatchesPlatform");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Initialize_LogsVersionBitsAndOS, "Initialize_LogsVersionBitsAndOS");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows,
         "Initialize_ReplacesGroupWhoseConstructorThrows");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows,
@@ -374,6 +378,36 @@ void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByO
         "by order, then name, with tied groups kept in registration order, as before suites existed");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_GetAppBitsStr_MatchesPointerSize()
+{
+    // Arrange
+    std::string const expected = std::to_string(sizeof(void*) * CHAR_BIT) + "-bit";
+
+    // Act
+    std::string const bits = TTestHandler::GetAppBitsStr();
+
+    // Assert
+    CheckEquals(expected, bits, __func__, __LINE__, "the pointer size this test was built with");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_GetBuildOS_MatchesPlatform()
+{
+    // Arrange
+#if defined(_WIN32)
+    std::string const expected = "Windows";
+#elif defined(__linux__)
+    std::string const expected = "Linux";
+#else
+    std::string const expected = "Unknown";
+#endif
+
+    // Act
+    std::string const os = TTestHandler::GetBuildOS();
+
+    // Assert
+    CheckEquals(expected, os, __func__, __LINE__, "the operating system this test was built for");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
 {
     // Arrange
@@ -404,6 +438,23 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
     }
 
     CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Initialize_LogsVersionBitsAndOS()
+{
+    // Arrange
+    TTestHandler handler;
+    TRecordingObserver observer;
+    handler.SetRunObserver(&observer);
+    std::string const expected = TTestHandler::GetVersionFullStr() + " - " + TTestHandler::GetAppBitsStr() + " - " +
+        TTestHandler::GetBuildOS() + "\n";
+
+    // Act
+    handler.Initialize("Test_Initialize_LogsVersionBitsAndOS");
+
+    // Assert
+    CheckStartsWith(observer.LogText, expected, __func__, __LINE__,
+        "the banner's first line is the version, then the app bits, then the build OS");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows()

@@ -10,6 +10,17 @@ versioned baseline.
 
 ## [Unreleased]
 
+### Added
+
+- `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
+  `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
+  operating system), describing the build the framework was compiled for.
+
+### Changed
+
+- The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
+  build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
+
 ## [1.4.0] - 2026-10-14
 
 ### Added

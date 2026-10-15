@@ -302,6 +302,25 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
     return fullNames;
 }
 //---------------------------------------------------------------------------
+std::string TTestHandler::GetAppBitsStr()
+{
+    if constexpr (sizeof(void*) == 8)
+        return "64-bit";
+    else
+        return "32-bit";
+}
+//---------------------------------------------------------------------------
+std::string TTestHandler::GetBuildOS()
+{
+#if defined(_WIN32)
+    return "Windows";
+#elif defined(__linux__)
+    return "Linux";
+#else
+    return "Unknown";
+#endif
+}
+//---------------------------------------------------------------------------
 std::string const& TTestHandler::GetProjectName() const
 {
     return m_ProjectName;
@@ -515,7 +534,7 @@ void TTestHandler::Initialize(std::string const& projectName)
 {
     m_ProjectName = projectName;
 
-    Log(GetVersionFullStr());
+    Log(GetVersionFullStr() + " - " + GetAppBitsStr() + " - " + GetBuildOS());
 
     Log("Initializing test handler and registering test groups for " + m_ProjectName + "...");
     RegisterTestGroups();
