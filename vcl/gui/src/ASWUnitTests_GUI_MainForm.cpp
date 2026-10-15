@@ -95,7 +95,11 @@ TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& 
     return nodes->AddChildObject(parent, FromUTF8(text), data);
 }
 //---------------------------------------------------------------------------
-// A Failures & Skips list item's Data holds its test's index into TGUITestList.
+/*
+    DataToIndex
+
+    A Failures & Skips list item's Data holds its test's index into TGUITestList.
+*/
 size_t DataToIndex(void* data)
 {
     return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data));
@@ -106,7 +110,6 @@ std::string FirstLine(std::string const& text)
     return text.substr(0, text.find('\n'));
 }
 //---------------------------------------------------------------------------
-// e.g. "0.84 s"
 std::string FormatSeconds(double seconds)
 {
     std::ostringstream text;
@@ -119,9 +122,13 @@ void* IndexToData(size_t index)
     return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index));
 }
 //---------------------------------------------------------------------------
-// The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
-// check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
-// or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
+/*
+    LogLineColor
+
+    The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
+    check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
+    or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
+*/
 TColor LogLineColor(std::string const& line)
 {
     if (line.find("***Test failed") != std::string::npos || line.find("**Check failed") != std::string::npos ||
@@ -136,7 +143,11 @@ TColor LogLineColor(std::string const& line)
     return clWindowText;
 }
 //---------------------------------------------------------------------------
-// Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
+/*
+    MonitorWorkAreas
+
+    Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
+*/
 std::vector<TRect> MonitorWorkAreas()
 {
     std::vector<TRect> workAreas;
@@ -147,7 +158,11 @@ std::vector<TRect> MonitorWorkAreas()
     return workAreas;
 }
 //---------------------------------------------------------------------------
-// A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
+/*
+    NodeData
+
+    A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
+*/
 void* NodeData(TNodeKind kind, size_t index)
 {
     return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index) * 4 + static_cast<std::uintptr_t>(kind));
@@ -167,9 +182,14 @@ TNodeCheckState ToNodeCheckState(TGUICheckState state)
 {
     switch (state)
     {
-        case TGUICheckState::Checked: return ncsChecked;
-        case TGUICheckState::Partial: return ncsPartial;
-        case TGUICheckState::Unchecked: return ncsUnchecked;
+        case TGUICheckState::Checked:
+            return ncsChecked;
+
+        case TGUICheckState::Partial:
+            return ncsPartial;
+
+        case TGUICheckState::Unchecked:
+            return ncsUnchecked;
     }
 
     return ncsUnchecked;
@@ -237,6 +257,7 @@ public:
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TFormASWUnitTestsGUIMain

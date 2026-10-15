@@ -141,11 +141,15 @@ TConsoleColor GetColorFor(TLogKind kind)
     {
         case TLogKind::Pass:
             return g_PassColor;
+
         case TLogKind::Fail:
             return g_FailColor;
+
         case TLogKind::Skip:
             return g_SkipColor;
+
         case TLogKind::Info:
+
         default:
             return TConsoleColor::Default;
     }
@@ -243,13 +247,17 @@ void TConsole::SetColor(TLogKind kind, TConsoleColor color)
         case TLogKind::Pass:
             g_PassColor = color;
             break;
+
         case TLogKind::Fail:
             g_FailColor = color;
             break;
+
         case TLogKind::Skip:
             g_SkipColor = color;
             break;
+
         case TLogKind::Info:
+
         default:
             break; // Info is never colored
     }

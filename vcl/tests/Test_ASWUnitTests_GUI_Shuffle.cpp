@@ -59,6 +59,7 @@ TGUIShuffle::TSeedSource SeedSequence(std::vector<unsigned int> const& seeds, si
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

@@ -89,6 +89,7 @@ void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, c
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

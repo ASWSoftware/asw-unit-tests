@@ -70,7 +70,7 @@ enum class TTestOutcome
 {
     Pass,
     Fail,
-    Skip
+    Skip,
 };
 
 
@@ -312,6 +312,7 @@ private:
 
     friend class TTestHandler; // For SetSuitePath()
 
+private:
     // The relation an ordering method (e.g. CheckGreaterThan()) checks 'value' has to 'bound'.
     enum class TOrdering
     {

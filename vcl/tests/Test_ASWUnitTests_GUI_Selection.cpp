@@ -56,6 +56,7 @@ std::vector<TTestId> SampleTests()
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

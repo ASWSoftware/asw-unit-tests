@@ -340,14 +340,15 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     end
     object Act_ShuffleOrder: TAction
       Caption = 'Run in &Shuffled Order'
-      Hint =
-        'Run the groups, and each group'#39's tests, in a random order, to f' +
-        'ind tests that depend on running in a particular order (--shuffle)'
+      Hint = 
+        'Run the groups, and each group'#39's tests, in a random order, to fi' +
+        'nd tests that depend on running in a particular order (--shuffle' +
+        ')'
       OnExecute = Act_ShuffleOrderExecute
     end
     object Act_ShuffleSeed: TAction
       Caption = 'Shuffle S&eed...'
-      Hint =
+      Hint = 
         'Choose a new random seed for each shuffled run, or one seed for ' +
         'every run to repeat its order (--shuffle-seed)'
       OnExecute = Act_ShuffleSeedExecute

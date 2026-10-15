@@ -95,16 +95,36 @@ std::string DescribeFault(unsigned long code)
 {
     switch (code)
     {
-        case EXCEPTION_ACCESS_VIOLATION: return "access violation";
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return "array bounds exceeded";
-        case EXCEPTION_DATATYPE_MISALIGNMENT: return "data misalignment";
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO: return "floating point divide by zero";
-        case EXCEPTION_FLT_INVALID_OPERATION: return "floating point invalid operation";
-        case EXCEPTION_ILLEGAL_INSTRUCTION: return "illegal instruction";
-        case EXCEPTION_INT_DIVIDE_BY_ZERO: return "integer divide by zero";
-        case EXCEPTION_INT_OVERFLOW: return "integer overflow";
-        case EXCEPTION_PRIV_INSTRUCTION: return "privileged instruction";
-        case EXCEPTION_STACK_OVERFLOW: return "stack overflow";
+        case EXCEPTION_ACCESS_VIOLATION:
+            return "access violation";
+
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+            return "array bounds exceeded";
+
+        case EXCEPTION_DATATYPE_MISALIGNMENT:
+            return "data misalignment";
+
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+            return "floating point divide by zero";
+
+        case EXCEPTION_FLT_INVALID_OPERATION:
+            return "floating point invalid operation";
+
+        case EXCEPTION_ILLEGAL_INSTRUCTION:
+            return "illegal instruction";
+
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:
+            return "integer divide by zero";
+
+        case EXCEPTION_INT_OVERFLOW:
+            return "integer overflow";
+
+        case EXCEPTION_PRIV_INSTRUCTION:
+            return "privileged instruction";
+
+        case EXCEPTION_STACK_OVERFLOW:
+            return "stack overflow";
+
         default:
         {
             char buffer[40];
@@ -139,6 +159,7 @@ bool IsRecognizedFault(unsigned long code)
         case EXCEPTION_PRIV_INSTRUCTION:
         case EXCEPTION_STACK_OVERFLOW:
             return true;
+
         default:
             return false;
     }
@@ -196,11 +217,20 @@ std::string DescribeFault(int signalNumber)
 {
     switch (signalNumber)
     {
-        case SIGSEGV: return "segmentation fault";
-        case SIGFPE: return "floating point exception";
-        case SIGILL: return "illegal instruction";
-        case SIGBUS: return "bus error";
-        default: return "signal " + std::to_string(signalNumber);
+        case SIGSEGV:
+            return "segmentation fault";
+
+        case SIGFPE:
+            return "floating point exception";
+
+        case SIGILL:
+            return "illegal instruction";
+
+        case SIGBUS:
+            return "bus error";
+
+        default:
+            return "signal " + std::to_string(signalNumber);
     }
 }
 

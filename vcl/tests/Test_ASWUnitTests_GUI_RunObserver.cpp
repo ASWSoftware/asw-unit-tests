@@ -132,6 +132,7 @@ void TFixture_GUIObserved::Test_Passes()
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

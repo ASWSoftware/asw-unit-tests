@@ -58,6 +58,7 @@ std::unique_ptr<System::Inifiles::TMemIniFile> NewMemIniFile()
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

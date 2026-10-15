@@ -2257,11 +2257,15 @@ bool TTestGroupBase::OrderingHolds(std::optional<int> order, TOrdering ordering)
     {
         case TOrdering::GreaterThan:
             return *order > 0;
+
         case TOrdering::GreaterThanOrEqual:
             return *order >= 0;
+
         case TOrdering::LessThan:
             return *order < 0;
+
         case TOrdering::LessThanOrEqual:
+
         default:
             return *order <= 0;
     }
@@ -2273,11 +2277,15 @@ char const* TTestGroupBase::OrderingSymbol(TOrdering ordering)
     {
         case TOrdering::GreaterThan:
             return ">";
+
         case TOrdering::GreaterThanOrEqual:
             return ">=";
+
         case TOrdering::LessThan:
             return "<";
+
         case TOrdering::LessThanOrEqual:
+
         default:
             return "<=";
     }

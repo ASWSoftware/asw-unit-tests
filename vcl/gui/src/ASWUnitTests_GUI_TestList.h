@@ -45,7 +45,7 @@ enum class TGUICheckState
 {
     Unchecked,
     Checked,
-    Partial
+    Partial,
 };
 
 
@@ -62,7 +62,7 @@ enum class TGUITestStatus
     Running,
     Passed,
     Failed,
-    Skipped
+    Skipped,
 };
 
 // 'qualifiedName' (a group's qualified name, or a suite's path) without the 'suitePath' it's in and the '.'

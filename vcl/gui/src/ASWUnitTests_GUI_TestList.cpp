@@ -54,9 +54,14 @@ TGUITestStatus StatusFromOutcome(TTestOutcome outcome)
 {
     switch (outcome)
     {
-        case TTestOutcome::Pass: return TGUITestStatus::Passed;
-        case TTestOutcome::Fail: return TGUITestStatus::Failed;
-        case TTestOutcome::Skip: return TGUITestStatus::Skipped;
+        case TTestOutcome::Pass:
+            return TGUITestStatus::Passed;
+
+        case TTestOutcome::Fail:
+            return TGUITestStatus::Failed;
+
+        case TTestOutcome::Skip:
+            return TGUITestStatus::Skipped;
     }
 
     return TGUITestStatus::Failed;
@@ -66,11 +71,20 @@ std::string StatusName(TGUITestStatus status)
 {
     switch (status)
     {
-        case TGUITestStatus::NotRun: return "Not run";
-        case TGUITestStatus::Running: return "Running";
-        case TGUITestStatus::Passed: return "Passed";
-        case TGUITestStatus::Failed: return "Failed";
-        case TGUITestStatus::Skipped: return "Skipped";
+        case TGUITestStatus::NotRun:
+            return "Not run";
+
+        case TGUITestStatus::Running:
+            return "Running";
+
+        case TGUITestStatus::Passed:
+            return "Passed";
+
+        case TGUITestStatus::Failed:
+            return "Failed";
+
+        case TGUITestStatus::Skipped:
+            return "Skipped";
     }
 
     return "Unknown";
@@ -388,11 +402,24 @@ TGUITestStatus TGUITestList::StatusOf(std::vector<size_t> const& indexes) const
     {
         switch (m_Statuses[index])
         {
-            case TGUITestStatus::Running: anyRunning = true; break;
-            case TGUITestStatus::Failed: anyFailed = true; break;
-            case TGUITestStatus::Skipped: anySkipped = true; break;
-            case TGUITestStatus::Passed: anyPassed = true; break;
-            case TGUITestStatus::NotRun: break;
+            case TGUITestStatus::Running:
+                anyRunning = true;
+                break;
+
+            case TGUITestStatus::Failed:
+                anyFailed = true;
+                break;
+
+            case TGUITestStatus::Skipped:
+                anySkipped = true;
+                break;
+
+            case TGUITestStatus::Passed:
+                anyPassed = true;
+                break;
+
+            case TGUITestStatus::NotRun:
+                break;
         }
     }
 

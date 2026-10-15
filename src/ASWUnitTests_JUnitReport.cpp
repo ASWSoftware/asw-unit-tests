@@ -98,6 +98,8 @@ void WriteTestCase(std::ostringstream& body, TJUnitTestCase const& testCase)
 
 } // namespace
 
+//---------------------------------------------------------------------------
+
 namespace ASWUnitTests
 {
 
@@ -173,18 +175,23 @@ std::string TJUnitReportWriter::EscapeXml(std::string const& text)
             case '&':
                 result += "&amp;";
                 break;
+
             case '<':
                 result += "&lt;";
                 break;
+
             case '>':
                 result += "&gt;";
                 break;
+
             case '"':
                 result += "&quot;";
                 break;
+
             case '\'':
                 result += "&apos;";
                 break;
+
             default:
                 result += ch;
                 break;

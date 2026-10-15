@@ -54,6 +54,7 @@ bool IsStorableName(std::string const& name)
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

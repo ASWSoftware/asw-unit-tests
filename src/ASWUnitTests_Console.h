@@ -51,7 +51,7 @@ enum class TConsoleColor
     BrightBlue,
     BrightMagenta,
     BrightCyan,
-    BrightWhite
+    BrightWhite,
 };
 
 
@@ -62,7 +62,7 @@ enum class TColorMode
 {
     Auto,   // color only if stdout is an interactive terminal that supports it
     Always,
-    Never
+    Never,
 };
 
 
@@ -77,7 +77,7 @@ enum class TLogKind
     Info,
     Pass,
     Fail,
-    Skip
+    Skip,
 };
 
 

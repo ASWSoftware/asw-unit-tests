@@ -37,7 +37,7 @@ enum class TJUnitOutcome
 {
     Pass,
     Fail,
-    Skip
+    Skip,
 };
 
 

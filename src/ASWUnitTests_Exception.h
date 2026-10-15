@@ -463,12 +463,13 @@ private:
     TExceptInvalidSuitePath(std::string const& msg, bool isMessage);
 
 public:
-    explicit TExceptInvalidSuitePath(std::string const& suitePath);
-
     // A group registered in suite 'registeredPath' whose own suite path (from its constructor, or its
     // GetSuitePath() for an ITestGroup that doesn't derive from TTestGroupBase) is 'groupPath'.
     static TExceptInvalidSuitePath Conflicting(std::string const& groupName, std::string const& registeredPath,
         std::string const& groupPath);
+
+public:
+    explicit TExceptInvalidSuitePath(std::string const& suitePath);
 };
 
 // /////// Compiler specific exceptions after this line /////////////////////
