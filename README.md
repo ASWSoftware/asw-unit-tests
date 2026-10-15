@@ -13,6 +13,8 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
 - **[Self-registering test methods](#self-registering-test-methods)** - `ASW_TEST` defines a test
   method and registers it with its group, so a test can't be written but left out of the group's
   constructor.
+- **[Test suites](#organizing-groups-into-suites)** - `TSuitePath` puts groups in nested suites, so
+  `--filter "Framework.*"` selects a whole suite, and the VCL GUI runner shows suites in its tree.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*`
   fails the test immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`,
   `Same`/`NotSame`, `Empty`/`NotEmpty`, `IsType`/`IsNotType`, `Near`/`NotNear`,
@@ -136,7 +138,8 @@ versions, and as constants in the `ASWUnitTests` namespace:
 ```
 ASWUnitTests [options]
 
-  --filter <pattern>   Run only tests whose "GroupName.TestName" full name matches <pattern>.
+  --filter <pattern>   Run only tests whose full name matches <pattern>. A full name is
+                       "GroupName.TestName", prefixed by "Suite.Path." for a group in a suite.
                        '*' matches any sequence of characters (including none); '?' matches
                        exactly one character. The whole name must match, e.g. "*String*" for
                        a substring search.
@@ -187,7 +190,7 @@ ASWUnitTests [options]
                        the report's <testsuites name="..."> attribute (default: "ASWUnitTests").
                        Set this to your own project's name so console output and CI dashboards
                        both identify the run correctly.
-  --list               List all registered tests as "GroupName.TestName" and exit, without
+  --list               List all registered tests by full name (see --filter) and exit, without
                        running anything. Combine with --filter to preview a pattern's matches
                        before running it.
   --pause              Prompt "press enter to continue" before exiting after a --list command
@@ -210,7 +213,8 @@ on running in a particular order (e.g. via shared static/global state). If `--sh
 failure, rerun with the logged seed via `--shuffle-seed` to reproduce it exactly while debugging. A
 seed gives the same order with every compiler and platform, and adding `--filter` keeps the matching
 tests in the order that seed gives the full suite, so you can narrow the rerun down to the tests
-involved.
+involved. A [suite](#organizing-groups-into-suites)'s groups are shuffled among themselves, so they
+still run together.
 
 `--partition-index`/`--partition-count` split the suite for parallel execution across separate OS
 processes. Each invocation still runs single-threaded and writes to its own console/JUnit output.
@@ -234,11 +238,12 @@ there: no further tests or groups run, and the process exits with a dedicated ex
 distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the report still
 gets written, covering every test that completed before the timeout, plus the timed-out test's own
 synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped,
-since there is no safe, portable way to interrupt a thread that may be stuck in an infinite loop; if
-a test finishes only moments after being abandoned rather than truly hanging forever, its outcome
-may be recorded inconsistently, since nothing synchronizes it with the timeout-handling thread at
-that point. In practice this only matters for a "barely" timed-out test, not a genuinely hung one,
-and the process exits immediately afterward regardless.
+since there is no safe, portable way to interrupt a thread that may be stuck in an infinite loop. If
+the test ends after all, moments later, its Check failures, its `Log()` lines and its outcome from
+then on never reach the results, the log or a run observer. A test that has already begun recording
+its outcome when the timeout comes counts as finished in time instead. Since that thread may still
+be using its test group, the runner then ends without destroying the test groups, as it does after a
+crash that aborts the run (see `--catch-crashes` below).
 
 `--catch-crashes` guards against a single test crashing (e.g. dereferencing a null pointer) and
 taking down the whole process with it. There is no default; without it, a crashing test still
@@ -288,13 +293,15 @@ This is useful for spotting slow tests without needing an external profiler.
 
 `--report-junit` produces a standard `<testsuites>`/`<testsuite>`/`<testcase>` report. One
 `<testsuite>` per test group, with `<failure>`/`<skipped>` elements carrying the same detail message
-shown on the console. `--project-name` sets both the console's `Initializing...` line and the
-report's `<testsuites name="...">` attribute.
+shown on the console. A group in a [suite](#organizing-groups-into-suites) is named by its qualified
+name (e.g. `Framework.Console.TTest_TConsole`), in its `<testsuite>`'s `name` and each
+`<testcase>`'s `classname`; suites don't get `<testsuite>` elements of their own. `--project-name`
+sets both the console's `Initializing...` line and the report's `<testsuites name="...">` attribute.
 
 Exit codes: `0` all run tests passed or were skipped (or `--version`/`--list`/`--help` completed),
 `1` one or more tests failed, `2` a `std::exception` (or, with
 [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, an RTL `Exception`) from
-`SetUp_Test()`/`TearDown_Test()` or `SetUp_Group()`/`TearDown_Group()` ended the run, `3` an
+`SetUp_Test()`, `TearDown_Test()` or `TearDown_Group()` ended the run, `3` an
 exception of any other type from one of those ended the run, `4` invalid command line arguments, `5`
 a test exceeded `--test-timeout-seconds` and the run was aborted, `6` a test crashed severely enough
 (with `--catch-crashes` given) that the run was aborted. An exception a test throws without
@@ -302,6 +309,9 @@ expecting it (outside a `Check*`/`Assert*` call, with no `SetExceptionExpected()
 test, with `Unexpected exception: ` and the exception's message as its detail, and the run carries
 on, so it's an ordinary test failure (exit code `1`), not `2` or `3`. Likewise, a crash caught by
 `--catch-crashes` that didn't force an abort is an ordinary test failure (exit code `1`), not `6`.
+An exception from a group's `SetUp_Group()` doesn't end the run either: each of the group's tests
+that would have run fails, with `SetUp_Group() exception: ` and the exception's message as its
+detail, `TearDown_Group()` still runs, and the run carries on with the next group (exit code `1`).
 Skipped tests never affect the exit code.
 
 ## VCL GUI Runner
@@ -314,11 +324,14 @@ together with the VCL console project.
 
 The window shows:
 
-- **Test tree** - Every registered test under its group, with a check box to choose what runs (all
-  are checked at first) and a colored dot for its status: gray not run, blue running, green passed,
-  red failed, amber skipped. A group's check box and dot summarize its tests.
+- **Test tree** - Every registered test under its group, and each group under its
+  [suite](#organizing-groups-into-suites), if any, with a check box to choose what runs (all are
+  checked at first) and a colored dot for its status: gray not run, blue running, green passed, red
+  failed, amber skipped. A group's or suite's check box and dot summarize its tests, including those
+  in the suites inside it. **View > Expand All** and **View > Collapse All** expand every suite and
+  group, or collapse the tree to its top-level ones; changing the filter expands it all again.
 - **Detail pane** - The selected test's result, duration, failure or skip detail, and its own log
-  output, or how many of a selected group's tests have each status.
+  output, or how many of a selected group's or suite's tests have each status.
 - **Failures & Skips** - Every failed or skipped test in the latest run. Double-click one to select
   it in the tree.
 - **Log** - The run's full output, with failures in red and skips in amber.
@@ -371,6 +384,11 @@ Tests run on the main (VCL) thread, so a test can create forms and controls.
 `--test-timeout-seconds` runs each test on a worker thread instead, so it can't be combined with
 tests like that; the log says so when it's given.
 
+A run that a test's timeout or crash abandoned leaves **Run Selected** and **Run Failed** disabled
+until the GUI is restarted, since the timed-out test may still be running, and a crash may have left
+the tests' state corrupted. Closing the window then ends the process without destroying the test
+groups, as the console runner does.
+
 The GUI takes the same [command line options](#command-line-options) as the console runner, with
 these differences:
 
@@ -411,8 +429,8 @@ starts the main form.
 
 The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
 `TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
-`std::cout`, is told as each test starts and finishes, and can stop a run between tests, so it can
-drive other kinds of runners too.
+`std::cout`, as plain text without the console's color codes, is told as each test starts and
+finishes, and can stop a run between tests, so it can drive other kinds of runners too.
 
 ## Registering Tests
 
@@ -450,6 +468,58 @@ ASW_REGISTER_TEST_GROUP_ORDERED(ASWUnitTests::TTest_TMyClassToTest, -1) // runs 
 
 Run order is purely for readable, reproducible output. A group's `SetUp_Group`/`TearDown_Group`
 should still make no assumption about which other groups have or haven't already run.
+
+A group whose constructor throws doesn't stop the run. It's logged at startup as `!!ERROR!!`, and a
+group named after its class as the registration macro gives it (e.g.
+`ASWUnitTests::TTest_TMyClassToTest`), in the suite the registration names, stands in for it, with
+one test, `(construction)`, which fails with `Test group class "..." could not be created: ` and the
+exception's message. The rest of the run goes on as usual, and it ends with exit code `1`. The
+exceptions to this are a duplicate test name and an invalid suite path, which still stop the run at
+startup.
+
+### Organizing Groups into Suites
+
+To organize many groups, put each in a suite by passing a `TSuitePath` to its base class
+constructor, ahead of the group's own name. A suite path names nested suites, outermost first,
+separated by `.`:
+
+```
+TTest_TConsole::TTest_TConsole()
+    : inherited(TSuitePath("Framework.Console"), "TTest_TConsole")
+{
+}
+```
+
+That puts group `TTest_TConsole` in suite `Console`, inside suite `Framework`. `TAutoTestGroup`
+(see [Self-Registering Test Methods](#self-registering-test-methods)) has the same constructor. The
+group's qualified name, `Framework.Console.TTest_TConsole`, starts all of its tests' full names, so:
+
+- `--filter "Framework.*"` runs every test in suite `Framework`, including those in `Console`, and
+  `--filter "Framework.Console.*"` runs just those in `Console`.
+- `--list`, the console log and the `--report-junit` report show its tests as
+  `Framework.Console.TTest_TConsole.TestName`, and the [VCL GUI runner](#vcl-gui-runner)'s test tree
+  shows each suite as a node, whose check box checks or unchecks all of its tests.
+
+The registration can name the suite instead, leaving the constructor as it is:
+
+```
+ASW_REGISTER_TEST_GROUP_IN_SUITE(TTest_TConsole, "Framework.Console")
+```
+
+`ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, order)` takes an order too. A group
+whose constructor names a different suite stops the run at startup, and so does an `ITestGroup`
+implemented without `TTestGroupBase` unless its own `GetSuitePath()` gives the registration's suite.
+
+A suite's groups always run together. Within a suite, or at the top level, groups and suites run in
+alphabetical order by their own names. `ASW_REGISTER_TEST_GROUP_ORDERED`'s order only places a group
+among the groups and suites beside it, where a suite counts as order `0`, so it never moves a group
+out of its suite.
+
+Suites only organize groups: they have no `SetUp_Group`/`TearDown_Group` of their own. A suite name
+can't be empty, so a path can't start or end with `.` or contain `..`; constructing a group with
+such a path, or registering one in it, throws `TExceptInvalidSuitePath`, which stops the run at
+startup. Moving a group into a suite changes its tests' full names, as renaming the group would, so
+update any `--filter` pattern that names them.
 
 ### Expecting a Specific Exception Type or Message
 
@@ -618,6 +688,18 @@ A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the val
 strings, `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer
 is shown as `(null)`.
 
+The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring)
+and [prefix and suffix](#checking-the-start-or-end-of-a-string) checks take two C strings too. In
+`CheckEqualsIC` and `CheckNotEqualsIC`, a null pointer only matches another null pointer, as in
+`CheckEquals`. In `CheckContains`, `CheckStartsWith` and `CheckEndsWith`, and their `IC` forms, a
+null pointer, as either the text or the part, matches nothing, so they fail and their `Not` forms
+pass:
+
+```
+char const* const name = FindName(); // null if not found
+CheckStartsWith(name, "ASW", __func__, __LINE__, "fails, rather than crashing, when not found");
+```
+
 ### Comparing Pointers
 
 `CheckEquals`/`AssertEquals` and `CheckNotEquals`/`AssertNotEquals` compare any other two pointers
@@ -654,7 +736,9 @@ CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
 ```
 
 Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form
-(e.g. a namespace or `class ` prefix) depends on the compiler.
+(e.g. a namespace or `class ` prefix) depends on the compiler. With
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, a `TObject` descendant is named
+by its `ClassName()` instead (e.g. `TStringList`), the same with every compiler.
 
 ### Comparing Strings, Ignoring Case
 
@@ -796,6 +880,9 @@ CheckNear(0.3f, sum, 0.0001f, __func__, __LINE__, "sum should be close to 0.3");
 
 Pick a tolerance appropriate to the computation being tested; there's no built-in default, since a
 sensible tolerance depends heavily on the magnitude and accumulated error of the values involved.
+
+A NaN is near nothing, not even another NaN, so `CheckNear` fails and `CheckNotNear` passes when
+either value is a NaN, whatever the tolerance. Equal infinities are near each other.
 
 ### Comparing Greater Than and Less Than
 

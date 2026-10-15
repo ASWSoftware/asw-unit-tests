@@ -32,8 +32,10 @@ limitations under the License.
 #include <stdexcept>
 #include <type_traits>
 //---------------------------------------------------------------------------
+#include <System.Classes.hpp>
 #include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -54,6 +56,24 @@ bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixtureObject
+//
+// A TObject descendant declared in C++, rather than in Delphi code, for TFixture_RTLTypeChecks below: its
+// typeid().name() isn't a name a demangler understands, unlike its ClassName().
+/////////////////////////////////////////////////////////////////////////////
+class TFixtureObject : public System::TObject
+{
+public:
+    __fastcall TFixtureObject()
+        : System::TObject()
+    {
+    }
+};
 
 //---------------------------------------------------------------------------
 
@@ -374,7 +394,8 @@ void TFixture_RTLThrowsChecks::Test_CheckThrows_WrongSiblingType_Fails()
 // TFixture_RTLTypeChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckIsType()/CheckIsNotType() with RTL
-// (Delphi) classes, held as their base class System::Sysutils::Exception: a subclass, a sibling, and a reference.
+// (Delphi) classes, held as their base class System::Sysutils::Exception: a subclass, a sibling, and a reference;
+// and a C++-declared TObject descendant, held as a TObject, with a Delphi class as the expected type, and the reverse.
 // Test names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_RTLTypeChecks : public TTestGroupBase
@@ -385,6 +406,8 @@ private:
 private:
     void Test_CheckIsNotType_Sibling_Passes();
     void Test_CheckIsNotType_Subclass_Fails();
+    void Test_CheckIsType_CppDeclaredClass_Fails();
+    void Test_CheckIsType_DelphiClass_Fails();
     void Test_CheckIsType_Reference_Passes();
     void Test_CheckIsType_Sibling_Fails();
     void Test_CheckIsType_Subclass_Passes();
@@ -404,6 +427,8 @@ TFixture_RTLTypeChecks::TFixture_RTLTypeChecks()
 
     RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsNotType_Sibling_Passes, "CheckIsNotType_Sibling_Passes");
     RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsNotType_Subclass_Fails, "CheckIsNotType_Subclass_Fails");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_CppDeclaredClass_Fails, "CheckIsType_CppDeclaredClass_Fails");
+    RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_DelphiClass_Fails, "CheckIsType_DelphiClass_Fails");
     RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Reference_Passes, "CheckIsType_Reference_Passes");
     RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Sibling_Fails, "CheckIsType_Sibling_Fails");
     RegisterTest(&TFixture_RTLTypeChecks::Test_CheckIsType_Subclass_Passes, "CheckIsType_Subclass_Passes");
@@ -420,6 +445,18 @@ void TFixture_RTLTypeChecks::Test_CheckIsNotType_Subclass_Fails()
 {
     std::unique_ptr<System::Sysutils::Exception> const ex(new System::Sysutils::EConvertError(L"boom"));
     CheckIsNotType<System::Sysutils::EConvertError>(ex, __func__, __LINE__, "it is one");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsType_CppDeclaredClass_Fails()
+{
+    std::unique_ptr<System::TObject> const object(new TFixtureObject());
+    CheckIsType<System::Classes::TStringList>(object, __func__, __LINE__, "a C++-declared class");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLTypeChecks::Test_CheckIsType_DelphiClass_Fails()
+{
+    std::unique_ptr<System::TObject> const object(new System::Classes::TStringList());
+    CheckIsType<TFixtureObject>(object, __func__, __LINE__, "a Delphi class");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLTypeChecks::Test_CheckIsType_Reference_Passes()
@@ -537,6 +574,8 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_RTLExceptions::TTest_ASWUnitTests_RTLExceptions()
     : inherited("ASWUnitTests_RTLExceptions_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_CrashGuardRun_LaterRTLExceptionStillCaught,
+        "CrashGuardRun_LaterRTLExceptionStillCaught");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNameAndMessage,
         "DescribeRTLException_IncludesClassNameAndMessage");
     RegisterTest(&TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses, "IsType_MatchesRTLClasses");
@@ -621,6 +660,48 @@ void TTest_ASWUnitTests_RTLExceptions::TearDown_Test(ITestCase& /*testCase*/)
 // /////// Begin tests after this line ///////////////////////
 
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_RTLExceptions::Test_CrashGuardRun_LaterRTLExceptionStillCaught()
+{
+    // The RTL counterpart of TTest_ASWUnitTests_CrashGuard's Test_Run_AccessViolation_LaterExceptionStillCaught(): with
+    // bcc32c, recovering from a crash inside a try block once left the next exception on the thread uncatchable.
+
+    // Arrange
+    bool caught = false;
+
+    // Act
+    TCrashGuardResult const result = TCrashGuard::Run([]()
+        {
+            // Called through a volatile pointer so the compiler can't drop the try block around it.
+            using TCrash = void (*)();
+            TCrash volatile crash = []()
+                {
+                    int* volatile nullPointer = nullptr;
+                    *nullPointer = 1;
+                };
+
+            try
+            {
+                crash();
+            }
+            catch (System::Sysutils::Exception const&)
+            {
+            }
+        });
+
+    try
+    {
+        throw System::Sysutils::EConvertError(L"thrown after the crash");
+    }
+    catch (System::Sysutils::EConvertError const&)
+    {
+        caught = true;
+    }
+
+    // Assert
+    CheckTrue(result.Crashed, __func__, __LINE__, "the access violation is caught");
+    CheckTrue(caught, __func__, __LINE__, "an RTL exception raised on the same thread afterwards is caught normally");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_RTLExceptions::Test_DescribeRTLException_IncludesClassNameAndMessage()
 {
     // Arrange
@@ -644,11 +725,13 @@ void TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses()
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(5), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(7), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     std::string siblingMessage;
     std::string subclassMessage;
+    std::string cppDeclaredMessage;
+    std::string delphiMessage;
     for (TTestCaseRecord const& record : results.CaseRecords)
     {
         if (NameEndsWith(record.TestName, "_Passes"))
@@ -665,17 +748,26 @@ void TTest_ASWUnitTests_RTLExceptions::Test_IsType_MatchesRTLClasses()
             Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
         }
 
-        if (record.TestName == "CheckIsType_Sibling_Fails")
+        if (record.TestName == "CheckIsType_CppDeclaredClass_Fails")
+            cppDeclaredMessage = record.Message;
+        else if (record.TestName == "CheckIsType_DelphiClass_Fails")
+            delphiMessage = record.Message;
+        else if (record.TestName == "CheckIsType_Sibling_Fails")
             siblingMessage = record.Message;
         else if (record.TestName == "CheckIsNotType_Subclass_Fails")
             subclassMessage = record.Message;
     }
 
-    // Type names vary by compiler, but always contain the class's own name.
-    CheckMatches(siblingMessage, std::string(".*Expected type \".*EConvertError\" but was \".*EArgumentException\"\\. "
-        "a sibling class"), __func__, __LINE__, "shows the expected class and the object's actual class");
-    CheckMatches(subclassMessage, std::string(".*Expected not type \".*EConvertError\" but was \".*EConvertError\"\\. "
-        "it is one"), __func__, __LINE__, "shows the class it shouldn't have been");
+    // Each class is named by its ClassName(), the same with every compiler.
+    CheckContains(siblingMessage, ": Expected type \"EConvertError\" but was \"EArgumentException\". a sibling class",
+        __func__, __LINE__, "shows the expected class and the object's actual class");
+    CheckContains(subclassMessage, ": Expected not type \"EConvertError\" but was \"EConvertError\". it is one",
+        __func__, __LINE__, "shows the class it shouldn't have been");
+    CheckContains(cppDeclaredMessage,
+        ": Expected type \"TStringList\" but was \"TFixtureObject\". a C++-declared class", __func__, __LINE__,
+        "names a C++-declared class too");
+    CheckContains(delphiMessage, ": Expected type \"TFixtureObject\" but was \"TStringList\". a Delphi class",
+        __func__, __LINE__, "and a C++-declared class as the expected type");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_RTLExceptions::Test_RTLExceptionMessage_ConvertsToUTF8()

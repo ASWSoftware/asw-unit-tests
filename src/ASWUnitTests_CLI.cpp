@@ -24,7 +24,6 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_CLI.h"
 //---------------------------------------------------------------------------
-#include <exception>
 #include <iostream>
 #include <limits>
 #include <string_view>
@@ -45,11 +44,12 @@ void PrintUsage()
     << "Usage: ASWUnitTests [options]\n"
     "\n"
     "Options:\n"
-    "  --filter <pattern>  Run only tests whose \"GroupName.TestName\" full name\n"
-    "                      matches <pattern>. '*' matches any sequence of\n"
-    "                      characters (including none); '?' matches exactly\n"
-    "                      one character. The whole name must match, e.g.\n"
-    "                      \"*String*\" for a substring search.\n"
+    "  --filter <pattern>  Run only tests whose full name matches <pattern>.\n"
+    "                      A full name is \"GroupName.TestName\", prefixed by\n"
+    "                      \"Suite.Path.\" for a group in a suite. '*' matches\n"
+    "                      any sequence of characters (including none); '?'\n"
+    "                      matches exactly one character. The whole name must\n"
+    "                      match, e.g. \"*String*\" for a substring search.\n"
     "  --filter-ignore-case\n"
     "                      Match --filter's <pattern> case-insensitively.\n"
     "                      Has no effect without --filter.\n"
@@ -115,8 +115,8 @@ void PrintUsage()
     "                      --report-junit is also given, used as the report's\n"
     "                      <testsuites name=\"...\"> attribute (default:\n"
     "                      \"ASWUnitTests\").\n"
-    "  --list              List all registered tests as \"GroupName.TestName\"\n"
-    "                      and exit, without running anything.\n"
+    "  --list              List all registered tests by full name (see\n"
+    "                      --filter) and exit, without running anything.\n"
     "  --pause             Prompt \"press enter to continue\" before exiting\n"
     "                      after a --list command or test run.\n"
     "  --version           Print the framework version and exit.\n"
@@ -508,23 +508,27 @@ std::optional<TColorMode> TCLIParser::ParseColorMode(std::string const& text)
 //---------------------------------------------------------------------------
 std::optional<unsigned int> TCLIParser::ParseUnsignedInt(std::string const& text)
 {
-    if (text.empty() || text[0] == '-')
+    if (text.empty())
         return std::nullopt;
 
-    try
-    {
-        size_t charsConsumed = 0;
-        unsigned long const value = std::stoul(text, &charsConsumed);
+    // Digit by digit, not with std::stoul(), which skips leading white space and accepts a sign, turning " -5" into
+    // a large unsigned value.
+    unsigned int const maxValue = std::numeric_limits<unsigned int>::max();
+    unsigned int value = 0;
 
-        if (charsConsumed != text.size() || value > std::numeric_limits<unsigned int>::max())
+    for (char const ch : text)
+    {
+        if (ch < '0' || ch > '9')
             return std::nullopt;
 
-        return static_cast<unsigned int>(value);
+        unsigned int const digit = static_cast<unsigned int>(ch - '0');
+        if (value > (maxValue - digit) / 10)
+            return std::nullopt;
+
+        value = value * 10 + digit;
     }
-    catch (std::exception const&)
-    {
-        return std::nullopt;
-    }
+
+    return value;
 }
 //---------------------------------------------------------------------------
 

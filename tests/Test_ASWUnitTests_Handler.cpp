@@ -26,11 +26,18 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
+#include <cstddef>
+#include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Console.h"
+#include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_StdOutRedirect.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -38,7 +45,21 @@ namespace
 
 using namespace ASWUnitTests;
 
+std::string JoinIndices(std::vector<size_t> const& indices);
 TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests);
+
+//---------------------------------------------------------------------------
+
+// 'indices' joined with ",", so a whole order can be compared, and shown on failure, as one string.
+std::string JoinIndices(std::vector<size_t> const& indices)
+{
+    std::string joined;
+
+    for (size_t i = 0; i < indices.size(); ++i)
+        joined += (i == 0 ? std::string() : std::string(",")) + std::to_string(indices[i]);
+
+    return joined;
+}
 
 //---------------------------------------------------------------------------
 
@@ -54,6 +75,141 @@ TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests)
         };
 }
 
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupConstructorThrows
+//
+// A group registered in suite "HandlerFixtures", so a nested TTestHandler creates it, whose constructor throws what
+// ConstructorThrows says, for Test_Initialize_ReplacesGroupWhoseConstructorThrows below. Otherwise (as in every
+// ordinary run) it's created as usual and its one test passes.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_GroupConstructorThrows : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_Passes();
+
+public:
+    enum class TThrow
+    {
+        Nothing,
+        StdException,     // A std::runtime_error.
+        RTLException,     // An EConvertError, in RTL builds.
+        DuplicateTestName // Registers its test twice, so RegisterTest() throws TExceptDuplicateTestName.
+    };
+
+    static TThrow ConstructorThrows;
+
+public:
+    TFixture_GroupConstructorThrows();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+TFixture_GroupConstructorThrows::TThrow TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+
+//---------------------------------------------------------------------------
+TFixture_GroupConstructorThrows::TFixture_GroupConstructorThrows()
+    : inherited("ASWUnitTests_Handler_ConstructorFixture")
+{
+    if (ConstructorThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate constructor failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (ConstructorThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate constructor failure");
+#endif
+
+    RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+
+    if (ConstructorThrows == TThrow::DuplicateTestName)
+        RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupConstructorThrows::Test_Passes()
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupSetUpThrows
+//
+// A registered group, so a nested TTestHandler creates and runs it, whose SetUp_Group() throws what SetUpGroupThrows
+// says, for Test_Run_FailsGroupTestsWhenSetUpGroupThrows below. Otherwise (as in every ordinary run) its set-up does
+// nothing and its two tests pass.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_GroupSetUpThrows : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_First();
+    void Test_Second();
+
+public:
+    enum class TThrow
+    {
+        Nothing,
+        StdException, // A std::runtime_error.
+        RTLException  // An EConvertError, in RTL builds.
+    };
+
+    static TThrow SetUpGroupThrows;
+    // Counts set by the latest instance, for the test to check.
+    static size_t TearDownGroupCalls;
+    static size_t TestsRun;
+
+public:
+    TFixture_GroupSetUpThrows();
+
+    void SetUp_Group() override;
+    void TearDown_Group() override;
+};
+
+TFixture_GroupSetUpThrows::TThrow TFixture_GroupSetUpThrows::SetUpGroupThrows = TThrow::Nothing;
+size_t TFixture_GroupSetUpThrows::TearDownGroupCalls = 0;
+size_t TFixture_GroupSetUpThrows::TestsRun = 0;
+
+//---------------------------------------------------------------------------
+TFixture_GroupSetUpThrows::TFixture_GroupSetUpThrows()
+    : inherited("ASWUnitTests_Handler_GroupSetUpFixture")
+{
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_First, "First");
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_Second, "Second");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::SetUp_Group()
+{
+    if (SetUpGroupThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate SetUp_Group() failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (SetUpGroupThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate SetUp_Group() failure");
+#endif
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::TearDown_Group()
+{
+    ++TearDownGroupCalls;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_First()
+{
+    ++TestsRun;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_Second()
+{
+    ++TestsRun;
+}
 //---------------------------------------------------------------------------
 
 
@@ -107,13 +263,29 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_Handler::TTest_ASWUnitTests_Handler()
     : inherited("ASWUnitTests_Handler_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_KeepsSuitesTogether,
+        "CanonicalGroupOrder_KeepsSuitesTogether");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_RejectsInvalidSuitePath,
+        "CanonicalGroupOrder_RejectsInvalidSuitePath");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName,
+        "CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames,
         "GetTests_MatchesGetAllTestFullNames");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows,
+        "Initialize_ReplacesGroupWhoseConstructorThrows");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows,
+        "Run_FailsGroupTestsWhenSetUpGroupThrows");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered,
         "Run_ShuffleKeepsOrderWhenFiltered");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOutput,
         "SetRunObserver_ReceivesInitializeAndRunOutput");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesLogWithoutColor,
+        "SetRunObserver_ReceivesLogWithoutColor");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups, "SetRunObserver_StopsBetweenGroups");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_KeepsSuitesTogether,
+        "ShuffledGroupOrder_KeepsSuitesTogether");
+    RegisterTest(&TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices,
+        "ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_CaseSensitivity, "WildcardMatch_CaseSensitivity");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_ExactAndStar, "WildcardMatch_ExactAndStar");
     RegisterTest(&TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark, "WildcardMatch_QuestionMark");
@@ -142,6 +314,65 @@ void TTest_ASWUnitTests_Handler::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_KeepsSuitesTogether()
+{
+    // Arrange: groups at the top level, in suite "S", and in suite "S.T", plus a group named "T" in "S" beside
+    // suite "S.T", given out of order.
+    std::vector<TTestGroupOrderKey> const groups = {
+        TTestGroupOrderKey{ "", "Zed", 0 },     // 0
+        TTestGroupOrderKey{ "S", "G2", 0 },     // 1
+        TTestGroupOrderKey{ "", "Alpha", 0 },   // 2
+        TTestGroupOrderKey{ "S.T", "G3", 0 },   // 3
+        TTestGroupOrderKey{ "S", "G1", 0 },     // 4
+        TTestGroupOrderKey{ "", "Early", -1 },  // 5
+        TTestGroupOrderKey{ "S", "Late", 1 },   // 6
+        TTestGroupOrderKey{ "S", "T", 0 },      // 7
+        TTestGroupOrderKey{ "S", "First", -5 }  // 8
+    };
+
+    // Act
+    std::vector<size_t> const order = TTestHandler::CanonicalGroupOrder(groups);
+
+    // Assert
+    CheckEquals(std::string("5,2,8,4,1,7,3,6,0"), JoinIndices(order), __func__, __LINE__,
+        "Early (order -1) first, then Alpha, then all of suite S before Zed; within S, First (order -5), G1, G2, "
+        "group T before suite T's G3, then Late (order 1). An order only sorts a group among its siblings, so "
+        "First doesn't move S ahead of Alpha");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_RejectsInvalidSuitePath()
+{
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            return TTestHandler::CanonicalGroupOrder({ TTestGroupOrderKey{ "S..T", "G", 0 } });
+        }, __func__, __LINE__, "a suite path with an empty suite name, from an ITestGroup's GetSuitePath()",
+        "Suite path \"S..T\" has an empty suite name");
+    CheckThrows<TExceptInvalidSuitePath>([]()
+        {
+            return TTestHandler::ShuffledGroupOrder({ "", "S." }, 1);
+        }, __func__, __LINE__, "ShuffledGroupOrder() checks suite paths the same way",
+        "Suite path \"S.\" has an empty suite name");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName()
+{
+    // Arrange
+    std::vector<TTestGroupOrderKey> const groups = {
+        TTestGroupOrderKey{ "", "Bravo", 0 },    // 0
+        TTestGroupOrderKey{ "", "Alpha", 0 },    // 1
+        TTestGroupOrderKey{ "", "Charlie", -1 }, // 2
+        TTestGroupOrderKey{ "", "Alpha", 0 },    // 3
+        TTestGroupOrderKey{ "", "Delta", 1 }     // 4
+    };
+
+    // Act
+    std::vector<size_t> const order = TTestHandler::CanonicalGroupOrder(groups);
+
+    // Assert
+    CheckEquals(std::string("2,1,3,0,4"), JoinIndices(order), __func__, __LINE__,
+        "by order, then name, with tied groups kept in registration order, as before suites existed");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
 {
@@ -173,6 +404,188 @@ void TTest_ASWUnitTests_Handler::Test_GetTests_MatchesGetAllTestFullNames()
     }
 
     CheckTrue(foundThisTest, __func__, __LINE__, "this very test is listed, under its own group");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Initialize_ReplacesGroupWhoseConstructorThrows()
+{
+    typedef TFixture_GroupConstructorThrows::TThrow TThrow;
+
+    // Cleared again however each scenario ends, so the group's own run in this suite isn't affected.
+    struct TResetThrow
+    {
+        ~TResetThrow()
+        {
+            TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+        }
+    } const resetThrow;
+
+    // What the constructor throws, and how the failure describes it.
+    std::vector<std::pair<TThrow, std::string> > const scenarios =
+    {
+        { TThrow::StdException, "deliberate constructor failure" },
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        {
+            TThrow::RTLException, "EConvertError: deliberate constructor failure"
+        },
+#endif
+    };
+
+    for (std::pair<TThrow, std::string> const& scenario : scenarios)
+    {
+        std::string const& description = scenario.second;
+        std::string const detail = "Test group class \"TFixture_GroupConstructorThrows\" could not be created: " +
+            description;
+
+        // Act
+        TTestHandler handler;
+        std::string log;
+        TTestResults results;
+        {
+            TFixture_GroupConstructorThrows::ConstructorThrows = scenario.first;
+            TStdOutRedirect const captureOutput;
+            handler.Initialize("Test_Initialize_ReplacesGroupWhoseConstructorThrows");
+            log = captureOutput.Str();
+            TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+            results = handler.Run([](std::string const& fullName)
+                {
+                    return fullName.rfind("HandlerFixtures.", 0) == 0;
+                }, "the HandlerFixtures suite");
+        }
+
+        // Assert
+        CheckContains(log, "!!ERROR!!: " + detail, __func__, __LINE__, description + ": the failure is logged");
+
+        bool foundStandIn = false;
+        for (TTestId const& test : handler.GetTests())
+        {
+            CheckNotEquals(std::string("HandlerFixtures.ASWUnitTests_Handler_ConstructorFixture"), test.GroupName,
+                __func__, __LINE__, description + ": the group itself wasn't created");
+
+            if (test.GroupName == "HandlerFixtures.TFixture_GroupConstructorThrows")
+            {
+                foundStandIn = true;
+                CheckEquals(std::string("(construction)"), test.TestName, __func__, __LINE__,
+                    description + ": the stand-in's one test");
+                CheckEquals(std::string("HandlerFixtures"), test.SuitePath, __func__, __LINE__,
+                    description + ": the stand-in is in the registration's suite");
+            }
+        }
+
+        CheckTrue(foundStandIn, __func__, __LINE__, description + ": a group named after the class stands in for it");
+        CheckEquals(1u, results.FailedCount, __func__, __LINE__, description + ": the stand-in's test fails");
+        CheckEquals(0u, results.SuccessCount, __func__, __LINE__, description + ": and nothing else in the suite ran");
+        AssertEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__,
+            description + ": one record");
+        CheckEquals(std::string("(construction)"), results.CaseRecords.front().TestName, __func__, __LINE__,
+            description + ": for the stand-in's test");
+        CheckEquals(detail, results.CaseRecords.front().Message, __func__, __LINE__,
+            description + ": saying why the group couldn't be created");
+    }
+
+    // A mistake in how a group registers its tests still stops the run at startup.
+    TTestHandler handler;
+    bool duplicateThrown = false;
+    {
+        TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::DuplicateTestName;
+        TStdOutRedirect const suppressOutput;
+
+        try
+        {
+            handler.Initialize("Test_Initialize_ReplacesGroupWhoseConstructorThrows");
+        }
+        catch (TExceptDuplicateTestName const&)
+        {
+            duplicateThrown = true;
+        }
+
+        TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
+    }
+
+    CheckTrue(duplicateThrown, __func__, __LINE__, "a TExceptDuplicateTestName from a constructor isn't replaced");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_Run_FailsGroupTestsWhenSetUpGroupThrows()
+{
+    // Arrange: the fixture group's first test only, so its other test checks the filter still applies, then a
+    // group of pure-function tests that must still run after it.
+    TestFilter const filter = [](std::string const& fullName)
+        {
+            return fullName == "ASWUnitTests_Handler_GroupSetUpFixture.First" ||
+                fullName.rfind("ASWUnitTests_Version_Tests.", 0) == 0;
+        };
+    TTestHandler handler;
+    {
+        TStdOutRedirect const suppressOutput;
+        handler.Initialize("Test_Run_FailsGroupTestsWhenSetUpGroupThrows");
+    }
+
+    // What SetUp_Group() throws, and how the failure describes it.
+    std::vector<std::pair<TFixture_GroupSetUpThrows::TThrow, std::string> > const scenarios =
+    {
+        { TFixture_GroupSetUpThrows::TThrow::StdException, "deliberate SetUp_Group() failure" },
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        {
+            TFixture_GroupSetUpThrows::TThrow::RTLException, "EConvertError: deliberate SetUp_Group() failure"
+        },
+#endif
+    };
+
+    for (std::pair<TFixture_GroupSetUpThrows::TThrow, std::string> const& scenario : scenarios)
+    {
+        std::string const& description = scenario.second;
+        TFixture_GroupSetUpThrows::TearDownGroupCalls = 0;
+        TFixture_GroupSetUpThrows::TestsRun = 0;
+
+        // Act
+        TTestResults results;
+        std::string log;
+        {
+            // Cleared again however Run() ends, so the group's own run in this suite isn't affected.
+            struct TResetThrow
+            {
+                ~TResetThrow()
+                {
+                    TFixture_GroupSetUpThrows::SetUpGroupThrows = TFixture_GroupSetUpThrows::TThrow::Nothing;
+                }
+            } const resetThrow;
+
+            TFixture_GroupSetUpThrows::SetUpGroupThrows = scenario.first;
+            TStdOutRedirect const captureOutput;
+            results = handler.Run(filter, "the fixture group and the version tests");
+            log = captureOutput.Str();
+        }
+
+        // Assert
+        CheckEquals(static_cast<size_t>(0), TFixture_GroupSetUpThrows::TestsRun, __func__, __LINE__,
+            description + ": none of the group's tests ran");
+        CheckEquals(static_cast<size_t>(1), TFixture_GroupSetUpThrows::TearDownGroupCalls, __func__, __LINE__,
+            description + ": TearDown_Group() still ran");
+        CheckEquals(1u, results.FailedCount, __func__, __LINE__,
+            description + ": one failure, for the one test the filter matches");
+        CheckGreaterThan(results.SuccessCount, 0u, __func__, __LINE__,
+            description + ": the next group's tests still ran and passed");
+
+        size_t fixtureRecords = 0;
+        for (TTestCaseRecord const& record : results.CaseRecords)
+        {
+            if (record.GroupName != "ASWUnitTests_Handler_GroupSetUpFixture")
+                continue;
+
+            ++fixtureRecords;
+            CheckEquals(std::string("First"), record.TestName, __func__, __LINE__,
+                description + ": the test the filter matches");
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, description + ": recorded as failed");
+            CheckEquals("SetUp_Group() exception: " + description, record.Message, __func__, __LINE__,
+                description + ": its detail names SetUp_Group() and the exception");
+        }
+
+        CheckEquals(static_cast<size_t>(1), fixtureRecords, __func__, __LINE__,
+            description + ": one record for the group");
+        CheckContains(log, "!!ERROR!!: SetUp_Group() exception for group \"ASWUnitTests_Handler_GroupSetUpFixture\": " +
+            description, __func__, __LINE__, description + ": the exception is logged");
+        CheckContains(log, "\"ASWUnitTests_Handler_GroupSetUpFixture.First\": SetUp_Group() exception: ", __func__,
+            __LINE__, description + ": and so is the test's failure");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_Run_ShuffleKeepsOrderWhenFiltered()
@@ -258,6 +671,26 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesInitializeAndRunOut
     CheckFalse(results.Stopped, __func__, __LINE__, "a run the observer never asked to stop isn't marked stopped");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_SetRunObserver_ReceivesLogWithoutColor()
+{
+    // Arrange
+    TTestHandler handler;
+    TRecordingObserver observer;
+    handler.SetRunObserver(&observer);
+    TColorMode const savedMode = TConsole::GetColorMode();
+    TConsole::SetColorMode(TColorMode::Always); // So the console would get color codes.
+
+    // Act
+    handler.Initialize("ObserverTestProject");
+    handler.Run(WildcardMatchTestsFilter(false), "WildcardMatch_* tests only");
+    TConsole::SetColorMode(savedMode);
+
+    // Assert
+    CheckContains(observer.LogText, "Done. Succeeded: 3", __func__, __LINE__, "the group's colored totals are logged");
+    CheckContains(observer.LogText, "Totals: succeeded: 3", __func__, __LINE__, "and so are the run's");
+    CheckTrue(observer.LogText.find('\x1b') == std::string::npos, __func__, __LINE__, "with no color codes");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups()
 {
     // Arrange
@@ -278,6 +711,74 @@ void TTest_ASWUnitTests_Handler::Test_SetRunObserver_StopsBetweenGroups()
     CheckNotContains(observer.LogText, "\"ASWUnitTests_StdOutRedirect_Tests\"", __func__, __LINE__,
         "the second group was never even set up");
     CheckContains(observer.LogText, "Run stopped on request", __func__, __LINE__, "the log says the run was stopped");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_KeepsSuitesTogether()
+{
+    // Arrange: groups in canonical order, with suite "A" (holding suite "A.B") and suite "C" among top-level ones.
+    std::vector<std::string> const suitePaths = { "", "A", "A", "A.B", "A.B", "A", "", "C", "C" };
+    std::vector<std::string> const suites = { "A", "A.B", "C" };
+    std::vector<std::string> const oneSuite(5, "A");
+    bool anyReordered = false;
+
+    for (unsigned int seed = 1; seed <= 20; ++seed)
+    {
+        // Act
+        std::vector<size_t> const order = TTestHandler::ShuffledGroupOrder(suitePaths, seed);
+
+        // Assert
+        std::vector<size_t> sorted = order;
+        std::sort(sorted.begin(), sorted.end());
+        CheckEquals(std::string("0,1,2,3,4,5,6,7,8"), JoinIndices(sorted), __func__, __LINE__,
+            "every group appears exactly once (seed " + std::to_string(seed) + ")");
+        CheckEquals(JoinIndices(order), JoinIndices(TTestHandler::ShuffledGroupOrder(suitePaths, seed)), __func__,
+            __LINE__, "the same seed gives the same order (seed " + std::to_string(seed) + ")");
+
+        for (std::string const& suite : suites)
+        {
+            size_t first = order.size();
+            size_t last = 0;
+            size_t count = 0;
+
+            for (size_t position = 0; position < order.size(); ++position)
+            {
+                std::string const& path = suitePaths[order[position]];
+
+                if (path == suite || path.rfind(suite + ".", 0) == 0)
+                {
+                    first = std::min(first, position);
+                    last = std::max(last, position);
+                    ++count;
+                }
+            }
+
+            CheckEquals(count, last - first + 1, __func__, __LINE__, "suite " + suite + "'s groups run together (seed " +
+                std::to_string(seed) + ")");
+        }
+
+        if (JoinIndices(order) != "0,1,2,3,4,5,6,7,8")
+            anyReordered = true;
+
+        CheckEquals(JoinIndices(ShuffledIndices(oneSuite.size(), seed + FNV1aHash("A"))),
+            JoinIndices(TTestHandler::ShuffledGroupOrder(oneSuite, seed)), __func__, __LINE__,
+            "a suite's groups are shuffled with the seed plus the FNV-1a hash of its path (seed " +
+            std::to_string(seed) + ")");
+    }
+
+    CheckTrue(anyReordered, __func__, __LINE__, "some seed actually shuffles the groups");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Handler::Test_ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices()
+{
+    std::vector<std::string> const suitePaths(7, std::string());
+
+    for (unsigned int seed = 1; seed <= 8; ++seed)
+    {
+        CheckEquals(JoinIndices(ShuffledIndices(suitePaths.size(), seed)),
+            JoinIndices(TTestHandler::ShuffledGroupOrder(suitePaths, seed)), __func__, __LINE__,
+            "without suites, a seed gives the same group order as before suites existed (seed " +
+            std::to_string(seed) + ")");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_WildcardMatch_CaseSensitivity()
@@ -305,6 +806,11 @@ void TTest_ASWUnitTests_Handler::Test_WildcardMatch_ExactAndStar()
         __func__, __LINE__, "a substring alone does not match - the whole name must match");
     CheckTrue(TTestHandler::WildcardMatch("*String*", "Test_ASWTools_String.cpp"),
         __func__, __LINE__, "explicit substring search via surrounding stars");
+    CheckTrue(TTestHandler::WildcardMatch("*", "*abc"), __func__, __LINE__, "bare star matches text starting with a star");
+    CheckTrue(TTestHandler::WildcardMatch("*c", "*abc"), __func__, __LINE__, "leading star matches a star in the text");
+    CheckTrue(TTestHandler::WildcardMatch("a*", "a*"), __func__, __LINE__, "trailing star matches a star in the text");
+    CheckTrue(TTestHandler::WildcardMatch("*b*", "a*b*c"), __func__, __LINE__, "stars around a name holding stars");
+    CheckFalse(TTestHandler::WildcardMatch("*d", "*abc"), __func__, __LINE__, "a star in the text is still just a char");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark()
@@ -322,3 +828,5 @@ void TTest_ASWUnitTests_Handler::Test_WildcardMatch_QuestionMark()
 
 //---------------------------------------------------------------------------
 ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_ASWUnitTests_Handler)
+ASW_REGISTER_TEST_GROUP_IN_SUITE(TFixture_GroupConstructorThrows, "HandlerFixtures")
+ASW_REGISTER_TEST_GROUP(TFixture_GroupSetUpThrows)

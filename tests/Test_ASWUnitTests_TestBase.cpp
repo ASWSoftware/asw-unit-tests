@@ -25,6 +25,7 @@ limitations under the License.
 #include "Test_ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -160,6 +161,27 @@ public:
         EventsOnConstructingThread = EventsOnConstructingThread && (std::this_thread::get_id() == m_ConstructingThread);
         ++StopRequestedCalls;
         return FinishedRecords.size() >= StopAfterFinishedCount;
+    }
+};
+
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TSlowFinishObserver
+//
+// A TRecordingObserver that takes 1.5 seconds over a test's "Finished test" log line, which a test logs while
+// recording its outcome, so a one second timeout fires during that, for
+// Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished below.
+/////////////////////////////////////////////////////////////////////////////
+class TSlowFinishObserver : public TRecordingObserver
+{
+public:
+    void OnLog(std::string const& text) override
+    {
+        TRecordingObserver::OnLog(text);
+
+        if (text.find("Finished test") != std::string::npos)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     }
 };
 
@@ -2384,6 +2406,56 @@ void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Pas
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_LateFinish
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that sleeps past a one second
+// timeout, then fails a Check, logs a line and ends, followed by one that must never run. Logging is left on, for a
+// run observer to collect. Used by Test_Run_IgnoresTestThatEndsAfterItsTimeout below to prove an abandoned test that
+// ends after all changes neither the results nor the log.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_LateFinish : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_EndsJustAfterTimeout();
+    void Test_NeverRuns();
+
+public:
+    std::atomic<bool> Ended{ false }; // Set as the first test ends, after its Check failure and its log line.
+
+public:
+    TFixture_LateFinish();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_LateFinish::TFixture_LateFinish()
+    : inherited("Fixture_LateFinish")
+{
+    // Registration order matters: the late test must run first, so the other is still pending at the timeout.
+    RegisterTest(&TFixture_LateFinish::Test_EndsJustAfterTimeout, "EndsJustAfterTimeout");
+    RegisterTest(&TFixture_LateFinish::Test_NeverRuns, "NeverRuns");
+}
+//---------------------------------------------------------------------------
+void TFixture_LateFinish::Test_EndsJustAfterTimeout()
+{
+    std::this_thread::sleep_for(std::chrono::milliseconds(1300));
+    CheckTrue(false, __func__, __LINE__, "late Check failure");
+    Log("late log line");
+    Ended = true;
+}
+//---------------------------------------------------------------------------
+void TFixture_LateFinish::Test_NeverRuns()
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_MatchesChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertMatches()/CheckMatches()/
@@ -2759,7 +2831,7 @@ void TFixture_MixedOutcomes::Test_Skip()
 // TFixture_NearComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckNear()/AssertNear()/
-// CheckNotNear()'s tolerance boundary: the implementation fails only when diff > tolerance, so a
+// CheckNotNear()'s tolerance boundary: the implementation passes only when diff <= tolerance, so a
 // diff exactly equal to tolerance must still count as "near". Test names self-document expected
 // outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
@@ -2831,6 +2903,369 @@ void TFixture_NearComparisons::Test_CheckNotNear_AtToleranceBoundary_Fails()
 void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 {
     CheckNotNear(1.0f, 1.51f, 0.5f, __func__, __LINE__, "diff (0.51) exceeds tolerance: correctly 'not near'");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearNonFiniteValues
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods, float and
+// double, with NaNs and infinities, so Test_Near_HandlesNaNAndInfinity below can check that a NaN is near nothing (not
+// even another NaN, however large the tolerance) and that equal infinities are near each other, though a NaN
+// difference or an infinite one compares false with any tolerance. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearNonFiniteValues : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_NaN_Fails();
+    void Test_AssertNotNear_EqualInfinities_Fails();
+    void Test_AssertNotNear_NaN_Passes();
+    void Test_CheckNear_BothNaN_Fails();
+    void Test_CheckNear_EqualInfinities_Passes();
+    void Test_CheckNear_EqualNegativeInfinities_Passes();
+    void Test_CheckNear_Float_EqualInfinities_Passes();
+    void Test_CheckNear_Float_NaN_Fails();
+    void Test_CheckNear_InfinityAndFinite_Fails();
+    void Test_CheckNear_NaNActual_Fails();
+    void Test_CheckNear_NaNExpected_Fails();
+    void Test_CheckNear_OppositeInfinities_Fails();
+    void Test_CheckNotNear_BothNaN_Passes();
+    void Test_CheckNotNear_EqualInfinities_Fails();
+    void Test_CheckNotNear_Float_NaN_Passes();
+    void Test_CheckNotNear_InfinityAndFinite_Passes();
+    void Test_CheckNotNear_NaN_Passes();
+
+public:
+    TFixture_NearNonFiniteValues();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_NearNonFiniteValues::TFixture_NearNonFiniteValues()
+    : inherited("Fixture_NearNonFiniteValues")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNear_NaN_Fails, "AssertNear_NaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNotNear_EqualInfinities_Fails,
+        "AssertNotNear_EqualInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_AssertNotNear_NaN_Passes, "AssertNotNear_NaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_BothNaN_Fails, "CheckNear_BothNaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_EqualInfinities_Passes,
+        "CheckNear_EqualInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_EqualNegativeInfinities_Passes,
+        "CheckNear_EqualNegativeInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_Float_EqualInfinities_Passes,
+        "CheckNear_Float_EqualInfinities_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_Float_NaN_Fails, "CheckNear_Float_NaN_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_InfinityAndFinite_Fails,
+        "CheckNear_InfinityAndFinite_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_NaNActual_Fails, "CheckNear_NaNActual_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_NaNExpected_Fails, "CheckNear_NaNExpected_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNear_OppositeInfinities_Fails,
+        "CheckNear_OppositeInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_BothNaN_Passes, "CheckNotNear_BothNaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_EqualInfinities_Fails,
+        "CheckNotNear_EqualInfinities_Fails");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_Float_NaN_Passes, "CheckNotNear_Float_NaN_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_InfinityAndFinite_Passes,
+        "CheckNotNear_InfinityAndFinite_Passes");
+    RegisterTest(&TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes, "CheckNotNear_NaN_Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNear_NaN_Fails()
+{
+    AssertNear(1.0, std::numeric_limits<double>::quiet_NaN(), 0.1, __func__, __LINE__, "a NaN is near nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNotNear_EqualInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    AssertNotNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near each other");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_AssertNotNear_NaN_Passes()
+{
+    AssertNotNear(1.0, std::numeric_limits<double>::quiet_NaN(), 0.1, __func__, __LINE__, "a NaN is near nothing");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_BothNaN_Fails()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckNear(nan, nan, 0.1, __func__, __LINE__, "a NaN isn't near another NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_EqualInfinities_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near, though their difference is a NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_EqualNegativeInfinities_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(-inf, -inf, 0.1, __func__, __LINE__, "equal negative infinities are near too");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_Float_EqualInfinities_Passes()
+{
+    float const inf = std::numeric_limits<float>::infinity();
+    CheckNear(inf, inf, 0.1f, __func__, __LINE__, "float overload, equal infinities are near");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_Float_NaN_Fails()
+{
+    CheckNear(1.0f, std::numeric_limits<float>::quiet_NaN(), 0.1f, __func__, __LINE__, "float overload, NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_InfinityAndFinite_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, 1.0, std::numeric_limits<double>::max(), __func__, __LINE__, "an infinite difference");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_NaNActual_Fails()
+{
+    CheckNear(1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "no tolerance accepts a NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_NaNExpected_Fails()
+{
+    CheckNear(std::numeric_limits<double>::quiet_NaN(), 1.0, 0.1, __func__, __LINE__, "a NaN as the expected value");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNear_OppositeInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNear(inf, -inf, 0.1, __func__, __LINE__, "opposite infinities are far apart");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_BothNaN_Passes()
+{
+    double const nan = std::numeric_limits<double>::quiet_NaN();
+    CheckNotNear(nan, nan, 0.1, __func__, __LINE__, "a NaN isn't near another NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_EqualInfinities_Fails()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNotNear(inf, inf, 0.1, __func__, __LINE__, "equal infinities are near each other");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_Float_NaN_Passes()
+{
+    CheckNotNear(1.0f, std::numeric_limits<float>::quiet_NaN(), 0.1f, __func__, __LINE__, "float overload, NaN");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_InfinityAndFinite_Passes()
+{
+    double const inf = std::numeric_limits<double>::infinity();
+    CheckNotNear(inf, 1.0, std::numeric_limits<double>::max(), __func__, __LINE__, "an infinite difference");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes()
+{
+    CheckNotNear(1.0, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::max(), __func__, __LINE__,
+        "no tolerance makes a NaN near");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NullCStringTextChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the C string overloads of the IC Equals,
+// Contains, StartsWith and EndsWith methods, Check and Assert, narrow and wide, and their Not forms, each with a null
+// text, a null part, both null, and a matching non-null pair, so Test_NullCStrings_MatchNothingInTextChecks below
+// can check that a null C string matches nothing in the text checks and equals only another null one in the IC
+// Equals ones. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations
+// above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NullCStringTextChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    // How a method treats a null C string, which decides each case's expected outcome.
+    enum class TNullRule
+    {
+        NeverMatches,    // Contains, StartsWith, EndsWith: fails for any null
+        NotNeverMatches, // their Not forms: passes for any null
+        EqualsOnlyNull,  // EqualsIC: fails for one null, passes for two
+        NotEqualsOnlyNull // NotEqualsIC: passes for one null, fails for two
+    };
+
+    char const* const m_NullNarrow = nullptr;
+    wchar_t const* const m_NullWide = nullptr;
+
+    // Registers 'name''s eight cases: null text, null part, both null and a matching pair, narrow and wide. 'call'
+    // takes the text and the part, as two char const* or two wchar_t const*, and calls the method with them. The
+    // matching pair is "ABC" and "abc" for an IC method and "abc" and "abc" otherwise, which every method matches.
+    template <typename TCall>
+    void RegisterCases(std::string const& name, TNullRule rule, bool ignoreCase, TCall call)
+    {
+        bool const negated = rule == TNullRule::NotNeverMatches || rule == TNullRule::NotEqualsOnlyNull;
+        char const* const outcomeWithOneNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::EqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWithBothNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::NotEqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWhenMatching = negated ? "_Fails" : "_Passes";
+        char const* const text = ignoreCase ? "ABC" : "abc";
+        wchar_t const* const wideText = ignoreCase ? L"ABC" : L"abc";
+
+        RegisterTest([this, call]() { call(m_NullNarrow, "abc"); }, name + "_Narrow_NullText" + outcomeWithOneNull);
+        RegisterTest([call, text]() { call(text, static_cast<char const*>(nullptr)); },
+            name + "_Narrow_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullNarrow, m_NullNarrow); }, name + "_Narrow_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, text]() { call(text, "abc"); }, name + "_Narrow_Matching" + outcomeWhenMatching);
+        RegisterTest([this, call]() { call(m_NullWide, L"abc"); }, name + "_Wide_NullText" + outcomeWithOneNull);
+        RegisterTest([call, wideText]() { call(wideText, static_cast<wchar_t const*>(nullptr)); },
+            name + "_Wide_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullWide, m_NullWide); }, name + "_Wide_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, wideText]() { call(wideText, L"abc"); }, name + "_Wide_Matching" + outcomeWhenMatching);
+    }
+
+public:
+    TFixture_NullCStringTextChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+TFixture_NullCStringTextChecks::TFixture_NullCStringTextChecks()
+    : inherited("Fixture_NullCStringTextChecks")
+{
+    SetLogSuppressed(true);
+
+    TNullRule const never = TNullRule::NeverMatches;
+    TNullRule const notNever = TNullRule::NotNeverMatches;
+
+    RegisterCases("AssertContains", never, false,
+        [this](auto text, auto part) {
+            AssertContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertContainsIC", never, true,
+        [this](auto text, auto part) {
+            AssertContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEndsWith", never, false,
+        [this](auto text, auto part) {
+            AssertEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEndsWithIC", never, true,
+        [this](auto text, auto part) {
+            AssertEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertEqualsIC", TNullRule::EqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            AssertEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotContains", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotContainsIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEndsWith", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEndsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotEqualsIC", TNullRule::NotEqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            AssertNotEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotStartsWith", notNever, false,
+        [this](auto text, auto part) {
+            AssertNotStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertNotStartsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            AssertNotStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertStartsWith", never, false,
+        [this](auto text, auto part) {
+            AssertStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("AssertStartsWithIC", never, true,
+        [this](auto text, auto part) {
+            AssertStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckContains", never, false,
+        [this](auto text, auto part) {
+            CheckContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckContainsIC", never, true,
+        [this](auto text, auto part) {
+            CheckContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEndsWith", never, false,
+        [this](auto text, auto part) {
+            CheckEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEndsWithIC", never, true,
+        [this](auto text, auto part) {
+            CheckEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckEqualsIC", TNullRule::EqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            CheckEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotContains", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotContains(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotContainsIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotContainsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEndsWith", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotEndsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEndsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotEndsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotEqualsIC", TNullRule::NotEqualsOnlyNull, true,
+        [this](auto text, auto part) {
+            CheckNotEqualsIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotStartsWith", notNever, false,
+        [this](auto text, auto part) {
+            CheckNotStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckNotStartsWithIC", notNever, true,
+        [this](auto text, auto part) {
+            CheckNotStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckStartsWith", never, false,
+        [this](auto text, auto part) {
+            CheckStartsWith(text, part, __func__, __LINE__, "msg");
+        });
+    RegisterCases("CheckStartsWithIC", never, true,
+        [this](auto text, auto part) {
+            CheckStartsWithIC(text, part, __func__, __LINE__, "msg");
+        });
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest([this]() {
+            CheckContains(m_NullNarrow, "abc", "msg");
+        }, "CheckContains_SourceLocation_NullText_Fails");
+#endif
 }
 //---------------------------------------------------------------------------
 
@@ -6009,6 +6444,9 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "IsType_UsesDynamicTypeAndShowsNames");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity, "Near_HandlesNaNAndInfinity");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks,
+        "NullCStrings_MatchNothingInTextChecks");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue,
         "NullNotNull_FailureNamesTheExpectedValue");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Ordering_ComparesByValueAndShowsBoth,
@@ -6019,8 +6457,12 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AppliesFilterToSkipNonMatchingTests");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished,
+        "Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
         "Run_EndsRunOnSetUpOrTearDownTestException");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout,
+        "Run_IgnoresTestThatEndsAfterItsTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_RecordsCheckFailuresInFailedTestDetail,
         "Run_RecordsCheckFailuresInFailedTestDetail");
@@ -6039,6 +6481,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ReportsTimedOutTestToRunObserver,
         "Run_ReportsTimedOutTestToRunObserver");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns, "Run_ResetsResultsBetweenRuns");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_SendsLogToRunObserverWithoutColor,
+        "Run_SendsLogToRunObserverWithoutColor");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder,
         "Run_ShuffleSeedProducesDeterministicOrder");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_StopsWhenRunObserverRequests,
@@ -7030,6 +7474,90 @@ void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
     }
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity()
+{
+    // Arrange
+    TFixture_NearNonFiniteValues fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(17), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks()
+{
+    // Arrange
+    TFixture_NullCStringTextChecks fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    size_t const expectedCount = 28 * 8 + 1;
+#else
+    size_t const expectedCount = 28 * 8;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass");
+        }
+        else if (NameEndsWith(record.TestName, "_Fails"))
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+
+            if (record.TestName.find("Null") != std::string::npos)
+            {
+                CheckContains(record.Message, "\"(null)\"", __func__, __LINE__,
+                    record.TestName + " shows the null C string as (null)");
+            }
+        }
+        else
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
+    }
+
+    // A few failures in full, Check and Assert, narrow and wide, worded as the methods' other failures are.
+    std::vector<std::pair<std::string, std::string> > const failures =
+    {
+        { "CheckContains_Narrow_NullText_Fails", "Expected \"(null)\" to contain \"abc\". msg" },
+        { "CheckEndsWithIC_Wide_NullPart_Fails", "Expected \"ABC\" to end with \"(null)\" (ignoring case). msg" },
+        { "CheckEqualsIC_Narrow_NullPart_Fails", "Expected \"ABC\" but was \"(null)\" (ignoring case). msg" },
+        { "CheckNotEqualsIC_Wide_BothNull_Fails", "Both values equal: \"(null)\" and \"(null)\" (ignoring case). msg" },
+        { "CheckStartsWith_Narrow_BothNull_Fails", "Expected \"(null)\" to start with \"(null)\". msg" },
+        { "AssertContainsIC_Wide_NullText_Fails", "Substring not found: " },
+        { "AssertContainsIC_Wide_NullText_Fails", ": Expected \"(null)\" to contain \"abc\" (ignoring case). msg" },
+        { "AssertEqualsIC_Wide_NullText_Fails", ": Expected: \"(null)\" but was \"abc\" (ignoring case). msg" },
+        { "AssertStartsWith_Narrow_NullPart_Fails", ": Expected \"abc\" to start with \"(null)\". msg" },
+    };
+
+    for (std::pair<std::string, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertNotNull(record, __func__, __LINE__, failure.first + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, failure.first + "'s failure");
+    }
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_NullNotNull_FailureNamesTheExpectedValue()
 {
     // Arrange
@@ -7185,29 +7713,8 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         "CaseRecords has an entry only for the tests that ran, not the full registered set");
 }
 //---------------------------------------------------------------------------
-/*
-    TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet
-
-    Skip()ped on RAD Studio's 32-bit compiler (bcc32c) specifically: the crash here is caught and
-    reported correctly (this is not the same failure as Test_ASWUnitTests_CrashGuard.cpp's Skip()ped
-    tests, which involve much deeper recursion), but the process still crashes moments later, before
-    ever reaching this method's own assertions - confirmed to happen even with nothing else running
-    before or after the one crashing test, so it is not about cumulative state or later tests
-    specifically. This means --catch-crashes' core "catch and continue" behavior, run through the
-    real test-execution pipeline (TTestGroupBase::Run() and beyond) rather than a bare, isolated
-    TCrashGuard::Run() call, is not currently safe to rely on for real use on 32-bit RAD Studio at
-    all, not just for the deep/stack-overflow edge cases 64-bit and bcc32c share - see the commit
-    that added this Skip() for the full investigation. 64-bit RAD Studio and MinGW are unaffected.
-*/
 void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet()
 {
-#if defined(__BORLANDC__) && defined(_WIN32) && !defined(_WIN64)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's 32-bit compiler (bcc32c): the crash is caught correctly, but the "
-        "process crashes moments later regardless, even with nothing else running before or after. "
-        "MinGW and 64-bit RAD Studio are unaffected; investigation ongoing.");
-#endif
-
     // Arrange
     TFixture_CrashingTest fixture;
 
@@ -7231,6 +7738,35 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIs
         "the synthetic record names the test that actually crashed");
     CheckEquals(TTestOutcome::Fail, crashedRecord.Outcome, __func__, __LINE__, "recorded as Fail, not Skip");
     CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "the failure message explains why: it crashed");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished()
+{
+    // Arrange
+    // Static, not locals: were the test abandoned after all (the failure this checks for), its worker thread would
+    // still use both after Run() returns.
+    static TFixture_ShortTest fixture;
+    static TSlowFinishObserver observer;
+    fixture.SetRunObserver(&observer);
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // Its "Finished test" line takes 1.5 seconds to log.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Assert
+    CheckFalse(timedOutThrown, __func__, __LINE__, "a test recording its outcome when the timeout comes isn't abandoned");
+
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__, "one record, the test's own");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "it passed, as it finished in time");
+    CheckEquals(0u, results.FailedCount, __func__, __LINE__, "and nothing failed");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException()
@@ -7273,6 +7809,54 @@ void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException
         CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__,
             scenario.ExpectedMessage + ": the test counts as failed");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout()
+{
+    // Arrange
+    // Static, not locals: the abandoned test's worker thread still uses both after Run() returns.
+    static TFixture_LateFinish fixture;
+    static TRecordingObserver observer;
+    fixture.Ended = false;
+    fixture.SetRunObserver(&observer);
+    size_t const logStart = observer.LogText().size();
+    bool timedOutThrown = false;
+
+    // Act
+    try
+    {
+        fixture.Run(TestFilter(), std::nullopt, 1u, false); // 1 second timeout; the test ends 0.3 seconds later.
+    }
+    catch (TExceptTestTimedOut const&)
+    {
+        timedOutThrown = true;
+    }
+
+    // Waits for the abandoned test to end, then a little longer for its thread to try recording its outcome.
+    std::chrono::steady_clock::time_point const waitStart = std::chrono::steady_clock::now();
+    while (!fixture.Ended && std::chrono::steady_clock::now() - waitStart < std::chrono::seconds(10))
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Assert
+    AssertTrue(timedOutThrown, __func__, __LINE__, "Run() throws TExceptTestTimedOut once the timeout is exceeded");
+    AssertTrue(fixture.Ended, __func__, __LINE__, "the abandoned test ended after all");
+
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__,
+        "only the timeout's record, none from the test ending later");
+    CheckEquals(1u, results.FailedCount, __func__, __LINE__, "the timeout counts as the one failure");
+    CheckEquals(0u, results.SuccessCount, __func__, __LINE__, "nothing passed");
+
+    for (std::string const& message : results.Messages)
+        CheckNotContains(message, "late Check failure", __func__, __LINE__, "the late Check failure isn't recorded");
+
+    std::string const log = observer.LogText().substr(logStart);
+    CheckContains(log, "!!TIMEOUT!!", __func__, __LINE__, "the timeout is logged");
+    CheckNotContains(log, "late Check failure", __func__, __LINE__, "the late Check failure isn't logged");
+    CheckNotContains(log, "late log line", __func__, __LINE__, "nor the test's own late log line");
+    CheckNotContains(log, "Finished test", __func__, __LINE__, "nor a \"Finished test\" line for it");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce()
@@ -7363,14 +7947,10 @@ void TTest_ASWUnitTests_TestBase::Test_Run_RecordsDurationOfShortTest()
     CheckGreaterThanOrEqual(results.CaseRecords.front().DurationSeconds, busyWaitSeconds, __func__, __LINE__,
         "the recorded duration includes the test's busy-wait");
 
-    // "passed" is wrapped in ANSI color codes when color is enabled, e.g. when stdout is an interactive terminal,
-    // so the expected text is colorized the same way.
     std::string const logText = observer.LogText();
-    std::string const passed = TConsole::Colorize("passed", TLogKind::Pass);
-    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - " + passed + " (", __func__, __LINE__,
+    CheckContains(logText, "Finished test: \"Fixture_ShortTest.BusyWaits\" - passed (", __func__, __LINE__,
         "the test's timing line is logged");
-    CheckNotContains(logText, "- " + passed + " (0.000 ms)", __func__, __LINE__,
-        "and doesn't show it as taking no time");
+    CheckNotContains(logText, "- passed (0.000 ms)", __func__, __LINE__, "and doesn't show it as taking no time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_RecordsOutcomeCountsAndCaseRecords()
@@ -7600,6 +8180,26 @@ void TTest_ASWUnitTests_TestBase::Test_Run_ResetsResultsBetweenRuns()
         "the second run's messages don't include the first run's");
     CheckEquals(firstRun.CaseRecords.size(), secondRun.CaseRecords.size(), __func__, __LINE__,
         "one record per test, not one per test per run");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_SendsLogToRunObserverWithoutColor()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logging on, with a pass, failures and Check failures to log.
+    TRecordingObserver observer;
+    fixture.SetRunObserver(&observer);
+    TColorMode const savedMode = TConsole::GetColorMode();
+    TConsole::SetColorMode(TColorMode::Always); // So the console would get color codes.
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+    TConsole::SetColorMode(savedMode);
+
+    // Assert
+    std::string const logText = observer.LogText();
+    CheckContains(logText, "***Test failed: ", __func__, __LINE__, "a failure is logged");
+    CheckContains(logText, " - passed (", __func__, __LINE__, "and a pass");
+    CheckTrue(logText.find('\x1b') == std::string::npos, __func__, __LINE__, "with no color codes");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ShuffleSeedProducesDeterministicOrder()

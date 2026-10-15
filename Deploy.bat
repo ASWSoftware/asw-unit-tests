@@ -139,6 +139,10 @@ call :CopyFile "tests\Test_ASWUnitTests_StdOutRedirect.cpp" "tests\Test_ASWUnitT
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_StdOutRedirect.h" "tests\Test_ASWUnitTests_StdOutRedirect.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Suite.cpp" "tests\Test_ASWUnitTests_Suite.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\Test_ASWUnitTests_Suite.h" "tests\Test_ASWUnitTests_Suite.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_TestBase.cpp" "tests\Test_ASWUnitTests_TestBase.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_TestBase.h" "tests\Test_ASWUnitTests_TestBase.h"

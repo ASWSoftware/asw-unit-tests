@@ -66,9 +66,11 @@ private:
 
 __published: // IDE-managed Components
     TAction* Act_About;
+    TAction* Act_CollapseAll;
     TAction* Act_CommandLineOptions;
     TAction* Act_CopyDetails;
     TAction* Act_Exit;
+    TAction* Act_ExpandAll;
     TAction* Act_ExportJUnitReport;
     TAction* Act_FocusFilter;
     TAction* Act_ResetLayout;
@@ -115,7 +117,10 @@ __published: // IDE-managed Components
     TMenuItem* MI_TestsSelectNone;
     TMenuItem* MI_TestsSeparator1;
     TMenuItem* MI_View;
+    TMenuItem* MI_ViewCollapseAll;
+    TMenuItem* MI_ViewExpandAll;
     TMenuItem* MI_ViewResetLayout;
+    TMenuItem* MI_ViewSeparator1;
     TMainMenu* MM_Main;
     TProgressBar* PB_Progress;
     TPageControl* PC_Results;
@@ -130,9 +135,11 @@ __published: // IDE-managed Components
     TTabSheet* TS_Log;
     TTreeView* TV_Tests;
     void __fastcall Act_AboutExecute(TObject* Sender);
+    void __fastcall Act_CollapseAllExecute(TObject* Sender);
     void __fastcall Act_CommandLineOptionsExecute(TObject* Sender);
     void __fastcall Act_CopyDetailsExecute(TObject* Sender);
     void __fastcall Act_ExitExecute(TObject* Sender);
+    void __fastcall Act_ExpandAllExecute(TObject* Sender);
     void __fastcall Act_ExportJUnitReportExecute(TObject* Sender);
     void __fastcall Act_FocusFilterExecute(TObject* Sender);
     void __fastcall Act_ResetLayoutExecute(TObject* Sender);
@@ -166,9 +173,6 @@ private: // User declarations
     std::optional<size_t> m_CurrentTestIndex;
     // The layout from the DFM, at 96 DPI, captured before the saved one is applied, for Reset Layout.
     ASWUnitTests::TGUILayout m_DefaultLayout;
-    // By index into m_TestList.GroupNames(); nullptr while hidden. Read through GroupNode(), which rebuilds it
-    // when the tree's window has been recreated.
-    std::vector<TTreeNode*> m_GroupNodes;
     // Set when the command line doesn't choose the tests itself (no --run, --filter, or partition options), so
     // the saved test selection is restored at start and saved again at close.
     bool m_KeepSelection;
@@ -177,6 +181,9 @@ private: // User declarations
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
     // finishes, and after a run an unhandled exception ended, which has no report, as in the console runner.
     std::optional<std::vector<ASWUnitTests::TJUnitTestCase> > m_LastRunJUnitTestCases;
+    // Set when a run ends with a test that timed out or crashed, after which no further run can start; see
+    // WasRunAborted().
+    bool m_RunAborted;
     std::optional<std::chrono::steady_clock::time_point> m_RunEnd;
     size_t m_RunFinishedCount;
     bool m_Running;
@@ -188,10 +195,11 @@ private: // User declarations
     // True while the tree's check boxes are being set from m_TestList, so TV_TestsCheckStateChanging() lets
     // those changes through instead of treating them as clicks.
     bool m_SyncingChecks;
-    // By index into m_TestList; nullptr while hidden. Read through TestNode(), like m_GroupNodes.
+    // By index into m_TestList; nullptr while hidden. Read through TestNode(), which rebuilds it when the
+    // tree's window has been recreated.
     std::vector<TTreeNode*> m_TestNodes;
-    // Set when the tree's window is destroyed, which frees every TTreeNode, so m_GroupNodes and m_TestNodes
-    // point at freed nodes until RebuildNodeCache() finds the ones the recreated window loaded in their place.
+    // Set when the tree's window is destroyed, which frees every TTreeNode, so m_TestNodes points at freed
+    // nodes until RebuildNodeCache() finds the ones the recreated window loaded in their place.
     bool m_TreeNodesStale;
     TWndMethod m_TreeViewWindowProc; // TV_Tests' own WindowProc, which TV_TestsWindowProc() passes messages on to.
 
@@ -211,15 +219,13 @@ private:
     ASWUnitTests::TGUILayout CurrentLayout();
     // Ends a run that an unhandled exception escaped from, described by 'description'.
     void FailRunOnUnhandledException(std::string const& description);
-    // The group's tree node, or nullptr while it's hidden.
-    TTreeNode* GroupNode(size_t groupIndex);
     // Restores the layout SaveLayout() saved, if any; see the definition.
     void LoadLayout();
     // Restores the test selection SaveSelection() saved, if any, noting what it restored in the log.
     void LoadSelection();
     void OnTestFinished(ASWUnitTests::TTestCaseRecord const& record, std::string const& testLog);
     void OnTestStarted(std::string const& groupName, std::string const& testName);
-    // Refills m_GroupNodes and m_TestNodes from the tree's nodes, by the index each one holds in its Data.
+    // Refills m_TestNodes from the tree's test nodes, by the index each one holds in its Data.
     void RebuildNodeCache();
     void RefreshAllNodeImages();
     // Deletes the saved layout, for --layout-reset, noting the outcome in the log.
@@ -234,6 +240,9 @@ private:
     void SaveLayout();
     // Saves which tests are checked and shown for the next start, ignoring any error.
     void SaveSelection();
+    // Sets a tree node's status image from m_TestList: a test's own status, or a group's or suite's, from its
+    // tests.
+    void SetNodeImage(TTreeNode* node);
     void SetRunning(bool running);
     // Shows m_Shuffle's state: Run in Shuffled Order's check mark, and the status bar.
     void ShowShuffleState();
@@ -243,10 +252,10 @@ private:
     // Watches for the tree's window being destroyed; see m_TreeNodesStale.
     void __fastcall TV_TestsWindowProc(TMessage& message);
     void UpdateCaption();
-    // Shows the selected test's or group's details in the detail pane.
+    // Shows the selected test's, group's or suite's details in the detail pane.
     void UpdateDetail();
     void UpdateStatusBar();
-    // Updates a test node's status image, and its group node's, if they're shown.
+    // Updates a test node's status image, and those of its group's and suites' nodes, if they're shown.
     void UpdateTestNodeImages(size_t testIndex);
     // Writes the latest run's JUnit report to 'path', noting the outcome in the log. Returns false, with
     // 'error' saying why, if it couldn't be written.
@@ -261,6 +270,10 @@ public: // User declarations
     int ExitCode() const;
     // Loads the registered tests and applies 'options' (see WinMain()). Call once, right after creating the form.
     void Start(ASWUnitTests::TGUIOptions const& options);
+    // True once a run has ended with a test that timed out or crashed. A timed-out test's abandoned thread may then
+    // still be running, using its group, so WinMain() ends the process without destroying the groups, as the console
+    // runner does.
+    bool WasRunAborted() const;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TFormASWUnitTestsGUIMain* FormASWUnitTestsGUIMain;

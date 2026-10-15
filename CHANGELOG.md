@@ -10,6 +10,137 @@ versioned baseline.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-14
+
+### Added
+
+- Test suites, for organizing test groups into a hierarchy of any depth. Pass a `TSuitePath` to
+  the new `TTestGroupBase(TSuitePath const& suitePath, std::string const& name)` constructor, or
+  the matching `TAutoTestGroup` one, e.g.
+  `inherited(TSuitePath("Framework.Console"), "TTest_TConsole")` for suite `Console` inside suite
+  `Framework`. A suite's groups run together, and the suite path starts its tests' full names, so
+  `--filter "Framework.*"` runs every test in suite `Framework`, and `--list`, the console log and
+  the `--report-junit` report's `classname` show `Framework.Console.TTest_TConsole`. Suites only
+  organize groups: they have no set-up or tear-down of their own. The order given to
+  `ASW_REGISTER_TEST_GROUP_ORDERED` places a group among its own suite's groups and suites, where a
+  suite sorts as order `0` by its own name, and `--shuffle` shuffles each suite's contents
+  separately, so they still run together. A suite path with an empty suite name, such as
+  `"Framework..Console"`, throws the new `TExceptInvalidSuitePath`, stopping the run at startup with
+  exit code `2`. Groups that aren't in a suite run in the same order as before, including the order
+  a given `--shuffle-seed` produces.
+- `ASW_REGISTER_TEST_GROUP_IN_SUITE(ClassName, suitePath)` and
+  `ASW_REGISTER_TEST_GROUP_IN_SUITE_ORDERED(ClassName, suitePath, order)` put a group in a suite
+  from its registration, e.g.
+  `ASW_REGISTER_TEST_GROUP_IN_SUITE(TTest_TConsole, "Framework.Console")`, so its constructor
+  needn't name the suite. A group whose constructor names a different suite, or an `ITestGroup`
+  implemented without `TTestGroupBase` whose own `GetSuitePath()` doesn't give that suite, stops the
+  run at startup with `TExceptInvalidSuitePath`. `TTestGroupRegistry::Register()`
+  takes the suite path as a new parameter after the order, and `TRegisteredTestGroupFactory` gains a
+  `SuitePath` member, which defaults to empty as `TTestCaseRecord`'s does.
+- `ITestGroup::GetSuitePath()` and `ITestGroup::GetQualifiedTestGroupName()`, and a `SuitePath`
+  member in `TTestCaseRecord` and `TTestId`, for code that reports or displays tests by suite.
+  `GetSuitePath()` isn't pure virtual, so an `ITestGroup` implemented without `TTestGroupBase`
+  still compiles unchanged, outside any suite. `SuitePath` is the last member and defaults to
+  empty, so existing brace initializers of either struct still compile, without a
+  `-Wmissing-field-initializers` warning.
+- The VCL GUI runner's test tree shows each suite as a node holding the groups and suites in it,
+  with group and suite nodes showing just their own names. A suite node's check box checks or
+  unchecks every test in it, including those in the suites inside it, its status image and detail
+  pane sum up those tests like a group's, and it's shown only while the filter box leaves some of
+  its tests visible.
+- VCL GUI runner: **Expand All** and **Collapse All** (View menu), which expand every suite and
+  group in the test tree, or collapse it to its top-level suites and groups. Changing the filter
+  box's text still expands the whole tree.
+- `TConsole::StripColor()`, which removes the ANSI color codes `TConsole::Colorize()` adds, and
+  `TConsole::GetColorMode()`, which returns the mode `TConsole::SetColorMode()` set.
+
+### Changed
+
+- `TTestCaseRecord::GroupName`, `TTestId::GroupName` and the group name passed to
+  `ITestRunObserver::OnTestStarted()` are now the group's qualified name, its suite path then its
+  own name (e.g. `Framework.Console.TTest_TConsole`), so groups with the same name in different
+  suites can be told apart. For a group that isn't in a suite, that's its own name, as before.
+  `GetTestGroupName()` is still just the group's own name. Moving a group into a suite changes its
+  tests' full names, as renaming the group would, so `--filter` patterns and saved VCL GUI runner
+  selections that named its tests no longer match them.
+- An exception from a group's `SetUp_Group()` no longer ends the run with exit code `2` or `3`,
+  without totals or a `--report-junit` report. It's logged as `!!ERROR!!`, each of the group's tests
+  that would have run fails with `SetUp_Group() exception: ` and the exception's message as its
+  detail, `TearDown_Group()` still runs, and the run carries on with the next group, so it ends with
+  exit code `1`. A run observer gets `OnTestStarted()` and `OnTestFinished()` for each of those
+  tests, as for any other.
+- An exception from a test group's constructor no longer ends the run at startup with exit code `2`
+  or `3`. It's logged as `!!ERROR!!`, and a group named after the class, as the registration macro
+  gives it, stands in for the group, in the suite the registration names, with one test,
+  `(construction)`, which fails with `Test group class "..." could not be created: ` and the
+  exception's message, so the run ends with exit code `1`. A `TExceptDuplicateTestName` or
+  `TExceptInvalidSuitePath` from a constructor still stops the run at startup.
+  `TTestGroupRegistry::Register()` takes the class name as a new last parameter, which the
+  registration macros pass, and `TRegisteredTestGroupFactory` gains a `ClassName` member, which
+  defaults to empty as `SuitePath` does.
+- A run observer's `OnLog()` now always gets plain text. It used to get the console's ANSI color
+  codes whenever color was enabled, e.g. with `--color always`, or in auto mode in a terminal, so an
+  observer that showed the log had to call `TConsole::SetColorMode(TColorMode::Never)` first, as the
+  VCL GUI runner did. Only the console gets color now, whatever the color mode, and an observer
+  that removed the codes itself still works.
+
+### Fixed
+
+- `CheckNear`/`AssertNear` passed when either value was a NaN, whatever the tolerance, and so did
+  `CheckNotNear`/`AssertNotNear`. A NaN is now near nothing, not even another NaN, so `CheckNear`
+  fails and `CheckNotNear` passes. Equal infinities are near each other, as before, and
+  `CheckNotNear` now fails for them. A test that passed only because the value it checked was a NaN
+  now fails.
+- A `*` in a `--filter` pattern, or in the VCL GUI runner's filter box, failed to match where the
+  test's full name had a `*` of its own, which a group name or a parameterized test's label can
+  have: `--filter "*"` didn't match a group named `*Group`. A `*` in the pattern is now always a
+  wildcard.
+- `--shuffle-seed`, `--partition-index`, `--partition-count` and `--test-timeout-seconds` accepted
+  a number with leading white space or a `+` sign, and on Windows also one with a `-` sign after
+  white space, which wrapped around to a large number: `--shuffle-seed " -5"` used seed
+  `4294967291`. They now take decimal digits only, and so does the VCL GUI runner's shuffle seed
+  box, which still ignores spaces around the number. `TCLIParser::ParseUnsignedInt()` changes the
+  same way.
+- On Windows, the console runner's `--report-junit` report, and any written with
+  `TJUnitReportWriter::Write()`, had CRLF line ends, unlike the VCL GUI runner's and those written
+  on Linux. Every report is now `TJUnitReportWriter::BuildXML()`'s text byte for byte, with LF line
+  ends.
+- After a test timed out (exit code `5`) or crashed (exit code `6`), the console runner destroyed
+  its test groups before ending, while the timed-out test's abandoned thread could still be running
+  one of their tests, so a test that was busy rather than hung could use a destroyed group and crash
+  the runner with another exit code. The runner now ends without destroying them.
+- A null C string passed to `CheckEqualsIC`, `CheckNotEqualsIC`, `CheckContains`,
+  `CheckStartsWith` or `CheckEndsWith`, or their `IC`, `Not` or `Assert` forms, was converted to a
+  `std::string` or `std::wstring`, which is undefined behavior: typically a crash, or with some
+  standard libraries an unexpected exception. Two C strings now go to new `char const*` and
+  `wchar_t const*` overloads. In the IC Equals methods, a null pointer equals only another null
+  one, as in `CheckEquals`. In the others, a null text or part matches nothing, so the check fails,
+  showing it as `(null)`, and its `Not` form passes. A C string compared with a `std::string` is
+  still converted to one, so a null one is still undefined behavior there, and in RTL builds one
+  compared with a `System::String` is still empty text.
+- With `--test-timeout-seconds`, a test that ended just after its timeout still recorded its Check
+  failures and its outcome in its group's results, while the run was already reporting them (a data
+  race, which could corrupt them), and logged its `Log()` lines and a "Finished test" line after the
+  run's totals. Once a test is abandoned, none of that reaches the results, the log or a run
+  observer any more. A test that has already begun recording its outcome when the timeout comes
+  counts as finished in time, rather than also being reported as timed out.
+- After a run in the VCL GUI runner ended with a test that timed out or crashed, Run Selected and
+  Run Failed could start another run, rerunning groups the timed-out test could still be using, and
+  closing the window destroyed the test groups while it might still be running. Both are now
+  disabled until the GUI is restarted, as the status bar says, and closing the window ends the
+  process without destroying the groups, as the console runner does.
+- With RTL exception support enabled, a failed `CheckIsType`/`CheckIsNotType` (or `Assert` form)
+  named a `TObject` descendant by its `typeid().name()`, which the RAD Studio compilers give as
+  `System.Classes.TStringList`, or as raw text such as `@:MyUnit.TMyObject` for a class declared in
+  C++. It's now named by its `ClassName()`, e.g. `TStringList` or `TMyObject`, the same with every
+  compiler. Other classes are named as before.
+- With RAD Studio's 32-bit compiler (bcc32c), a crash caught by `--catch-crashes` was logged and
+  failed its test, but the next exception thrown on that thread ended the process with an access
+  violation (exit code `-1073741819`) or as an unhandled exception, typically before the run's
+  totals. The recovery left Win32's chain of exception handlers pointing into the crashed test's
+  abandoned stack. `TCrashGuard::Run()` now restores it, so the run carries on with the next test,
+  as with every other compiler.
+
 ## [1.3.0] - 2026-10-11
 
 ### Added
@@ -390,7 +521,8 @@ Initial versioned release, switching the project to semantic versioning and addi
 (test group registration, `Check`/`Assert` methods, RAD Studio and CMake build support, etc.) is
 treated as the baseline and is not itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.1.0...v1.2.0

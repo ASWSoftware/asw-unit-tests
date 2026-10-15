@@ -42,7 +42,7 @@ namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
 TTest_ASWTools_String::TTest_ASWTools_String()
-    : inherited("ASWTools_String_Tests")
+    : inherited(TSuitePath("ASWExamples"), "ASWTools_String_Tests")
 {
     RegisterTest(&TTest_ASWTools_String::Test_Compare, "Compare");
     RegisterTest(&TTest_ASWTools_String::Test_CompareIC, "CompareIC");

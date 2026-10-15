@@ -28,10 +28,18 @@ limitations under the License.
 #include <cctype>
 #include <chrono>
 #include <ctime>
+#include <functional>
 #include <iomanip>
 #include <iostream>
+#include <map>
+#include <memory>
+#include <optional>
 #include <random>
 #include <sstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
@@ -39,6 +47,76 @@ limitations under the License.
 #include "ASWUnitTests_Utils.h"
 #include "ASWUnitTests_Version.h"
 //---------------------------------------------------------------------------
+
+namespace
+{
+
+// Calls 'callable' and returns a description of what it threw: what() for a std::exception (this framework's own
+// failure signals, such as an Assert* failure, included), or "ClassName: Message" for an RTL exception (see
+// DescribeRTLException()); or nullopt when it threw nothing. Each exception is caught exactly once, never rethrown
+// and caught again, since an RTL exception object is freed when the first handler that catches it ends.
+std::optional<std::string> CallAndDescribeException(std::function<void()> const& callable)
+{
+    try
+    {
+        callable();
+    }
+    catch (std::exception const& ex)
+    {
+        return std::string(ex.what());
+    }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        return ASWUnitTests::DescribeRTLException(ex);
+    }
+    catch (...)
+    {
+        return std::string("an object that is neither a std::exception nor an RTL Exception");
+    }
+#else
+    catch (...)
+    {
+        return std::string("a non-std::exception object");
+    }
+#endif
+
+    return std::nullopt;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TUncreatableTestGroup
+//
+// Stands in for a registered test group whose constructor threw (see TTestHandler::CreateTestGroup()), so the run
+// reports that as a failure rather than ending before it starts: one test, "(construction)", which fails with
+// 'detail'.
+/////////////////////////////////////////////////////////////////////////////
+class TUncreatableTestGroup : public ASWUnitTests::TTestGroupBase
+{
+private:
+    typedef ASWUnitTests::TTestGroupBase inherited;
+
+public:
+    TUncreatableTestGroup(std::string const& name, std::string const& detail)
+        : inherited(name)
+    {
+        RegisterTest([detail]()
+            {
+                throw ASWUnitTests::TTestException(detail);
+            }, "(construction)");
+    }
+
+    void SetUp_Group() override
+    {
+    }
+
+    void TearDown_Group() override
+    {
+    }
+};
+
+} // namespace
 
 namespace ASWUnitTests
 {
@@ -55,6 +133,155 @@ TTestHandler::TTestHandler()
 //---------------------------------------------------------------------------
 TTestHandler::~TTestHandler()
 {
+}
+//---------------------------------------------------------------------------
+void TTestHandler::ApplyRegisteredSuitePath(ITestGroup& group, std::string const& registeredPath)
+{
+    if (registeredPath.empty())
+        return;
+
+    TSuitePath const checked(registeredPath); // Throws TExceptInvalidSuitePath for an invalid path.
+    std::string const groupPath = group.GetSuitePath();
+
+    if (groupPath == registeredPath)
+        return;
+
+    TTestGroupBase* const groupBase = dynamic_cast<TTestGroupBase*>(&group);
+
+    if (!groupPath.empty() || groupBase == nullptr)
+        throw TExceptInvalidSuitePath::Conflicting(group.GetTestGroupName(), registeredPath, groupPath);
+
+    groupBase->SetSuitePath(registeredPath);
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::CanonicalGroupOrder
+
+    Gives each group a sort key with one entry per level of its path: one for each suite it's in, outermost
+    first, then one for the group itself. Each entry is (order, name, kind), where a suite's entry is
+    (0, its suite name, 1) and the group's is (its order, its name, 0), so comparing two keys entry by entry
+    compares the groups, or the suites holding them, at the first level where their paths differ. A group and a
+    suite that tie on order and name at the same level sort the group first. Without suites, each key is a
+    single (order, name, 0) entry, which sorts exactly as order then name did before suites existed.
+*/
+std::vector<size_t> TTestHandler::CanonicalGroupOrder(std::vector<TTestGroupOrderKey> const& groups)
+{
+    typedef std::tuple<int, std::string, int> TLevelKey;
+
+    std::vector<std::vector<TLevelKey> > sortKeys;
+
+    for (TTestGroupOrderKey const& group : groups)
+    {
+        TSuitePath const suitePath(group.SuitePath);
+        std::vector<TLevelKey> sortKey;
+
+        for (std::string const& suiteName : suitePath.GetNames())
+            sortKey.push_back(TLevelKey(0, suiteName, 1));
+
+        sortKey.push_back(TLevelKey(group.Order, group.Name, 0));
+        sortKeys.push_back(sortKey);
+    }
+
+    std::vector<size_t> order(groups.size());
+
+    for (size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+
+    std::stable_sort(order.begin(), order.end(), [&sortKeys](size_t a, size_t b)
+        {
+            return sortKeys[a] < sortKeys[b];
+        });
+
+    return order;
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::CreateTestGroup
+
+    Creates the group 'registered' registers. If its constructor throws, logs that and returns a
+    group standing in for it, named after its class, whose one test, "(construction)", fails saying
+    why, so the run carries on and reports it. A TExceptDuplicateTestName or TExceptInvalidSuitePath,
+    a mistake in how the group names its tests or its suite, still stops the run at startup.
+*/
+std::unique_ptr<ITestGroup> TTestHandler::CreateTestGroup(TRegisteredTestGroupFactory const& registered)
+{
+    std::string description;
+
+    try
+    {
+        return registered.Factory();
+    }
+    catch (TExceptDuplicateTestName const&)
+    {
+        throw;
+    }
+    catch (TExceptInvalidSuitePath const&)
+    {
+        throw;
+    }
+    catch (std::exception const& ex)
+    {
+        description = ex.what();
+    }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        description = DescribeRTLException(ex);
+    }
+    catch (...)
+    {
+        description = "an object that is neither a std::exception nor an RTL Exception";
+    }
+#else
+    catch (...)
+    {
+        description = "a non-std::exception object";
+    }
+#endif
+
+    std::string const className = registered.ClassName.empty() ? std::string("(unnamed)") : registered.ClassName;
+    std::string const detail = "Test group class \"" + className + "\" could not be created: " + description;
+    Log("!!ERROR!!: " + detail);
+
+    return std::make_unique<TUncreatableTestGroup>(className, detail);
+}
+//---------------------------------------------------------------------------
+/*
+    TTestHandler::FailGroupTests
+
+    Returns a failure with detail 'detail' for each of 'group''s tests that 'filter' matches, logged
+    and reported to the run observer as each would be had it run and failed. Used for a group whose
+    SetUp_Group() threw, whose tests can't run without it.
+*/
+TTestResults TTestHandler::FailGroupTests(ITestGroup& group, TestFilter const& filter, std::string const& detail)
+{
+    TTestResults results;
+    std::string const groupName = group.GetQualifiedTestGroupName();
+    std::string const tag = "***Test failed";
+
+    for (std::unique_ptr<ITestCase> const& testCase : group.GetTestCallbackList())
+    {
+        std::string const& testName = testCase->GetName();
+        std::string const fullName = groupName + "." + testName;
+
+        if (filter != nullptr && !filter(fullName))
+            continue;
+
+        if (m_RunObserver != nullptr)
+            m_RunObserver->OnTestStarted(groupName, testName);
+
+        std::string const plainMsg = tag + ": \"" + fullName + "\": " + detail;
+        results.FailedCount++;
+        results.Messages.push_back(plainMsg);
+        results.CaseRecords.push_back(
+            TTestCaseRecord{ groupName, testName, 0.0, TTestOutcome::Fail, detail, group.GetSuitePath() });
+        Log(TConsole::Colorize(tag, TLogKind::Fail) + plainMsg.substr(tag.size()));
+
+        if (m_RunObserver != nullptr)
+            m_RunObserver->OnTestFinished(results.CaseRecords.back());
+    }
+
+    return results;
 }
 //---------------------------------------------------------------------------
 /*
@@ -97,13 +324,13 @@ std::vector<TTestId> TTestHandler::GetTests()
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
              testIt != testGroup.GetTestCallbackList().end(); testIt++)
         {
             ITestCase& testCase = *testIt->get();
-            tests.push_back(TTestId{ groupName, testCase.GetName() });
+            tests.push_back(TTestId{ groupName, testCase.GetName(), testGroup.GetSuitePath() });
         }
     }
 
@@ -149,6 +376,81 @@ std::string TTestHandler::GetVersionFullStr()
 }
 //---------------------------------------------------------------------------
 /*
+    TTestHandler::ShuffledGroupOrder
+
+    Builds the suite tree from the groups' suite paths: each suite's children are its groups and the suites
+    inside it, in the order they first appear in 'suitePaths', with the top level as the root. Then walks the
+    tree, visiting each node's children in an order from ShuffledIndices(), so each suite's groups come out
+    together.
+*/
+std::vector<size_t> TTestHandler::ShuffledGroupOrder(std::vector<std::string> const& suitePaths, unsigned int seed)
+{
+    // A child of a suite (or of the top level): a group, by its index into 'suitePaths', or a suite, by its index
+    // into 'suites'.
+    struct TChild
+    {
+        bool IsSuite;
+        size_t Index;
+    };
+
+    struct TSuite
+    {
+        std::string Path; // Empty for the top level.
+        std::vector<TChild> Children;
+    };
+
+    std::vector<TSuite> suites(1); // suites[0] is the top level.
+    std::map<std::string, size_t> suiteIndexByPath;
+
+    for (size_t groupIndex = 0; groupIndex < suitePaths.size(); ++groupIndex)
+    {
+        TSuitePath const suitePath(suitePaths[groupIndex]);
+        size_t parent = 0;
+        std::string path;
+
+        for (std::string const& suiteName : suitePath.GetNames())
+        {
+            path += (path.empty() ? std::string() : std::string(".")) + suiteName;
+
+            std::map<std::string, size_t>::const_iterator const found = suiteIndexByPath.find(path);
+            if (found != suiteIndexByPath.end())
+            {
+                parent = found->second;
+                continue;
+            }
+
+            size_t const suiteIndex = suites.size();
+            suites.push_back(TSuite{ path, std::vector<TChild>() });
+            suites[parent].Children.push_back(TChild{ true, suiteIndex });
+            suiteIndexByPath[path] = suiteIndex;
+            parent = suiteIndex;
+        }
+
+        suites[parent].Children.push_back(TChild{ false, groupIndex });
+    }
+
+    std::vector<size_t> order;
+    std::function<void (size_t)> appendShuffled = [&](size_t suiteIndex)
+        {
+            TSuite const& suite = suites[suiteIndex];
+            unsigned int const suiteSeed = suite.Path.empty() ? seed : (seed + FNV1aHash(suite.Path));
+
+            for (size_t childIndex : ShuffledIndices(suite.Children.size(), suiteSeed))
+            {
+                TChild const& child = suite.Children[childIndex];
+
+                if (child.IsSuite)
+                    appendShuffled(child.Index);
+                else
+                    order.push_back(child.Index);
+            }
+        };
+
+    appendShuffled(0);
+    return order;
+}
+//---------------------------------------------------------------------------
+/*
     TTestHandler::WildcardMatch
 
     Matches 'text' against 'pattern' in full (not a substring search),
@@ -180,16 +482,17 @@ bool TTestHandler::WildcardMatch(std::string const& pattern, std::string const& 
 
     while (t < text.size())
     {
-        if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
-        {
-            ++p;
-            ++t;
-        }
-        else if (p < pattern.size() && pattern[p] == '*')
+        // A '*' is checked first, so it's always a wildcard, even where the text has a '*' too.
+        if (p < pattern.size() && pattern[p] == '*')
         {
             starIdx = p;
             matchIdx = t;
             ++p;
+        }
+        else if (p < pattern.size() && (pattern[p] == '?' || pattern[p] == text[t]))
+        {
+            ++p;
+            ++t;
         }
         else if (starIdx != std::string::npos)
         {
@@ -253,7 +556,7 @@ void TTestHandler::ListTests(TestFilter const& filter, std::string const& filter
     for (ITestGroups::iterator it = m_TestGroups.begin(); it != m_TestGroups.end(); it++)
     {
         ITestGroup& testGroup = *it->get();
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
         bool groupHasMatch = false;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
@@ -292,7 +595,7 @@ void TTestHandler::Log(std::string const& msg)
 {
     if (m_RunObserver != nullptr)
     {
-        m_RunObserver->OnLog(msg + "\n");
+        m_RunObserver->OnLog(TConsole::StripColor(msg) + "\n");
         return;
     }
 
@@ -303,7 +606,7 @@ void TTestHandler::LogAppend(std::string const& msg)
 {
     if (m_RunObserver != nullptr)
     {
-        m_RunObserver->OnLog(msg);
+        m_RunObserver->OnLog(TConsole::StripColor(msg));
         return;
     }
 
@@ -314,39 +617,34 @@ void TTestHandler::LogAppend(std::string const& msg)
     TTestHandler::RegisterTestGroups
 
     Instantiates every test group that self-registered via the
-    ASW_REGISTER_TEST_GROUP / ASW_REGISTER_TEST_GROUP_ORDERED macro (see
-    ASWUnitTests_Registry.h). Test modules are added or removed from their
-    own .cpp files; this method never needs to change.
+    ASW_REGISTER_TEST_GROUP macros (see ASWUnitTests_Registry.h), and puts
+    each in the suite its registration names, if any (see
+    ApplyRegisteredSuitePath()). Test modules are added or removed from their
+    own .cpp files; this method never needs to change. A group whose
+    constructor throws is replaced by one that reports it (see
+    CreateTestGroup()).
 
-    Groups run in ascending order by their registered order (default 0),
-    with ties broken alphabetically by group name, so the default run
-    order is alphabetical and deterministic across compilers/linkers.
+    Groups are kept in their canonical order (see CanonicalGroupOrder()):
+    by default alphabetical, with each suite's groups together, and
+    deterministic across compilers/linkers.
 */
 void TTestHandler::RegisterTestGroups()
 {
-    struct TOrderedGroup
-    {
-        int Order;
-        std::unique_ptr<ITestGroup> Group;
-    };
-
-    std::vector<TOrderedGroup> orderedGroups;
+    std::vector<std::unique_ptr<ITestGroup> > groups;
+    std::vector<TTestGroupOrderKey> orderKeys;
 
     for (TRegisteredTestGroupFactory const& registered : TTestGroupRegistry::Factories())
-        orderedGroups.push_back(TOrderedGroup{ registered.Order, registered.Factory() });
-
-    std::stable_sort(orderedGroups.begin(), orderedGroups.end(),
-        [](TOrderedGroup const& a, TOrderedGroup const& b)
-        {
-            if (a.Order != b.Order)
-                return a.Order < b.Order;
-            return a.Group->GetTestGroupName() < b.Group->GetTestGroupName();
-        });
-
-    for (TOrderedGroup& orderedGroup : orderedGroups)
     {
-        orderedGroup.Group->SetRunObserver(m_RunObserver);
-        m_TestGroups.push_back(std::move(orderedGroup.Group));
+        groups.push_back(CreateTestGroup(registered));
+        ApplyRegisteredSuitePath(*groups.back(), registered.SuitePath);
+        orderKeys.push_back(TTestGroupOrderKey{ groups.back()->GetSuitePath(), groups.back()->GetTestGroupName(),
+                                                registered.Order });
+    }
+
+    for (size_t index : CanonicalGroupOrder(orderKeys))
+    {
+        groups[index]->SetRunObserver(m_RunObserver);
+        m_TestGroups.push_back(std::move(groups[index]));
     }
 }
 //---------------------------------------------------------------------------
@@ -360,9 +658,11 @@ void TTestHandler::RegisterTestGroups()
     groups that actually run. The active filter (or lack of one) is always
     logged, so redirected output still explains why fewer tests ran.
 
-    When 'shuffle' is set, group order is randomized, and each group's test
-    order is independently randomized too (each from a seed derived from the
-    master seed and the group's name, so results stay reproducible without
+    When 'shuffle' is set, group order is randomized (see
+    ShuffledGroupOrder(), which keeps each suite's groups together), and
+    each group's test order is independently randomized too (each from a
+    seed derived from the master seed and the group's qualified name, so
+    results stay reproducible without
     every equally-sized group shuffling identically). The master seed is
     'shuffleSeed' if given, otherwise one is generated and logged so a
     failure caused by shuffled order can be reproduced. A seed gives the
@@ -399,8 +699,13 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
 
     if (shuffle)
     {
+        std::vector<std::string> suitePaths;
+
+        for (std::unique_ptr<ITestGroup> const& testGroup : m_TestGroups)
+            suitePaths.push_back(testGroup->GetSuitePath());
+
         resolvedSeed = shuffleSeed.has_value() ? shuffleSeed : std::random_device{}();
-        groupOrder = ShuffledIndices(m_TestGroups.size(), *resolvedSeed);
+        groupOrder = ShuffledGroupOrder(suitePaths, *resolvedSeed);
     }
     else
     {
@@ -419,7 +724,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
             continue;
         }
 
-        std::string const& groupName = testGroup.GetTestGroupName();
+        std::string const groupName = testGroup.GetQualifiedTestGroupName();
         bool anyMatch = false;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
@@ -455,7 +760,7 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
     for (std::vector<ITestGroup*>::iterator it = groupsToRun.begin(); it != groupsToRun.end(); it++)
     {
         ITestGroup& testGroup = **it;
-        std::string const& name = testGroup.GetTestGroupName();
+        std::string const name = testGroup.GetQualifiedTestGroupName();
         size_t nTestsInGroup = 0;
 
         for (ITestGroup::TestCallbackList::iterator testIt = testGroup.GetTestCallbackList().begin();
@@ -477,31 +782,47 @@ TTestResults TTestHandler::Run(TestFilter const& filter, std::string const& filt
         Log("--------------------------------------------------------------------------------");
         Log("[" + GetUTCTimeISO8601() + "] Setting up group " + std::to_string(++groupNum) + " of " +
             std::to_string(nGroups) + ": \"" + name + "\"");
-        testGroup.SetUp_Group();
-
-        // run
-        Log("Running " + std::to_string(nTestsInGroup) + " test" + std::string((nTestsInGroup == 1) ? "." : "s."));
-
-        std::optional<unsigned int> groupSeed;
-        if (resolvedSeed.has_value())
-            groupSeed = *resolvedSeed + FNV1aHash(name);
+        std::optional<std::string> const setUpFailure = CallAndDescribeException([&testGroup]()
+            {
+                testGroup.SetUp_Group();
+            });
 
         bool groupTimedOut = false;
         bool groupCrashed = false;
-        try
+        TTestResults setUpFailureResults;
+
+        if (setUpFailure.has_value())
         {
-            testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
+            // The group's tests can't run without their set-up, so each one fails instead, and the run carries on
+            // with the next group, after tearing this one down as usual.
+            Log("!!ERROR!!: SetUp_Group() exception for group \"" + name + "\": " + *setUpFailure);
+            setUpFailureResults = FailGroupTests(testGroup, filter, "SetUp_Group() exception: " + *setUpFailure);
         }
-        catch (TExceptTestTimedOut const&)
+        else
         {
-            groupTimedOut = true;
-        }
-        catch (TExceptTestCrashed const&)
-        {
-            groupCrashed = true;
+            // run
+            Log("Running " + std::to_string(nTestsInGroup) + " test" +
+                std::string((nTestsInGroup == 1) ? "." : "s."));
+
+            std::optional<unsigned int> groupSeed;
+            if (resolvedSeed.has_value())
+                groupSeed = *resolvedSeed + FNV1aHash(name);
+
+            try
+            {
+                testGroup.Run(filter, groupSeed, testTimeoutSeconds, catchCrashes);
+            }
+            catch (TExceptTestTimedOut const&)
+            {
+                groupTimedOut = true;
+            }
+            catch (TExceptTestCrashed const&)
+            {
+                groupCrashed = true;
+            }
         }
 
-        TTestResults const& testGroupResults = testGroup.Results();
+        TTestResults const& testGroupResults = setUpFailure.has_value() ? setUpFailureResults : testGroup.Results();
         Log("Done. " +
             TConsole::Colorize("Succeeded: " + std::to_string(testGroupResults.SuccessCount), TLogKind::Pass) +
             ", " + TConsole::Colorize("failed: " + std::to_string(testGroupResults.FailedCount), TLogKind::Fail) +

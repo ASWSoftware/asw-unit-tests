@@ -33,6 +33,34 @@ limitations under the License.
 namespace
 {
 
+// Written through by CrashInsideTryBlock() below. At namespace scope, not a local: GCC 13 and 14 at
+// -O3 drop the write through a local 'int* volatile' initialized to nullptr in the same function, so
+// nothing crashes (seen in the Linux CI build; GCC 15 and Clang keep it).
+int* volatile g_NullPointer = nullptr;
+
+// A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
+// while it's entered, so this crashes with the chain's head pointing into this function's stack
+// frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
+// since the framework calls each test from inside its own try blocks. The crash is called through a
+// volatile pointer so no compiler can see it can't throw and drop the try block. Used by
+// Test_Run_AccessViolation_LaterExceptionStillCaught() below.
+void CrashInsideTryBlock()
+{
+    using TCrash = void (*)();
+    TCrash volatile crash = []()
+        {
+            *g_NullPointer = 1;
+        };
+
+    try
+    {
+        crash();
+    }
+    catch (std::exception const&)
+    {
+    }
+}
+
 // Not a tail call: 'buffer[0]' is read again after the recursive call returns, so no compiler can
 // turn this into a loop with constant stack usage the way it could a simple tail-recursive
 // version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
@@ -100,6 +128,8 @@ TTest_ASWUnitTests_CrashGuard::TTest_ASWUnitTests_CrashGuard()
 {
     RegisterTest(&TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbort,
         "Run_AccessViolation_CaughtAndDoesNotAbort");
+    RegisterTest(&TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_LaterExceptionStillCaught,
+        "Run_AccessViolation_LaterExceptionStillCaught");
     RegisterTest(&TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort,
         "Run_DeepAccessViolation_CaughtAndDoesNotAbort");
     RegisterTest(&TTest_ASWUnitTests_CrashGuard::Test_Run_DivideByZero_Caught, "Run_DivideByZero_Caught");
@@ -165,23 +195,59 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbo
 }
 //---------------------------------------------------------------------------
 /*
+    TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_LaterExceptionStillCaught
+
+    Recovering from a crash must leave the thread able to throw and catch exceptions again. With RAD
+    Studio's 32-bit compiler (bcc32c), the jump out of the crash once left Win32's chain of exception
+    handlers pointing into the abandoned stack, and the next exception on the thread then crashed the
+    process for real. The crash has to happen inside a try block (see CrashInsideTryBlock()) for that
+    chain to have moved on before the jump.
+*/
+void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_LaterExceptionStillCaught()
+{
+    // Arrange
+    bool caught = false;
+
+    // Act
+    TCrashGuardResult const result = TCrashGuard::Run([]()
+        {
+            CrashInsideTryBlock();
+        });
+
+    try
+    {
+        throw std::runtime_error("thrown after the crash");
+    }
+    catch (std::runtime_error const&)
+    {
+        caught = true;
+    }
+
+    // Assert
+    CheckTrue(result.Crashed, __func__, __LINE__, "the access violation is caught");
+    CheckTrue(caught, __func__, __LINE__, "an exception thrown on the same thread afterwards is caught normally");
+}
+//---------------------------------------------------------------------------
+/*
     TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort
 
     Not merely a handful of frames deep, deliberately: an ordinary crash a couple thousand frames
     deep was found to be misclassified as abort-worthy specifically on RAD Studio's Clang-based
     compilers (bcc32c/bcc64) in a Release build, while MinGW handled the exact same code correctly
-    at every depth tried. bcc32c/bcc64 remain unreliable at this specifically, in ways further
-    tuning (a larger SetThreadStackGuarantee(), a shallower depth) did not resolve cleanly - see
-    Skip() below and the commit that added it for the full investigation. This test is Skip()ped on
-    those compilers rather than deleted, since MinGW (and, unverified so far, MSVC) still need real
-    coverage of "an ordinary crash, meaningfully deep, still doesn't force an abort."
+    at every depth tried. bcc64x remains unreliable at this specifically, in ways further tuning (a
+    larger SetThreadStackGuarantee(), a shallower depth) did not resolve cleanly - see Skip() below
+    and the commit that added it for the full investigation. This test is Skip()ped on that compiler
+    rather than deleted, since MinGW, bcc32c (and, unverified so far, MSVC) still need real coverage
+    of "an ordinary crash, meaningfully deep, still doesn't force an abort." bcc32c passes it in
+    Debug and Release builds, while bcc64x still fails it in a Release build (checked 2026-10-14,
+    RAD Studio 13.1).
 */
 void TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort()
 {
-#if defined(__BORLANDC__)
+#if defined(__BORLANDC__) && defined(_WIN64)
     Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's bcc32c/bcc64 in a Release build: an ordinary crash this deep was "
-        "sometimes misclassified as abort-worthy. MinGW handles this correctly; investigation ongoing.");
+        "Unreliable on RAD Studio's bcc64x in a Release build: an ordinary crash this deep was "
+        "misclassified as abort-worthy. MinGW and bcc32c handle this correctly; investigation ongoing.");
 #endif
 
     // Arrange, Act
