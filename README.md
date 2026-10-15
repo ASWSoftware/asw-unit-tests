@@ -241,7 +241,9 @@ synthetic failure entry. The abandoned worker thread itself is never joined or f
 since there is no safe, portable way to interrupt a thread that may be stuck in an infinite loop. If
 the test ends after all, moments later, its Check failures, its `Log()` lines and its outcome from
 then on never reach the results, the log or a run observer. A test that has already begun recording
-its outcome when the timeout comes counts as finished in time instead.
+its outcome when the timeout comes counts as finished in time instead. Since that thread may still
+be using its test group, the runner then ends without destroying the test groups, as it does after a
+crash that aborts the run (see `--catch-crashes` below).
 
 `--catch-crashes` guards against a single test crashing (e.g. dereferencing a null pointer) and
 taking down the whole process with it. There is no default; without it, a crashing test still

@@ -10,6 +10,8 @@ versioned baseline.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-14
+
 ### Added
 
 - Test suites, for organizing test groups into a hierarchy of any depth. Pass a `TSuitePath` to
@@ -519,7 +521,8 @@ Initial versioned release, switching the project to semantic versioning and addi
 (test group registration, `Check`/`Assert` methods, RAD Studio and CMake build support, etc.) is
 treated as the baseline and is not itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.1.0...v1.2.0
