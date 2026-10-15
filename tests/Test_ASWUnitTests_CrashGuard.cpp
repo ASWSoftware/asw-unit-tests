@@ -33,6 +33,11 @@ limitations under the License.
 namespace
 {
 
+// Written through by CrashInsideTryBlock() below. At namespace scope, not a local: GCC 13 and 14 at
+// -O3 drop the write through a local 'int* volatile' initialized to nullptr in the same function, so
+// nothing crashes (seen in the Linux CI build; GCC 15 and Clang keep it).
+int* volatile g_NullPointer = nullptr;
+
 // A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
 // while it's entered, so this crashes with the chain's head pointing into this function's stack
 // frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
@@ -44,8 +49,7 @@ void CrashInsideTryBlock()
     using TCrash = void (*)();
     TCrash volatile crash = []()
         {
-            int* volatile nullPointer = nullptr;
-            *nullPointer = 1;
+            *g_NullPointer = 1;
         };
 
     try
