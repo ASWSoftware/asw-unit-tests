@@ -55,6 +55,8 @@ limitations under the License.
 namespace ASWUnitTests
 {
 
+struct TRegisteredTestGroupFactory; // See ASWUnitTests_Registry.h.
+
 /////////////////////////////////////////////////////////////////////////////
 // TTestId
 //
@@ -106,6 +108,8 @@ private:
     ITestGroups m_TestGroups;
 
 private:
+    std::unique_ptr<ITestGroup> CreateTestGroup(TRegisteredTestGroupFactory const& registered);
+    TTestResults FailGroupTests(ITestGroup& group, TestFilter const& filter, std::string const& detail);
     void RegisterTestGroups();
 
 public:

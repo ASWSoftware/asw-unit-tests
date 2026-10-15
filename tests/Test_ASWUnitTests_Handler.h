@@ -41,8 +41,11 @@ private: // Test methods
     void Test_CanonicalGroupOrder_RejectsInvalidSuitePath();
     void Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName();
     void Test_GetTests_MatchesGetAllTestFullNames();
+    void Test_Initialize_ReplacesGroupWhoseConstructorThrows();
+    void Test_Run_FailsGroupTestsWhenSetUpGroupThrows();
     void Test_Run_ShuffleKeepsOrderWhenFiltered();
     void Test_SetRunObserver_ReceivesInitializeAndRunOutput();
+    void Test_SetRunObserver_ReceivesLogWithoutColor();
     void Test_SetRunObserver_StopsBetweenGroups();
     void Test_ShuffledGroupOrder_KeepsSuitesTogether();
     void Test_ShuffledGroupOrder_WithoutSuites_MatchesShuffledIndices();

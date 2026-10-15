@@ -199,7 +199,8 @@ bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& s
 {
     std::string const xml = BuildXML(suitesName, testCases);
 
-    std::ofstream file(filePath, std::ios::out | std::ios::trunc);
+    // Binary, so the file holds BuildXML()'s bytes unchanged, with LF line ends, rather than CRLF on Windows.
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
     if (!file.is_open())
         return false;
 

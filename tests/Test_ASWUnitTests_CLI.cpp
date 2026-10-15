@@ -452,6 +452,14 @@ void TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Invalid()
     CheckFalse(TCLIParser::ParseUnsignedInt("-5").has_value(),
         __func__, __LINE__, "negative number rejected (wraps past unsigned int max)");
     CheckFalse(TCLIParser::ParseUnsignedInt("99999999999").has_value(), __func__, __LINE__, "overflows unsigned int");
+    CheckFalse(TCLIParser::ParseUnsignedInt("4294967296").has_value(), __func__, __LINE__, "one past UINT_MAX");
+    CheckFalse(TCLIParser::ParseUnsignedInt("4294967300").has_value(), __func__, __LINE__, "past UINT_MAX in the last digit");
+    CheckFalse(TCLIParser::ParseUnsignedInt(" 5").has_value(), __func__, __LINE__, "leading space");
+    CheckFalse(TCLIParser::ParseUnsignedInt("5 ").has_value(), __func__, __LINE__, "trailing space");
+    CheckFalse(TCLIParser::ParseUnsignedInt("+5").has_value(), __func__, __LINE__, "plus sign");
+    CheckFalse(TCLIParser::ParseUnsignedInt(" -5").has_value(), __func__, __LINE__, "space then minus sign");
+    CheckFalse(TCLIParser::ParseUnsignedInt("\t5").has_value(), __func__, __LINE__, "leading tab");
+    CheckFalse(TCLIParser::ParseUnsignedInt("0x10").has_value(), __func__, __LINE__, "hex prefix");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Valid()
@@ -460,6 +468,9 @@ void TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Valid()
     CheckTrue(TCLIParser::ParseUnsignedInt("0") == 0u, __func__, __LINE__, "zero");
     CheckTrue(TCLIParser::ParseUnsignedInt("123") == 123u, __func__, __LINE__, "ordinary value");
     CheckTrue(TCLIParser::ParseUnsignedInt("4294967295") == 4294967295u, __func__, __LINE__, "exactly UINT_MAX");
+    CheckTrue(TCLIParser::ParseUnsignedInt("007") == 7u, __func__, __LINE__, "leading zeros");
+    CheckTrue(TCLIParser::ParseUnsignedInt("00000000004294967295") == 4294967295u, __func__, __LINE__,
+        "UINT_MAX after many leading zeros");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ToJUnitTestCases_CopiesEachRecord()

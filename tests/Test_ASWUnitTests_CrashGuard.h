@@ -51,6 +51,7 @@ private:
 
 private: // Test methods
     void Test_Run_AccessViolation_CaughtAndDoesNotAbort();
+    void Test_Run_AccessViolation_LaterExceptionStillCaught();
     void Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort();
     void Test_Run_DivideByZero_Caught();
     void Test_Run_NormalCompletion_ReturnsNotCrashed();

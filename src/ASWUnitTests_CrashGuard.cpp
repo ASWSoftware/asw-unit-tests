@@ -288,6 +288,16 @@ namespace ASWUnitTests
     added to fix it. This is a different problem than the "which fault is this" ambiguity described
     above; sigaltstack() only ensures the handler for a SIGSEGV gets to run at all, it does not by
     itself distinguish a stack overflow from an ordinary one once it does.
+
+    Saving and restoring the head of the thread's exception-handler chain (NT_TIB::ExceptionList)
+    handles an issue with RAD Studio's 32-bit compiler (bcc32c), whose longjmp() doesn't restore it.
+    32-bit Windows keeps that chain in a linked list of records on the stack, one for each function
+    with an active try block or destructors to run, so after jumping out of a crash in a test, which
+    the framework calls from inside its own try blocks, the head still pointed into the abandoned
+    stack. The crash was caught and reported, but the next exception thrown on the thread walked the
+    stale chain, and the process died with an access violation or an unhandled exception. Confirmed
+    by logging the head before setjmp() and after the jump. 64-bit Windows finds handlers from
+    unwind tables instead of a chain on the stack, so it has nothing to restore.
 */
 TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
 {
@@ -304,6 +314,12 @@ TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
     std::jmp_buf* const previousJumpBuf = g_JumpBuf;
     g_JumpBuf = &jumpBuf;
 
+#if defined(__BORLANDC__) && defined(__clang__) && !defined(_WIN64)
+    // bcc32c's longjmp() doesn't restore this; see above TCrashGuard::Run().
+    NT_TIB* const threadInfo = reinterpret_cast<NT_TIB*>(::NtCurrentTeb());
+    PEXCEPTION_REGISTRATION_RECORD const exceptionHandlers = threadInfo->ExceptionList;
+#endif
+
     // setjmp() returns 0 on this, its first, normal call, so body() runs from here. If it faults,
     // CrashVectoredHandler() above calls longjmp(jumpBuf, 1) from wherever the fault happened; that
     // does not resume execution there, but instead restores the CPU/stack state saved by this same
@@ -319,6 +335,9 @@ TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
     }
     else
     {
+#if defined(__BORLANDC__) && defined(__clang__) && !defined(_WIN64)
+        threadInfo->ExceptionList = exceptionHandlers;
+#endif
         result.Crashed = true;
         result.ShouldAbortRun = (g_FaultCode == EXCEPTION_STACK_OVERFLOW);
         result.Description = DescribeFault(g_FaultCode);

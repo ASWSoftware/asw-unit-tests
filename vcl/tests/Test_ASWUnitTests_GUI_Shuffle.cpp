@@ -167,7 +167,7 @@ void TTest_ASWUnitTests_GUI_Shuffle::Test_ApplySeedChoice_NewSeedEachRun()
 void TTest_ASWUnitTests_GUI_Shuffle::Test_ApplySeedChoice_RejectsInvalidSeed()
 {
     // Arrange
-    std::vector<std::string> const invalidSeeds = { "", "   ", "abc", "-1", "12 34", "4294967296" };
+    std::vector<std::string> const invalidSeeds = { "", "   ", "abc", "-1", "+5", "12 34", "4294967296" };
 
     for (std::string const& seedText : invalidSeeds)
     {

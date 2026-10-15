@@ -66,9 +66,11 @@ private:
 
 __published: // IDE-managed Components
     TAction* Act_About;
+    TAction* Act_CollapseAll;
     TAction* Act_CommandLineOptions;
     TAction* Act_CopyDetails;
     TAction* Act_Exit;
+    TAction* Act_ExpandAll;
     TAction* Act_ExportJUnitReport;
     TAction* Act_FocusFilter;
     TAction* Act_ResetLayout;
@@ -115,7 +117,10 @@ __published: // IDE-managed Components
     TMenuItem* MI_TestsSelectNone;
     TMenuItem* MI_TestsSeparator1;
     TMenuItem* MI_View;
+    TMenuItem* MI_ViewCollapseAll;
+    TMenuItem* MI_ViewExpandAll;
     TMenuItem* MI_ViewResetLayout;
+    TMenuItem* MI_ViewSeparator1;
     TMainMenu* MM_Main;
     TProgressBar* PB_Progress;
     TPageControl* PC_Results;
@@ -130,9 +135,11 @@ __published: // IDE-managed Components
     TTabSheet* TS_Log;
     TTreeView* TV_Tests;
     void __fastcall Act_AboutExecute(TObject* Sender);
+    void __fastcall Act_CollapseAllExecute(TObject* Sender);
     void __fastcall Act_CommandLineOptionsExecute(TObject* Sender);
     void __fastcall Act_CopyDetailsExecute(TObject* Sender);
     void __fastcall Act_ExitExecute(TObject* Sender);
+    void __fastcall Act_ExpandAllExecute(TObject* Sender);
     void __fastcall Act_ExportJUnitReportExecute(TObject* Sender);
     void __fastcall Act_FocusFilterExecute(TObject* Sender);
     void __fastcall Act_ResetLayoutExecute(TObject* Sender);
@@ -174,6 +181,9 @@ private: // User declarations
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
     // finishes, and after a run an unhandled exception ended, which has no report, as in the console runner.
     std::optional<std::vector<ASWUnitTests::TJUnitTestCase> > m_LastRunJUnitTestCases;
+    // Set when a run ends with a test that timed out or crashed, after which no further run can start; see
+    // WasRunAborted().
+    bool m_RunAborted;
     std::optional<std::chrono::steady_clock::time_point> m_RunEnd;
     size_t m_RunFinishedCount;
     bool m_Running;
@@ -260,6 +270,10 @@ public: // User declarations
     int ExitCode() const;
     // Loads the registered tests and applies 'options' (see WinMain()). Call once, right after creating the form.
     void Start(ASWUnitTests::TGUIOptions const& options);
+    // True once a run has ended with a test that timed out or crashed. A timed-out test's abandoned thread may then
+    // still be running, using its group, so WinMain() ends the process without destroying the groups, as the console
+    // runner does.
+    bool WasRunAborted() const;
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TFormASWUnitTestsGUIMain* FormASWUnitTestsGUIMain;

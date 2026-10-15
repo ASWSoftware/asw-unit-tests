@@ -24,6 +24,7 @@ limitations under the License.
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -130,16 +131,21 @@ int main(int argc, char* argv[])
 
     int returnCode = ExitCode_Success;
 
+    // Outside the try block, so that after a timeout or a crash the std::_Exit() calls below end the process with the
+    // handler and its groups still alive: a timed-out test's abandoned worker thread may still be running one of their
+    // tests.
+    std::unique_ptr<TTestHandler> tester;
+
     try
     {
-        TTestHandler tester;
+        tester = std::make_unique<TTestHandler>();
 
-        tester.Initialize(options.ProjectName);
+        tester->Initialize(options.ProjectName);
 
         std::string filterDescription;
-        TestFilter const filter = TCLIParser::BuildTestFilter(tester, options, filterDescription);
+        TestFilter const filter = TCLIParser::BuildTestFilter(*tester, options, filterDescription);
 
-        returnCode = RunTests(tester, options, filter, filterDescription);
+        returnCode = RunTests(*tester, options, filter, filterDescription);
     }
     catch (std::exception const& ex)
     {
@@ -164,17 +170,18 @@ int main(int argc, char* argv[])
     if (returnCode == ExitCode_TestTimedOut)
     {
         // A test's worker thread may still be stuck (see TTestGroupBase::RunWithTimeout()) and was
-        // deliberately abandoned rather than joined. Skip static destructors/atexit handlers, which
-        // could otherwise race with whatever that thread eventually does, and exit immediately.
+        // deliberately abandoned rather than joined. Skip the handler's destructor and static
+        // destructors/atexit handlers, which could otherwise race with whatever that thread
+        // eventually does, and exit immediately.
         std::_Exit(returnCode);
     }
 
     if (returnCode == ExitCode_TestCrashed)
     {
         // The crash that got us here (a stack overflow, or a POSIX SIGSEGV that might have been one -
-        // see TCrashGuard::Run()) may have left global/static state corrupted. Skip static
-        // destructors/atexit handlers, which could misbehave against that corrupted state, and exit
-        // immediately rather than trust them to run cleanly.
+        // see TCrashGuard::Run()) may have left global/static state corrupted. Skip the handler's
+        // destructor and static destructors/atexit handlers, which could misbehave against that
+        // corrupted state, and exit immediately rather than trust them to run cleanly.
         std::_Exit(returnCode);
     }
 

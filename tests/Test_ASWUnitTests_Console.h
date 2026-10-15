@@ -39,6 +39,8 @@ private:
 private: // Test methods
     void Test_ParseColorName_RejectsInvalid();
     void Test_ParseColorName_Recognizes();
+    void Test_StripColor_RemovesColorCodesOnly();
+    void Test_StripColor_RemovesWhatColorizeAdds();
 
 public:
     TTest_ASWUnitTests_Console();

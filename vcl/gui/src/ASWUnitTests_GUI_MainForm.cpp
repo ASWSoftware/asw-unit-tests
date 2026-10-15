@@ -44,7 +44,6 @@ limitations under the License.
 #include <Vcl.Clipbrd.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
-#include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
@@ -121,12 +120,14 @@ void* IndexToData(size_t index)
 }
 //---------------------------------------------------------------------------
 // The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
-// check, an unhandled exception, or a fatal SetUp_Test()/TearDown_Test() error) and its skip lines stand out.
+// check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
+// or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
 TColor LogLineColor(std::string const& line)
 {
     if (line.find("***Test failed") != std::string::npos || line.find("**Check failed") != std::string::npos ||
         line.find("\" - failed (") != std::string::npos || line.find("Unhandled exception") != std::string::npos ||
-        line.find("!!FATAL ERROR!!") != std::string::npos)
+        line.find("!!FATAL ERROR!!") != std::string::npos || line.find("!!ERROR!!") != std::string::npos ||
+        line.find("!!TIMEOUT!!") != std::string::npos || line.find("!!CRASH!!") != std::string::npos)
         return FailureColor;
 
     if (line.find("***Test skipped") != std::string::npos || line.find("\" - skipped (") != std::string::npos)
@@ -249,6 +250,7 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_CloseAfterRun(false),
       m_KeepSelection(false),
       m_LastRunExitCode(ExitCode_Success),
+      m_RunAborted(false),
       m_RunFinishedCount(0),
       m_Running(false),
       m_RunTotalCount(0),
@@ -303,6 +305,21 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_CollapseAllExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Collapse All", [this]()
+    {
+        {
+            TTreeUpdateScope const updating(TV_Tests->Items);
+            TV_Tests->FullCollapse();
+        }
+
+        // A selected node that's now hidden passes the selection to the top-level node above it, which the
+        // detail pane was found not to follow on its own.
+        UpdateDetail();
+    });
+}
+//---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Act_CommandLineOptionsExecute(TObject* /*Sender*/)
 {
     RunGuarded("Command Line Options", []()
@@ -328,6 +345,20 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_ExitExecute(TObject* /*Sender*/)
     RunGuarded("Exit", [this]()
     {
         Close();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ExpandAllExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Expand All", [this]()
+    {
+        {
+            TTreeUpdateScope const updating(TV_Tests->Items);
+            TV_Tests->FullExpand();
+        }
+
+        if (TV_Tests->Selected != nullptr)
+            TV_Tests->Selected->MakeVisible();
     });
 }
 //---------------------------------------------------------------------------
@@ -629,6 +660,10 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
 
     RefreshAllNodeImages();
     SyncTreeChecks();
+
+    // e.g. while the filter hides every test.
+    Act_CollapseAll->Enabled = (TV_Tests->Items->Count > 0);
+    Act_ExpandAll->Enabled = (TV_Tests->Items->Count > 0);
 
     if (TV_Tests->Items->Count > 0)
         TV_Tests->Items->GetFirstNode()->MakeVisible();
@@ -1062,7 +1097,7 @@ void TFormASWUnitTestsGUIMain::RunGuarded(char const* where, std::function<void(
 */
 void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string const& filterDescription)
 {
-    if (m_Running)
+    if (m_Running || m_RunAborted)
         return;
 
     m_TestList.ResetResults();
@@ -1093,12 +1128,16 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
             m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
         m_Observer.Flush();
 
+        // A timed-out test's abandoned thread may still be running one of the groups' tests, and a crash may have
+        // left their state corrupted, so nothing runs again until the GUI is restarted (see WasRunAborted()).
+        m_RunAborted = results.TimedOut || results.Crashed;
+
         if (results.Stopped)
             m_StatusMessage = "Stopped before every test ran.";
         else if (results.TimedOut)
-            m_StatusMessage = "A test timed out, so the rest of the run was abandoned.";
+            m_StatusMessage = "A test timed out, so the rest of the run was abandoned. Restart to run tests again.";
         else if (results.Crashed)
-            m_StatusMessage = "A test crashed, so the rest of the run was abandoned.";
+            m_StatusMessage = "A test crashed, so the rest of the run was abandoned. Restart to run tests again.";
         else
             m_StatusMessage = "Done.";
 
@@ -1212,8 +1251,9 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     Act_CommandLineOptions->Enabled = !running;
     Act_ExportJUnitReport->Enabled = !running && m_LastRunJUnitTestCases.has_value();
 
-    Act_RunFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_RunSelected->Enabled = !running;
+    // Nor once a run has been aborted; see RunTests().
+    Act_RunFailed->Enabled = !running && !m_RunAborted && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
+    Act_RunSelected->Enabled = !running && !m_RunAborted;
     Act_SelectAll->Enabled = !running;
     Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
     Act_SelectNone->Enabled = !running;
@@ -1247,9 +1287,6 @@ void TFormASWUnitTestsGUIMain::ShowShuffleState()
 void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
 {
     m_Options = options;
-
-    // The GUI shows the framework's log output as plain text, so it must never contain ANSI color codes.
-    TConsole::SetColorMode(TColorMode::Never);
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {
@@ -1553,6 +1590,11 @@ void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)
     // The test's own image, then those of its group and the suites holding it, whose status depends on it.
     for (TTreeNode* node = testNode; node != nullptr; node = node->Parent)
         SetNodeImage(node);
+}
+//---------------------------------------------------------------------------
+bool TFormASWUnitTestsGUIMain::WasRunAborted() const
+{
+    return m_RunAborted;
 }
 //---------------------------------------------------------------------------
 /*

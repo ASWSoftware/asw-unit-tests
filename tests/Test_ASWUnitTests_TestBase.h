@@ -64,12 +64,16 @@ private: // Test methods
     void Test_Fail_AbortsTestAsFailed();
     void Test_IsType_UsesDynamicTypeAndShowsNames();
     void Test_Matches_MatchesWholeTextAndShowsPattern();
+    void Test_Near_HandlesNaNAndInfinity();
+    void Test_NullCStrings_MatchNothingInTextChecks();
     void Test_NullNotNull_FailureNamesTheExpectedValue();
     void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
+    void Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished();
     void Test_Run_EndsRunOnSetUpOrTearDownTestException();
+    void Test_Run_IgnoresTestThatEndsAfterItsTimeout();
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
     void Test_Run_RecordsDurationOfShortTest();
@@ -80,6 +84,7 @@ private: // Test methods
     void Test_Run_ReportsRunObserverEventsOnCallingThreadUnderTimeout();
     void Test_Run_ReportsTimedOutTestToRunObserver();
     void Test_Run_ResetsResultsBetweenRuns();
+    void Test_Run_SendsLogToRunObserverWithoutColor();
     void Test_Run_ShuffleSeedProducesDeterministicOrder();
     void Test_Run_StopsWhenRunObserverRequests();
     void Test_Same_ComparesAddressesNotContent();

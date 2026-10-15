@@ -52,7 +52,7 @@ Keep all source files (`.cpp`/`.h`) plain ASCII, including comments. MSVC reads 
 - Insert new class methods in alphabetical order within their existing section. If the class has named or visibly separated sections, preserve those sections and alphabetize only within the relevant section.
 - Insert new free functions in alphabetical order within their existing section. Apply the same section rule when functions are grouped.
 - Follow the surrounding naming, indentation, brace, include, and comment style. Avoid unrelated formatting changes.
-- Keep declarations and definitions consistent, and update all relevant project or build files when adding source files.
+- Keep declarations and definitions consistent, and update all relevant project or build files when adding, removing or renaming source files, including `Deploy.bat`, which copies an explicit list of files.
 - Add or update focused tests for behavior changes, including error and platform-specific cases where applicable.
 
 ## Building and Testing

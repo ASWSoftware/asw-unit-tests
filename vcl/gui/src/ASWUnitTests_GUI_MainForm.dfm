@@ -352,6 +352,16 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
         'every run to repeat its order (--shuffle-seed)'
       OnExecute = Act_ShuffleSeedExecute
     end
+    object Act_ExpandAll: TAction
+      Caption = '&Expand All'
+      Hint = 'Expand every suite and group in the test tree'
+      OnExecute = Act_ExpandAllExecute
+    end
+    object Act_CollapseAll: TAction
+      Caption = '&Collapse All'
+      Hint = 'Collapse the test tree to its top-level suites and groups'
+      OnExecute = Act_CollapseAllExecute
+    end
   end
   object IL_Status: TImageList
     Left = 120
@@ -407,6 +417,15 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     end
     object MI_View: TMenuItem
       Caption = '&View'
+      object MI_ViewExpandAll: TMenuItem
+        Action = Act_ExpandAll
+      end
+      object MI_ViewCollapseAll: TMenuItem
+        Action = Act_CollapseAll
+      end
+      object MI_ViewSeparator1: TMenuItem
+        Caption = '-'
+      end
       object MI_ViewResetLayout: TMenuItem
         Action = Act_ResetLayout
       end

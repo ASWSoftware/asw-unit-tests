@@ -60,6 +60,10 @@ struct TRegisteredTestGroupFactory
     // brace initializer written before this member existed still compiles without a -Wmissing-field-initializers
     // warning.
     std::string SuitePath = std::string();
+    // The registered class's name as written in the registration macro, e.g. "TTest_TConsole", which names the group
+    // that stands in for it if its constructor throws (see TTestHandler::Initialize()). Empty for a group registered
+    // by calling TTestGroupRegistry::Register() without one. Defaulted, like SuitePath.
+    std::string ClassName = std::string();
 };
 
 
@@ -79,7 +83,8 @@ public:
 
 public:
     static TestGroupFactoryList& Factories();
-    static int Register(TestGroupFactory factory, int order = 0, std::string const& suitePath = std::string());
+    static int Register(TestGroupFactory factory, int order = 0, std::string const& suitePath = std::string(),
+        std::string const& className = std::string());
 };
 
 } // namespace ASWUnitTests
@@ -147,7 +152,7 @@ public:
             []() -> std::unique_ptr<::ASWUnitTests::ITestGroup> \
             { \
                 return std::make_unique<ClassName>(); \
-            }, (order), (suitePath)); \
+            }, (order), (suitePath), #ClassName); \
     ASWUnitTests_SUPPRESS_COUNTER_WARNING_END
 
 #define ASW_REGISTER_TEST_GROUP_IN_SUITE(ClassName, suitePath) \

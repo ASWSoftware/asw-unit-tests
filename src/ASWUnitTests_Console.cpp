@@ -185,6 +185,11 @@ std::string TConsole::Colorize(std::string const& text, TLogKind kind)
     return AnsiCode(GetColorFor(kind)) + text + AnsiReset();
 }
 //---------------------------------------------------------------------------
+TColorMode TConsole::GetColorMode()
+{
+    return g_ColorMode;
+}
+//---------------------------------------------------------------------------
 bool TConsole::IsColorEnabled()
 {
     if (g_ColorMode == TColorMode::Always)
@@ -253,6 +258,35 @@ void TConsole::SetColor(TLogKind kind, TConsoleColor color)
 void TConsole::SetColorMode(TColorMode mode)
 {
     g_ColorMode = mode;
+}
+//---------------------------------------------------------------------------
+std::string TConsole::StripColor(std::string const& text)
+{
+    std::string result;
+    result.reserve(text.size());
+    std::string::size_type i = 0;
+
+    while (i < text.size())
+    {
+        // An SGR sequence, as Colorize() writes: ESC, '[', any digits and semicolons, then 'm'.
+        if (text[i] == '\x1b' && i + 1 < text.size() && text[i + 1] == '[')
+        {
+            std::string::size_type end = i + 2;
+            while (end < text.size() && ((text[end] >= '0' && text[end] <= '9') || text[end] == ';'))
+                ++end;
+
+            if (end < text.size() && text[end] == 'm')
+            {
+                i = end + 1;
+                continue;
+            }
+        }
+
+        result += text[i];
+        ++i;
+    }
+
+    return result;
 }
 //---------------------------------------------------------------------------
 
