@@ -24,6 +24,10 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
+#include <cstddef>
+#include <memory>
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
 #include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
@@ -58,6 +62,24 @@ std::vector<std::string> ProcessArguments()
         args.push_back(ToUTF8(System::ParamStr(i)));
 
     return args;
+}
+//---------------------------------------------------------------------------
+std::string ReadFileBytes(System::UnicodeString const& path)
+{
+    System::Sysutils::TBytes const bytes = System::Ioutils::TFile::ReadAllBytes(path);
+
+    if (bytes.Length == 0)
+        return std::string();
+
+    return std::string(reinterpret_cast<char const*>(&bytes[0]), static_cast<std::size_t>(bytes.Length));
+}
+//---------------------------------------------------------------------------
+void WriteFileBytes(System::UnicodeString const& path, std::string const& bytes)
+{
+    std::unique_ptr<System::Classes::TFileStream> const file(new System::Classes::TFileStream(path, fmCreate));
+
+    if (!bytes.empty())
+        file->WriteBuffer(bytes.data(), static_cast<NativeInt>(bytes.size()));
 }
 //---------------------------------------------------------------------------
 

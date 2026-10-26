@@ -43,6 +43,12 @@ System::UnicodeString GUISelectionFilePath();
 // This process's command-line arguments, without the program name, converted to UTF-8, for
 // TGUICommandLine::Parse().
 std::vector<std::string> ProcessArguments();
+// The file's bytes, unchanged, e.g. UTF-8 text for TGUIINIDocument. Throws an RTL exception if it can't be
+// read.
+std::string ReadFileBytes(System::UnicodeString const& path);
+// Replaces the file's content with 'bytes', unchanged, creating the file if needed (but not its folder).
+// Throws an RTL exception if it can't be written.
+void WriteFileBytes(System::UnicodeString const& path, std::string const& bytes);
 
 } // namespace ASWUnitTests
 

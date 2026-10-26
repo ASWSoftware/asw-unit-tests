@@ -28,6 +28,7 @@ limitations under the License.
 #include <vector>
 //---------------------------------------------------------------------------
 #include <System.hpp>
+#include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
@@ -52,6 +53,8 @@ TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote,
+        "ReadFileBytes_ReadsWhatWriteFileBytesWrote");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_GUI_VCLSystem::~TTest_ASWUnitTests_GUI_VCLSystem()
@@ -121,6 +124,41 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount()
     // Assert
     CheckEquals(static_cast<size_t>(expectedCount), args.size(), __func__, __LINE__,
         "one entry per argument, without the program name");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote()
+{
+    // Arrange: a file name with a character outside every ANSI code page but UTF-8's (U+4E2D), and bytes a
+    // text conversion would change: CRLF and LF line breaks, a NUL, and UTF-8 for U+00E9.
+    System::UnicodeString const path = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString(L"ASWUnitTests_VCLSystem_\x4E2D.tmp"));
+    std::string const bytes("a\r\nb\nc\0d\xC3\xA9", 10);
+
+    // Deletes the file however the test ends.
+    struct TDeleteFile
+    {
+        System::UnicodeString const Path;
+
+        ~TDeleteFile()
+        {
+            System::Sysutils::DeleteFile(Path);
+        }
+    } const deleteFile{ path };
+
+    // Act
+    WriteFileBytes(path, bytes);
+    std::string const read = ReadFileBytes(path);
+
+    WriteFileBytes(path, "xy");
+    std::string const shorter = ReadFileBytes(path);
+
+    WriteFileBytes(path, std::string());
+    std::string const empty = ReadFileBytes(path);
+
+    // Assert
+    CheckEquals(bytes, read, __func__, __LINE__, "every byte is read back unchanged");
+    CheckEquals(std::string("xy"), shorter, __func__, __LINE__, "writing again replaces the whole file");
+    CheckEmpty(empty, __func__, __LINE__, "an empty file reads as empty");
 }
 //---------------------------------------------------------------------------
 

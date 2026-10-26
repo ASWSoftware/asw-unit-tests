@@ -39,7 +39,6 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.IniFiles.hpp>
 #include <System.IOUtils.hpp>
 #include <Vcl.Clipbrd.hpp>
 //---------------------------------------------------------------------------
@@ -80,10 +79,11 @@ std::string FirstLine(std::string const& text);
 std::string FormatSeconds(double seconds);
 void* IndexToData(size_t index);
 TColor LogLineColor(std::string const& line);
-std::vector<TRect> MonitorWorkAreas();
+std::vector<TGUIRect> MonitorWorkAreas();
 void* NodeData(TNodeKind kind, size_t index);
 size_t NodeIndex(void* data);
 TNodeKind NodeKind(void* data);
+TGUIRect ToGUIRect(TRect const& rect);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
 //---------------------------------------------------------------------------
@@ -155,12 +155,12 @@ TColor LogLineColor(std::string const& line)
 
     Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
 */
-std::vector<TRect> MonitorWorkAreas()
+std::vector<TGUIRect> MonitorWorkAreas()
 {
-    std::vector<TRect> workAreas;
+    std::vector<TGUIRect> workAreas;
 
     for (int i = 0; i < Screen->MonitorCount; ++i)
-        workAreas.push_back(Screen->Monitors[i]->WorkareaRect);
+        workAreas.push_back(ToGUIRect(Screen->Monitors[i]->WorkareaRect));
 
     return workAreas;
 }
@@ -183,6 +183,11 @@ size_t NodeIndex(void* data)
 TNodeKind NodeKind(void* data)
 {
     return static_cast<TNodeKind>(reinterpret_cast<std::uintptr_t>(data) % 4);
+}
+//---------------------------------------------------------------------------
+TGUIRect ToGUIRect(TRect const& rect)
+{
+    return TGUIRect(rect.Left, rect.Top, rect.Right, rect.Bottom);
 }
 //---------------------------------------------------------------------------
 TNodeCheckState ToNodeCheckState(TGUICheckState state)
@@ -760,8 +765,8 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 
     if (::GetWindowPlacement(Handle, &placement))
     {
-        TRect const bounds = WorkspaceToScreen(TRect(placement.rcNormalPosition), Screen->PrimaryMonitor->BoundsRect,
-            Screen->PrimaryMonitor->WorkareaRect);
+        TGUIRect const bounds = WorkspaceToScreen(ToGUIRect(TRect(placement.rcNormalPosition)),
+            ToGUIRect(Screen->PrimaryMonitor->BoundsRect), ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
 
         TGUIWindowBounds window;
         window.Height = ScaleTo96(bounds.Height(), pixelsPerInch);
@@ -862,8 +867,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
         if (!System::Sysutils::FileExists(path))
             return;
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        layout = LoadGUILayout(*ini);
+        layout = LoadGUILayout(TGUIINIDocument(ReadFileBytes(path)));
     }
     catch (...)
     {
@@ -873,7 +877,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
     if (layout.Window.has_value())
     {
         TGUIWindowBounds const& window = *layout.Window;
-        TRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
+        TGUIRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
             window.Top + ScaleFrom96(window.Height, CurrentPPI));
 
         // Not where it can't be reached, e.g. on a monitor that's since been disconnected. Set as the window
@@ -884,8 +888,8 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
 
         if (IsWindowReachable(bounds, MonitorWorkAreas()) && ::GetWindowPlacement(Handle, &placement))
         {
-            TRect const normal = ScreenToWorkspace(bounds, Screen->PrimaryMonitor->BoundsRect,
-                Screen->PrimaryMonitor->WorkareaRect);
+            TGUIRect const normal = ScreenToWorkspace(bounds, ToGUIRect(Screen->PrimaryMonitor->BoundsRect),
+                ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
             placement.rcNormalPosition.left = normal.Left;
             placement.rcNormalPosition.top = normal.Top;
             placement.rcNormalPosition.right = normal.Right;
@@ -1218,9 +1222,10 @@ void TFormASWUnitTestsGUIMain::SaveLayout()
         System::UnicodeString const path = GUILayoutFilePath();
         System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        SaveGUILayout(*ini, CurrentLayout());
-        ini->UpdateFile();
+        // Starting from the file's current text keeps any other values in it.
+        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUILayout(ini, CurrentLayout());
+        WriteFileBytes(path, ini.Text());
     }
     catch (...)
     {

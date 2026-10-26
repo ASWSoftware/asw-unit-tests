@@ -25,12 +25,8 @@ limitations under the License.
 #include "Test_ASWUnitTests_GUI_Layout.h"
 //---------------------------------------------------------------------------
 #include <initializer_list>
-#include <memory>
 #include <string>
 #include <vector>
-//---------------------------------------------------------------------------
-#include <System.IniFiles.hpp>
-#include <System.Types.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -40,25 +36,20 @@ limitations under the License.
 namespace
 {
 
-using System::Types::TRect;
-
-//---------------------------------------------------------------------------
-
-std::unique_ptr<System::Inifiles::TMemIniFile> NewMemIniFile();
-
-//---------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------
-/*
-    NewMemIniFile
-
-    An empty, in-memory INI file; nothing is read from or written to disk.
-*/
-std::unique_ptr<System::Inifiles::TMemIniFile> NewMemIniFile()
-{
-    return std::unique_ptr<System::Inifiles::TMemIniFile>(new System::Inifiles::TMemIniFile(System::UnicodeString()));
-}
-//---------------------------------------------------------------------------
+// A layout file exactly as the VCL GUI runner saved it with the VCL's TMemIniFile, before 1.5 (copied from a
+// real one), so files saved before then still load, and the file is still written the same way.
+char const TMemIniFileLayout[] =
+    "[Panels]\r\n"
+    "DetailHeight=288\r\n"
+    "TestTreeWidth=446\r\n"
+    "\r\n"
+    "[Window]\r\n"
+    "Height=969\r\n"
+    "Left=365\r\n"
+    "Top=232\r\n"
+    "Width=1285\r\n"
+    "Maximized=0\r\n"
+    "\r\n";
 
 } // namespace
 
@@ -81,8 +72,15 @@ TTest_ASWUnitTests_GUI_Layout::TTest_ASWUnitTests_GUI_Layout()
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_TrueOnAWorkArea, "IsWindowReachable_TrueOnAWorkArea");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_EmptyIniHasNoValues, "LoadGUILayout_EmptyIniHasNoValues");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_IgnoresInvalidValues, "LoadGUILayout_IgnoresInvalidValues");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_ReadsAFileTMemIniFileSaved,
+        "LoadGUILayout_ReadsAFileTMemIniFileSaved");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_ReadsWholeDecimalNumbers,
+        "LoadGUILayout_ReadsWholeDecimalNumbers");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_KeepsOtherValues, "SaveGUILayout_KeepsOtherValues");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RemovesMissingValues, "SaveGUILayout_RemovesMissingValues");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RoundTrips, "SaveGUILayout_RoundTrips");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_WritesWhatTMemIniFileWrote,
+        "SaveGUILayout_WritesWhatTMemIniFileWrote");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_ScaleFrom96_ScalesAndRounds, "ScaleFrom96_ScalesAndRounds");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_ScaleTo96_ReversesScaleFrom96, "ScaleTo96_ReversesScaleFrom96");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_ScreenToWorkspace_ReversesWorkspaceToScreen,
@@ -118,52 +116,52 @@ void TTest_ASWUnitTests_GUI_Layout::TearDown_Test(ITestCase& /*testCase*/)
 void TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_FalseOffScreen()
 {
     // Arrange
-    std::vector<TRect> const workAreas{ TRect(0, 0, 1920, 1040) };
+    std::vector<TGUIRect> const workAreas{ TGUIRect(0, 0, 1920, 1040) };
 
     // Act and Assert
-    CheckFalse(IsWindowReachable(TRect(2000, 100, 2800, 700), workAreas), __func__, __LINE__,
+    CheckFalse(IsWindowReachable(TGUIRect(2000, 100, 2800, 700), workAreas), __func__, __LINE__,
         "a window past a disconnected monitor's edge");
-    CheckFalse(IsWindowReachable(TRect(1870, 100, 2670, 700), workAreas), __func__, __LINE__,
+    CheckFalse(IsWindowReachable(TGUIRect(1870, 100, 2670, 700), workAreas), __func__, __LINE__,
         "only 50 pixels of its title bar on screen");
-    CheckFalse(IsWindowReachable(TRect(100, 100, 900, 700), std::vector<TRect>()), __func__, __LINE__,
+    CheckFalse(IsWindowReachable(TGUIRect(100, 100, 900, 700), std::vector<TGUIRect>()), __func__, __LINE__,
         "no work areas at all");
-    CheckFalse(IsWindowReachable(TRect(100, 100, 100, 700), workAreas), __func__, __LINE__, "an empty rectangle");
+    CheckFalse(IsWindowReachable(TGUIRect(100, 100, 100, 700), workAreas), __func__, __LINE__, "an empty rectangle");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_FalseWhenTitleBarIsHidden()
 {
     // Arrange
-    std::vector<TRect> const workAreas{ TRect(0, 0, 1920, 1040) };
+    std::vector<TGUIRect> const workAreas{ TGUIRect(0, 0, 1920, 1040) };
 
     // Act and Assert
-    CheckFalse(IsWindowReachable(TRect(100, -20, 900, 580), workAreas), __func__, __LINE__,
+    CheckFalse(IsWindowReachable(TGUIRect(100, -20, 900, 580), workAreas), __func__, __LINE__,
         "its top above the work area");
-    CheckFalse(IsWindowReachable(TRect(100, 1020, 900, 1620), workAreas), __func__, __LINE__,
+    CheckFalse(IsWindowReachable(TGUIRect(100, 1020, 900, 1620), workAreas), __func__, __LINE__,
         "its title bar below the work area's bottom, e.g. behind the taskbar");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_TrueOnAWorkArea()
 {
     // Arrange: a second monitor to the left of the primary one, at negative screen coordinates.
-    std::vector<TRect> const workAreas{ TRect(0, 0, 1920, 1040), TRect(-1600, 0, 0, 860) };
+    std::vector<TGUIRect> const workAreas{ TGUIRect(0, 0, 1920, 1040), TGUIRect(-1600, 0, 0, 860) };
 
     // Act and Assert
-    CheckTrue(IsWindowReachable(TRect(100, 100, 900, 700), workAreas), __func__, __LINE__, "on the primary monitor");
-    CheckTrue(IsWindowReachable(TRect(-1200, 100, -400, 700), workAreas), __func__, __LINE__,
+    CheckTrue(IsWindowReachable(TGUIRect(100, 100, 900, 700), workAreas), __func__, __LINE__, "on the primary monitor");
+    CheckTrue(IsWindowReachable(TGUIRect(-1200, 100, -400, 700), workAreas), __func__, __LINE__,
         "on the second monitor");
-    CheckTrue(IsWindowReachable(TRect(1770, 100, 2570, 700), workAreas), __func__, __LINE__,
+    CheckTrue(IsWindowReachable(TGUIRect(1770, 100, 2570, 700), workAreas), __func__, __LINE__,
         "150 pixels of its title bar on screen");
-    CheckTrue(IsWindowReachable(TRect(100, 800, 900, 1400), workAreas), __func__, __LINE__,
+    CheckTrue(IsWindowReachable(TGUIRect(100, 800, 900, 1400), workAreas), __func__, __LINE__,
         "only its title bar and a little more on screen");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_EmptyIniHasNoValues()
 {
     // Arrange
-    std::unique_ptr<System::Inifiles::TMemIniFile> const ini = NewMemIniFile();
+    TGUIINIDocument ini;
 
     // Act
-    TGUILayout const layout = LoadGUILayout(*ini);
+    TGUILayout const layout = LoadGUILayout(ini);
 
     // Assert
     CheckFalse(layout.DetailHeight.has_value(), __func__, __LINE__, "no detail pane height");
@@ -175,17 +173,17 @@ void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_EmptyIniHasNoValues()
 void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_IgnoresInvalidValues()
 {
     // Arrange
-    std::unique_ptr<System::Inifiles::TMemIniFile> const ini = NewMemIniFile();
-    ini->WriteString("Panels", "DetailHeight", "0");
-    ini->WriteString("Panels", "TestTreeWidth", "wide");
-    ini->WriteString("Window", "Height", "600");
-    ini->WriteString("Window", "Left", "10");
-    ini->WriteString("Window", "Maximized", "yes");
-    ini->WriteString("Window", "Top", "");
-    ini->WriteString("Window", "Width", "800");
+    TGUIINIDocument ini;
+    ini.WriteString("Panels", "DetailHeight", "0");
+    ini.WriteString("Panels", "TestTreeWidth", "wide");
+    ini.WriteString("Window", "Height", "600");
+    ini.WriteString("Window", "Left", "10");
+    ini.WriteString("Window", "Maximized", "yes");
+    ini.WriteString("Window", "Top", "");
+    ini.WriteString("Window", "Width", "800");
 
     // Act
-    TGUILayout const layout = LoadGUILayout(*ini);
+    TGUILayout const layout = LoadGUILayout(ini);
 
     // Assert
     CheckFalse(layout.DetailHeight.has_value(), __func__, __LINE__, "a zero size is ignored");
@@ -194,17 +192,101 @@ void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_IgnoresInvalidValues()
     CheckFalse(layout.Window.has_value(), __func__, __LINE__, "the window isn't placed without all four values");
 
     // Arrange: every window value valid except a height below the minimum.
-    ini->WriteString("Window", "Height", "40");
-    ini->WriteString("Window", "Top", "20");
+    ini.WriteString("Window", "Height", "40");
+    ini.WriteString("Window", "Top", "20");
 
     // Act and Assert
-    CheckFalse(LoadGUILayout(*ini).Window.has_value(), __func__, __LINE__, "nor with a height too small to use");
+    CheckFalse(LoadGUILayout(ini).Window.has_value(), __func__, __LINE__, "nor with a height too small to use");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_ReadsAFileTMemIniFileSaved()
+{
+    // Arrange
+    TGUIINIDocument const ini(TMemIniFileLayout);
+
+    // Act
+    TGUILayout const layout = LoadGUILayout(ini);
+
+    // Assert
+    AssertTrue(layout.DetailHeight.has_value(), __func__, __LINE__, "the detail pane height is read");
+    CheckEquals(288, *layout.DetailHeight, __func__, __LINE__, "its value");
+    CheckFalse(layout.Maximized, __func__, __LINE__, "not maximized");
+    AssertTrue(layout.TestTreeWidth.has_value(), __func__, __LINE__, "the test tree width is read");
+    CheckEquals(446, *layout.TestTreeWidth, __func__, __LINE__, "its value");
+    AssertTrue(layout.Window.has_value(), __func__, __LINE__, "the window bounds are read");
+    CheckEquals(969, layout.Window->Height, __func__, __LINE__, "height");
+    CheckEquals(365, layout.Window->Left, __func__, __LINE__, "left");
+    CheckEquals(232, layout.Window->Top, __func__, __LINE__, "top");
+    CheckEquals(1285, layout.Window->Width, __func__, __LINE__, "width");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Layout::Test_LoadGUILayout_ReadsWholeDecimalNumbers()
+{
+    // Arrange: the window's values with a sign, at the ends of int's range, and just past them.
+    TGUIINIDocument ini;
+    ini.WriteString("Window", "Height", "+600");
+    ini.WriteString("Window", "Left", "-2147483648");
+    ini.WriteString("Window", "Top", "2147483647");
+    ini.WriteString("Window", "Width", "800");
+
+    // Act
+    TGUILayout const layout = LoadGUILayout(ini);
+
+    // Assert
+    AssertTrue(layout.Window.has_value(), __func__, __LINE__, "the window bounds are read");
+    CheckEquals(600, layout.Window->Height, __func__, __LINE__, "a leading plus sign is allowed");
+    CheckEquals(-2147483647 - 1, layout.Window->Left, __func__, __LINE__, "the smallest int");
+    CheckEquals(2147483647, layout.Window->Top, __func__, __LINE__, "the largest int");
+
+    for (char const* tooBig : { "2147483648", "-2147483649", "99999999999999999999" })
+    {
+        ini.WriteString("Window", "Top", tooBig);
+        CheckFalse(LoadGUILayout(ini).Window.has_value(), __func__, __LINE__,
+            std::string("a number that doesn't fit in an int is invalid: ") + tooBig);
+    }
+
+    for (char const* notWhole : { "-", "+", "12px", "1.5", "1e3", "0x10", "$10", "1 2" })
+    {
+        ini.WriteString("Window", "Top", notWhole);
+        CheckFalse(LoadGUILayout(ini).Window.has_value(), __func__, __LINE__,
+            std::string("only a whole decimal number is valid, not: ") + notWhole);
+    }
+
+    // Act and Assert: the maximized flag is set by any whole number other than 0, as TCustomIniFile::ReadBool()
+    // read it.
+    for (char const* maximized : { "1", "2", "-1" })
+    {
+        ini.WriteString("Window", "Maximized", maximized);
+        CheckTrue(LoadGUILayout(ini).Maximized, __func__, __LINE__, std::string("maximized: ") + maximized);
+    }
+
+    for (char const* notMaximized : { "0", "-0", "" })
+    {
+        ini.WriteString("Window", "Maximized", notMaximized);
+        CheckFalse(LoadGUILayout(ini).Maximized, __func__, __LINE__, std::string("not maximized: ") + notMaximized);
+    }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_KeepsOtherValues()
+{
+    // Arrange: a file with a key and a section the layout doesn't use, e.g. from a later version.
+    TGUIINIDocument ini("[Window]\r\nState=Docked\r\n\r\n[Other]\r\nName=Value\r\n\r\n");
+    TGUILayout layout;
+    layout.DetailHeight = 170;
+
+    // Act
+    SaveGUILayout(ini, layout);
+
+    // Assert
+    CheckEquals(std::string("[Window]\r\nState=Docked\r\nMaximized=0\r\n\r\n[Other]\r\nName=Value\r\n\r\n"
+        "[Panels]\r\nDetailHeight=170\r\n\r\n"), ini.Text(), __func__, __LINE__,
+        "the other values stay, with the layout's added after them");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RemovesMissingValues()
 {
     // Arrange
-    std::unique_ptr<System::Inifiles::TMemIniFile> const ini = NewMemIniFile();
+    TGUIINIDocument ini;
     TGUILayout full;
     full.DetailHeight = 170;
     full.TestTreeWidth = 360;
@@ -214,25 +296,28 @@ void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RemovesMissingValues()
     window.Top = 60;
     window.Width = 1000;
     full.Window = window;
-    SaveGUILayout(*ini, full);
+    SaveGUILayout(ini, full);
 
     // Act
-    SaveGUILayout(*ini, TGUILayout());
+    SaveGUILayout(ini, TGUILayout());
 
     // Assert
-    CheckFalse(ini->ValueExists("Panels", "DetailHeight"), __func__, __LINE__, "the detail pane height is removed");
-    CheckFalse(ini->ValueExists("Panels", "TestTreeWidth"), __func__, __LINE__, "the test tree width is removed");
-    CheckFalse(ini->ValueExists("Window", "Height"), __func__, __LINE__, "and so are the window's height,");
-    CheckFalse(ini->ValueExists("Window", "Left"), __func__, __LINE__, "left,");
-    CheckFalse(ini->ValueExists("Window", "Top"), __func__, __LINE__, "top,");
-    CheckFalse(ini->ValueExists("Window", "Width"), __func__, __LINE__, "and width");
-    CheckTrue(ini->ValueExists("Window", "Maximized"), __func__, __LINE__, "the maximized flag is always written");
+    CheckFalse(ini.ReadString("Panels", "DetailHeight").has_value(), __func__, __LINE__,
+        "the detail pane height is removed");
+    CheckFalse(ini.ReadString("Panels", "TestTreeWidth").has_value(), __func__, __LINE__,
+        "the test tree width is removed");
+    CheckFalse(ini.ReadString("Window", "Height").has_value(), __func__, __LINE__, "and so are the window's height,");
+    CheckFalse(ini.ReadString("Window", "Left").has_value(), __func__, __LINE__, "left,");
+    CheckFalse(ini.ReadString("Window", "Top").has_value(), __func__, __LINE__, "top,");
+    CheckFalse(ini.ReadString("Window", "Width").has_value(), __func__, __LINE__, "and width");
+    CheckTrue(ini.ReadString("Window", "Maximized").has_value(), __func__, __LINE__,
+        "the maximized flag is always written");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RoundTrips()
 {
     // Arrange: a window on a monitor left of the primary one, so its position is negative.
-    std::unique_ptr<System::Inifiles::TMemIniFile> const ini = NewMemIniFile();
+    TGUIINIDocument ini;
     TGUILayout saved;
     saved.DetailHeight = 170;
     saved.Maximized = true;
@@ -245,8 +330,8 @@ void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RoundTrips()
     saved.Window = window;
 
     // Act
-    SaveGUILayout(*ini, saved);
-    TGUILayout const loaded = LoadGUILayout(*ini);
+    SaveGUILayout(ini, saved);
+    TGUILayout const loaded = LoadGUILayout(ini);
 
     // Assert
     AssertTrue(loaded.DetailHeight.has_value(), __func__, __LINE__, "the detail pane height is kept");
@@ -259,6 +344,34 @@ void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_RoundTrips()
     CheckEquals(-1500, loaded.Window->Left, __func__, __LINE__, "left");
     CheckEquals(60, loaded.Window->Top, __func__, __LINE__, "top");
     CheckEquals(1024, loaded.Window->Width, __func__, __LINE__, "width");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Layout::Test_SaveGUILayout_WritesWhatTMemIniFileWrote()
+{
+    // Arrange: the layout TMemIniFileLayout holds, saved to a new file.
+    TGUIINIDocument ini;
+    TGUILayout layout;
+    layout.DetailHeight = 288;
+    layout.TestTreeWidth = 446;
+    TGUIWindowBounds window;
+    window.Height = 969;
+    window.Left = 365;
+    window.Top = 232;
+    window.Width = 1285;
+    layout.Window = window;
+
+    // Act
+    SaveGUILayout(ini, layout);
+    std::string const newFile = ini.Text();
+
+    TGUIINIDocument existing(TMemIniFileLayout);
+    SaveGUILayout(existing, layout);
+
+    // Assert
+    CheckEquals(std::string(TMemIniFileLayout), newFile, __func__, __LINE__,
+        "a new file has the same text, values, and order as TMemIniFile wrote");
+    CheckEquals(std::string(TMemIniFileLayout), existing.Text(), __func__, __LINE__,
+        "and saving the same layout over that file doesn't change it");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_ScaleFrom96_ScalesAndRounds()
@@ -289,13 +402,13 @@ void TTest_ASWUnitTests_GUI_Layout::Test_ScaleTo96_ReversesScaleFrom96()
 void TTest_ASWUnitTests_GUI_Layout::Test_ScreenToWorkspace_ReversesWorkspaceToScreen()
 {
     // Arrange: a taskbar docked at the left of the primary monitor pushes its work area right 60 pixels.
-    TRect const primaryMonitor(0, 0, 1920, 1080);
-    TRect const leftTaskbarWorkArea(60, 0, 1920, 1080);
-    TRect const screenRect(150, 90, 1350, 910);
+    TGUIRect const primaryMonitor(0, 0, 1920, 1080);
+    TGUIRect const leftTaskbarWorkArea(60, 0, 1920, 1080);
+    TGUIRect const screenRect(150, 90, 1350, 910);
 
     // Act
-    TRect const workspaceRect = ScreenToWorkspace(screenRect, primaryMonitor, leftTaskbarWorkArea);
-    TRect const roundTrip = WorkspaceToScreen(workspaceRect, primaryMonitor, leftTaskbarWorkArea);
+    TGUIRect const workspaceRect = ScreenToWorkspace(screenRect, primaryMonitor, leftTaskbarWorkArea);
+    TGUIRect const roundTrip = WorkspaceToScreen(workspaceRect, primaryMonitor, leftTaskbarWorkArea);
 
     // Assert
     CheckEquals(90, workspaceRect.Left, __func__, __LINE__, "left moves by the work area's offset");
@@ -311,12 +424,12 @@ void TTest_ASWUnitTests_GUI_Layout::Test_ScreenToWorkspace_ReversesWorkspaceToSc
 void TTest_ASWUnitTests_GUI_Layout::Test_WorkspaceToScreen_OffsetsByPrimaryWorkArea()
 {
     // Arrange: a taskbar docked at the top of the primary monitor pushes its work area down 40 pixels.
-    TRect const primaryMonitor(0, 0, 1920, 1080);
-    TRect const topTaskbarWorkArea(0, 40, 1920, 1080);
+    TGUIRect const primaryMonitor(0, 0, 1920, 1080);
+    TGUIRect const topTaskbarWorkArea(0, 40, 1920, 1080);
 
     // Act
-    TRect const shifted = WorkspaceToScreen(TRect(10, 10, 810, 610), primaryMonitor, topTaskbarWorkArea);
-    TRect const unshifted = WorkspaceToScreen(TRect(10, 10, 810, 610), primaryMonitor, TRect(0, 0, 1920, 1040));
+    TGUIRect const shifted = WorkspaceToScreen(TGUIRect(10, 10, 810, 610), primaryMonitor, topTaskbarWorkArea);
+    TGUIRect const unshifted = WorkspaceToScreen(TGUIRect(10, 10, 810, 610), primaryMonitor, TGUIRect(0, 0, 1920, 1040));
 
     // Assert
     CheckEquals(10, shifted.Left, __func__, __LINE__, "left is unchanged");

@@ -25,9 +25,9 @@ limitations under the License.
 #include "ASWUnitTests_GUI_Layout.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <climits>
 #include <cmath>
-//---------------------------------------------------------------------------
-#include <System.SysUtils.hpp>
+#include <string>
 //---------------------------------------------------------------------------
 
 namespace
@@ -48,27 +48,65 @@ int const TitleBarHeight = 30;
 
 //---------------------------------------------------------------------------
 
-std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident);
-std::optional<int> ReadSize(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident, int minimum);
-void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident,
+std::optional<int> ParseInt(std::string const& text);
+std::optional<int> ReadInt(ASWUnitTests::TGUIINIDocument const& ini, char const* section, char const* ident);
+std::optional<int> ReadSize(ASWUnitTests::TGUIINIDocument const& ini, char const* section, char const* ident,
+    int minimum);
+void WriteOrDelete(ASWUnitTests::TGUIINIDocument& ini, char const* section, char const* ident,
     std::optional<int> const& value);
 
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
 /*
+    ParseInt
+
+    'text' as a whole decimal number, with an optional sign, or empty if it isn't one or doesn't fit in an int.
+*/
+std::optional<int> ParseInt(std::string const& text)
+{
+    size_t start = 0;
+    bool const negative = !text.empty() && text[0] == '-';
+
+    if (!text.empty() && (text[0] == '-' || text[0] == '+'))
+        start = 1;
+
+    if (start == text.size())
+        return std::nullopt;
+
+    // Accumulated as a negative number, whose range includes INT_MIN.
+    long long value = 0;
+
+    for (size_t i = start; i < text.size(); ++i)
+    {
+        if (text[i] < '0' || text[i] > '9')
+            return std::nullopt;
+
+        value = value * 10 - (text[i] - '0');
+
+        if (value < INT_MIN)
+            return std::nullopt;
+    }
+
+    if (!negative && -value > INT_MAX)
+        return std::nullopt;
+
+    return static_cast<int>(negative ? value : -value);
+}
+//---------------------------------------------------------------------------
+/*
     ReadInt
 
     The value, or empty if it's missing or isn't a whole number.
 */
-std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident)
+std::optional<int> ReadInt(ASWUnitTests::TGUIINIDocument const& ini, char const* section, char const* ident)
 {
-    int value = 0;
+    std::optional<std::string> const text = ini.ReadString(section, ident);
 
-    if (!System::Sysutils::TryStrToInt(ini.ReadString(section, ident, System::UnicodeString()), value))
+    if (!text.has_value())
         return std::nullopt;
 
-    return value;
+    return ParseInt(*text);
 }
 //---------------------------------------------------------------------------
 /*
@@ -76,7 +114,8 @@ std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* se
 
     The value, or empty if it's missing, isn't a whole number, or is less than 'minimum'.
 */
-std::optional<int> ReadSize(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident, int minimum)
+std::optional<int> ReadSize(ASWUnitTests::TGUIINIDocument const& ini, char const* section, char const* ident,
+    int minimum)
 {
     std::optional<int> const value = ReadInt(ini, section, ident);
 
@@ -86,11 +125,11 @@ std::optional<int> ReadSize(System::Inifiles::TCustomIniFile& ini, char const* s
     return value;
 }
 //---------------------------------------------------------------------------
-void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident,
+void WriteOrDelete(ASWUnitTests::TGUIINIDocument& ini, char const* section, char const* ident,
     std::optional<int> const& value)
 {
     if (value.has_value())
-        ini.WriteInteger(section, ident, *value);
+        ini.WriteString(section, ident, std::to_string(*value));
     else
         ini.DeleteKey(section, ident);
 }
@@ -104,7 +143,7 @@ namespace ASWUnitTests
 {
 
 //---------------------------------------------------------------------------
-bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::Types::TRect> const& workAreas)
+bool IsWindowReachable(TGUIRect const& bounds, std::vector<TGUIRect> const& workAreas)
 {
     if (bounds.Width() <= 0 || bounds.Height() <= 0)
         return false;
@@ -112,7 +151,7 @@ bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::T
     int const titleBarBottom = bounds.Top + std::min(bounds.Height(), TitleBarHeight);
     int const minWidth = std::min(bounds.Width(), MinGrabWidth);
 
-    for (System::Types::TRect const& workArea : workAreas)
+    for (TGUIRect const& workArea : workAreas)
     {
         int const overlapWidth = std::min(bounds.Right, workArea.Right) - std::max(bounds.Left, workArea.Left);
         bool const titleBarInside = bounds.Top >= workArea.Top && titleBarBottom <= workArea.Bottom;
@@ -124,12 +163,12 @@ bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::T
     return false;
 }
 //---------------------------------------------------------------------------
-TGUILayout LoadGUILayout(System::Inifiles::TCustomIniFile& ini)
+TGUILayout LoadGUILayout(TGUIINIDocument const& ini)
 {
     TGUILayout layout;
 
     layout.DetailHeight = ReadSize(ini, PanelsSection, "DetailHeight", MinPanelSize);
-    layout.Maximized = ini.ReadBool(WindowSection, "Maximized", false);
+    layout.Maximized = ReadInt(ini, WindowSection, "Maximized").value_or(0) != 0;
     layout.TestTreeWidth = ReadSize(ini, PanelsSection, "TestTreeWidth", MinPanelSize);
 
     std::optional<int> const height = ReadSize(ini, WindowSection, "Height", MinWindowHeight);
@@ -151,7 +190,7 @@ TGUILayout LoadGUILayout(System::Inifiles::TCustomIniFile& ini)
     return layout;
 }
 //---------------------------------------------------------------------------
-void SaveGUILayout(System::Inifiles::TCustomIniFile& ini, TGUILayout const& layout)
+void SaveGUILayout(TGUIINIDocument& ini, TGUILayout const& layout)
 {
     WriteOrDelete(ini, PanelsSection, "DetailHeight", layout.DetailHeight);
     WriteOrDelete(ini, PanelsSection, "TestTreeWidth", layout.TestTreeWidth);
@@ -174,7 +213,7 @@ void SaveGUILayout(System::Inifiles::TCustomIniFile& ini, TGUILayout const& layo
     WriteOrDelete(ini, WindowSection, "Top", top);
     WriteOrDelete(ini, WindowSection, "Width", width);
 
-    ini.WriteBool(WindowSection, "Maximized", layout.Maximized);
+    ini.WriteString(WindowSection, "Maximized", layout.Maximized ? "1" : "0");
 }
 //---------------------------------------------------------------------------
 int ScaleFrom96(int value, int pixelsPerInch)
@@ -190,22 +229,49 @@ int ScaleTo96(int value, int pixelsPerInch)
     return static_cast<int>(std::lround(static_cast<double>(value) * 96.0 / pixelsPerInch));
 }
 //---------------------------------------------------------------------------
-System::Types::TRect ScreenToWorkspace(System::Types::TRect const& rect, System::Types::TRect const& primaryMonitor,
-    System::Types::TRect const& primaryWorkArea)
+TGUIRect ScreenToWorkspace(TGUIRect const& rect, TGUIRect const& primaryMonitor, TGUIRect const& primaryWorkArea)
 {
     int const dx = primaryWorkArea.Left - primaryMonitor.Left;
     int const dy = primaryWorkArea.Top - primaryMonitor.Top;
 
-    return System::Types::TRect(rect.Left - dx, rect.Top - dy, rect.Right - dx, rect.Bottom - dy);
+    return TGUIRect(rect.Left - dx, rect.Top - dy, rect.Right - dx, rect.Bottom - dy);
 }
 //---------------------------------------------------------------------------
-System::Types::TRect WorkspaceToScreen(System::Types::TRect const& rect, System::Types::TRect const& primaryMonitor,
-    System::Types::TRect const& primaryWorkArea)
+TGUIRect WorkspaceToScreen(TGUIRect const& rect, TGUIRect const& primaryMonitor, TGUIRect const& primaryWorkArea)
 {
     int const dx = primaryWorkArea.Left - primaryMonitor.Left;
     int const dy = primaryWorkArea.Top - primaryMonitor.Top;
 
-    return System::Types::TRect(rect.Left + dx, rect.Top + dy, rect.Right + dx, rect.Bottom + dy);
+    return TGUIRect(rect.Left + dx, rect.Top + dy, rect.Right + dx, rect.Bottom + dy);
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TGUIRect
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TGUIRect::TGUIRect()
+{
+}
+//---------------------------------------------------------------------------
+TGUIRect::TGUIRect(int left, int top, int right, int bottom)
+    : Bottom(bottom),
+      Left(left),
+      Right(right),
+      Top(top)
+{
+}
+//---------------------------------------------------------------------------
+int TGUIRect::Height() const
+{
+    return Bottom - Top;
+}
+//---------------------------------------------------------------------------
+int TGUIRect::Width() const
+{
+    return Right - Left;
 }
 //---------------------------------------------------------------------------
 

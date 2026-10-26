@@ -31,9 +31,9 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TTest_ASWUnitTests_GUI_Layout
 //
-// Exercises the VCL GUI runner's saved window layout
-// (vcl/gui/src/ASWUnitTests_GUI_Layout.h). Listed in both vcl/ projects, so
-// it also runs from the VCL console runner.
+// Exercises the GUI runners' saved window layout
+// (gui/src/ASWUnitTests_GUI_Layout.h). Listed in every project, so it also
+// runs from the console runners.
 /////////////////////////////////////////////////////////////////////////////
 class TTest_ASWUnitTests_GUI_Layout : public TTestGroupBase
 {
@@ -46,8 +46,12 @@ private: // Test methods
     void Test_IsWindowReachable_TrueOnAWorkArea();
     void Test_LoadGUILayout_EmptyIniHasNoValues();
     void Test_LoadGUILayout_IgnoresInvalidValues();
+    void Test_LoadGUILayout_ReadsAFileTMemIniFileSaved();
+    void Test_LoadGUILayout_ReadsWholeDecimalNumbers();
+    void Test_SaveGUILayout_KeepsOtherValues();
     void Test_SaveGUILayout_RemovesMissingValues();
     void Test_SaveGUILayout_RoundTrips();
+    void Test_SaveGUILayout_WritesWhatTMemIniFileWrote();
     void Test_ScaleFrom96_ScalesAndRounds();
     void Test_ScaleTo96_ReversesScaleFrom96();
     void Test_ScreenToWorkspace_ReversesWorkspaceToScreen();

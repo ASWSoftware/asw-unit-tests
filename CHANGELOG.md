@@ -20,18 +20,22 @@ versioned baseline.
 
 - The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
   build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
-- The VCL GUI runner's units that contain no VCL code moved from `vcl\gui\src` to a new `gui\src`
+- The VCL GUI runner's units that don't need the VCL moved from `vcl\gui\src` to a new `gui\src`
   folder, so other GUI runners can share them: `ASWUnitTests_GUI_CommandLine`,
-  `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`, `ASWUnitTests_GUI_Shuffle` and
-  `ASWUnitTests_GUI_TestList`. A project that builds the VCL GUI must compile them from `gui\src`
-  and add that folder to its include path. The VCL-only parts they had moved to the new
+  `ASWUnitTests_GUI_Layout`, `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`,
+  `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, plus the new
+  `ASWUnitTests_GUI_INIDocument`. A project that builds the VCL GUI must compile them from
+  `gui\src` and add that folder to its include path. Their VCL-only parts moved to the new
   `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h`, which the project must also compile:
-  `GUILayoutFilePath()` (from `ASWUnitTests_GUI_Layout.h`), `GUISelectionFilePath()` (from
-  `ASWUnitTests_GUI_Selection.h`), and `TGUICommandLine::ProcessArguments()`, now the free
-  function `ProcessArguments()`. A `WinMain()` modeled on `ASWUnitTests_VCL_GUI.cpp` must include
-  that header and call `ASWUnitTests::ProcessArguments()` instead. The selection file's first line,
-  a comment, now reads "ASWUnitTests GUI test selection" instead of "ASWUnitTests VCL GUI test
-  selection"; files saved before still load.
+  `GUILayoutFilePath()`, `GUISelectionFilePath()`, and `TGUICommandLine::ProcessArguments()`, now
+  the free function `ProcessArguments()`. A `WinMain()` modeled on `ASWUnitTests_VCL_GUI.cpp` must
+  include that header and call `ASWUnitTests::ProcessArguments()` instead. The layout functions now
+  take a `TGUIINIDocument` instead of a `TCustomIniFile`, and a `TGUIRect` instead of a `TRect`.
+- The VCL GUI runner reads and writes its layout file (`%APPDATA%\ASWUnitTests\<exe name>.ini`)
+  itself, the same way `TMemIniFile` did, so files saved by earlier versions load as before and are
+  written the same way. A size or position written in hexadecimal by hand is now ignored, as an
+  invalid value. The selection file's first line, a comment, now reads "ASWUnitTests GUI test
+  selection" instead of "ASWUnitTests VCL GUI test selection"; files saved before still load.
 
 ## [1.4.0] - 2026-10-14
 

@@ -25,13 +25,32 @@ limitations under the License.
 #include <optional>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.hpp>
-#include <System.IniFiles.hpp>
-#include <System.Types.hpp>
+#include "ASWUnitTests_GUI_INIDocument.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+/////////////////////////////////////////////////////////////////////////////
+// TGUIRect
+//
+// A rectangle in pixels, like the Windows API's RECT: Right and Bottom are
+// just outside it, so Width() is Right - Left.
+/////////////////////////////////////////////////////////////////////////////
+struct TGUIRect
+{
+    int Bottom = 0;
+    int Left = 0;
+    int Right = 0;
+    int Top = 0;
+
+    TGUIRect();
+    TGUIRect(int left, int top, int right, int bottom);
+
+    int Height() const;
+    int Width() const;
+};
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TGUIWindowBounds
@@ -52,13 +71,15 @@ struct TGUIWindowBounds
 /////////////////////////////////////////////////////////////////////////////
 // TGUILayout
 //
-// The VCL GUI runner's window layout, saved when the window closes and
-// restored when it next opens. Sizes are kept at 96 DPI (100% display
-// scaling), converted with ScaleFrom96() and ScaleTo96(), so a layout saved
-// at one display scaling still fits at another. A value that's missing, or
-// wasn't valid when loaded, is empty, and the window keeps its default for
-// it. Contains no VCL UI code, so it's unit tested from the VCL console
-// runner (see vcl/tests/Test_ASWUnitTests_GUI_Layout.cpp).
+// A GUI runner's window layout, saved when the window closes and restored
+// when it next opens. Sizes are kept at 96 DPI (100% display scaling),
+// converted with ScaleFrom96() and ScaleTo96(), so a layout saved at one
+// display scaling still fits at another. A value that's missing, or wasn't
+// valid when loaded, is empty, and the window keeps its default for it.
+// Contains no UI code, so it's unit tested from the console runners (see
+// gui/tests/Test_ASWUnitTests_GUI_Layout.cpp). Each GUI reads and writes the
+// file itself, e.g. the VCL GUI's at GUILayoutFilePath() in
+// vcl/gui/src/ASWUnitTests_GUI_VCLSystem.h.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUILayout
 {
@@ -72,24 +93,24 @@ struct TGUILayout
 
 // Whether enough of a window's top edge, where its title bar is, lies on one of 'workAreas' for the window to
 // be dragged; e.g. false once the monitor it was on has been disconnected. All in screen pixels.
-bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::Types::TRect> const& workAreas);
-// Reads the layout SaveGUILayout() wrote to 'ini'.
-TGUILayout LoadGUILayout(System::Inifiles::TCustomIniFile& ini);
-// Writes 'layout' to 'ini', removing each value it doesn't have. For a TMemIniFile, the file itself is only
-// written by a later UpdateFile().
-void SaveGUILayout(System::Inifiles::TCustomIniFile& ini, TGUILayout const& layout);
+bool IsWindowReachable(TGUIRect const& bounds, std::vector<TGUIRect> const& workAreas);
+// Reads the layout SaveGUILayout() wrote to 'ini'. A size or position is read as a whole decimal number, and
+// the maximized flag as maximized when it's a whole number other than 0, as the VCL's TCustomIniFile read them
+// (though it also read hexadecimal, which a layout file never has).
+TGUILayout LoadGUILayout(TGUIINIDocument const& ini);
+// Writes 'layout' to 'ini', removing each value it doesn't have. The file itself is written from the
+// document's Text() afterward.
+void SaveGUILayout(TGUIINIDocument& ini, TGUILayout const& layout);
 // Converts a size at 96 DPI to one at 'pixelsPerInch', rounded to the nearest pixel.
 int ScaleFrom96(int value, int pixelsPerInch);
 // Converts a size at 'pixelsPerInch' to one at 96 DPI, rounded to the nearest pixel.
 int ScaleTo96(int value, int pixelsPerInch);
 // Converts 'rect' from screen coordinates to workspace coordinates, which SetWindowPlacement() uses; the
 // reverse of WorkspaceToScreen().
-System::Types::TRect ScreenToWorkspace(System::Types::TRect const& rect, System::Types::TRect const& primaryMonitor,
-    System::Types::TRect const& primaryWorkArea);
+TGUIRect ScreenToWorkspace(TGUIRect const& rect, TGUIRect const& primaryMonitor, TGUIRect const& primaryWorkArea);
 // Converts 'rect' from workspace coordinates, which GetWindowPlacement() uses and which are relative to the
 // primary monitor's work area, to screen coordinates.
-System::Types::TRect WorkspaceToScreen(System::Types::TRect const& rect, System::Types::TRect const& primaryMonitor,
-    System::Types::TRect const& primaryWorkArea);
+TGUIRect WorkspaceToScreen(TGUIRect const& rect, TGUIRect const& primaryMonitor, TGUIRect const& primaryWorkArea);
 
 } // namespace ASWUnitTests
 

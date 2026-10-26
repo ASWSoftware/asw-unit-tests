@@ -44,6 +44,7 @@ private: // Test methods
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
     void Test_ProcessArguments_MatchesParamCount();
+    void Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote();
 
 public:
     TTest_ASWUnitTests_GUI_VCLSystem();
