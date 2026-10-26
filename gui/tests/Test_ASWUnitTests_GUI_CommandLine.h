@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_GUI_RunObserver.h
+Test_ASWUnitTests_GUI_CommandLine.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,8 +19,8 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_GUI_RunObserverH
-#define Test_ASWUnitTests_GUI_RunObserverH
+#ifndef Test_ASWUnitTests_GUI_CommandLineH
+#define Test_ASWUnitTests_GUI_CommandLineH
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
@@ -29,29 +29,31 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_GUI_RunObserver
+// TTest_ASWUnitTests_GUI_CommandLine
 //
-// Exercises the VCL GUI runner's ITestRunObserver
-// (vcl/gui/src/ASWUnitTests_GUI_RunObserver.h), both with hand-made events
-// and by running a small unregistered fixture group through it (see the
-// .cpp). Listed in both vcl/ projects, so it also runs from the VCL
-// console runner.
+// Exercises the GUI runners' command-line parsing
+// (gui/src/ASWUnitTests_GUI_CommandLine.h). Listed in every project, so it
+// also runs from the console runners.
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_GUI_RunObserver : public TTestGroupBase
+class TTest_ASWUnitTests_GUI_CommandLine : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
-    void Test_Events_ArriveInOrderWithEachTestsOwnLog();
-    void Test_Flush_HandsOverLogAfterLastTest();
-    void Test_OnLog_FromWorkerThreadWaitsForNextEvent();
-    void Test_Run_ReportsEachTestWithItsOwnLogUnderTimeout();
-    void Test_StopRequest_CanBeRequestedAndReset();
+    void Test_HelpText_MatchesHelpOption();
+    void Test_Parse_ConsoleOnlyOptionsAreReportedAsIgnored();
+    void Test_Parse_ExitWithoutRunIsInvalid();
+    void Test_Parse_HelpIncludesGUIOptions();
+    void Test_Parse_LayoutOptionsAreGUIOnlyOptions();
+    void Test_Parse_NoArgumentsUsesDefaults();
+    void Test_Parse_PassesConsoleOptionsThrough();
+    void Test_Parse_RunAndExitAreGUIOnlyOptions();
+    void Test_Parse_UnrecognizedOptionIsInvalid();
 
 public:
-    TTest_ASWUnitTests_GUI_RunObserver();
-    ~TTest_ASWUnitTests_GUI_RunObserver() override;
+    TTest_ASWUnitTests_GUI_CommandLine();
+    ~TTest_ASWUnitTests_GUI_CommandLine() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -62,4 +64,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_GUI_RunObserverH
+#endif // #ifndef Test_ASWUnitTests_GUI_CommandLineH

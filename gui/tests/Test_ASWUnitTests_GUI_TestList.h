@@ -31,9 +31,9 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TTest_ASWUnitTests_GUI_TestList
 //
-// Exercises the VCL GUI runner's test list and check state model
-// (vcl/gui/src/ASWUnitTests_GUI_TestList.h). Listed in both vcl/ projects,
-// so it also runs from the VCL console runner.
+// Exercises the GUI runners' test list and check state model
+// (gui/src/ASWUnitTests_GUI_TestList.h). Listed in every project, so it
+// also runs from the console runners.
 /////////////////////////////////////////////////////////////////////////////
 class TTest_ASWUnitTests_GUI_TestList : public TTestGroupBase
 {

@@ -2,7 +2,7 @@
 ASWUnitTests_GUI_Shuffle.h
 Author: Anthony S. West - ASW Software
 
-Whether the VCL GUI runner shuffles its runs, and with which seed.
+Whether a GUI runner shuffles its runs, and with which seed.
 
 Copyright 2026 ASW Software
 
@@ -40,8 +40,8 @@ namespace ASWUnitTests
 // seed, every run uses it, so each repeats the same order. Without one, each
 // run gets a new random seed, and the last one used is kept, so Shuffle
 // Seed... can fix it to repeat that run's order.
-// Contains no VCL code, so it's unit tested from the VCL console runner
-// (see vcl/tests/Test_ASWUnitTests_GUI_Shuffle.cpp).
+// Contains no UI code, so it's unit tested from the console runners
+// (see gui/tests/Test_ASWUnitTests_GUI_Shuffle.cpp).
 /////////////////////////////////////////////////////////////////////////////
 class TGUIShuffle
 {

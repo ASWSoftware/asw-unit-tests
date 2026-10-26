@@ -423,9 +423,10 @@ echo %ERRORLEVEL%
 
 To run your own tests in the GUI, create a RAD Studio VCL application that defines
 `ASWUNITTESTS_RTL_EXCEPTIONS`, and add to it: the framework's `src` files except `main.cpp`; the
-files in `vcl\gui\src`, including `ASWUnitTests_GUI_MainForm.dfm`; your own test modules; and a
-`WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line and
-starts the main form.
+files in `gui\src` (shared by the GUI runners) and `vcl\gui\src`, including
+`ASWUnitTests_GUI_MainForm.dfm`, with both folders on the include path; your own test modules; and
+a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line
+and starts the main form.
 
 The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
 `TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
@@ -1137,7 +1138,7 @@ its `src` files from your own project's build file, alongside your own test modu
 my-project/
 +-- third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
 |   +-- src/                      <- framework core (never touched)
-|   +-- vcl/gui/src/              <- VCL GUI runner, if you use it (never touched)
+|   +-- gui/src/, vcl/gui/src/    <- VCL GUI runner, if you use it (never touched)
 |   `-- cmake/, rad370/, tests/, toTest/, other vcl/ folders   <- this framework's own example build, unused by you
 +-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
 `-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo

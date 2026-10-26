@@ -20,6 +20,14 @@ versioned baseline.
 
 - The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
   build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
+- The VCL GUI runner's units that contain no VCL code moved from `vcl\gui\src` to a new `gui\src`
+  folder, so other GUI runners can share them: `ASWUnitTests_GUI_CommandLine`,
+  `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`. A
+  project that builds the VCL GUI must compile them from `gui\src` and add that folder to its
+  include path. `TGUICommandLine::ProcessArguments()` is now the free function
+  `ProcessArguments()`, in the new `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h`, which the project
+  must also compile; a `WinMain()` modeled on `ASWUnitTests_VCL_GUI.cpp` must include that header
+  and call `ASWUnitTests::ProcessArguments()` instead.
 
 ## [1.4.0] - 2026-10-14
 

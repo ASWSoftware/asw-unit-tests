@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 USEFORM("..\src\ASWUnitTests_GUI_MainForm.cpp", FormASWUnitTestsGUIMain);
 //---------------------------------------------------------------------------
@@ -49,7 +50,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
         // and the process exits with the same code the console runner would use, without opening the GUI.
         ASWUnitTests::TGUIOptions options;
         ASWUnitTests::TGUICommandLineResult const commandLine =
-            ASWUnitTests::TGUICommandLine::Parse(ASWUnitTests::TGUICommandLine::ProcessArguments(), options);
+            ASWUnitTests::TGUICommandLine::Parse(ASWUnitTests::ProcessArguments(), options);
 
         if (commandLine.EarlyExitCode.has_value())
         {

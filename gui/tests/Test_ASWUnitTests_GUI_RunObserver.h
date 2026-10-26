@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_GUI_Shuffle.h
+Test_ASWUnitTests_GUI_RunObserver.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,8 +19,8 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_GUI_ShuffleH
-#define Test_ASWUnitTests_GUI_ShuffleH
+#ifndef Test_ASWUnitTests_GUI_RunObserverH
+#define Test_ASWUnitTests_GUI_RunObserverH
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
@@ -29,32 +29,28 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_GUI_Shuffle
+// TTest_ASWUnitTests_GUI_RunObserver
 //
-// Exercises the VCL GUI runner's shuffle state
-// (vcl/gui/src/ASWUnitTests_GUI_Shuffle.h). Listed in both vcl/ projects,
-// so it also runs from the VCL console runner.
+// Exercises the GUI runners' ITestRunObserver
+// (gui/src/ASWUnitTests_GUI_RunObserver.h), both with hand-made events and
+// by running a small unregistered fixture group through it (see the .cpp).
+// Listed in every project, so it also runs from the console runners.
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_GUI_Shuffle : public TTestGroupBase
+class TTest_ASWUnitTests_GUI_RunObserver : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
-    void Test_ApplyCommandLine_SeedTurnsShufflingOn();
-    void Test_ApplySeedChoice_FixedSeed();
-    void Test_ApplySeedChoice_NewSeedEachRun();
-    void Test_ApplySeedChoice_RejectsInvalidSeed();
-    void Test_NextRunSeed_FixedSeedRepeats();
-    void Test_NextRunSeed_NewSeedEachRun();
-    void Test_NextRunSeed_OffReturnsNothing();
-    void Test_SeedToShow_PrefersFixedThenLastSeed();
-    void Test_SetEnabled_KeepsSeeds();
-    void Test_StatusText_DescribesState();
+    void Test_Events_ArriveInOrderWithEachTestsOwnLog();
+    void Test_Flush_HandsOverLogAfterLastTest();
+    void Test_OnLog_FromWorkerThreadWaitsForNextEvent();
+    void Test_Run_ReportsEachTestWithItsOwnLogUnderTimeout();
+    void Test_StopRequest_CanBeRequestedAndReset();
 
 public:
-    TTest_ASWUnitTests_GUI_Shuffle();
-    ~TTest_ASWUnitTests_GUI_Shuffle() override;
+    TTest_ASWUnitTests_GUI_RunObserver();
+    ~TTest_ASWUnitTests_GUI_RunObserver() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -65,4 +61,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_GUI_ShuffleH
+#endif // #ifndef Test_ASWUnitTests_GUI_RunObserverH

@@ -36,16 +36,16 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TGUIRunObserver
 //
-// The VCL GUI runner's ITestRunObserver. It contains no VCL code itself: it
-// hands each event to the std::function callbacks below, which the main form
-// sets, so its behavior can be unit tested without a window (see
-// vcl/tests/Test_ASWUnitTests_GUI_RunObserver.cpp).
+// The GUI runners' ITestRunObserver. It contains no UI code itself: it
+// hands each event to the std::function callbacks below, which the main
+// window sets, so its behavior can be unit tested without a window (see
+// gui/tests/Test_ASWUnitTests_GUI_RunObserver.cpp).
 //
 // Log text can arrive from a test's worker thread (see ITestRunObserver), so
 // OnLog() only appends it to a buffer under a lock. The buffer is handed to
 // LogTextCallback when a test starts or finishes, and by Flush(), so every
 // callback runs on the thread that called TTestHandler::Run(), which for the
-// GUI is its main (VCL) thread.
+// GUI is its main (UI) thread.
 //
 // Text logged between a test's start and finish is also collected as that
 // test's own log and passed to TestFinishedCallback, for the detail pane.

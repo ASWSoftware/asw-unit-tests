@@ -9,6 +9,7 @@ These instructions apply to the entire repository unless a more specific `AGENTS
 ASWUnitTests is a lightweight C++ console unit-testing framework.
 
 - `src/` contains the framework implementation.
+- `gui/src/` contains the GUI runners' shared units, which contain no UI or VCL code, and `gui/tests/` their unit tests, which every project (CMake and RAD Studio) compiles, so they also run on Linux.
 - `tests/` contains unit tests for the example code.
 - `toTest/` contains example code under test.
 - `rad370/` contains the RAD Studio 13.1 project and Windows build scripts.
@@ -66,7 +67,7 @@ For other environments, use the repository's CMake configuration when present or
 - Check compiler warnings and errors.
 - Validate both Windows-specific and portable paths when the change touches platform code.
 - When the change touches code guarded by `ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED`, or the exception handling around it, also build and run the VCL console project (`vcl/console/rad370/Build_Win64x_Debug.bat` and the Win32 script), since no other build compiles that code.
-- When the change touches `vcl/gui/src/`, or framework code the GUI runner uses (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
+- When the change touches `vcl/gui/src/` or `gui/src/`, or framework code the GUI runner uses (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
 
 ## Changelog
 

@@ -24,11 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_GUI_CommandLine.h"
 //---------------------------------------------------------------------------
-#include <System.hpp>
-//---------------------------------------------------------------------------
 #include "ASWUnitTests_StdOutRedirect.h"
-//---------------------------------------------------------------------------
-#include "ASWUnitTests_GUI_Strings.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -68,7 +64,7 @@ TGUICommandLineResult TGUICommandLine::Parse(std::vector<std::string> const& arg
 
     // TCLIParser rejects options it doesn't know, so the GUI-only ones are taken out first. Its argv[0] is
     // the program name, which it skips.
-    std::vector<std::string> cliArgs{ "ASWUnitTests_VCL_GUI" };
+    std::vector<std::string> cliArgs{ "ASWUnitTests_GUI" };
 
     for (std::string const& arg : args)
     {
@@ -122,16 +118,6 @@ TGUICommandLineResult TGUICommandLine::Parse(std::vector<std::string> const& arg
         options.IgnoredOptions.push_back("--color-pass/--color-fail/--color-skip");
 
     return result;
-}
-//---------------------------------------------------------------------------
-std::vector<std::string> TGUICommandLine::ProcessArguments()
-{
-    std::vector<std::string> args;
-
-    for (int i = 1; i <= System::ParamCount(); ++i)
-        args.push_back(ToUTF8(System::ParamStr(i)));
-
-    return args;
 }
 //---------------------------------------------------------------------------
 

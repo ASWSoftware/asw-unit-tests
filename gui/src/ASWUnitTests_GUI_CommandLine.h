@@ -35,7 +35,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TGUIOptions
 //
-// The VCL GUI runner's command-line options: everything the console runner
+// The GUI runners' command-line options: everything the console runner
 // accepts (in CLI), plus the GUI-only options.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUIOptions
@@ -68,13 +68,15 @@ struct TGUICommandLineResult
 /////////////////////////////////////////////////////////////////////////////
 // TGUICommandLine
 //
-// Parses the VCL GUI runner's command line. The GUI-only options are handled
+// Parses a GUI runner's command line. The GUI-only options are handled
 // here; everything else goes through the console runner's own TCLIParser, so
-// both runners accept the same options with the same validation and help
-// text. TCLIParser writes its messages to std::cout, which a GUI app has no
-// console for, so Parse() captures them into the result's Message instead.
-// Contains no VCL UI code, so it's unit tested from the VCL console runner
-// (see vcl/tests/Test_ASWUnitTests_GUI_CommandLine.cpp).
+// the GUI and console runners accept the same options with the same
+// validation and help text. TCLIParser writes its messages to std::cout,
+// which a GUI app has no console for, so Parse() captures them into the
+// result's Message instead. Contains no UI code, so it's unit tested from the
+// console runners (see gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp). Each
+// GUI gets its process's arguments its own way, e.g. the VCL GUI's
+// ProcessArguments() in vcl/gui/src/ASWUnitTests_GUI_VCLSystem.h.
 /////////////////////////////////////////////////////////////////////////////
 class TGUICommandLine
 {
@@ -84,11 +86,8 @@ public:
     // The full help text, exactly as --help shows it: the console runner's usage text plus the GUI-only
     // options.
     static std::string HelpText();
-    // Parses 'args' (the arguments without the program name, as ProcessArguments() returns them) into
-    // 'options'.
+    // Parses 'args' (the process's arguments without the program name, in UTF-8) into 'options'.
     static TGUICommandLineResult Parse(std::vector<std::string> const& args, TGUIOptions& options);
-    // This process's command-line arguments, without the program name, converted to UTF-8.
-    static std::vector<std::string> ProcessArguments();
 };
 
 } // namespace ASWUnitTests

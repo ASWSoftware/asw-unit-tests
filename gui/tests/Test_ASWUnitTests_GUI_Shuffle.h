@@ -1,5 +1,5 @@
 /* **************************************************************************
-Test_ASWUnitTests_GUI_CommandLine.h
+Test_ASWUnitTests_GUI_Shuffle.h
 Author: Anthony S. West - ASW Software
 
 Copyright 2026 ASW Software
@@ -19,8 +19,8 @@ limitations under the License.
 ************************************************************************** */
 
 //---------------------------------------------------------------------------
-#ifndef Test_ASWUnitTests_GUI_CommandLineH
-#define Test_ASWUnitTests_GUI_CommandLineH
+#ifndef Test_ASWUnitTests_GUI_ShuffleH
+#define Test_ASWUnitTests_GUI_ShuffleH
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
@@ -29,32 +29,32 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
-// TTest_ASWUnitTests_GUI_CommandLine
+// TTest_ASWUnitTests_GUI_Shuffle
 //
-// Exercises the VCL GUI runner's command-line parsing
-// (vcl/gui/src/ASWUnitTests_GUI_CommandLine.h). Listed in both vcl/
-// projects, so it also runs from the VCL console runner.
+// Exercises the GUI runners' shuffle state
+// (gui/src/ASWUnitTests_GUI_Shuffle.h). Listed in every project, so it also
+// runs from the console runners.
 /////////////////////////////////////////////////////////////////////////////
-class TTest_ASWUnitTests_GUI_CommandLine : public TTestGroupBase
+class TTest_ASWUnitTests_GUI_Shuffle : public TTestGroupBase
 {
 private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
-    void Test_HelpText_MatchesHelpOption();
-    void Test_Parse_ConsoleOnlyOptionsAreReportedAsIgnored();
-    void Test_Parse_ExitWithoutRunIsInvalid();
-    void Test_Parse_HelpIncludesGUIOptions();
-    void Test_Parse_LayoutOptionsAreGUIOnlyOptions();
-    void Test_Parse_NoArgumentsUsesDefaults();
-    void Test_Parse_PassesConsoleOptionsThrough();
-    void Test_Parse_RunAndExitAreGUIOnlyOptions();
-    void Test_Parse_UnrecognizedOptionIsInvalid();
-    void Test_ProcessArguments_MatchesParamCount();
+    void Test_ApplyCommandLine_SeedTurnsShufflingOn();
+    void Test_ApplySeedChoice_FixedSeed();
+    void Test_ApplySeedChoice_NewSeedEachRun();
+    void Test_ApplySeedChoice_RejectsInvalidSeed();
+    void Test_NextRunSeed_FixedSeedRepeats();
+    void Test_NextRunSeed_NewSeedEachRun();
+    void Test_NextRunSeed_OffReturnsNothing();
+    void Test_SeedToShow_PrefersFixedThenLastSeed();
+    void Test_SetEnabled_KeepsSeeds();
+    void Test_StatusText_DescribesState();
 
 public:
-    TTest_ASWUnitTests_GUI_CommandLine();
-    ~TTest_ASWUnitTests_GUI_CommandLine() override;
+    TTest_ASWUnitTests_GUI_Shuffle();
+    ~TTest_ASWUnitTests_GUI_Shuffle() override;
 
     void SetUp_Group() override;
     void SetUp_Test(ITestCase& testCase) override;
@@ -65,4 +65,4 @@ public:
 } // namespace ASWUnitTests
 
 //---------------------------------------------------------------------------
-#endif // #ifndef Test_ASWUnitTests_GUI_CommandLineH
+#endif // #ifndef Test_ASWUnitTests_GUI_ShuffleH

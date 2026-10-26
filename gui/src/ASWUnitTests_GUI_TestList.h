@@ -38,7 +38,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TGUICheckState
 //
-// A group's check state in the VCL GUI runner's test tree: all, none, or
+// A group's check state in a GUI runner's test tree: all, none, or
 // only some of its tests checked.
 /////////////////////////////////////////////////////////////////////////////
 enum class TGUICheckState
@@ -52,7 +52,7 @@ enum class TGUICheckState
 /////////////////////////////////////////////////////////////////////////////
 // TGUITestStatus
 //
-// A test's status in the VCL GUI runner's current or latest run, in the
+// A test's status in a GUI runner's current or latest run, in the
 // order of the tree's status image list, so a status converts directly to
 // its image index.
 /////////////////////////////////////////////////////////////////////////////
@@ -81,7 +81,7 @@ std::string StatusName(TGUITestStatus status);
 /////////////////////////////////////////////////////////////////////////////
 // TGUITestResult
 //
-// What the VCL GUI runner keeps about a test that finished in the current
+// What a GUI runner keeps about a test that finished in the current
 // or latest run: its record, and the text it logged while running.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUITestResult
@@ -94,15 +94,15 @@ struct TGUITestResult
 /////////////////////////////////////////////////////////////////////////////
 // TGUITestList
 //
-// The VCL GUI runner's list of registered tests and which of them are
+// A GUI runner's list of registered tests and which of them are
 // checked to run, and each one's status and result, independent of how the
 // tree displays them. Tests are identified by their index, in the canonical order
 // TTestHandler::GetTests() returns them, and groups (by qualified name) and
 // suites (by path, including suites that only hold other suites) appear in
 // the order their first test does. A suite's tests are those of every group
-// in it or in the suites inside it. Contains no VCL code, so it's unit
-// tested from the VCL console runner (see
-// vcl/tests/Test_ASWUnitTests_GUI_TestList.cpp).
+// in it or in the suites inside it. Contains no UI code, so it's unit
+// tested from the console runners (see
+// gui/tests/Test_ASWUnitTests_GUI_TestList.cpp).
 //
 // Tests can be hidden by the filter box (see SetVisibleFilter()). While
 // some are, everything about checking and grouping applies only to the

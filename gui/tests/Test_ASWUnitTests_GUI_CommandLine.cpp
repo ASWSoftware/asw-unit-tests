@@ -28,8 +28,6 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.hpp>
-//---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
@@ -80,7 +78,6 @@ TTest_ASWUnitTests_GUI_CommandLine::TTest_ASWUnitTests_GUI_CommandLine()
     RegisterTest(&TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_PassesConsoleOptionsThrough, "Parse_PassesConsoleOptionsThrough");
     RegisterTest(&TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_RunAndExitAreGUIOnlyOptions, "Parse_RunAndExitAreGUIOnlyOptions");
     RegisterTest(&TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_UnrecognizedOptionIsInvalid, "Parse_UnrecognizedOptionIsInvalid");
-    RegisterTest(&TTest_ASWUnitTests_GUI_CommandLine::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_GUI_CommandLine::~TTest_ASWUnitTests_GUI_CommandLine()
@@ -278,20 +275,6 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_UnrecognizedOptionIsInvalid(
         "the console runner's own error message is passed on");
     CheckContains(result.Message, "--run ", __func__, __LINE__,
         "and the usage text that follows it lists the GUI-only options too");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_GUI_CommandLine::Test_ProcessArguments_MatchesParamCount()
-{
-    // Arrange
-    // The runner's own arguments vary with how it was started, so only their count can be checked here.
-    int const expectedCount = System::ParamCount();
-
-    // Act
-    std::vector<std::string> const args = TGUICommandLine::ProcessArguments();
-
-    // Assert
-    CheckEquals(static_cast<size_t>(expectedCount), args.size(), __func__, __LINE__,
-        "one entry per argument, without the program name");
 }
 //---------------------------------------------------------------------------
 

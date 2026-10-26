@@ -1,0 +1,93 @@
+/* **************************************************************************
+Test_ASWUnitTests_GUI_VCLSystem.cpp
+Author: Anthony S. West - ASW Software
+
+See header for info.
+
+Copyright 2026 ASW Software
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+************************************************************************** */
+
+//---------------------------------------------------------------------------
+// Module header
+#include "Test_ASWUnitTests_GUI_VCLSystem.h"
+//---------------------------------------------------------------------------
+#include <string>
+#include <vector>
+//---------------------------------------------------------------------------
+#include <System.hpp>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_VCLSystem.h"
+//---------------------------------------------------------------------------
+
+namespace ASWUnitTests
+{
+
+/////////////////////////////////////////////////////////////////////////////
+// TTest_ASWUnitTests_GUI_VCLSystem
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
+    : inherited("ASWUnitTests_GUI_VCLSystem_Tests")
+{
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
+}
+//---------------------------------------------------------------------------
+TTest_ASWUnitTests_GUI_VCLSystem::~TTest_ASWUnitTests_GUI_VCLSystem()
+{
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::SetUp_Group()
+{
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::SetUp_Test(ITestCase& /*testCase*/)
+{
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::TearDown_Group()
+{
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::TearDown_Test(ITestCase& /*testCase*/)
+{
+}
+//---------------------------------------------------------------------------
+
+// /////// Begin tests after this line ///////////////////////
+
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount()
+{
+    // Arrange
+    // The runner's own arguments vary with how it was started, so only their count can be checked here.
+    int const expectedCount = System::ParamCount();
+
+    // Act
+    std::vector<std::string> const args = ProcessArguments();
+
+    // Assert
+    CheckEquals(static_cast<size_t>(expectedCount), args.size(), __func__, __LINE__,
+        "one entry per argument, without the program name");
+}
+//---------------------------------------------------------------------------
+
+} // namespace ASWUnitTests
+
+//---------------------------------------------------------------------------
+ASW_REGISTER_TEST_GROUP(ASWUnitTests::TTest_ASWUnitTests_GUI_VCLSystem)
