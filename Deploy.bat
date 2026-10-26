@@ -71,6 +71,10 @@ call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.cpp" "gui\src\ASWUnitTests_GUI
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.h" "gui\src\ASWUnitTests_GUI_TestList.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Tree.cpp" "gui\src\ASWUnitTests_GUI_Tree.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Tree.h" "gui\src\ASWUnitTests_GUI_Tree.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_CommandLine.cpp" "gui\tests\Test_ASWUnitTests_GUI_CommandLine.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_CommandLine.h" "gui\tests\Test_ASWUnitTests_GUI_CommandLine.h"
@@ -98,6 +102,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_TestList.cpp" "gui\tests\Test_ASWUnitTests_GUI_TestList.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_TestList.h" "gui\tests\Test_ASWUnitTests_GUI_TestList.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Tree.cpp" "gui\tests\Test_ASWUnitTests_GUI_Tree.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Tree.h" "gui\tests\Test_ASWUnitTests_GUI_Tree.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\ASWUnitTests.cbproj" "rad370\ASWUnitTests.cbproj"
 if errorlevel 1 exit /b 1

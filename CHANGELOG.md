@@ -24,8 +24,8 @@ versioned baseline.
   folder, so other GUI runners can share them: `ASWUnitTests_GUI_CommandLine`,
   `ASWUnitTests_GUI_Layout`, `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`,
   `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, plus the new
-  `ASWUnitTests_GUI_INIDocument`. A project that builds the VCL GUI must compile them from
-  `gui\src` and add that folder to its include path. Their VCL-only parts moved to the new
+  `ASWUnitTests_GUI_INIDocument` and `ASWUnitTests_GUI_Tree`. A project that builds the VCL GUI must
+  compile them from `gui\src` and add that folder to its include path. Their VCL-only parts moved to the new
   `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h`, which the project must also compile:
   `GUILayoutFilePath()`, `GUISelectionFilePath()`, and `TGUICommandLine::ProcessArguments()`, now
   the free function `ProcessArguments()`. A `WinMain()` modeled on `ASWUnitTests_VCL_GUI.cpp` must

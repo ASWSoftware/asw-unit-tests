@@ -50,6 +50,7 @@ limitations under the License.
 #include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_Tree.h"
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 
@@ -61,16 +62,6 @@ using namespace ASWUnitTests;
 TColor const FailureColor = static_cast<TColor>(RGB(200, 0, 0));
 TColor const SkipColor = static_cast<TColor>(RGB(190, 120, 0));
 
-// What a test tree node stands for. A node's Data holds its kind and an index (see NodeData()): a suite
-// node's into TGUITestList::SuitePaths(), a group node's into its GroupNames(), and a test node's into the
-// list itself.
-enum class TNodeKind
-{
-    Suite,
-    Group,
-    Test,
-};
-
 //---------------------------------------------------------------------------
 
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
@@ -80,9 +71,8 @@ std::string FormatSeconds(double seconds);
 void* IndexToData(size_t index);
 TColor LogLineColor(std::string const& line);
 std::vector<TGUIRect> MonitorWorkAreas();
-void* NodeData(TNodeKind kind, size_t index);
-size_t NodeIndex(void* data);
-TNodeKind NodeKind(void* data);
+void* NodeData(TGUINodeRef const& ref);
+TGUINodeRef NodeRef(void* data);
 TGUIRect ToGUIRect(TRect const& rect);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
@@ -168,21 +158,16 @@ std::vector<TGUIRect> MonitorWorkAreas()
 /*
     NodeData
 
-    A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
+    A test tree node's Data: which suite, group or test it stands for, encoded by EncodeGUINodeRef().
 */
-void* NodeData(TNodeKind kind, size_t index)
+void* NodeData(TGUINodeRef const& ref)
 {
-    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index) * 4 + static_cast<std::uintptr_t>(kind));
+    return reinterpret_cast<void*>(EncodeGUINodeRef(ref));
 }
 //---------------------------------------------------------------------------
-size_t NodeIndex(void* data)
+TGUINodeRef NodeRef(void* data)
 {
-    return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data) / 4);
-}
-//---------------------------------------------------------------------------
-TNodeKind NodeKind(void* data)
-{
-    return static_cast<TNodeKind>(reinterpret_cast<std::uintptr_t>(data) % 4);
+    return DecodeGUINodeRef(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
 TGUIRect ToGUIRect(TRect const& rect)
@@ -645,44 +630,18 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
         TV_Tests->Items->Clear();
         m_TestNodes.assign(m_TestList.Count(), nullptr);
 
-        // By index into m_TestList.SuitePaths(). A suite's node, and those of the suites holding it, are added
-        // just before its first group's, so suites and groups keep m_TestList's order, where each suite's
-        // groups are together.
-        std::vector<TTreeNode*> suiteNodes(m_TestList.SuitePaths().size(), nullptr);
-        std::function<TTreeNode* (std::string const&)> suiteNode = [&](std::string const& suitePath) -> TTreeNode*
-            {
-                if (suitePath.empty())
-                    return nullptr;
+        // Each node comes after its parent, so its parent's tree node already exists.
+        std::vector<TGUITreeNode> const nodes = BuildGUITree(m_TestList);
+        std::vector<TTreeNode*> treeNodes;
+        treeNodes.reserve(nodes.size());
 
-                size_t const suiteIndex = m_TestList.SuiteIndexOf(suitePath).value();
-
-                if (suiteNodes[suiteIndex] == nullptr)
-                {
-                    std::string const parentPath = ParentSuitePath(suitePath);
-                    suiteNodes[suiteIndex] = AddTreeNode(TV_Tests->Items, suiteNode(parentPath),
-                        NameInSuite(suitePath, parentPath), NodeData(TNodeKind::Suite, suiteIndex));
-                }
-
-                return suiteNodes[suiteIndex];
-            };
-
-        // Only visible tests get nodes, and a group or suite only gets one if any of its tests are visible.
-        std::vector<std::string> const& groupNames = m_TestList.GroupNames();
-        for (size_t groupIndex = 0; groupIndex < groupNames.size(); ++groupIndex)
+        for (TGUITreeNode const& node : nodes)
         {
-            std::vector<size_t> const testIndexes = m_TestList.TestsInGroup(groupNames[groupIndex]);
-            if (testIndexes.empty())
-                continue;
+            TTreeNode* const parent = node.Parent.has_value() ? treeNodes[*node.Parent] : nullptr;
+            treeNodes.push_back(AddTreeNode(TV_Tests->Items, parent, node.Text, NodeData(node.Ref)));
 
-            std::string const suitePath = m_TestList.GroupSuitePath(groupNames[groupIndex]);
-            TTreeNode* const groupNode = AddTreeNode(TV_Tests->Items, suiteNode(suitePath),
-                NameInSuite(groupNames[groupIndex], suitePath), NodeData(TNodeKind::Group, groupIndex));
-
-            for (size_t testIndex : testIndexes)
-            {
-                m_TestNodes[testIndex] = AddTreeNode(TV_Tests->Items, groupNode, m_TestList.Test(testIndex).TestName,
-                    NodeData(TNodeKind::Test, testIndex));
-            }
+            if (node.Ref.Kind == TGUINodeKind::Test)
+                m_TestNodes[node.Ref.Index] = treeNodes.back();
         }
 
         // The nodes just added are the tree's current ones, even if its window was recreated before this.
@@ -1026,10 +985,10 @@ void TFormASWUnitTestsGUIMain::RebuildNodeCache()
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
     {
-        size_t const index = NodeIndex(node->Data);
+        TGUINodeRef const ref = NodeRef(node->Data);
 
-        if (NodeKind(node->Data) == TNodeKind::Test && index < m_TestNodes.size())
-            m_TestNodes[index] = node;
+        if (ref.Kind == TGUINodeKind::Test && ref.Index < m_TestNodes.size())
+            m_TestNodes[ref.Index] = node;
     }
 
     m_TreeNodesStale = false;
@@ -1251,25 +1210,7 @@ void TFormASWUnitTestsGUIMain::SaveSelection()
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
 {
-    size_t const index = NodeIndex(node->Data);
-    TGUITestStatus status = TGUITestStatus::NotRun;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            status = m_TestList.SuiteStatus(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            status = m_TestList.GroupStatus(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            status = m_TestList.Status(index);
-            break;
-    }
-
-    int const image = static_cast<int>(status);
+    int const image = static_cast<int>(GUINodeStatus(m_TestList, NodeRef(node->Data)));
     node->ImageIndex = image;
     node->SelectedIndex = image;
 }
@@ -1430,24 +1371,7 @@ void TFormASWUnitTestsGUIMain::SyncTreeChecks()
     TScopedFlag const syncing(m_SyncingChecks);
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
-    {
-        size_t const index = NodeIndex(node->Data);
-
-        switch (NodeKind(node->Data))
-        {
-            case TNodeKind::Suite:
-                node->CheckState = ToNodeCheckState(m_TestList.SuiteCheckState(m_TestList.SuitePaths()[index]));
-                break;
-
-            case TNodeKind::Group:
-                node->CheckState = ToNodeCheckState(m_TestList.GroupCheckState(m_TestList.GroupNames()[index]));
-                break;
-
-            case TNodeKind::Test:
-                node->CheckState = m_TestList.IsChecked(index) ? ncsChecked : ncsUnchecked;
-                break;
-        }
-    }
+        node->CheckState = ToNodeCheckState(GUINodeCheckState(m_TestList, NodeRef(node->Data)));
 
     UpdateStatusBar(); // For its checked count.
 }
@@ -1490,23 +1414,7 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging(TCustomTree
         if (m_Running)
             return;
 
-        bool const check = (OldCheckState != ncsChecked);
-        size_t const index = NodeIndex(Node->Data);
-
-        switch (NodeKind(Node->Data))
-        {
-            case TNodeKind::Suite:
-                m_TestList.SetSuiteChecked(m_TestList.SuitePaths()[index], check);
-                break;
-
-            case TNodeKind::Group:
-                m_TestList.SetGroupChecked(m_TestList.GroupNames()[index], check);
-                break;
-
-            case TNodeKind::Test:
-                m_TestList.SetChecked(index, check);
-                break;
-        }
+        SetGUINodeChecked(m_TestList, NodeRef(Node->Data), OldCheckState != ncsChecked);
 
         // Changing check boxes from inside the tree's own change notification isn't safe, so the update
         // waits until this click has been fully handled.
@@ -1562,25 +1470,8 @@ void TFormASWUnitTestsGUIMain::UpdateDetail()
         return;
     }
 
-    size_t const index = NodeIndex(node->Data);
-    std::string text;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            text = m_TestList.SuiteDetailText(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            text = m_TestList.GroupDetailText(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            text = m_TestList.DetailText(index);
-            break;
-    }
-
-    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(text));
+    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(GUINodeDetailText(m_TestList,
+        NodeRef(node->Data))));
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateStatusBar()

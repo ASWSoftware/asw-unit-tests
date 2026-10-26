@@ -340,6 +340,10 @@
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>5</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Tree.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Tree.h</DependentOn>
+            <BuildOrder>50</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_GUI_TextDialog.cpp">
             <DependentOn>..\src\ASWUnitTests_GUI_TextDialog.h</DependentOn>
             <BuildOrder>6</BuildOrder>
@@ -379,6 +383,10 @@
         <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.cpp">
             <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>31</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.h</DependentOn>
+            <BuildOrder>51</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.h</DependentOn>
