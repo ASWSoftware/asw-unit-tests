@@ -33,12 +33,18 @@ limitations under the License.
 namespace
 {
 
+//---------------------------------------------------------------------------
+
 void AppendUTF8(std::string& text, uint32_t codePoint);
 bool IsHighSurrogate(uint32_t codeUnit);
 bool IsLowSurrogate(uint32_t codeUnit);
 
 //---------------------------------------------------------------------------
-// Appends 'codePoint', which must be a valid code point, to 'text' as UTF-8.
+/*
+    AppendUTF8
+
+    Appends 'codePoint', which must be a valid code point, to 'text' as UTF-8.
+*/
 void AppendUTF8(std::string& text, uint32_t codePoint)
 {
     if (codePoint < 0x80)
@@ -64,22 +70,21 @@ void AppendUTF8(std::string& text, uint32_t codePoint)
         text += static_cast<char>(0x80 | (codePoint & 0x3F));
     }
 }
-
 //---------------------------------------------------------------------------
 bool IsHighSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
 }
-
 //---------------------------------------------------------------------------
 bool IsLowSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
 }
-
 //---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

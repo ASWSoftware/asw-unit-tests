@@ -74,7 +74,6 @@ void TTest_TMersenneTwisterRandom::TearDown_Test(ITestCase& /*testCase*/)
 // /////// Begin tests after this line ///////////////////////
 
 //---------------------------------------------------------------------------
-// Test: Constructor sets default seed
 ASW_TEST(TTest_TMersenneTwisterRandom, Constructor_DefaultSeed)
 {
     // Arrange
@@ -87,7 +86,11 @@ ASW_TEST(TTest_TMersenneTwisterRandom, Constructor_DefaultSeed)
     AssertEquals(static_cast<uint32_t>(1), seed, __func__, __LINE__, "Default seed should be 1");
 }
 //---------------------------------------------------------------------------
-// Test: Random() returns float in [0.0, 1.0]
+/*
+    TTest_TMersenneTwisterRandom::Test_Random_FloatRange
+
+    Test: Random() returns float in [0.0, 1.0]
+*/
 ASW_TEST(TTest_TMersenneTwisterRandom, Random_FloatRange)
 {
     // Arrange
@@ -110,7 +113,11 @@ ASW_TEST(TTest_TMersenneTwisterRandom, Random_FloatRange)
     AssertTrue(inRange, __func__, __LINE__, "Random() should be in [0.0, 1.0]");
 }
 //---------------------------------------------------------------------------
-// Test: Random(uint32_t n) returns values in [0, n)
+/*
+    TTest_TMersenneTwisterRandom::Test_Random_UIntRange
+
+    Test: Random(uint32_t n) returns values in [0, n)
+*/
 ASW_TEST(TTest_TMersenneTwisterRandom, Random_UIntRange)
 {
     // Arrange
@@ -134,7 +141,6 @@ ASW_TEST(TTest_TMersenneTwisterRandom, Random_UIntRange)
     AssertTrue(inRange, __func__, __LINE__, "Random(n) should be in [0, n)");
 }
 //---------------------------------------------------------------------------
-// Test: Randomize changes the seed
 ASW_TEST(TTest_TMersenneTwisterRandom, Randomize_ChangesSeed)
 {
     // Arrange
@@ -150,7 +156,6 @@ ASW_TEST(TTest_TMersenneTwisterRandom, Randomize_ChangesSeed)
     AssertNotEquals(before, after, __func__, __LINE__, "Randomize should change the seed");
 }
 //---------------------------------------------------------------------------
-// Test: Set and Get Seed
 ASW_TEST(TTest_TMersenneTwisterRandom, SetAndGetSeed)
 {
     // Arrange

@@ -47,6 +47,8 @@ int const MinWindowWidth = 200;
 int const MinGrabWidth = 100;
 int const TitleBarHeight = 30;
 
+//---------------------------------------------------------------------------
+
 std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident);
 std::optional<int> ReadSize(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident, int minimum);
 void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident,
@@ -55,7 +57,11 @@ void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, c
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// The value, or empty if it's missing or isn't a whole number.
+/*
+    ReadInt
+
+    The value, or empty if it's missing or isn't a whole number.
+*/
 std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident)
 {
     int value = 0;
@@ -66,7 +72,11 @@ std::optional<int> ReadInt(System::Inifiles::TCustomIniFile& ini, char const* se
     return value;
 }
 //---------------------------------------------------------------------------
-// The value, or empty if it's missing, isn't a whole number, or is less than 'minimum'.
+/*
+    ReadSize
+
+    The value, or empty if it's missing, isn't a whole number, or is less than 'minimum'.
+*/
 std::optional<int> ReadSize(System::Inifiles::TCustomIniFile& ini, char const* section, char const* ident, int minimum)
 {
     std::optional<int> const value = ReadInt(ini, section, ident);

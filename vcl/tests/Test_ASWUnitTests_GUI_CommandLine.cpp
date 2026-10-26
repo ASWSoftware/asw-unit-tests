@@ -41,6 +41,8 @@ namespace
 
 using namespace ASWUnitTests;
 
+//---------------------------------------------------------------------------
+
 bool Contains(std::vector<std::string> const& list, std::string const& item);
 
 //---------------------------------------------------------------------------
@@ -125,10 +127,6 @@ void TTest_ASWUnitTests_GUI_CommandLine::Test_HelpText_MatchesHelpOption()
     CheckContains(text, "--run ", __func__, __LINE__, "including the GUI-only options");
     CheckEmpty(consoleOutput, __func__, __LINE__, "nothing was written to std::cout");
 }
-//---------------------------------------------------------------------------
-
-// /////// Begin tests after this line ///////////////////////
-
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_CommandLine::Test_Parse_ConsoleOnlyOptionsAreReportedAsIgnored()
 {

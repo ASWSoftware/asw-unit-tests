@@ -24,8 +24,6 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -36,15 +34,27 @@ limitations under the License.
 #  include <unistd.h>
 #endif
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
 
 namespace
 {
 
-// Portable enough for this one use: a per-process-unique suffix for the temp folder name below, so
-// two OS processes running this suite concurrently (e.g. via --partition-index/--partition-count)
-// never share, and can't race on, the same temp directory.
+//---------------------------------------------------------------------------
+
+unsigned long GetCurrentProcessIdPortable();
+std::string WithoutTimestamps(std::string xml);
+
+//---------------------------------------------------------------------------
+/*
+    GetCurrentProcessIdPortable
+
+    Portable enough for this one use: a per-process-unique suffix for the temp folder name below, so
+    two OS processes running this suite concurrently (e.g. via --partition-index/--partition-count)
+    never share, and can't race on, the same temp directory.
+*/
 unsigned long GetCurrentProcessIdPortable()
 {
 #if defined(_WIN32)
@@ -53,8 +63,12 @@ unsigned long GetCurrentProcessIdPortable()
     return static_cast<unsigned long>(::getpid());
 #endif
 }
+//---------------------------------------------------------------------------
+/*
+    WithoutTimestamps
 
-// 'xml' with each timestamp attribute's value removed, so two reports built in different seconds compare equal.
+    'xml' with each timestamp attribute's value removed, so two reports built in different seconds compare equal.
+*/
 std::string WithoutTimestamps(std::string xml)
 {
     std::string const attribute = "timestamp=\"";
@@ -74,6 +88,8 @@ std::string WithoutTimestamps(std::string xml)
 }
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

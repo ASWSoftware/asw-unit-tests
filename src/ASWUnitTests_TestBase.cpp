@@ -68,31 +68,103 @@ struct TWorkerState
 // The worker state of the test this thread runs, or nullptr on a thread that isn't a test's worker.
 thread_local TWorkerState* t_WorkerState = nullptr;
 
-// Returns 'str' for display in a failure message, or "(null)" when it's nullptr.
+//---------------------------------------------------------------------------
+
+std::string CStringDisplayText(char const* str);
+std::string CStringDisplayText(wchar_t const* str);
+
+std::string CStringOrEmpty(char const* str);
+std::wstring CStringOrEmpty(wchar_t const* str);
+
+template <typename TChar>
+bool CharEqualsIgnoringASCIICase(TChar a, TChar b);
+
+template <typename TString>
+bool ContainsIgnoringASCIICase(TString const& text, TString const& substring);
+
+std::string DisplayText(std::string const& text);
+
+template <typename TString>
+bool EndsWith(TString const& text, TString const& suffix);
+
+template <typename TString>
+bool EndsWithIgnoringASCIICase(TString const& text, TString const& suffix);
+
+template <typename TString>
+bool EqualsIgnoringASCIICase(TString const& a, TString const& b);
+
+std::string FormatDurationMs(std::chrono::steady_clock::time_point start);
+
+template <typename TFloat>
+std::string FormatFloatingPoint(TFloat value, int precision);
+
+template <typename TFloat>
+std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat bound);
+
+std::string HexBytes(unsigned char const* bytes, std::size_t offset, std::size_t size);
+
+template <typename TString>
+bool MatchesRegex(TString const& text, TString const& pattern, std::string& error);
+
+std::string MemoryFailure(void const* expected, void const* actual, std::size_t size, bool expectEqual);
+
+template <typename TFloat>
+TFloat NearDifference(TFloat expected, TFloat actual);
+
+template <typename TChar>
+std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase);
+
+template <typename TString>
+std::string RegexMatchFailure(TString const& text, TString const& pattern, bool expectMatch);
+
+template <typename TString>
+bool StartsWith(TString const& text, TString const& prefix);
+
+template <typename TString>
+bool StartsWithIgnoringASCIICase(TString const& text, TString const& prefix);
+
+//---------------------------------------------------------------------------
+/*
+    CStringDisplayText
+
+    Returns 'str' for display in a failure message, or "(null)" when it's nullptr.
+*/
 std::string CStringDisplayText(char const* str)
 {
     return (str != nullptr) ? std::string(str) : std::string("(null)");
 }
+//---------------------------------------------------------------------------
+/*
+    CStringDisplayText
 
-// Returns 'str' as UTF-8 for display in a failure message, or "(null)" when it's nullptr.
+    Returns 'str' as UTF-8 for display in a failure message, or "(null)" when it's nullptr.
+*/
 std::string CStringDisplayText(wchar_t const* str)
 {
     return (str != nullptr) ? ASWUnitTests::WideToUTF8(str) : std::string("(null)");
 }
+//---------------------------------------------------------------------------
+/*
+    CStringOrEmpty
 
-// Returns 'str' as a string, or an empty one when it's nullptr.
+    Returns 'str' as a string, or an empty one when it's nullptr.
+*/
 std::string CStringOrEmpty(char const* str)
 {
     return (str != nullptr) ? std::string(str) : std::string();
 }
-
+//---------------------------------------------------------------------------
 std::wstring CStringOrEmpty(wchar_t const* str)
 {
     return (str != nullptr) ? std::wstring(str) : std::wstring();
 }
+//---------------------------------------------------------------------------
+/*
+    CharEqualsIgnoringASCIICase
 
-// True if 'a' and 'b' are the same character, ignoring the case of the ASCII letters A-Z only, so the result doesn't
-// depend on the platform or the current locale (and a byte of a multi-byte UTF-8 sequence is never changed).
+    True if 'a' and 'b' are the same character, ignoring the case of the ASCII letters A-Z only, so the result doesn't
+    depend on the platform or the current locale (and a byte of a multi-byte UTF-8 sequence is never changed).
+*/
 template <typename TChar>
 bool CharEqualsIgnoringASCIICase(TChar a, TChar b)
 {
@@ -106,8 +178,12 @@ bool CharEqualsIgnoringASCIICase(TChar a, TChar b)
 
     return toLower(a) == toLower(b);
 }
+//---------------------------------------------------------------------------
+/*
+    ContainsIgnoringASCIICase
 
-// True if 'text' contains 'substring', comparing characters with CharEqualsIgnoringASCIICase().
+    True if 'text' contains 'substring', comparing characters with CharEqualsIgnoringASCIICase().
+*/
 template <typename TString>
 bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
 {
@@ -115,41 +191,57 @@ bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
     return substring.empty() || (std::search(text.begin(), text.end(), substring.begin(), substring.end(),
         CharEqualsIgnoringASCIICase<typename TString::value_type>) != text.end());
 }
+//---------------------------------------------------------------------------
+/*
+    DisplayText
 
-// True if 'text' ends with 'suffix'. Every text ends with the empty string, and none with a longer suffix.
+    Returns 'text' for display in a failure message, as UTF-8.
+*/
+std::string DisplayText(std::string const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::string DisplayText(std::wstring const& text)
+{
+    return ASWUnitTests::WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+/*
+    EndsWith
+
+    True if 'text' ends with 'suffix'. Every text ends with the empty string, and none with a longer suffix.
+*/
 template <typename TString>
 bool EndsWith(TString const& text, TString const& suffix)
 {
     return text.size() >= suffix.size() && text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
+//---------------------------------------------------------------------------
+/*
+    EndsWithIgnoringASCIICase
 
-// True if 'text' ends with 'suffix', comparing characters with CharEqualsIgnoringASCIICase().
+    True if 'text' ends with 'suffix', comparing characters with CharEqualsIgnoringASCIICase().
+*/
 template <typename TString>
 bool EndsWithIgnoringASCIICase(TString const& text, TString const& suffix)
 {
     return text.size() >= suffix.size() && std::equal(suffix.rbegin(), suffix.rend(), text.rbegin(),
         CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
+//---------------------------------------------------------------------------
+/*
+    EqualsIgnoringASCIICase
 
-// Returns 'text' for display in a failure message, as UTF-8.
-std::string DisplayText(std::string const& text)
-{
-    return text;
-}
-
-std::string DisplayText(std::wstring const& text)
-{
-    return ASWUnitTests::WideToUTF8(text);
-}
-
-// True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
+    True if 'a' and 'b' are the same text, comparing characters with CharEqualsIgnoringASCIICase().
+*/
 template <typename TString>
 bool EqualsIgnoringASCIICase(TString const& a, TString const& b)
 {
     return a.size() == b.size() &&
         std::equal(a.begin(), a.end(), b.begin(), CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
-
+//---------------------------------------------------------------------------
 std::string FormatDurationMs(std::chrono::steady_clock::time_point start)
 {
     double const elapsedMs = std::chrono::duration<double, std::milli>(
@@ -159,8 +251,12 @@ std::string FormatDurationMs(std::chrono::steady_clock::time_point start)
     oss << std::fixed << std::setprecision(3) << elapsedMs << " ms";
     return oss.str();
 }
+//---------------------------------------------------------------------------
+/*
+    FormatFloatingPoint
 
-// Returns 'value' with 'precision' significant digits, in the classic locale so it doesn't depend on the current one.
+    Returns 'value' with 'precision' significant digits, in the classic locale so it doesn't depend on the current one.
+*/
 template <typename TFloat>
 std::string FormatFloatingPoint(TFloat value, int precision)
 {
@@ -169,9 +265,13 @@ std::string FormatFloatingPoint(TFloat value, int precision)
     oss << std::setprecision(precision) << value;
     return oss.str();
 }
+//---------------------------------------------------------------------------
+/*
+    FormatFloatingPointPair
 
-// Returns 'value' and 'bound' with as many digits as TFloat reliably holds, or with all of them when that would make
-// two different values look equal.
+    Returns 'value' and 'bound' with as many digits as TFloat reliably holds, or with all of them when that would make
+    two different values look equal.
+*/
 template <typename TFloat>
 std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat bound)
 {
@@ -186,9 +286,13 @@ std::pair<std::string, std::string> FormatFloatingPointPair(TFloat value, TFloat
 
     return texts;
 }
+//---------------------------------------------------------------------------
+/*
+    HexBytes
 
-// Up to 16 of the 'size' bytes at 'bytes', from 'offset', as uppercase hex pairs (e.g. "0A 1B 2C"), followed by " ..."
-// when more follow.
+    Up to 16 of the 'size' bytes at 'bytes', from 'offset', as uppercase hex pairs (e.g. "0A 1B 2C"), followed by " ..."
+    when more follow.
+*/
 std::string HexBytes(unsigned char const* bytes, std::size_t offset, std::size_t size)
 {
     std::size_t const maxShown = 16;
@@ -204,9 +308,13 @@ std::string HexBytes(unsigned char const* bytes, std::size_t offset, std::size_t
 
     return oss.str();
 }
+//---------------------------------------------------------------------------
+/*
+    MatchesRegex
 
-// True if the whole of 'text' matches the ECMAScript regular expression 'pattern'. When 'pattern' is invalid, or too
-// complex to match, returns false and sets 'error' to std::regex_error's description; otherwise leaves 'error' alone.
+    True if the whole of 'text' matches the ECMAScript regular expression 'pattern'. When 'pattern' is invalid, or too
+    complex to match, returns false and sets 'error' to std::regex_error's description; otherwise leaves 'error' alone.
+*/
 template <typename TString>
 bool MatchesRegex(TString const& text, TString const& pattern, std::string& error)
 {
@@ -221,10 +329,14 @@ bool MatchesRegex(TString const& text, TString const& pattern, std::string& erro
         return false;
     }
 }
+//---------------------------------------------------------------------------
+/*
+    MemoryFailure
 
-// The failure detail for an EqualsMem (when 'expectEqual') or NotEqualsMem method, or an empty string when it passes.
-// Zero bytes, or the same pointer twice (even null), are equal without reading either. Exactly one null pointer is
-// never equal to the other memory, and isn't read.
+    The failure detail for an EqualsMem (when 'expectEqual') or NotEqualsMem method, or an empty string when it passes.
+    Zero bytes, or the same pointer twice (even null), are equal without reading either. Exactly one null pointer is
+    never equal to the other memory, and isn't read.
+*/
 std::string MemoryFailure(void const* expected, void const* actual, std::size_t size, bool expectEqual)
 {
     unsigned char const* const expectedBytes = static_cast<unsigned char const*>(expected);
@@ -261,10 +373,14 @@ std::string MemoryFailure(void const* expected, void const* actual, std::size_t 
 
     return "Expected the " + std::to_string(size) + " bytes to differ, but both are \"" + bytes + "\"";
 }
+//---------------------------------------------------------------------------
+/*
+    NearDifference
 
-// The absolute difference between 'expected' and 'actual' for the Near and NotNear methods: zero when they're equal,
-// so equal infinities (whose difference is a NaN) are near each other, and a NaN when either is a NaN, which a
-// "diff <= tolerance" test never accepts, so a NaN is near nothing, not even another NaN.
+    The absolute difference between 'expected' and 'actual' for the Near and NotNear methods: zero when they're equal,
+    so equal infinities (whose difference is a NaN) are near each other, and a NaN when either is a NaN, which a
+    "diff <= tolerance" test never accepts, so a NaN is near nothing, not even another NaN.
+*/
 template <typename TFloat>
 TFloat NearDifference(TFloat expected, TFloat actual)
 {
@@ -273,18 +389,26 @@ TFloat NearDifference(TFloat expected, TFloat actual)
 
     return std::fabs(expected - actual);
 }
+//---------------------------------------------------------------------------
+/*
+    NullTextFailure
 
-// The detail for a text check that fails because 'text' or 'part' is a null C string, worded as the check's other
-// failures are, e.g. Expected "(null)" to contain "abc". followed by the caller's message.
+    The detail for a text check that fails because 'text' or 'part' is a null C string, worded as the check's other
+    failures are, e.g. Expected "(null)" to contain "abc". followed by the caller's message.
+*/
 template <typename TChar>
 std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase)
 {
     return "Expected \"" + CStringDisplayText(text) + "\" " + relation + " \"" + CStringDisplayText(part) + "\"" +
         (ignoreCase ? " (ignoring case)" : "") + ". ";
 }
+//---------------------------------------------------------------------------
+/*
+    RegexMatchFailure
 
-// The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
-// invalid pattern always fails, saying why.
+    The failure detail for a Matches (when 'expectMatch') or NotMatches method, or an empty string when it passes. An
+    invalid pattern always fails, saying why.
+*/
 template <typename TString>
 std::string RegexMatchFailure(TString const& text, TString const& pattern, bool expectMatch)
 {
@@ -300,23 +424,34 @@ std::string RegexMatchFailure(TString const& text, TString const& pattern, bool 
     return "Expected \"" + DisplayText(text) + "\" " + (expectMatch ? "to match" : "not to match") + " \"" +
         DisplayText(pattern) + "\"";
 }
+//---------------------------------------------------------------------------
+/*
+    StartsWith
 
-// True if 'text' starts with 'prefix'. Every text starts with the empty string, and none with a longer prefix.
+    True if 'text' starts with 'prefix'. Every text starts with the empty string, and none with a longer prefix.
+*/
 template <typename TString>
 bool StartsWith(TString const& text, TString const& prefix)
 {
     return text.size() >= prefix.size() && text.compare(0, prefix.size(), prefix) == 0;
 }
+//---------------------------------------------------------------------------
+/*
+    StartsWithIgnoringASCIICase
 
-// True if 'text' starts with 'prefix', comparing characters with CharEqualsIgnoringASCIICase().
+    True if 'text' starts with 'prefix', comparing characters with CharEqualsIgnoringASCIICase().
+*/
 template <typename TString>
 bool StartsWithIgnoringASCIICase(TString const& text, TString const& prefix)
 {
     return text.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), text.begin(),
         CharEqualsIgnoringASCIICase<typename TString::value_type>);
 }
+//---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

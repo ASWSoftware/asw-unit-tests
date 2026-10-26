@@ -38,12 +38,17 @@ namespace
 
 using namespace ASWUnitTests;
 
+//---------------------------------------------------------------------------
+
 TGUIShuffle::TSeedSource SeedSequence(std::vector<unsigned int> const& seeds, size_t& callCount);
 
 //---------------------------------------------------------------------------
+/*
+    SeedSequence
 
-// New seeds that come from 'seeds' in turn (repeating the last one once they run out), counting each call in
-// 'callCount', which must outlive the returned source.
+    New seeds that come from 'seeds' in turn (repeating the last one once they run out), counting each call in
+    'callCount', which must outlive the returned source.
+*/
 TGUIShuffle::TSeedSource SeedSequence(std::vector<unsigned int> const& seeds, size_t& callCount)
 {
     callCount = 0;
@@ -54,7 +59,6 @@ TGUIShuffle::TSeedSource SeedSequence(std::vector<unsigned int> const& seeds, si
             return seed;
         };
 }
-
 //---------------------------------------------------------------------------
 
 } // namespace

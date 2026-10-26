@@ -36,6 +36,8 @@ namespace
 
 using namespace ASWUnitTests;
 
+//---------------------------------------------------------------------------
+
 std::string FormatSeconds(double seconds);
 std::string FormatUtcTimestamp();
 void WriteTestCase(std::ostringstream& body, TJUnitTestCase const& testCase);

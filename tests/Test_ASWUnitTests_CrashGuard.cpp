@@ -26,8 +26,9 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <stdexcept>
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_CrashGuard.h"
 #include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_CrashGuard.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -38,12 +39,23 @@ namespace
 // nothing crashes (seen in the Linux CI build; GCC 15 and Clang keep it).
 int* volatile g_NullPointer = nullptr;
 
-// A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
-// while it's entered, so this crashes with the chain's head pointing into this function's stack
-// frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
-// since the framework calls each test from inside its own try blocks. The crash is called through a
-// volatile pointer so no compiler can see it can't throw and drop the try block. Used by
-// Test_Run_AccessViolation_LaterExceptionStillCaught() below.
+//---------------------------------------------------------------------------
+
+void CrashInsideTryBlock();
+int RecurseDeeplyThenCrash(int depth);
+int RecurseUntilStackOverflows(int depth);
+
+//---------------------------------------------------------------------------
+/*
+    CrashInsideTryBlock
+
+    A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
+    while it's entered, so this crashes with the chain's head pointing into this function's stack
+    frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
+    since the framework calls each test from inside its own try blocks. The crash is called through a
+    volatile pointer so no compiler can see it can't throw and drop the try block. Used by
+    Test_Run_AccessViolation_LaterExceptionStillCaught() below.
+*/
 void CrashInsideTryBlock()
 {
     using TCrash = void (*)();
@@ -60,14 +72,42 @@ void CrashInsideTryBlock()
     {
     }
 }
+//---------------------------------------------------------------------------
+/*
+    RecurseDeeplyThenCrash
 
-// Not a tail call: 'buffer[0]' is read again after the recursive call returns, so no compiler can
-// turn this into a loop with constant stack usage the way it could a simple tail-recursive
-// version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
-// MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
-// permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
-// about here is the deliberate point, not a mistake, hence silencing just that one warning.
-// bcc32c is Clang-based but, unlike bcc64x, doesn't define __GNUC__, so it needs its own branch.
+    A small per-frame footprint (unlike RecurseUntilStackOverflows() above), so 20 frames of this
+    use only a few tens of KB and never overflows the stack on its own; the crash at the bottom is
+    an ordinary access violation, deliberately reached from deep in the call stack. Used by
+    Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
+*/
+int RecurseDeeplyThenCrash(int depth)
+{
+    volatile char buffer[16];
+    buffer[0] = static_cast<char>(depth);
+
+    if (depth >= 20)
+    {
+        int* const nullPointer = nullptr;
+        *const_cast<int*>(nullPointer) = 1;
+        return buffer[0];
+    }
+
+    int const deeper = RecurseDeeplyThenCrash(depth + 1);
+    return deeper + buffer[0];
+}
+//---------------------------------------------------------------------------
+/*
+    RecurseUntilStackOverflows
+
+    Not a tail call: 'buffer[0]' is read again after the recursive call returns, so no compiler can
+    turn this into a loop with constant stack usage the way it could a simple tail-recursive
+    version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
+    MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
+    permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
+    about here is the deliberate point, not a mistake, hence silencing just that one warning.
+    bcc32c is Clang-based but, unlike bcc64x, doesn't define __GNUC__, so it needs its own branch.
+*/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Winfinite-recursion"
@@ -92,28 +132,11 @@ int RecurseUntilStackOverflows(int depth)
 #elif defined(_MSC_VER)
 #  pragma warning(pop)
 #endif
-
-// A small per-frame footprint (unlike RecurseUntilStackOverflows() above), so 20 frames of this
-// use only a few tens of KB and never overflows the stack on its own; the crash at the bottom is
-// an ordinary access violation, deliberately reached from deep in the call stack. Used by
-// Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
-int RecurseDeeplyThenCrash(int depth)
-{
-    volatile char buffer[16];
-    buffer[0] = static_cast<char>(depth);
-
-    if (depth >= 20)
-    {
-        int* const nullPointer = nullptr;
-        *const_cast<int*>(nullPointer) = 1;
-        return buffer[0];
-    }
-
-    int const deeper = RecurseDeeplyThenCrash(depth + 1);
-    return deeper + buffer[0];
-}
+//---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

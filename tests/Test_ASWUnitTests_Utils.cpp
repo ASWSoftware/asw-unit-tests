@@ -24,13 +24,13 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------

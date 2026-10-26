@@ -71,6 +71,8 @@ enum class TNodeKind
     Test,
 };
 
+//---------------------------------------------------------------------------
+
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
 size_t DataToIndex(void* data);
 std::string FirstLine(std::string const& text);
@@ -86,7 +88,11 @@ TNodeCheckState ToNodeCheckState(TGUICheckState state);
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// Adds a node as the last child of 'parent', or as the last top-level node when 'parent' is nullptr.
+/*
+    AddTreeNode
+
+    Adds a node as the last child of 'parent', or as the last top-level node when 'parent' is nullptr.
+*/
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data)
 {
     if (parent == nullptr)

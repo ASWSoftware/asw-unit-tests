@@ -24,8 +24,6 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <algorithm>
 #include <climits>
 #include <cstddef>
@@ -33,6 +31,8 @@ limitations under the License.
 #include <string>
 #include <utility>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
@@ -45,39 +45,6 @@ namespace
 {
 
 using namespace ASWUnitTests;
-
-std::string JoinIndices(std::vector<size_t> const& indices);
-TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests);
-
-//---------------------------------------------------------------------------
-
-// 'indices' joined with ",", so a whole order can be compared, and shown on failure, as one string.
-std::string JoinIndices(std::vector<size_t> const& indices)
-{
-    std::string joined;
-
-    for (size_t i = 0; i < indices.size(); ++i)
-        joined += (i == 0 ? std::string() : std::string(",")) + std::to_string(indices[i]);
-
-    return joined;
-}
-
-//---------------------------------------------------------------------------
-
-// Matches only this group's own WildcardMatch_* tests (pure static-function checks, so safe to run from a
-// nested TTestHandler inside this group, and never including the test doing the nesting), plus, when asked,
-// every ASWUnitTests_StdOutRedirect_Tests test, a second group that runs after this one.
-TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests)
-{
-    return [alsoStdOutRedirectTests](std::string const& fullName)
-        {
-            return fullName.rfind("ASWUnitTests_Handler_Tests.WildcardMatch_", 0) == 0 ||
-                (alsoStdOutRedirectTests && fullName.rfind("ASWUnitTests_StdOutRedirect_Tests.", 0) == 0);
-        };
-}
-
-//---------------------------------------------------------------------------
-
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_GroupConstructorThrows
@@ -113,29 +80,6 @@ public:
 };
 
 TFixture_GroupConstructorThrows::TThrow TFixture_GroupConstructorThrows::ConstructorThrows = TThrow::Nothing;
-
-//---------------------------------------------------------------------------
-TFixture_GroupConstructorThrows::TFixture_GroupConstructorThrows()
-    : inherited("ASWUnitTests_Handler_ConstructorFixture")
-{
-    if (ConstructorThrows == TThrow::StdException)
-        throw std::runtime_error("deliberate constructor failure");
-
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-    if (ConstructorThrows == TThrow::RTLException)
-        throw System::Sysutils::EConvertError("deliberate constructor failure");
-#endif
-
-    RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
-
-    if (ConstructorThrows == TThrow::DuplicateTestName)
-        RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
-}
-//---------------------------------------------------------------------------
-void TFixture_GroupConstructorThrows::Test_Passes()
-{
-}
-//---------------------------------------------------------------------------
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -178,41 +122,6 @@ TFixture_GroupSetUpThrows::TThrow TFixture_GroupSetUpThrows::SetUpGroupThrows = 
 size_t TFixture_GroupSetUpThrows::TearDownGroupCalls = 0;
 size_t TFixture_GroupSetUpThrows::TestsRun = 0;
 
-//---------------------------------------------------------------------------
-TFixture_GroupSetUpThrows::TFixture_GroupSetUpThrows()
-    : inherited("ASWUnitTests_Handler_GroupSetUpFixture")
-{
-    RegisterTest(&TFixture_GroupSetUpThrows::Test_First, "First");
-    RegisterTest(&TFixture_GroupSetUpThrows::Test_Second, "Second");
-}
-//---------------------------------------------------------------------------
-void TFixture_GroupSetUpThrows::SetUp_Group()
-{
-    if (SetUpGroupThrows == TThrow::StdException)
-        throw std::runtime_error("deliberate SetUp_Group() failure");
-
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-    if (SetUpGroupThrows == TThrow::RTLException)
-        throw System::Sysutils::EConvertError("deliberate SetUp_Group() failure");
-#endif
-}
-//---------------------------------------------------------------------------
-void TFixture_GroupSetUpThrows::TearDown_Group()
-{
-    ++TearDownGroupCalls;
-}
-//---------------------------------------------------------------------------
-void TFixture_GroupSetUpThrows::Test_First()
-{
-    ++TestsRun;
-}
-//---------------------------------------------------------------------------
-void TFixture_GroupSetUpThrows::Test_Second()
-{
-    ++TestsRun;
-}
-//---------------------------------------------------------------------------
-
 
 /////////////////////////////////////////////////////////////////////////////
 // TRecordingObserver
@@ -250,8 +159,113 @@ public:
 
 //---------------------------------------------------------------------------
 
+std::string JoinIndices(std::vector<size_t> const& indices);
+TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests);
+
+//---------------------------------------------------------------------------
+/*
+    JoinIndices
+
+    'indices' joined with ",", so a whole order can be compared, and shown on failure, as one string.
+*/
+std::string JoinIndices(std::vector<size_t> const& indices)
+{
+    std::string joined;
+
+    for (size_t i = 0; i < indices.size(); ++i)
+        joined += (i == 0 ? std::string() : std::string(",")) + std::to_string(indices[i]);
+
+    return joined;
+}
+//---------------------------------------------------------------------------
+/*
+    WildcardMatchTestsFilter
+
+    Matches only this group's own WildcardMatch_* tests (pure static-function checks, so safe to run from a
+    nested TTestHandler inside this group, and never including the test doing the nesting), plus, when asked,
+    every ASWUnitTests_StdOutRedirect_Tests test, a second group that runs after this one.
+*/
+TestFilter WildcardMatchTestsFilter(bool alsoStdOutRedirectTests)
+{
+    return [alsoStdOutRedirectTests](std::string const& fullName)
+        {
+            return fullName.rfind("ASWUnitTests_Handler_Tests.WildcardMatch_", 0) == 0 ||
+                (alsoStdOutRedirectTests && fullName.rfind("ASWUnitTests_StdOutRedirect_Tests.", 0) == 0);
+        };
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupConstructorThrows
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_GroupConstructorThrows::TFixture_GroupConstructorThrows()
+    : inherited("ASWUnitTests_Handler_ConstructorFixture")
+{
+    if (ConstructorThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate constructor failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (ConstructorThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate constructor failure");
+#endif
+
+    RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+
+    if (ConstructorThrows == TThrow::DuplicateTestName)
+        RegisterTest(&TFixture_GroupConstructorThrows::Test_Passes, "Passes");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupConstructorThrows::Test_Passes()
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_GroupSetUpThrows
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_GroupSetUpThrows::TFixture_GroupSetUpThrows()
+    : inherited("ASWUnitTests_Handler_GroupSetUpFixture")
+{
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_First, "First");
+    RegisterTest(&TFixture_GroupSetUpThrows::Test_Second, "Second");
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::SetUp_Group()
+{
+    if (SetUpGroupThrows == TThrow::StdException)
+        throw std::runtime_error("deliberate SetUp_Group() failure");
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    if (SetUpGroupThrows == TThrow::RTLException)
+        throw System::Sysutils::EConvertError("deliberate SetUp_Group() failure");
+#endif
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::TearDown_Group()
+{
+    ++TearDownGroupCalls;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_First()
+{
+    ++TestsRun;
+}
+//---------------------------------------------------------------------------
+void TFixture_GroupSetUpThrows::Test_Second()
+{
+    ++TestsRun;
+}
+//---------------------------------------------------------------------------
+
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

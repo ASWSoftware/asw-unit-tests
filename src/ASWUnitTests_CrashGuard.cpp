@@ -61,16 +61,20 @@ using namespace ASWUnitTests;
 thread_local std::jmp_buf* g_JumpBuf = nullptr;
 thread_local unsigned long g_FaultCode = 0;
 
+//---------------------------------------------------------------------------
+
 LONG WINAPI CrashVectoredHandler(PEXCEPTION_POINTERS info);
 std::string DescribeFault(unsigned long code);
 bool IsRecognizedFault(unsigned long code);
 
 //---------------------------------------------------------------------------
+/*
+    CrashVectoredHandler
 
-//---------------------------------------------------------------------------
-// MSVC's C4702 (unreachable code) is a code-generation warning, evaluated against the warning state
-// in effect at the end of the function rather than at the offending line, so it has to be disabled
-// around the whole function; the unreachable return below is intentional (see its comment).
+    MSVC's C4702 (unreachable code) is a code-generation warning, evaluated against the warning state
+    in effect at the end of the function rather than at the offending line, so it has to be disabled
+    around the whole function; the unreachable return below is intentional (see its comment).
+*/
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable: 4702)
@@ -89,7 +93,6 @@ LONG WINAPI CrashVectoredHandler(PEXCEPTION_POINTERS info)
 #if defined(_MSC_VER)
 #  pragma warning(pop)
 #endif
-
 //---------------------------------------------------------------------------
 std::string DescribeFault(unsigned long code)
 {
@@ -135,9 +138,13 @@ std::string DescribeFault(unsigned long code)
 }
 
 //---------------------------------------------------------------------------
-// Only these codes are ever treated as "the test crashed"; anything else, including a C++
-// exception's own internal dispatch codes, is left completely alone (see the comment above
-// g_JumpBuf), so ordinary C++ exception handling is unaffected by this handler being installed.
+/*
+    IsRecognizedFault
+
+    Only these codes are ever treated as "the test crashed"; anything else, including a C++
+    exception's own internal dispatch codes, is left completely alone (see the comment above
+    g_JumpBuf), so ordinary C++ exception handling is unaffected by this handler being installed.
+*/
 bool IsRecognizedFault(unsigned long code)
 {
     switch (code)
@@ -188,12 +195,12 @@ thread_local int g_FaultSignal = 0;
 // mirroring why SetThreadStackGuarantee() on the Windows side below is also called every time.
 thread_local char g_AltStackBuffer[64 * 1024];
 
+//---------------------------------------------------------------------------
+
 void CrashSignalHandler(int signalNumber);
 std::string DescribeFault(int signalNumber);
 void EnsureAlternateSignalStack();
 void InstallSignalHandlersOnce();
-
-//---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
 void CrashSignalHandler(int signalNumber)
@@ -267,6 +274,8 @@ void InstallSignalHandlersOnce()
 #endif
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -406,5 +415,6 @@ TCrashGuardResult TCrashGuard::Run(std::function<void()> const& body)
 
     return result;
 }
+//---------------------------------------------------------------------------
 
 } // namespace ASWUnitTests

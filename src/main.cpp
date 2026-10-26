@@ -54,6 +54,8 @@ int _dowildcard = 0;
 namespace
 {
 
+//---------------------------------------------------------------------------
+
 void ApplyColorOptions(TCLIOptions const& options);
 void PauseIfRequested(bool pauseOnExit);
 int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const& filter, std::string const& filterDescription);

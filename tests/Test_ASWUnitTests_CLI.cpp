@@ -27,8 +27,8 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
 

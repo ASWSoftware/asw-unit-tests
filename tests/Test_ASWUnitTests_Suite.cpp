@@ -24,13 +24,13 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Suite.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
@@ -46,7 +46,17 @@ namespace
 char const* const ThisSuitePath = "Suites.Nested";
 char const* const ThisQualifiedName = "Suites.Nested.ASWUnitTests_Suite_Tests";
 
-// 'names' joined with "|", so a whole list can be compared, and shown on failure, as one string.
+//---------------------------------------------------------------------------
+
+std::string JoinNames(std::vector<std::string> const& names);
+TestFilter WildcardFilter(std::string const& pattern);
+
+//---------------------------------------------------------------------------
+/*
+    JoinNames
+
+    'names' joined with "|", so a whole list can be compared, and shown on failure, as one string.
+*/
 std::string JoinNames(std::vector<std::string> const& names)
 {
     std::string joined;
@@ -56,8 +66,12 @@ std::string JoinNames(std::vector<std::string> const& names)
 
     return joined;
 }
+//---------------------------------------------------------------------------
+/*
+    WildcardFilter
 
-// A filter matching full names against 'pattern' the way --filter does.
+    A filter matching full names against 'pattern' the way --filter does.
+*/
 TestFilter WildcardFilter(std::string const& pattern)
 {
     return [pattern](std::string const& fullTestName)
@@ -65,9 +79,11 @@ TestFilter WildcardFilter(std::string const& pattern)
             return TTestHandler::WildcardMatch(pattern, fullTestName);
         };
 }
+//---------------------------------------------------------------------------
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_AutoSuiteGroup
@@ -91,19 +107,6 @@ public:
     void SetUp_Group() override {}
     void TearDown_Group() override {}
 };
-
-//---------------------------------------------------------------------------
-TFixture_AutoSuiteGroup::TFixture_AutoSuiteGroup()
-    : inherited(TSuitePath("Outer"), "Fixture_AutoSuiteGroup")
-{
-    SetLogSuppressed(true);
-}
-//---------------------------------------------------------------------------
-ASW_TEST(TFixture_AutoSuiteGroup, Auto)
-{
-    ++Calls;
-}
-//---------------------------------------------------------------------------
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -222,6 +225,24 @@ public:
     void TearDown_Group() override {}
 };
 
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_AutoSuiteGroup
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_AutoSuiteGroup::TFixture_AutoSuiteGroup()
+    : inherited(TSuitePath("Outer"), "Fixture_AutoSuiteGroup")
+{
+    SetLogSuppressed(true);
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TFixture_AutoSuiteGroup, Auto)
+{
+    ++Calls;
+}
+//---------------------------------------------------------------------------
 
 namespace
 {
@@ -262,6 +283,7 @@ public:
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TTest_ASWUnitTests_Suite

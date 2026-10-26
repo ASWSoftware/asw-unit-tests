@@ -47,6 +47,8 @@ limitations under the License.
 #  include <string_view>
 #endif
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Console.h"
 #include "ASWUnitTests_Exception.h"
@@ -60,46 +62,1634 @@ namespace
 
 using namespace ASWUnitTests;
 
-size_t CountOccurrences(std::string const& text, std::string const& needle);
-TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
-bool NameEndsWith(std::string const& name, std::string const& suffix);
-
-//---------------------------------------------------------------------------
-// Number of non-overlapping occurrences of 'needle' in 'text'.
-size_t CountOccurrences(std::string const& text, std::string const& needle)
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_BoolComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test
+// per bool overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), so
+// Test_Equals_ShowsBoolValuesAsTrueOrFalse below can check that every failure message shows the
+// values as "true"/"false" rather than "1"/"0".
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_BoolComparisons : public TTestGroupBase
 {
-    size_t count = 0;
+private:
+    typedef TTestGroupBase inherited;
 
-    for (size_t pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos + needle.size()))
-        ++count;
+private:
+    void Test_AssertEquals_Different_Fails();
+    void Test_AssertNotEquals_Same_Fails();
+    void Test_CheckEquals_Different_Fails();
+    void Test_CheckNotEquals_Same_Fails();
 
-    return count;
-}
+public:
+    TFixture_BoolComparisons();
 
-//---------------------------------------------------------------------------
-// The record for 'testName' in 'results', or nullptr if there isn't one.
-TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_CStringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the C string overloads of
+// AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), narrow and wide. Without those
+// overloads, two C strings convert to bool and match the bool overload, so the "DifferentLiterals"
+// tests pass/fail the wrong way round. The "SameContentDifferentBuffers" tests compare a literal with
+// a separate array holding the same text, so they fail if the pointers are compared instead of the
+// content (two identical literals may share one address). Test names self-document expected outcome
+// via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_CStringComparisons : public TTestGroupBase
 {
-    for (TTestCaseRecord const& record : results.CaseRecords)
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_DifferentLiterals_Fails();
+    void Test_AssertEquals_NullAndNonNull_Fails();
+    void Test_AssertEquals_SameContentDifferentBuffers_Passes();
+    void Test_AssertEquals_Wide_DifferentLiterals_Fails();
+    void Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_AssertNotEquals_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_AssertNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails();
+    void Test_CheckEquals_BothNull_Passes();
+    void Test_CheckEquals_DifferentLiterals_Fails();
+    void Test_CheckEquals_EmptyAndNull_Fails();
+    void Test_CheckEquals_NullAndEmpty_Fails();
+    void Test_CheckEquals_SameContentDifferentBuffers_Passes();
+    void Test_CheckEquals_Wide_BothNull_Passes();
+    void Test_CheckEquals_Wide_DifferentLiterals_Fails();
+    void Test_CheckEquals_Wide_NullAndEmpty_Fails();
+    void Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes();
+    void Test_CheckNotEquals_BothNull_Fails();
+    void Test_CheckNotEquals_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_SameContentDifferentBuffers_Fails();
+    void Test_CheckNotEquals_Wide_BothNull_Fails();
+    void Test_CheckNotEquals_Wide_DifferentLiterals_Passes();
+    void Test_CheckNotEquals_Wide_NullAndEmpty_Passes();
+    void Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails();
+
+public:
+    TFixture_CStringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContains()/CheckContains()/
+// AssertNotContains()/CheckNotContains(), narrow and wide. "Wide_NonASCII" checks that a wide failure shows
+// its text as UTF-8. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContains_Absent_Fails();
+    void Test_AssertContains_Present_Passes();
+    void Test_AssertContains_Wide_Absent_Fails();
+    void Test_AssertContains_Wide_Present_Passes();
+    void Test_AssertNotContains_Absent_Passes();
+    void Test_AssertNotContains_Present_Fails();
+    void Test_AssertNotContains_Wide_Absent_Passes();
+    void Test_AssertNotContains_Wide_Present_Fails();
+    void Test_CheckContains_Absent_Fails();
+    void Test_CheckContains_DifferentCase_Fails();
+    void Test_CheckContains_EmptySubstring_Passes();
+    void Test_CheckContains_Present_Passes();
+    void Test_CheckContains_SubstringLongerThanText_Fails();
+    void Test_CheckContains_Wide_Absent_Fails();
+    void Test_CheckContains_Wide_NonASCII_Fails();
+    void Test_CheckContains_Wide_Present_Passes();
+    void Test_CheckNotContains_Absent_Passes();
+    void Test_CheckNotContains_EmptySubstring_Fails();
+    void Test_CheckNotContains_Present_Fails();
+    void Test_CheckNotContains_Wide_Absent_Passes();
+    void Test_CheckNotContains_Wide_Present_Fails();
+
+public:
+    TFixture_ContainsComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ContainsICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContainsIC()/CheckContainsIC()/
+// AssertNotContainsIC()/CheckNotContainsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded: the
+// "NonLetters" tests use characters 0x20 apart, which a fold that just sets bit 0x20 would wrongly match, and the
+// "NonASCII" tests show that accented letters keep their case. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ContainsICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertContainsIC_Absent_Fails();
+    void Test_AssertContainsIC_DifferentCase_Passes();
+    void Test_AssertContainsIC_Wide_Absent_Fails();
+    void Test_AssertContainsIC_Wide_DifferentCase_Passes();
+    void Test_AssertNotContainsIC_Absent_Passes();
+    void Test_AssertNotContainsIC_DifferentCase_Fails();
+    void Test_AssertNotContainsIC_Wide_Absent_Passes();
+    void Test_AssertNotContainsIC_Wide_DifferentCase_Fails();
+    void Test_CheckContainsIC_Absent_Fails();
+    void Test_CheckContainsIC_BothEmpty_Passes();
+    void Test_CheckContainsIC_DifferentCase_Passes();
+    void Test_CheckContainsIC_EmptySubstring_Passes();
+    void Test_CheckContainsIC_EmptyText_Fails();
+    void Test_CheckContainsIC_NonASCII_Fails();
+    void Test_CheckContainsIC_NonLetters_Fails();
+    void Test_CheckContainsIC_SubstringAtEnd_Passes();
+    void Test_CheckContainsIC_SubstringLongerThanText_Fails();
+    void Test_CheckContainsIC_Wide_Absent_Fails();
+    void Test_CheckContainsIC_Wide_DifferentCase_Passes();
+    void Test_CheckContainsIC_Wide_NonASCII_Fails();
+    void Test_CheckNotContainsIC_Absent_Passes();
+    void Test_CheckNotContainsIC_DifferentCase_Fails();
+    void Test_CheckNotContainsIC_EmptySubstring_Fails();
+    void Test_CheckNotContainsIC_Wide_Absent_Passes();
+    void Test_CheckNotContainsIC_Wide_DifferentCase_Fails();
+
+public:
+    TFixture_ContainsICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EmptyChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEmpty()/CheckEmpty()/
+// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), and (where the
+// library has it) std::string_view, so Test_Empty_ShowsContentsOnFailure below can check what each failure shows.
+// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EmptyChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEmpty_EmptyString_Passes();
+    void Test_AssertEmpty_String_Fails();
+    void Test_AssertNotEmpty_EmptyVector_Fails();
+    void Test_AssertNotEmpty_Vector_Passes();
+    void Test_CheckEmpty_EmptyMap_Passes();
+    void Test_CheckEmpty_ForwardList_Fails();
+    void Test_CheckEmpty_OneElement_Fails();
+#if defined(__cpp_lib_string_view)
+    void Test_CheckEmpty_StringView_Fails();
+#endif
+    void Test_CheckEmpty_Vector_Fails();
+    void Test_CheckEmpty_WideString_Fails();
+    void Test_CheckNotEmpty_EmptyString_Fails();
+    void Test_CheckNotEmpty_String_Passes();
+
+public:
+    TFixture_EmptyChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EndsWithComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWith()/CheckEndsWith()/
+// AssertNotEndsWith()/CheckNotEndsWith(), narrow and wide. "SuffixOnlyAtStart" and "SuffixOnlyInMiddle" catch a
+// check that matches anywhere but the end, and "SuffixLongerThanText" one that doesn't check the length first.
+// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EndsWithComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEndsWith_Absent_Fails();
+    void Test_AssertEndsWith_Present_Passes();
+    void Test_AssertEndsWith_Wide_Absent_Fails();
+    void Test_AssertEndsWith_Wide_Present_Passes();
+    void Test_AssertNotEndsWith_Absent_Passes();
+    void Test_AssertNotEndsWith_Present_Fails();
+    void Test_AssertNotEndsWith_Wide_Absent_Passes();
+    void Test_AssertNotEndsWith_Wide_Present_Fails();
+    void Test_CheckEndsWith_Absent_Fails();
+    void Test_CheckEndsWith_BothEmpty_Passes();
+    void Test_CheckEndsWith_DifferentCase_Fails();
+    void Test_CheckEndsWith_EmptySuffix_Passes();
+    void Test_CheckEndsWith_EmptyText_Fails();
+    void Test_CheckEndsWith_Present_Passes();
+    void Test_CheckEndsWith_SuffixLongerThanText_Fails();
+    void Test_CheckEndsWith_SuffixOnlyAtStart_Fails();
+    void Test_CheckEndsWith_SuffixOnlyInMiddle_Fails();
+    void Test_CheckEndsWith_Wide_Absent_Fails();
+    void Test_CheckEndsWith_Wide_NonASCII_Fails();
+    void Test_CheckEndsWith_Wide_Present_Passes();
+    void Test_CheckNotEndsWith_Absent_Passes();
+    void Test_CheckNotEndsWith_BothEmpty_Fails();
+    void Test_CheckNotEndsWith_EmptySuffix_Fails();
+    void Test_CheckNotEndsWith_Present_Fails();
+    void Test_CheckNotEndsWith_SuffixLongerThanText_Passes();
+    void Test_CheckNotEndsWith_SuffixOnlyAtStart_Passes();
+    void Test_CheckNotEndsWith_SuffixOnlyInMiddle_Passes();
+    void Test_CheckNotEndsWith_Wide_Absent_Passes();
+    void Test_CheckNotEndsWith_Wide_Present_Fails();
+
+public:
+    TFixture_EndsWithComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EndsWithICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWithIC()/CheckEndsWithIC()/
+// AssertNotEndsWithIC()/CheckNotEndsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EndsWithICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEndsWithIC_Absent_Fails();
+    void Test_AssertEndsWithIC_DifferentCase_Passes();
+    void Test_AssertEndsWithIC_Wide_Absent_Fails();
+    void Test_AssertEndsWithIC_Wide_DifferentCase_Passes();
+    void Test_AssertNotEndsWithIC_Absent_Passes();
+    void Test_AssertNotEndsWithIC_DifferentCase_Fails();
+    void Test_AssertNotEndsWithIC_Wide_Absent_Passes();
+    void Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails();
+    void Test_CheckEndsWithIC_Absent_Fails();
+    void Test_CheckEndsWithIC_BothEmpty_Passes();
+    void Test_CheckEndsWithIC_DifferentCase_Passes();
+    void Test_CheckEndsWithIC_EmptySuffix_Passes();
+    void Test_CheckEndsWithIC_EmptyText_Fails();
+    void Test_CheckEndsWithIC_NonASCII_Fails();
+    void Test_CheckEndsWithIC_NonLetters_Fails();
+    void Test_CheckEndsWithIC_SuffixLongerThanText_Fails();
+    void Test_CheckEndsWithIC_SuffixOnlyAtStart_Fails();
+    void Test_CheckEndsWithIC_SuffixOnlyInMiddle_Fails();
+    void Test_CheckEndsWithIC_Wide_Absent_Fails();
+    void Test_CheckEndsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckEndsWithIC_Wide_NonASCII_Fails();
+    void Test_CheckNotEndsWithIC_Absent_Passes();
+    void Test_CheckNotEndsWithIC_DifferentCase_Fails();
+    void Test_CheckNotEndsWithIC_EmptySuffix_Fails();
+    void Test_CheckNotEndsWithIC_SuffixLongerThanText_Passes();
+    void Test_CheckNotEndsWithIC_SuffixOnlyAtStart_Passes();
+    void Test_CheckNotEndsWithIC_Wide_Absent_Passes();
+    void Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails();
+
+public:
+    TFixture_EndsWithICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EnumComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
+// AssertNotEquals()/CheckNotEquals() with scoped enums (enum class), compared and shown by their underlying values,
+// including char, signed and 64-bit unsigned underlying types; plus an unscoped enum with an int, which must still
+// compile and compare as before. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EnumComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    enum class TBig : uint64_t
     {
-        if (record.TestName == testName)
-            return &record;
+        One = 1,
+        Max = std::numeric_limits<uint64_t>::max()
+    };
+
+    enum class TColor
+    {
+        Red,
+        Green,
+        Blue
+    };
+
+    enum class TLetter : char
+    {
+        A = 'A',
+        B = 'B'
+    };
+
+    enum TPlain
+    {
+        PlainA,
+        PlainB
+    };
+
+    enum class TSmall : int8_t
+    {
+        Negative = -1,
+        Positive = 1
+    };
+
+private:
+    void Test_AssertEquals_Different_Fails();
+    void Test_AssertEquals_Same_Passes();
+    void Test_AssertNotEquals_Different_Passes();
+    void Test_AssertNotEquals_Same_Fails();
+    void Test_CheckEquals_CharUnderlying_Fails();
+    void Test_CheckEquals_Different_Fails();
+    void Test_CheckEquals_NegativeUnderlying_Fails();
+    void Test_CheckEquals_Same_Passes();
+    void Test_CheckEquals_UInt64Underlying_Fails();
+    void Test_CheckEquals_UnscopedEnumAndInt_Passes();
+    void Test_CheckNotEquals_Different_Passes();
+    void Test_CheckNotEquals_Same_Fails();
+
+public:
+    TFixture_EnumComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_EqualsICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsIC()/CheckEqualsIC()/
+// AssertNotEqualsIC()/CheckNotEqualsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. "DifferentLength" catches a comparison that stops at the end of the shorter
+// value. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_EqualsICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEqualsIC_DifferentCase_Passes();
+    void Test_AssertEqualsIC_DifferentText_Fails();
+    void Test_AssertEqualsIC_Wide_DifferentCase_Passes();
+    void Test_AssertEqualsIC_Wide_DifferentText_Fails();
+    void Test_AssertNotEqualsIC_DifferentCase_Fails();
+    void Test_AssertNotEqualsIC_DifferentText_Passes();
+    void Test_AssertNotEqualsIC_Wide_DifferentCase_Fails();
+    void Test_AssertNotEqualsIC_Wide_DifferentText_Passes();
+    void Test_CheckEqualsIC_BothEmpty_Passes();
+    void Test_CheckEqualsIC_DifferentCase_Passes();
+    void Test_CheckEqualsIC_DifferentLength_Fails();
+    void Test_CheckEqualsIC_DifferentText_Fails();
+    void Test_CheckEqualsIC_EmptyAndNonEmpty_Fails();
+    void Test_CheckEqualsIC_NonASCII_Fails();
+    void Test_CheckEqualsIC_NonLetters_Fails();
+    void Test_CheckEqualsIC_Wide_DifferentCase_Passes();
+    void Test_CheckEqualsIC_Wide_DifferentText_Fails();
+    void Test_CheckEqualsIC_Wide_NonASCII_Fails();
+    void Test_CheckNotEqualsIC_DifferentCase_Fails();
+    void Test_CheckNotEqualsIC_DifferentText_Passes();
+    void Test_CheckNotEqualsIC_SameText_Fails();
+    void Test_CheckNotEqualsIC_Wide_DifferentCase_Fails();
+    void Test_CheckNotEqualsIC_Wide_DifferentText_Passes();
+
+public:
+    TFixture_EqualsICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixtureSpecificError
+//
+// Unrelated (sibling) exception type for TFixture_ExceptionExpectations
+// below, so a "wrong type" scenario can throw a real type that isn't just a
+// differently-worded same class.
+/////////////////////////////////////////////////////////////////////////////
+class TFixtureSpecificError : public std::runtime_error
+{
+public:
+    explicit TFixtureSpecificError(std::string const& msg)
+        : std::runtime_error(msg)
+    {
+    }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixtureOtherError
+//
+// Unrelated (sibling) exception type for TFixture_ExceptionExpectations
+// below, so a "wrong type" scenario can throw a real type that isn't just a
+// differently-worded same class.
+/////////////////////////////////////////////////////////////////////////////
+class TFixtureOtherError : public std::runtime_error
+{
+public:
+    explicit TFixtureOtherError(std::string const& msg)
+        : std::runtime_error(msg)
+    {
+    }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ExceptionExpectations
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per
+// SetExceptionExpected()/Test() branch: no throw, a generic expectation satisfied by either a
+// std::exception or a non-std::exception throw, and a specific-type expectation crossed with an
+// exact type match, a polymorphic base-type match, a wrong sibling type, a non-std::exception
+// throw, and a message substring that's present or absent; plus an Assert* failure while a generic
+// or specific exception is expected, and an earlier Check* failure followed by the expected
+// exception, on each path that would otherwise pass. Every test name ends with "_Passes" or
+// "_Fails", read generically by Test_SetExceptionExpected_MatchesTypeAndMessage below via
+// NameEndsWith() rather than a hand-maintained table.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ExceptionExpectations : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails();
+    void Test_CheckFailedThenGenericExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails();
+    void Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails();
+    void Test_ExceptionExpectedButNoneThrown_Fails();
+    void Test_GenericExceptionExpected_AssertFails_Fails();
+    void Test_GenericExceptionExpected_NonStdExceptionThrown_Passes();
+    void Test_GenericExceptionExpected_StdExceptionThrown_Passes();
+    void Test_SpecificTypeExpected_AssertFails_Fails();
+    void Test_SpecificTypeExpected_ExactTypeThrown_Passes();
+    void Test_SpecificTypeExpected_MessageSubstringAbsent_Fails();
+    void Test_SpecificTypeExpected_MessageSubstringPresent_Passes();
+    void Test_SpecificTypeExpected_NonStdExceptionThrown_Fails();
+    void Test_SpecificTypeExpected_PolymorphicBaseTypeThrown_Passes();
+    void Test_SpecificTypeExpected_WrongSiblingTypeThrown_Fails();
+
+public:
+    TFixture_ExceptionExpectations();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_FailCalls
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling Fail(), so Test_Fail_AbortsTestAsFailed
+// below can check it fails the test, stops it (ReachedAfterFail stays false), still fails while an exception is
+// expected, and keeps an earlier Check failure in the record. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_FailCalls : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_Fail_AfterCheckFailure_Fails();
+    void Test_Fail_Fails();
+    void Test_Fail_WhileExceptionExpected_Fails();
+
+public:
+    bool ReachedAfterFail = false;
+
+    TFixture_FailCalls();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_IntegerComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
+// of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), for two integer types that no
+// fixed-width overload matches exactly. Without those overloads, most of these calls don't compile
+// (ambiguous). The "NegativeAndUnsignedMax" tests catch a comparison that lets -1 wrap around to an
+// unsigned maximum, and the "Int64Max" tests check the int64_t/uint64_t boundary. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_IntegerComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_IntAndInt64Different_Fails();
+    void Test_AssertEquals_IntAndInt64Equal_Passes();
+    void Test_AssertNotEquals_IntAndInt64Equal_Fails();
+    void Test_AssertNotEquals_NegativeAndUnsignedMax_Passes();
+    void Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails();
+    void Test_CheckEquals_Int64MaxAndUint64_Passes();
+    void Test_CheckEquals_IntAndInt64Different_Fails();
+    void Test_CheckEquals_IntAndInt64Equal_Passes();
+    void Test_CheckEquals_IntAndShort_Passes();
+    void Test_CheckEquals_IntAndUnsigned_Passes();
+    void Test_CheckEquals_LongAndLong_Passes();
+    void Test_CheckEquals_LongLongAndLongLong_Passes();
+    void Test_CheckEquals_NegativeAndUint64Max_Fails();
+    void Test_CheckEquals_NegativeAndUnsignedMax_Fails();
+    void Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes();
+    void Test_CheckNotEquals_IntAndInt64Equal_Fails();
+    void Test_CheckNotEquals_NegativeAndUint64Max_Passes();
+    void Test_CheckNotEquals_NegativeAndUnsignedMax_Passes();
+
+public:
+    TFixture_IntegerComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_LateFinish
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that sleeps past a one second
+// timeout, then fails a Check, logs a line and ends, followed by one that must never run. Logging is left on, for a
+// run observer to collect. Used by Test_Run_IgnoresTestThatEndsAfterItsTimeout below to prove an abandoned test that
+// ends after all changes neither the results nor the log.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_LateFinish : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_EndsJustAfterTimeout();
+    void Test_NeverRuns();
+
+public:
+    std::atomic<bool> Ended{ false }; // Set as the first test ends, after its Check failure and its log line.
+
+public:
+    TFixture_LateFinish();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_MatchesChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertMatches()/CheckMatches()/
+// AssertNotMatches()/CheckNotMatches(), narrow and wide, so Test_Matches_MatchesWholeTextAndShowsPattern below can
+// check their outcomes and messages. "PartialMatch" shows the whole text must match, and "InvalidPattern" that a bad
+// pattern fails the check instead of throwing std::regex_error. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_MatchesChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertMatches_InvalidPattern_Fails();
+    void Test_AssertMatches_Matching_Passes();
+    void Test_AssertMatches_NotMatching_Fails();
+    void Test_AssertNotMatches_Matching_Fails();
+    void Test_AssertNotMatches_NotMatching_Passes();
+    void Test_CheckMatches_InvalidPattern_Fails();
+    void Test_CheckMatches_Matching_Passes();
+    void Test_CheckMatches_PartialMatch_Fails();
+    void Test_CheckMatches_Wide_Matching_Passes();
+    void Test_CheckMatches_Wide_NotMatching_Fails();
+    void Test_CheckNotMatches_InvalidPattern_Fails();
+    void Test_CheckNotMatches_Matching_Fails();
+    void Test_CheckNotMatches_NotMatching_Passes();
+
+public:
+    TFixture_MatchesChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_MemoryComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsMem()/CheckEqualsMem()/
+// AssertNotEqualsMem()/CheckNotEqualsMem(), so Test_EqualsMem_ShowsFirstDifferingBytes below can check their outcomes
+// and messages: a difference at the start, in the middle and past 16 bytes, zero bytes, the same pointer twice, and
+// null pointers. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_MemoryComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEqualsMem_Different_Fails();
+    void Test_AssertEqualsMem_Same_Passes();
+    void Test_AssertNotEqualsMem_Different_Passes();
+    void Test_AssertNotEqualsMem_Same_Fails();
+    void Test_CheckEqualsMem_ActualNull_Fails();
+    void Test_CheckEqualsMem_BothNull_Passes();
+    void Test_CheckEqualsMem_DifferentLater_Fails();
+    void Test_CheckEqualsMem_LongDifference_Fails();
+    void Test_CheckEqualsMem_SameBuffer_Passes();
+    void Test_CheckEqualsMem_ZeroSize_Passes();
+    void Test_CheckNotEqualsMem_Different_Passes();
+    void Test_CheckNotEqualsMem_NullAndBuffer_Passes();
+    void Test_CheckNotEqualsMem_Same_Fails();
+
+public:
+    TFixture_MemoryComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_MixedOutcomes
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
+// TTestGroupBase can produce, plus one that fails twice in a row to prove a Check failure doesn't
+// abort the rest of the test the way an Assert failure does, and one whose Check failure is
+// followed by an Assert failure, so both end up in its record's detail. Constructed and run directly by
+// TTest_ASWUnitTests_TestBase's own test methods below, so its deliberate failures/skip only ever
+// affect this fixture's own Results() - never the real, self-registered suite running it.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_MixedOutcomes : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_ContinuesAfterCheckFailure();
+    void Test_FailViaAssert();
+    void Test_FailViaCheck();
+    void Test_FailViaCheckThenAssert();
+    void Test_Pass();
+    void Test_Skip();
+
+public:
+    bool ReachedSecondCheck = false;
+
+public:
+    explicit TFixture_MixedOutcomes(bool suppressLog = true);
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckNear()/AssertNear()/
+// CheckNotNear()'s tolerance boundary: the implementation passes only when diff <= tolerance, so a
+// diff exactly equal to tolerance must still count as "near". Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_JustOutsideTolerance_Fails();
+    void Test_CheckNear_AtToleranceBoundary_Passes();
+    void Test_CheckNear_Double_AtToleranceBoundary_Passes();
+    void Test_CheckNear_JustOutsideTolerance_Fails();
+    void Test_CheckNotNear_AtToleranceBoundary_Fails();
+    void Test_CheckNotNear_JustOutsideTolerance_Passes();
+
+public:
+    TFixture_NearComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearNonFiniteValues
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods, float and
+// double, with NaNs and infinities, so Test_Near_HandlesNaNAndInfinity below can check that a NaN is near nothing (not
+// even another NaN, however large the tolerance) and that equal infinities are near each other, though a NaN
+// difference or an infinite one compares false with any tolerance. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearNonFiniteValues : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_NaN_Fails();
+    void Test_AssertNotNear_EqualInfinities_Fails();
+    void Test_AssertNotNear_NaN_Passes();
+    void Test_CheckNear_BothNaN_Fails();
+    void Test_CheckNear_EqualInfinities_Passes();
+    void Test_CheckNear_EqualNegativeInfinities_Passes();
+    void Test_CheckNear_Float_EqualInfinities_Passes();
+    void Test_CheckNear_Float_NaN_Fails();
+    void Test_CheckNear_InfinityAndFinite_Fails();
+    void Test_CheckNear_NaNActual_Fails();
+    void Test_CheckNear_NaNExpected_Fails();
+    void Test_CheckNear_OppositeInfinities_Fails();
+    void Test_CheckNotNear_BothNaN_Passes();
+    void Test_CheckNotNear_EqualInfinities_Fails();
+    void Test_CheckNotNear_Float_NaN_Passes();
+    void Test_CheckNotNear_InfinityAndFinite_Passes();
+    void Test_CheckNotNear_NaN_Passes();
+
+public:
+    TFixture_NearNonFiniteValues();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NullCStringTextChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the C string overloads of the IC Equals,
+// Contains, StartsWith and EndsWith methods, Check and Assert, narrow and wide, and their Not forms, each with a null
+// text, a null part, both null, and a matching non-null pair, so Test_NullCStrings_MatchNothingInTextChecks below
+// can check that a null C string matches nothing in the text checks and equals only another null one in the IC
+// Equals ones. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations
+// above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NullCStringTextChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    // How a method treats a null C string, which decides each case's expected outcome.
+    enum class TNullRule
+    {
+        NeverMatches,    // Contains, StartsWith, EndsWith: fails for any null
+        NotNeverMatches, // their Not forms: passes for any null
+        EqualsOnlyNull,  // EqualsIC: fails for one null, passes for two
+        NotEqualsOnlyNull // NotEqualsIC: passes for one null, fails for two
+    };
+
+    char const* const m_NullNarrow = nullptr;
+    wchar_t const* const m_NullWide = nullptr;
+
+    // Registers 'name''s eight cases: null text, null part, both null and a matching pair, narrow and wide. 'call'
+    // takes the text and the part, as two char const* or two wchar_t const*, and calls the method with them. The
+    // matching pair is "ABC" and "abc" for an IC method and "abc" and "abc" otherwise, which every method matches.
+    template <typename TCall>
+    void RegisterCases(std::string const& name, TNullRule rule, bool ignoreCase, TCall call)
+    {
+        bool const negated = rule == TNullRule::NotNeverMatches || rule == TNullRule::NotEqualsOnlyNull;
+        char const* const outcomeWithOneNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::EqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWithBothNull =
+            (rule == TNullRule::NeverMatches || rule == TNullRule::NotEqualsOnlyNull) ? "_Fails" : "_Passes";
+        char const* const outcomeWhenMatching = negated ? "_Fails" : "_Passes";
+        char const* const text = ignoreCase ? "ABC" : "abc";
+        wchar_t const* const wideText = ignoreCase ? L"ABC" : L"abc";
+
+        RegisterTest([this, call]() { call(m_NullNarrow, "abc"); }, name + "_Narrow_NullText" + outcomeWithOneNull);
+        RegisterTest([call, text]() { call(text, static_cast<char const*>(nullptr)); },
+            name + "_Narrow_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullNarrow, m_NullNarrow); }, name + "_Narrow_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, text]() { call(text, "abc"); }, name + "_Narrow_Matching" + outcomeWhenMatching);
+        RegisterTest([this, call]() { call(m_NullWide, L"abc"); }, name + "_Wide_NullText" + outcomeWithOneNull);
+        RegisterTest([call, wideText]() { call(wideText, static_cast<wchar_t const*>(nullptr)); },
+            name + "_Wide_NullPart" + outcomeWithOneNull);
+        RegisterTest([this, call]() { call(m_NullWide, m_NullWide); }, name + "_Wide_BothNull" + outcomeWithBothNull);
+        RegisterTest([call, wideText]() { call(wideText, L"abc"); }, name + "_Wide_Matching" + outcomeWhenMatching);
     }
 
-    return nullptr;
-}
+public:
+    TFixture_NullCStringTextChecks();
 
-//---------------------------------------------------------------------------
-// True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
-// "..._Fails") documents its expected outcome, and the outer verifying test can check every
-// registered test generically instead of hand-maintaining a separate expected-outcome table. Also
-// used to check the end of a failure message.
-bool NameEndsWith(std::string const& name, std::string const& suffix)
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NullChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertNull()/CheckNull()/AssertNotNull()/
+// CheckNotNull() with null and non-null raw pointers, smart pointers, std::function objects, C strings and a nullptr
+// literal, so Test_NullNotNull_FailureNamesTheExpectedValue below can check each is compared with nullptr and that
+// each failure states the value that was expected. Test names self-document expected outcome via NameEndsWith(), same
+// as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NullChecks : public TTestGroupBase
 {
-    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
+private:
+    typedef TTestGroupBase inherited;
 
-//---------------------------------------------------------------------------
+private:
+    void Test_AssertNotNull_NonNull_Passes();
+    void Test_AssertNotNull_Null_Fails();
+    void Test_AssertNull_NonNull_Fails();
+    void Test_AssertNull_Null_Passes();
+    void Test_CheckNotNull_EmptyCString_Passes();
+    void Test_CheckNotNull_EmptyFunction_Fails();
+    void Test_CheckNotNull_NonNull_Passes();
+    void Test_CheckNotNull_Null_Fails();
+    void Test_CheckNotNull_SharedPtr_Passes();
+    void Test_CheckNull_EmptyFunction_Passes();
+    void Test_CheckNull_NonNull_Fails();
+    void Test_CheckNull_NullCString_Passes();
+    void Test_CheckNull_Null_Passes();
+    void Test_CheckNull_NullptrLiteral_Passes();
+    void Test_CheckNull_UniquePtr_Fails();
+
+public:
+    TFixture_NullChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_OrderRecorder
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group of 8 trivially-passing tests (A-H)
+// that each record their own name into a caller-owned vector when run, for verifying Run()'s
+// --shuffle ordering and TestFilter application. 8 tests keeps the odds of a shuffled order
+// coincidentally matching the unshuffled one at 1-in-40320 or better, low enough that
+// Test_Run_ShuffleSeedProducesDeterministicOrder below won't flake.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_OrderRecorder : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    std::vector<std::string>& m_ExecutionOrder;
+
+private:
+    void Test_A();
+    void Test_B();
+    void Test_C();
+    void Test_D();
+    void Test_E();
+    void Test_F();
+    void Test_G();
+    void Test_H();
+
+public:
+    explicit TFixture_OrderRecorder(std::vector<std::string>& executionOrder);
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_OrderingComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the GreaterThan/GreaterThanOrEqual/
+// LessThan/LessThanOrEqual methods, each called as (value, bound). The "Negative...Max" and "...MaxAndNegative" tests
+// catch a comparison that lets -1 wrap around to an unsigned maximum (the built-in -1 < 4294967295u is false), the
+// "Uint64Max" ones the case where neither value fits the other's type, and the NaN ones that a NaN fails every check.
+// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_OrderingComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertGreaterThanOrEqual_Equal_Passes();
+    void Test_AssertGreaterThanOrEqual_Less_Fails();
+    void Test_AssertGreaterThan_Equal_Fails();
+    void Test_AssertGreaterThan_Greater_Passes();
+    void Test_AssertLessThanOrEqual_Equal_Passes();
+    void Test_AssertLessThanOrEqual_Greater_Fails();
+    void Test_AssertLessThan_Equal_Fails();
+    void Test_AssertLessThan_Less_Passes();
+    void Test_CheckGreaterThanOrEqual_Equal_Passes();
+    void Test_CheckGreaterThanOrEqual_Greater_Passes();
+    void Test_CheckGreaterThanOrEqual_Less_Fails();
+    void Test_CheckGreaterThanOrEqual_NaN_Fails();
+    void Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes();
+    void Test_CheckGreaterThan_DoubleAndInt_Passes();
+    void Test_CheckGreaterThan_Double_Fails();
+    void Test_CheckGreaterThan_Equal_Fails();
+    void Test_CheckGreaterThan_Float_Fails();
+    void Test_CheckGreaterThan_Greater_Passes();
+    void Test_CheckGreaterThan_Infinity_Passes();
+    void Test_CheckGreaterThan_LongDouble_Fails();
+    void Test_CheckGreaterThan_Less_Fails();
+    void Test_CheckGreaterThan_Uint64MaxAndNegative_Passes();
+    void Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes();
+    void Test_CheckLessThanOrEqual_Equal_Passes();
+    void Test_CheckLessThanOrEqual_Greater_Fails();
+    void Test_CheckLessThanOrEqual_IntAndInt64_Passes();
+    void Test_CheckLessThanOrEqual_Less_Passes();
+    void Test_CheckLessThanOrEqual_NaNBound_Fails();
+    void Test_CheckLessThan_CloseDoubles_Fails();
+    void Test_CheckLessThan_Equal_Fails();
+    void Test_CheckLessThan_Greater_Fails();
+    void Test_CheckLessThan_Less_Passes();
+    void Test_CheckLessThan_NaN_Fails();
+    void Test_CheckLessThan_NegativeAndUint64Max_Passes();
+    void Test_CheckLessThan_NegativeAndUnsignedMax_Passes();
+    void Test_CheckLessThan_Uint64MaxAndNegative_Fails();
+
+public:
+    TFixture_OrderingComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_PointerComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
+// AssertNotEquals()/CheckNotEquals() with two pointers. Without the pointer overloads, two pointers convert to bool
+// and match the bool overload, so two different non-null pointers compare equal and the "DifferentPointers" tests
+// pass/fail the wrong way round. The tests compare the addresses of First and Second, so
+// Test_Equals_ComparesPointersByAddress below can check the addresses a failure shows. Test names self-document
+// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_PointerComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    struct TBase
+    {
+        int Value = 0;
+    };
+
+    struct TDerived : TBase
+    {
+    };
+
+    // Different bodies, so a linker that merges identical functions (e.g. MSVC's /OPT:ICF) can't give them one address.
+    static int FirstFunction() { return 1; }
+    static int SecondFunction() { return 2; }
+
+private:
+    void Test_AssertEquals_DifferentPointers_Fails();
+    void Test_AssertEquals_SamePointer_Passes();
+    void Test_AssertNotEquals_DifferentPointers_Passes();
+    void Test_AssertNotEquals_SamePointer_Fails();
+    void Test_CheckEquals_BaseAndDerived_Passes();
+    void Test_CheckEquals_DifferentFunctions_Fails();
+    void Test_CheckEquals_DifferentPointers_Fails();
+    void Test_CheckEquals_MutableCStringBuffer_Passes();
+    void Test_CheckEquals_NullAndNonNull_Fails();
+    void Test_CheckEquals_SamePointer_Passes();
+    void Test_CheckEquals_VoidAndTyped_Passes();
+    void Test_CheckNotEquals_DifferentPointers_Passes();
+    void Test_CheckNotEquals_SamePointer_Fails();
+
+public:
+    int First = 0;
+    int Second = 0;
+
+    TFixture_PointerComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SameChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertSame()/CheckSame()/AssertNotSame()/
+// CheckNotSame() with raw pointers, arrays, smart pointers and C strings, which unlike CheckEquals() are compared by
+// address, not content. The basic tests compare the addresses of First and Second, so
+// Test_Same_ComparesAddressesNotContent below can check the addresses a failure shows. Test names self-document
+// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SameChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotSame_DifferentObjects_Passes();
+    void Test_AssertNotSame_SameObject_Fails();
+    void Test_AssertSame_DifferentObjects_Fails();
+    void Test_AssertSame_SameObject_Passes();
+    void Test_CheckNotSame_CStringsSameContent_Passes();
+    void Test_CheckNotSame_SameObject_Fails();
+    void Test_CheckSame_ArrayAndPointer_Passes();
+    void Test_CheckSame_BothNull_Passes();
+    void Test_CheckSame_CStringsSameContent_Fails();
+    void Test_CheckSame_DifferentObjects_Fails();
+    void Test_CheckSame_RawAndSharedPtr_Passes();
+    void Test_CheckSame_SameObject_Passes();
+    void Test_CheckSame_SharedPtrCopies_Passes();
+    void Test_CheckSame_UniquePtrs_Fails();
+
+public:
+    int First = 0;
+    int Second = 0;
+
+    TFixture_SameChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ShortTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that busy-waits for
+// BusyWaitDuration, far less than a millisecond, timed with std::chrono::steady_clock. Logging is left on, for a
+// run observer to collect. Used by Test_Run_RecordsDurationOfShortTest below to prove a short test's duration is
+// measured, rather than read from a clock too coarse to see it (RAD Studio's 32-bit high_resolution_clock only
+// advances about every 10 ms).
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ShortTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_BusyWaits();
+
+public:
+    static constexpr std::chrono::microseconds BusyWaitDuration{ 200 };
+
+public:
+    TFixture_ShortTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SlowTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
+// followed by one that must never run if RunWithTimeout() correctly abandons the hung test and
+// TTestGroupBase::Run() correctly aborts the rest of the group afterward. Used by
+// Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SlowTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_HangsForever();
+    void Test_NeverRuns();
+
+public:
+    bool NeverRunReached = false;
+
+public:
+    TFixture_SlowTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_SourceLocations
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling each std::source_location
+// overload. Each "_Fails"/"_Skips" test records the line of its call in ExpectedLines, so
+// Test_SourceLocation_ReportsCallerFunctionAndLine below can check the failure names that test's
+// function and line. "_Passes" tests check that arguments forward to the same overloads as the
+// method/line form (C strings, mixed integers, wide substrings, exception expectations), and the "IC" ones that
+// they reach the case-insensitive overloads. The StartsWith/EndsWith texts are chosen so that forwarding to the wrong
+// overload (IC or not, start or end, Not or not) changes the outcome of at least one test. CheckIsEven() is a custom
+// helper of the kind a test author might write, passing its caller's location through.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_SourceLocations : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void CheckIsEven(int value, std::source_location loc = std::source_location::current());
+
+    void Test_AssertContainsIC_Passes();
+    void Test_AssertContains_Fails();
+    void Test_AssertEmpty_Fails();
+    void Test_AssertEndsWithIC_Passes();
+    void Test_AssertEndsWith_Fails();
+    void Test_AssertEqualsIC_Passes();
+    void Test_AssertEqualsMem_Fails();
+    void Test_AssertEquals_CStrings_Passes();
+    void Test_AssertEquals_Fails();
+    void Test_AssertFalse_Fails();
+    void Test_AssertGreaterThanOrEqual_Passes();
+    void Test_AssertGreaterThan_Fails();
+    void Test_AssertIsNotType_Fails();
+    void Test_AssertIsType_Fails();
+    void Test_AssertLessThanOrEqual_Passes();
+    void Test_AssertLessThan_Fails();
+    void Test_AssertMatches_Fails();
+    void Test_AssertNear_Fails();
+    void Test_AssertNoThrow_Fails();
+    void Test_AssertNotContainsIC_Fails();
+    void Test_AssertNotContains_Fails();
+    void Test_AssertNotEmpty_Fails();
+    void Test_AssertNotEndsWithIC_Fails();
+    void Test_AssertNotEndsWith_DifferentCase_Passes();
+    void Test_AssertNotEndsWith_Fails();
+    void Test_AssertNotEqualsIC_Fails();
+    void Test_AssertNotEqualsMem_Fails();
+    void Test_AssertNotEquals_Fails();
+    void Test_AssertNotMatches_Fails();
+    void Test_AssertNotNear_Fails();
+    void Test_AssertNotNull_Fails();
+    void Test_AssertNotSame_Fails();
+    void Test_AssertNotStartsWithIC_Fails();
+    void Test_AssertNotStartsWith_DifferentCase_Passes();
+    void Test_AssertNotStartsWith_Fails();
+    void Test_AssertNull_Fails();
+    void Test_AssertSame_Fails();
+    void Test_AssertStartsWithIC_Passes();
+    void Test_AssertStartsWith_Fails();
+    void Test_AssertThrows_Fails();
+    void Test_AssertTrue_Fails();
+    void Test_CheckContainsIC_Passes();
+    void Test_CheckContains_Fails();
+    void Test_CheckContains_Wide_Passes();
+    void Test_CheckEmpty_Fails();
+    void Test_CheckEndsWithIC_Passes();
+    void Test_CheckEndsWith_Fails();
+    void Test_CheckEndsWith_Wide_Passes();
+    void Test_CheckEqualsIC_Passes();
+    void Test_CheckEqualsMem_Fails();
+    void Test_CheckEquals_EnumClass_Fails();
+    void Test_CheckEquals_Fails();
+    void Test_CheckEquals_MixedIntegers_Passes();
+    void Test_CheckFalse_Fails();
+    void Test_CheckGreaterThanOrEqual_Passes();
+    void Test_CheckGreaterThan_Fails();
+    void Test_CheckIsNotType_Fails();
+    void Test_CheckIsType_Fails();
+    void Test_CheckLessThanOrEqual_Passes();
+    void Test_CheckLessThan_Fails();
+    void Test_CheckMatches_Fails();
+    void Test_CheckMatches_Wide_Passes();
+    void Test_CheckNear_Fails();
+    void Test_CheckNear_Passes();
+    void Test_CheckNoThrow_Fails();
+    void Test_CheckNotContainsIC_Fails();
+    void Test_CheckNotContains_Fails();
+    void Test_CheckNotEmpty_Fails();
+    void Test_CheckNotEndsWithIC_Fails();
+    void Test_CheckNotEndsWith_DifferentCase_Passes();
+    void Test_CheckNotEndsWith_Fails();
+    void Test_CheckNotEqualsIC_Fails();
+    void Test_CheckNotEqualsMem_Fails();
+    void Test_CheckNotEquals_Fails();
+    void Test_CheckNotMatches_Fails();
+    void Test_CheckNotNear_Fails();
+    void Test_CheckNotNull_Fails();
+    void Test_CheckNotSame_Fails();
+    void Test_CheckNotSame_UniquePtrs_Passes();
+    void Test_CheckNotStartsWithIC_Fails();
+    void Test_CheckNotStartsWith_DifferentCase_Passes();
+    void Test_CheckNotStartsWith_Fails();
+    void Test_CheckNull_Fails();
+    void Test_CheckNull_UniquePtr_Passes();
+    void Test_CheckSame_Fails();
+    void Test_CheckStartsWithIC_Passes();
+    void Test_CheckStartsWith_Fails();
+    void Test_CheckStartsWith_Wide_Passes();
+    void Test_CheckThrows_Fails();
+    void Test_CheckThrows_MessageMatches_Passes();
+    void Test_CheckTrue_Fails();
+    void Test_CheckTrue_ThroughHelper_Fails();
+    void Test_Fail_Fails();
+    void Test_SetExceptionExpected_Bool_NoneThrown_Fails();
+    void Test_SetExceptionExpected_Bool_Passes();
+    void Test_SetExceptionExpected_TypeAndMessage_Passes();
+    void Test_SetExceptionExpected_Type_NoneThrown_Fails();
+    void Test_Skip_Skips();
+
+public:
+    std::map<std::string, int> ExpectedLines; // Test name to the line of its failing/skipping call.
+
+    TFixture_SourceLocations();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+#endif  // #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StartsWithComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWith()/CheckStartsWith()/
+// AssertNotStartsWith()/CheckNotStartsWith(), narrow and wide. "PrefixOnlyAtEnd" and "PrefixOnlyInMiddle" catch a
+// check that matches anywhere but the start, and "PrefixLongerThanText" one that doesn't check the length first.
+// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
+// NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StartsWithComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotStartsWith_Absent_Passes();
+    void Test_AssertNotStartsWith_Present_Fails();
+    void Test_AssertNotStartsWith_Wide_Absent_Passes();
+    void Test_AssertNotStartsWith_Wide_Present_Fails();
+    void Test_AssertStartsWith_Absent_Fails();
+    void Test_AssertStartsWith_Present_Passes();
+    void Test_AssertStartsWith_Wide_Absent_Fails();
+    void Test_AssertStartsWith_Wide_Present_Passes();
+    void Test_CheckNotStartsWith_Absent_Passes();
+    void Test_CheckNotStartsWith_BothEmpty_Fails();
+    void Test_CheckNotStartsWith_EmptyPrefix_Fails();
+    void Test_CheckNotStartsWith_PrefixLongerThanText_Passes();
+    void Test_CheckNotStartsWith_PrefixOnlyAtEnd_Passes();
+    void Test_CheckNotStartsWith_PrefixOnlyInMiddle_Passes();
+    void Test_CheckNotStartsWith_Present_Fails();
+    void Test_CheckNotStartsWith_Wide_Absent_Passes();
+    void Test_CheckNotStartsWith_Wide_Present_Fails();
+    void Test_CheckStartsWith_Absent_Fails();
+    void Test_CheckStartsWith_BothEmpty_Passes();
+    void Test_CheckStartsWith_DifferentCase_Fails();
+    void Test_CheckStartsWith_EmptyPrefix_Passes();
+    void Test_CheckStartsWith_EmptyText_Fails();
+    void Test_CheckStartsWith_PrefixLongerThanText_Fails();
+    void Test_CheckStartsWith_PrefixOnlyAtEnd_Fails();
+    void Test_CheckStartsWith_PrefixOnlyInMiddle_Fails();
+    void Test_CheckStartsWith_Present_Passes();
+    void Test_CheckStartsWith_Wide_Absent_Fails();
+    void Test_CheckStartsWith_Wide_NonASCII_Fails();
+    void Test_CheckStartsWith_Wide_Present_Passes();
+
+public:
+    TFixture_StartsWithComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StartsWithICComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWithIC()/CheckStartsWithIC()/
+// AssertNotStartsWithIC()/CheckNotStartsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
+// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
+// TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StartsWithICComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNotStartsWithIC_Absent_Passes();
+    void Test_AssertNotStartsWithIC_DifferentCase_Fails();
+    void Test_AssertNotStartsWithIC_Wide_Absent_Passes();
+    void Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails();
+    void Test_AssertStartsWithIC_Absent_Fails();
+    void Test_AssertStartsWithIC_DifferentCase_Passes();
+    void Test_AssertStartsWithIC_Wide_Absent_Fails();
+    void Test_AssertStartsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckNotStartsWithIC_Absent_Passes();
+    void Test_CheckNotStartsWithIC_DifferentCase_Fails();
+    void Test_CheckNotStartsWithIC_EmptyPrefix_Fails();
+    void Test_CheckNotStartsWithIC_PrefixLongerThanText_Passes();
+    void Test_CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes();
+    void Test_CheckNotStartsWithIC_Wide_Absent_Passes();
+    void Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails();
+    void Test_CheckStartsWithIC_Absent_Fails();
+    void Test_CheckStartsWithIC_BothEmpty_Passes();
+    void Test_CheckStartsWithIC_DifferentCase_Passes();
+    void Test_CheckStartsWithIC_EmptyPrefix_Passes();
+    void Test_CheckStartsWithIC_EmptyText_Fails();
+    void Test_CheckStartsWithIC_NonASCII_Fails();
+    void Test_CheckStartsWithIC_NonLetters_Fails();
+    void Test_CheckStartsWithIC_PrefixLongerThanText_Fails();
+    void Test_CheckStartsWithIC_PrefixOnlyAtEnd_Fails();
+    void Test_CheckStartsWithIC_PrefixOnlyInMiddle_Fails();
+    void Test_CheckStartsWithIC_Wide_Absent_Fails();
+    void Test_CheckStartsWithIC_Wide_DifferentCase_Passes();
+    void Test_CheckStartsWithIC_Wide_NonASCII_Fails();
+
+public:
+    TFixture_StartsWithICComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_StringComparisons
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test per string
+// overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals() whose failure message didn't use to
+// show the values: wide text (shown as UTF-8), the NotEquals overloads (which show the shared value), and null wide
+// C strings (shown as "(null)", like narrow ones). Used by Test_Equals_ShowsStringValues below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_StringComparisons : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertEquals_WideCStringNull_Fails();
+    void Test_AssertEquals_Wide_Fails();
+    void Test_AssertNotEquals_CStringBothNull_Fails();
+    void Test_AssertNotEquals_String_Fails();
+    void Test_AssertNotEquals_WideCStringBothNull_Fails();
+    void Test_AssertNotEquals_Wide_Fails();
+    void Test_CheckEquals_WideCStringNull_Fails();
+    void Test_CheckEquals_WideCString_Fails();
+    void Test_CheckEquals_Wide_Fails();
+    void Test_CheckNotEquals_CStringBothNull_Fails();
+    void Test_CheckNotEquals_String_Fails();
+    void Test_CheckNotEquals_WideCStringBothNull_Fails();
+    void Test_CheckNotEquals_Wide_Fails();
+
+public:
+    TFixture_StringComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ThrowingSetUpTearDown
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose SetUp_Test() or TearDown_Test(), as chosen
+// by 'ThrowFrom', throws a std::runtime_error for its first test. That test expects an exception and throws one,
+// so the exception from TearDown_Test() arrives while one is expected, and must not be taken for it. The second
+// test records whether it ran. Used by Test_Run_EndsRunOnSetUpOrTearDownTestException below.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ThrowingSetUpTearDown : public TTestGroupBase
+{
+public:
+    enum class TThrowFrom
+    {
+        SetUp,
+        TearDown
+    };
+
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_RunsAfterThrowingTest();
+    void Test_ThrowsExpectedException();
+
+public:
+    bool RunsAfterThrowingTestReached = false;
+    TThrowFrom const ThrowFrom;
+
+public:
+    explicit TFixture_ThrowingSetUpTearDown(TThrowFrom throwFrom);
+
+    void SetUp_Group() override {}
+    void SetUp_Test(ITestCase& testCase) override;
+    void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ThrowsChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertThrows()/CheckThrows()/
+// AssertNoThrow()/CheckNoThrow(), so Test_Throws_ChecksTypeAndMessageAndContinues below can check their outcomes
+// and messages. ReachedAfterCheckNoThrow shows a failed Check lets the test continue; ReachedAfterInnerAssert shows
+// an Assert failure inside the callable still ends the test instead of counting as the exception thrown. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ThrowsChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNoThrow_NoException_Passes();
+    void Test_AssertNoThrow_Throws_Fails();
+    void Test_AssertThrows_NoException_Fails();
+    void Test_AssertThrows_RightType_Passes();
+    void Test_CheckNoThrow_Throws_Fails();
+    void Test_CheckThrows_AssertFailureInside_Fails();
+    void Test_CheckThrows_FrameworkTypeRequested_Passes();
+    void Test_CheckThrows_MessageMatches_Passes();
+    void Test_CheckThrows_MessageMismatch_Fails();
+    void Test_CheckThrows_NoException_Fails();
+    void Test_CheckThrows_NonStdException_Fails();
+    void Test_CheckThrows_SeveralCalls_Passes();
+    void Test_CheckThrows_Subclass_Passes();
+    void Test_CheckThrows_WrongType_Fails();
+
+public:
+    bool ReachedAfterCheckNoThrow = false;
+    bool ReachedAfterInnerAssert = false;
+
+    TFixture_ThrowsChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_TrueFalseChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
+// CheckFalse() with a value that passes and one that fails, so Test_TrueFalse_FailureNamesTheExpectedValue below can
+// check that each failure states the value that was expected, not the opposite. Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TrueFalseChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertFalse_False_Passes();
+    void Test_AssertFalse_True_Fails();
+    void Test_AssertTrue_False_Fails();
+    void Test_AssertTrue_True_Passes();
+    void Test_CheckFalse_False_Passes();
+    void Test_CheckFalse_True_Fails();
+    void Test_CheckTrue_False_Fails();
+    void Test_CheckTrue_True_Passes();
+
+public:
+    TFixture_TrueFalseChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_TypeChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertIsType()/CheckIsType()/
+// AssertIsNotType()/CheckIsNotType() with a small class hierarchy, through raw and smart pointers and a reference, so
+// Test_IsType_UsesDynamicTypeAndShowsNames below can check their outcomes and messages. A subclass counts as its base
+// class's type, and a null pointer is never any type. Test names self-document expected outcome via NameEndsWith(),
+// same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TypeChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+    struct TShape
+    {
+        virtual ~TShape() = default;
+    };
+
+    struct TCircle : TShape
+    {
+    };
+
+    struct TBigCircle : TCircle
+    {
+    };
+
+    struct TSquare : TShape
+    {
+    };
+
+private:
+    void Test_AssertIsNotType_OtherType_Passes();
+    void Test_AssertIsNotType_SameType_Fails();
+    void Test_AssertIsType_RightType_Passes();
+    void Test_AssertIsType_WrongType_Fails();
+    void Test_CheckIsNotType_Null_Passes();
+    void Test_CheckIsNotType_OtherType_Passes();
+    void Test_CheckIsNotType_Subclass_Fails();
+    void Test_CheckIsType_BaseObject_Fails();
+    void Test_CheckIsType_Null_Fails();
+    void Test_CheckIsType_Reference_Passes();
+    void Test_CheckIsType_RightType_Passes();
+    void Test_CheckIsType_SharedPtr_Passes();
+    void Test_CheckIsType_Subclass_Passes();
+    void Test_CheckIsType_UniquePtr_Fails();
+
+public:
+    TFixture_TypeChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_UnexpectedExceptions
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose tests throw without expecting it: a
+// std::exception, an object that isn't an exception at all, and a std::exception after a failed Check. Each of
+// the first two is followed by a test that passes. Registration order matters: each throwing test must run before
+// the test after it. Used by the Run_*UnexpectedException* tests below to prove an unexpected exception only fails
+// the test that threw it, after which TearDown_Test() and the remaining tests still run.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_UnexpectedExceptions : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CheckFailsThenThrowsStdException();
+    void Test_RunsAfterNonException();
+    void Test_RunsAfterStdException();
+    void Test_ThrowsNonException();
+    void Test_ThrowsStdException();
+
+public:
+    std::vector<std::string> TornDownTests; // The tests TearDown_Test() ran for, in order.
+
+public:
+    TFixture_UnexpectedExceptions();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_CrashingTest
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
+// integer divide by zero), followed by one that records whether it ran. Used by
+// Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet below to prove --catch-crashes' central
+// behavior: unlike a timeout, which can only abandon-and-abort, a caught crash lets the group
+// continue running its remaining tests. Deliberately not a null-pointer write: that's a SIGSEGV on
+// POSIX, and TCrashGuard::Run() treats every SIGSEGV there as abort-worthy (it can't tell an
+// ordinary one apart from a stack overflow - see its comment), which would make this fixture's
+// crashing test abort the group instead of letting it continue, defeating the point of this test.
+// An integer divide by zero (SIGFPE on POSIX, EXCEPTION_INT_DIVIDE_BY_ZERO on Windows) is never
+// abort-worthy on either platform, so it exercises "ordinary crash, group continues" portably.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_CrashingTest : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CrashesButDoesNotAbort();
+    void Test_RunsAfterTheCrash();
+
+public:
+    bool RunsAfterTheCrashReached = false;
+
+public:
+    TFixture_CrashingTest();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -164,7 +1754,6 @@ public:
     }
 };
 
-//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TSlowFinishObserver
@@ -187,31 +1776,60 @@ public:
 
 //---------------------------------------------------------------------------
 
+size_t CountOccurrences(std::string const& text, std::string const& needle);
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
+bool NameEndsWith(std::string const& name, std::string const& suffix);
+
+//---------------------------------------------------------------------------
+/*
+    CountOccurrences
+
+    Number of non-overlapping occurrences of 'needle' in 'text'.
+*/
+size_t CountOccurrences(std::string const& text, std::string const& needle)
+{
+    size_t count = 0;
+
+    for (size_t pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos + needle.size()))
+        ++count;
+
+    return count;
+}
+//---------------------------------------------------------------------------
+/*
+    FindRecord
+
+    The record for 'testName' in 'results', or nullptr if there isn't one.
+*/
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
+{
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (record.TestName == testName)
+            return &record;
+    }
+
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+/*
+    NameEndsWith
+
+    True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
+    "..._Fails") documents its expected outcome, and the outer verifying test can check every
+    registered test generically instead of hand-maintaining a separate expected-outcome table. Also
+    used to check the end of a failure message.
+*/
+bool NameEndsWith(std::string const& name, std::string const& suffix)
+{
+    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+//---------------------------------------------------------------------------
+
+
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_BoolComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test
-// per bool overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), so
-// Test_Equals_ShowsBoolValuesAsTrueOrFalse below can check that every failure message shows the
-// values as "true"/"false" rather than "1"/"0".
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_BoolComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEquals_Different_Fails();
-    void Test_AssertNotEquals_Same_Fails();
-    void Test_CheckEquals_Different_Fails();
-    void Test_CheckNotEquals_Same_Fails();
-
-public:
-    TFixture_BoolComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_BoolComparisons::TFixture_BoolComparisons()
@@ -249,54 +1867,7 @@ void TFixture_BoolComparisons::Test_CheckNotEquals_Same_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_CStringComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the C string overloads of
-// AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), narrow and wide. Without those
-// overloads, two C strings convert to bool and match the bool overload, so the "DifferentLiterals"
-// tests pass/fail the wrong way round. The "SameContentDifferentBuffers" tests compare a literal with
-// a separate array holding the same text, so they fail if the pointers are compared instead of the
-// content (two identical literals may share one address). Test names self-document expected outcome
-// via NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_CStringComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEquals_DifferentLiterals_Fails();
-    void Test_AssertEquals_NullAndNonNull_Fails();
-    void Test_AssertEquals_SameContentDifferentBuffers_Passes();
-    void Test_AssertEquals_Wide_DifferentLiterals_Fails();
-    void Test_AssertEquals_Wide_SameContentDifferentBuffers_Passes();
-    void Test_AssertNotEquals_DifferentLiterals_Passes();
-    void Test_AssertNotEquals_SameContentDifferentBuffers_Fails();
-    void Test_AssertNotEquals_Wide_DifferentLiterals_Passes();
-    void Test_AssertNotEquals_Wide_SameContentDifferentBuffers_Fails();
-    void Test_CheckEquals_BothNull_Passes();
-    void Test_CheckEquals_DifferentLiterals_Fails();
-    void Test_CheckEquals_EmptyAndNull_Fails();
-    void Test_CheckEquals_NullAndEmpty_Fails();
-    void Test_CheckEquals_SameContentDifferentBuffers_Passes();
-    void Test_CheckEquals_Wide_BothNull_Passes();
-    void Test_CheckEquals_Wide_DifferentLiterals_Fails();
-    void Test_CheckEquals_Wide_NullAndEmpty_Fails();
-    void Test_CheckEquals_Wide_SameContentDifferentBuffers_Passes();
-    void Test_CheckNotEquals_BothNull_Fails();
-    void Test_CheckNotEquals_DifferentLiterals_Passes();
-    void Test_CheckNotEquals_NullAndEmpty_Passes();
-    void Test_CheckNotEquals_SameContentDifferentBuffers_Fails();
-    void Test_CheckNotEquals_Wide_BothNull_Fails();
-    void Test_CheckNotEquals_Wide_DifferentLiterals_Passes();
-    void Test_CheckNotEquals_Wide_NullAndEmpty_Passes();
-    void Test_CheckNotEquals_Wide_SameContentDifferentBuffers_Fails();
-
-public:
-    TFixture_CStringComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_CStringComparisons::TFixture_CStringComparisons()
@@ -506,46 +2077,7 @@ void TFixture_CStringComparisons::Test_CheckNotEquals_Wide_SameContentDifferentB
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_ContainsComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContains()/CheckContains()/
-// AssertNotContains()/CheckNotContains(), narrow and wide. "Wide_NonASCII" checks that a wide failure shows
-// its text as UTF-8. Test names self-document expected outcome via NameEndsWith(), same as
-// TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ContainsComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertContains_Absent_Fails();
-    void Test_AssertContains_Present_Passes();
-    void Test_AssertContains_Wide_Absent_Fails();
-    void Test_AssertContains_Wide_Present_Passes();
-    void Test_AssertNotContains_Absent_Passes();
-    void Test_AssertNotContains_Present_Fails();
-    void Test_AssertNotContains_Wide_Absent_Passes();
-    void Test_AssertNotContains_Wide_Present_Fails();
-    void Test_CheckContains_Absent_Fails();
-    void Test_CheckContains_DifferentCase_Fails();
-    void Test_CheckContains_EmptySubstring_Passes();
-    void Test_CheckContains_Present_Passes();
-    void Test_CheckContains_SubstringLongerThanText_Fails();
-    void Test_CheckContains_Wide_Absent_Fails();
-    void Test_CheckContains_Wide_NonASCII_Fails();
-    void Test_CheckContains_Wide_Present_Passes();
-    void Test_CheckNotContains_Absent_Passes();
-    void Test_CheckNotContains_EmptySubstring_Fails();
-    void Test_CheckNotContains_Present_Fails();
-    void Test_CheckNotContains_Wide_Absent_Passes();
-    void Test_CheckNotContains_Wide_Present_Fails();
-
-public:
-    TFixture_ContainsComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ContainsComparisons::TFixture_ContainsComparisons()
@@ -704,51 +2236,7 @@ void TFixture_ContainsComparisons::Test_CheckNotContains_Wide_Present_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_ContainsICComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertContainsIC()/CheckContainsIC()/
-// AssertNotContainsIC()/CheckNotContainsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded: the
-// "NonLetters" tests use characters 0x20 apart, which a fold that just sets bit 0x20 would wrongly match, and the
-// "NonASCII" tests show that accented letters keep their case. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ContainsICComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertContainsIC_Absent_Fails();
-    void Test_AssertContainsIC_DifferentCase_Passes();
-    void Test_AssertContainsIC_Wide_Absent_Fails();
-    void Test_AssertContainsIC_Wide_DifferentCase_Passes();
-    void Test_AssertNotContainsIC_Absent_Passes();
-    void Test_AssertNotContainsIC_DifferentCase_Fails();
-    void Test_AssertNotContainsIC_Wide_Absent_Passes();
-    void Test_AssertNotContainsIC_Wide_DifferentCase_Fails();
-    void Test_CheckContainsIC_Absent_Fails();
-    void Test_CheckContainsIC_BothEmpty_Passes();
-    void Test_CheckContainsIC_DifferentCase_Passes();
-    void Test_CheckContainsIC_EmptySubstring_Passes();
-    void Test_CheckContainsIC_EmptyText_Fails();
-    void Test_CheckContainsIC_NonASCII_Fails();
-    void Test_CheckContainsIC_NonLetters_Fails();
-    void Test_CheckContainsIC_SubstringAtEnd_Passes();
-    void Test_CheckContainsIC_SubstringLongerThanText_Fails();
-    void Test_CheckContainsIC_Wide_Absent_Fails();
-    void Test_CheckContainsIC_Wide_DifferentCase_Passes();
-    void Test_CheckContainsIC_Wide_NonASCII_Fails();
-    void Test_CheckNotContainsIC_Absent_Passes();
-    void Test_CheckNotContainsIC_DifferentCase_Fails();
-    void Test_CheckNotContainsIC_EmptySubstring_Fails();
-    void Test_CheckNotContainsIC_Wide_Absent_Passes();
-    void Test_CheckNotContainsIC_Wide_DifferentCase_Fails();
-
-public:
-    TFixture_ContainsICComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ContainsICComparisons::TFixture_ContainsICComparisons()
@@ -938,39 +2426,7 @@ void TFixture_ContainsICComparisons::Test_CheckNotContainsIC_Wide_DifferentCase_
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_EmptyChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEmpty()/CheckEmpty()/
-// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), and (where the
-// library has it) std::string_view, so Test_Empty_ShowsContentsOnFailure below can check what each failure shows.
-// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_EmptyChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEmpty_EmptyString_Passes();
-    void Test_AssertEmpty_String_Fails();
-    void Test_AssertNotEmpty_EmptyVector_Fails();
-    void Test_AssertNotEmpty_Vector_Passes();
-    void Test_CheckEmpty_EmptyMap_Passes();
-    void Test_CheckEmpty_ForwardList_Fails();
-    void Test_CheckEmpty_OneElement_Fails();
-#if defined(__cpp_lib_string_view)
-    void Test_CheckEmpty_StringView_Fails();
-#endif
-    void Test_CheckEmpty_Vector_Fails();
-    void Test_CheckEmpty_WideString_Fails();
-    void Test_CheckNotEmpty_EmptyString_Fails();
-    void Test_CheckNotEmpty_String_Passes();
-
-public:
-    TFixture_EmptyChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_EmptyChecks::TFixture_EmptyChecks()
@@ -1062,55 +2518,7 @@ void TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_EndsWithComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWith()/CheckEndsWith()/
-// AssertNotEndsWith()/CheckNotEndsWith(), narrow and wide. "SuffixOnlyAtStart" and "SuffixOnlyInMiddle" catch a
-// check that matches anywhere but the end, and "SuffixLongerThanText" one that doesn't check the length first.
-// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_EndsWithComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEndsWith_Absent_Fails();
-    void Test_AssertEndsWith_Present_Passes();
-    void Test_AssertEndsWith_Wide_Absent_Fails();
-    void Test_AssertEndsWith_Wide_Present_Passes();
-    void Test_AssertNotEndsWith_Absent_Passes();
-    void Test_AssertNotEndsWith_Present_Fails();
-    void Test_AssertNotEndsWith_Wide_Absent_Passes();
-    void Test_AssertNotEndsWith_Wide_Present_Fails();
-    void Test_CheckEndsWith_Absent_Fails();
-    void Test_CheckEndsWith_BothEmpty_Passes();
-    void Test_CheckEndsWith_DifferentCase_Fails();
-    void Test_CheckEndsWith_EmptySuffix_Passes();
-    void Test_CheckEndsWith_EmptyText_Fails();
-    void Test_CheckEndsWith_Present_Passes();
-    void Test_CheckEndsWith_SuffixLongerThanText_Fails();
-    void Test_CheckEndsWith_SuffixOnlyAtStart_Fails();
-    void Test_CheckEndsWith_SuffixOnlyInMiddle_Fails();
-    void Test_CheckEndsWith_Wide_Absent_Fails();
-    void Test_CheckEndsWith_Wide_NonASCII_Fails();
-    void Test_CheckEndsWith_Wide_Present_Passes();
-    void Test_CheckNotEndsWith_Absent_Passes();
-    void Test_CheckNotEndsWith_BothEmpty_Fails();
-    void Test_CheckNotEndsWith_EmptySuffix_Fails();
-    void Test_CheckNotEndsWith_Present_Fails();
-    void Test_CheckNotEndsWith_SuffixLongerThanText_Passes();
-    void Test_CheckNotEndsWith_SuffixOnlyAtStart_Passes();
-    void Test_CheckNotEndsWith_SuffixOnlyInMiddle_Passes();
-    void Test_CheckNotEndsWith_Wide_Absent_Passes();
-    void Test_CheckNotEndsWith_Wide_Present_Fails();
-
-public:
-    TFixture_EndsWithComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_EndsWithComparisons::TFixture_EndsWithComparisons()
@@ -1321,53 +2729,7 @@ void TFixture_EndsWithComparisons::Test_CheckNotEndsWith_Wide_Present_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_EndsWithICComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEndsWithIC()/CheckEndsWithIC()/
-// AssertNotEndsWithIC()/CheckNotEndsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
-// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
-// TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_EndsWithICComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEndsWithIC_Absent_Fails();
-    void Test_AssertEndsWithIC_DifferentCase_Passes();
-    void Test_AssertEndsWithIC_Wide_Absent_Fails();
-    void Test_AssertEndsWithIC_Wide_DifferentCase_Passes();
-    void Test_AssertNotEndsWithIC_Absent_Passes();
-    void Test_AssertNotEndsWithIC_DifferentCase_Fails();
-    void Test_AssertNotEndsWithIC_Wide_Absent_Passes();
-    void Test_AssertNotEndsWithIC_Wide_DifferentCase_Fails();
-    void Test_CheckEndsWithIC_Absent_Fails();
-    void Test_CheckEndsWithIC_BothEmpty_Passes();
-    void Test_CheckEndsWithIC_DifferentCase_Passes();
-    void Test_CheckEndsWithIC_EmptySuffix_Passes();
-    void Test_CheckEndsWithIC_EmptyText_Fails();
-    void Test_CheckEndsWithIC_NonASCII_Fails();
-    void Test_CheckEndsWithIC_NonLetters_Fails();
-    void Test_CheckEndsWithIC_SuffixLongerThanText_Fails();
-    void Test_CheckEndsWithIC_SuffixOnlyAtStart_Fails();
-    void Test_CheckEndsWithIC_SuffixOnlyInMiddle_Fails();
-    void Test_CheckEndsWithIC_Wide_Absent_Fails();
-    void Test_CheckEndsWithIC_Wide_DifferentCase_Passes();
-    void Test_CheckEndsWithIC_Wide_NonASCII_Fails();
-    void Test_CheckNotEndsWithIC_Absent_Passes();
-    void Test_CheckNotEndsWithIC_DifferentCase_Fails();
-    void Test_CheckNotEndsWithIC_EmptySuffix_Fails();
-    void Test_CheckNotEndsWithIC_SuffixLongerThanText_Passes();
-    void Test_CheckNotEndsWithIC_SuffixOnlyAtStart_Passes();
-    void Test_CheckNotEndsWithIC_Wide_Absent_Passes();
-    void Test_CheckNotEndsWithIC_Wide_DifferentCase_Fails();
-
-public:
-    TFixture_EndsWithICComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_EndsWithICComparisons::TFixture_EndsWithICComparisons()
@@ -1578,69 +2940,7 @@ void TFixture_EndsWithICComparisons::Test_CheckNotEndsWithIC_Wide_DifferentCase_
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_EnumComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
-// AssertNotEquals()/CheckNotEquals() with scoped enums (enum class), compared and shown by their underlying values,
-// including char, signed and 64-bit unsigned underlying types; plus an unscoped enum with an int, which must still
-// compile and compare as before. Test names self-document expected outcome via NameEndsWith(), same as
-// TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_EnumComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-    enum class TBig : uint64_t
-    {
-        One = 1,
-        Max = std::numeric_limits<uint64_t>::max()
-    };
-
-    enum class TColor
-    {
-        Red,
-        Green,
-        Blue
-    };
-
-    enum class TLetter : char
-    {
-        A = 'A',
-        B = 'B'
-    };
-
-    enum TPlain
-    {
-        PlainA,
-        PlainB
-    };
-
-    enum class TSmall : int8_t
-    {
-        Negative = -1,
-        Positive = 1
-    };
-
-private:
-    void Test_AssertEquals_Different_Fails();
-    void Test_AssertEquals_Same_Passes();
-    void Test_AssertNotEquals_Different_Passes();
-    void Test_AssertNotEquals_Same_Fails();
-    void Test_CheckEquals_CharUnderlying_Fails();
-    void Test_CheckEquals_Different_Fails();
-    void Test_CheckEquals_NegativeUnderlying_Fails();
-    void Test_CheckEquals_Same_Passes();
-    void Test_CheckEquals_UInt64Underlying_Fails();
-    void Test_CheckEquals_UnscopedEnumAndInt_Passes();
-    void Test_CheckNotEquals_Different_Passes();
-    void Test_CheckNotEquals_Same_Fails();
-
-public:
-    TFixture_EnumComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_EnumComparisons::TFixture_EnumComparisons()
@@ -1729,48 +3029,7 @@ void TFixture_EnumComparisons::Test_CheckNotEquals_Same_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_EqualsICComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsIC()/CheckEqualsIC()/
-// AssertNotEqualsIC()/CheckNotEqualsIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
-// TFixture_ContainsICComparisons above. "DifferentLength" catches a comparison that stops at the end of the shorter
-// value. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_EqualsICComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEqualsIC_DifferentCase_Passes();
-    void Test_AssertEqualsIC_DifferentText_Fails();
-    void Test_AssertEqualsIC_Wide_DifferentCase_Passes();
-    void Test_AssertEqualsIC_Wide_DifferentText_Fails();
-    void Test_AssertNotEqualsIC_DifferentCase_Fails();
-    void Test_AssertNotEqualsIC_DifferentText_Passes();
-    void Test_AssertNotEqualsIC_Wide_DifferentCase_Fails();
-    void Test_AssertNotEqualsIC_Wide_DifferentText_Passes();
-    void Test_CheckEqualsIC_BothEmpty_Passes();
-    void Test_CheckEqualsIC_DifferentCase_Passes();
-    void Test_CheckEqualsIC_DifferentLength_Fails();
-    void Test_CheckEqualsIC_DifferentText_Fails();
-    void Test_CheckEqualsIC_EmptyAndNonEmpty_Fails();
-    void Test_CheckEqualsIC_NonASCII_Fails();
-    void Test_CheckEqualsIC_NonLetters_Fails();
-    void Test_CheckEqualsIC_Wide_DifferentCase_Passes();
-    void Test_CheckEqualsIC_Wide_DifferentText_Fails();
-    void Test_CheckEqualsIC_Wide_NonASCII_Fails();
-    void Test_CheckNotEqualsIC_DifferentCase_Fails();
-    void Test_CheckNotEqualsIC_DifferentText_Passes();
-    void Test_CheckNotEqualsIC_SameText_Fails();
-    void Test_CheckNotEqualsIC_Wide_DifferentCase_Fails();
-    void Test_CheckNotEqualsIC_Wide_DifferentText_Passes();
-
-public:
-    TFixture_EqualsICComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_EqualsICComparisons::TFixture_EqualsICComparisons()
@@ -1949,80 +3208,8 @@ void TFixture_EqualsICComparisons::Test_CheckNotEqualsIC_Wide_DifferentText_Pass
 
 
 /////////////////////////////////////////////////////////////////////////////
-// TFixtureSpecificError
-//
-// Unrelated (sibling) exception type for TFixture_ExceptionExpectations
-// below, so a "wrong type" scenario can throw a real type that isn't just a
-// differently-worded same class.
-/////////////////////////////////////////////////////////////////////////////
-class TFixtureSpecificError : public std::runtime_error
-{
-public:
-    explicit TFixtureSpecificError(std::string const& msg)
-        : std::runtime_error(msg)
-    {
-    }
-};
-
-
-/////////////////////////////////////////////////////////////////////////////
-// TFixtureOtherError
-//
-// Unrelated (sibling) exception type for TFixture_ExceptionExpectations
-// below, so a "wrong type" scenario can throw a real type that isn't just a
-// differently-worded same class.
-/////////////////////////////////////////////////////////////////////////////
-class TFixtureOtherError : public std::runtime_error
-{
-public:
-    explicit TFixtureOtherError(std::string const& msg)
-        : std::runtime_error(msg)
-    {
-    }
-};
-
-
-/////////////////////////////////////////////////////////////////////////////
 // TFixture_ExceptionExpectations
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per
-// SetExceptionExpected()/Test() branch: no throw, a generic expectation satisfied by either a
-// std::exception or a non-std::exception throw, and a specific-type expectation crossed with an
-// exact type match, a polymorphic base-type match, a wrong sibling type, a non-std::exception
-// throw, and a message substring that's present or absent; plus an Assert* failure while a generic
-// or specific exception is expected, and an earlier Check* failure followed by the expected
-// exception, on each path that would otherwise pass. Every test name ends with "_Passes" or
-// "_Fails", read generically by Test_SetExceptionExpected_MatchesTypeAndMessage below via
-// NameEndsWith() rather than a hand-maintained table.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ExceptionExpectations : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails();
-    void Test_CheckFailedThenGenericExpectedExceptionThrown_Fails();
-    void Test_CheckFailedThenNonStdExpectedExceptionThrown_Fails();
-    void Test_CheckFailedThenSpecificExpectedExceptionThrown_Fails();
-    void Test_ExceptionExpectedButNoneThrown_Fails();
-    void Test_GenericExceptionExpected_AssertFails_Fails();
-    void Test_GenericExceptionExpected_NonStdExceptionThrown_Passes();
-    void Test_GenericExceptionExpected_StdExceptionThrown_Passes();
-    void Test_SpecificTypeExpected_AssertFails_Fails();
-    void Test_SpecificTypeExpected_ExactTypeThrown_Passes();
-    void Test_SpecificTypeExpected_MessageSubstringAbsent_Fails();
-    void Test_SpecificTypeExpected_MessageSubstringPresent_Passes();
-    void Test_SpecificTypeExpected_NonStdExceptionThrown_Fails();
-    void Test_SpecificTypeExpected_PolymorphicBaseTypeThrown_Passes();
-    void Test_SpecificTypeExpected_WrongSiblingTypeThrown_Fails();
-
-public:
-    TFixture_ExceptionExpectations();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
@@ -2062,10 +3249,14 @@ TFixture_ExceptionExpectations::TFixture_ExceptionExpectations()
         "SpecificTypeExpected_WrongSiblingTypeThrown_Fails");
 }
 //---------------------------------------------------------------------------
-// The next four each fail a Check* and then let an exception arrive while one is expected. A std::exception
-// matching a generic or a specific expectation, and a non-std::exception object, are each a way Test() can
-// otherwise reach a pass, and the earlier Check* failure must still fail the test on every one of them. An
-// Assert* failure never counts as the expected exception; that case checks both failures reach the record.
+/*
+    TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails
+
+    The next four each fail a Check* and then let an exception arrive while one is expected. A std::exception
+    matching a generic or a specific expectation, and a non-std::exception object, are each a way Test() can
+    otherwise reach a pass, and the earlier Check* failure must still fail the test on every one of them. An
+    Assert* failure never counts as the expected exception; that case checks both failures reach the record.
+*/
 void TFixture_ExceptionExpectations::Test_CheckFailedThenAssertFailedWhileExceptionExpected_Fails()
 {
     SetExceptionExpected(true, __func__, __LINE__, "generic expectation, then a failed Check and a failed Assert");
@@ -2167,30 +3358,7 @@ void TFixture_ExceptionExpectations::Test_SpecificTypeExpected_WrongSiblingTypeT
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_FailCalls
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling Fail(), so Test_Fail_AbortsTestAsFailed
-// below can check it fails the test, stops it (ReachedAfterFail stays false), still fails while an exception is
-// expected, and keeps an earlier Check failure in the record. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_FailCalls : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_Fail_AfterCheckFailure_Fails();
-    void Test_Fail_Fails();
-    void Test_Fail_WhileExceptionExpected_Fails();
-
-public:
-    bool ReachedAfterFail = false;
-
-    TFixture_FailCalls();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_FailCalls::TFixture_FailCalls()
@@ -2225,45 +3393,7 @@ void TFixture_FailCalls::Test_Fail_WhileExceptionExpected_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_IntegerComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
-// of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals(), for two integer types that no
-// fixed-width overload matches exactly. Without those overloads, most of these calls don't compile
-// (ambiguous). The "NegativeAndUnsignedMax" tests catch a comparison that lets -1 wrap around to an
-// unsigned maximum, and the "Int64Max" tests check the int64_t/uint64_t boundary. Test names
-// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_IntegerComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEquals_IntAndInt64Different_Fails();
-    void Test_AssertEquals_IntAndInt64Equal_Passes();
-    void Test_AssertNotEquals_IntAndInt64Equal_Fails();
-    void Test_AssertNotEquals_NegativeAndUnsignedMax_Passes();
-    void Test_CheckEquals_AboveInt64MaxAndInt64Max_Fails();
-    void Test_CheckEquals_Int64MaxAndUint64_Passes();
-    void Test_CheckEquals_IntAndInt64Different_Fails();
-    void Test_CheckEquals_IntAndInt64Equal_Passes();
-    void Test_CheckEquals_IntAndShort_Passes();
-    void Test_CheckEquals_IntAndUnsigned_Passes();
-    void Test_CheckEquals_LongAndLong_Passes();
-    void Test_CheckEquals_LongLongAndLongLong_Passes();
-    void Test_CheckEquals_NegativeAndUint64Max_Fails();
-    void Test_CheckEquals_NegativeAndUnsignedMax_Fails();
-    void Test_CheckEquals_UnsignedLongAndUnsignedLong_Passes();
-    void Test_CheckNotEquals_IntAndInt64Equal_Fails();
-    void Test_CheckNotEquals_NegativeAndUint64Max_Passes();
-    void Test_CheckNotEquals_NegativeAndUnsignedMax_Passes();
-
-public:
-    TFixture_IntegerComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_IntegerComparisons::TFixture_IntegerComparisons()
@@ -2407,30 +3537,7 @@ void TFixture_IntegerComparisons::Test_CheckNotEquals_NegativeAndUnsignedMax_Pas
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_LateFinish
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that sleeps past a one second
-// timeout, then fails a Check, logs a line and ends, followed by one that must never run. Logging is left on, for a
-// run observer to collect. Used by Test_Run_IgnoresTestThatEndsAfterItsTimeout below to prove an abandoned test that
-// ends after all changes neither the results nor the log.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_LateFinish : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_EndsJustAfterTimeout();
-    void Test_NeverRuns();
-
-public:
-    std::atomic<bool> Ended{ false }; // Set as the first test ends, after its Check failure and its log line.
-
-public:
-    TFixture_LateFinish();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_LateFinish::TFixture_LateFinish()
@@ -2457,39 +3564,7 @@ void TFixture_LateFinish::Test_NeverRuns()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_MatchesChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertMatches()/CheckMatches()/
-// AssertNotMatches()/CheckNotMatches(), narrow and wide, so Test_Matches_MatchesWholeTextAndShowsPattern below can
-// check their outcomes and messages. "PartialMatch" shows the whole text must match, and "InvalidPattern" that a bad
-// pattern fails the check instead of throwing std::regex_error. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_MatchesChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertMatches_InvalidPattern_Fails();
-    void Test_AssertMatches_Matching_Passes();
-    void Test_AssertMatches_NotMatching_Fails();
-    void Test_AssertNotMatches_Matching_Fails();
-    void Test_AssertNotMatches_NotMatching_Passes();
-    void Test_CheckMatches_InvalidPattern_Fails();
-    void Test_CheckMatches_Matching_Passes();
-    void Test_CheckMatches_PartialMatch_Fails();
-    void Test_CheckMatches_Wide_Matching_Passes();
-    void Test_CheckMatches_Wide_NotMatching_Fails();
-    void Test_CheckNotMatches_InvalidPattern_Fails();
-    void Test_CheckNotMatches_Matching_Fails();
-    void Test_CheckNotMatches_NotMatching_Passes();
-
-public:
-    TFixture_MatchesChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_MatchesChecks::TFixture_MatchesChecks()
@@ -2589,39 +3664,7 @@ void TFixture_MatchesChecks::Test_CheckNotMatches_NotMatching_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_MemoryComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEqualsMem()/CheckEqualsMem()/
-// AssertNotEqualsMem()/CheckNotEqualsMem(), so Test_EqualsMem_ShowsFirstDifferingBytes below can check their outcomes
-// and messages: a difference at the start, in the middle and past 16 bytes, zero bytes, the same pointer twice, and
-// null pointers. Test names self-document expected outcome via NameEndsWith(), same as
-// TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_MemoryComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEqualsMem_Different_Fails();
-    void Test_AssertEqualsMem_Same_Passes();
-    void Test_AssertNotEqualsMem_Different_Passes();
-    void Test_AssertNotEqualsMem_Same_Fails();
-    void Test_CheckEqualsMem_ActualNull_Fails();
-    void Test_CheckEqualsMem_BothNull_Passes();
-    void Test_CheckEqualsMem_DifferentLater_Fails();
-    void Test_CheckEqualsMem_LongDifference_Fails();
-    void Test_CheckEqualsMem_SameBuffer_Passes();
-    void Test_CheckEqualsMem_ZeroSize_Passes();
-    void Test_CheckNotEqualsMem_Different_Passes();
-    void Test_CheckNotEqualsMem_NullAndBuffer_Passes();
-    void Test_CheckNotEqualsMem_Same_Fails();
-
-public:
-    TFixture_MemoryComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_MemoryComparisons::TFixture_MemoryComparisons()
@@ -2747,36 +3790,7 @@ void TFixture_MemoryComparisons::Test_CheckNotEqualsMem_Same_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_MixedOutcomes
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test method per outcome
-// TTestGroupBase can produce, plus one that fails twice in a row to prove a Check failure doesn't
-// abort the rest of the test the way an Assert failure does, and one whose Check failure is
-// followed by an Assert failure, so both end up in its record's detail. Constructed and run directly by
-// TTest_ASWUnitTests_TestBase's own test methods below, so its deliberate failures/skip only ever
-// affect this fixture's own Results() - never the real, self-registered suite running it.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_MixedOutcomes : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_ContinuesAfterCheckFailure();
-    void Test_FailViaAssert();
-    void Test_FailViaCheck();
-    void Test_FailViaCheckThenAssert();
-    void Test_Pass();
-    void Test_Skip();
-
-public:
-    bool ReachedSecondCheck = false;
-
-public:
-    explicit TFixture_MixedOutcomes(bool suppressLog = true);
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_MixedOutcomes::TFixture_MixedOutcomes(bool suppressLog)
@@ -2829,31 +3843,7 @@ void TFixture_MixedOutcomes::Test_Skip()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_NearComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckNear()/AssertNear()/
-// CheckNotNear()'s tolerance boundary: the implementation passes only when diff <= tolerance, so a
-// diff exactly equal to tolerance must still count as "near". Test names self-document expected
-// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_NearComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNear_JustOutsideTolerance_Fails();
-    void Test_CheckNear_AtToleranceBoundary_Passes();
-    void Test_CheckNear_Double_AtToleranceBoundary_Passes();
-    void Test_CheckNear_JustOutsideTolerance_Fails();
-    void Test_CheckNotNear_AtToleranceBoundary_Fails();
-    void Test_CheckNotNear_JustOutsideTolerance_Passes();
-
-public:
-    TFixture_NearComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_NearComparisons::TFixture_NearComparisons()
@@ -2909,43 +3899,7 @@ void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_NearNonFiniteValues
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods, float and
-// double, with NaNs and infinities, so Test_Near_HandlesNaNAndInfinity below can check that a NaN is near nothing (not
-// even another NaN, however large the tolerance) and that equal infinities are near each other, though a NaN
-// difference or an infinite one compares false with any tolerance. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_NearNonFiniteValues : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNear_NaN_Fails();
-    void Test_AssertNotNear_EqualInfinities_Fails();
-    void Test_AssertNotNear_NaN_Passes();
-    void Test_CheckNear_BothNaN_Fails();
-    void Test_CheckNear_EqualInfinities_Passes();
-    void Test_CheckNear_EqualNegativeInfinities_Passes();
-    void Test_CheckNear_Float_EqualInfinities_Passes();
-    void Test_CheckNear_Float_NaN_Fails();
-    void Test_CheckNear_InfinityAndFinite_Fails();
-    void Test_CheckNear_NaNActual_Fails();
-    void Test_CheckNear_NaNExpected_Fails();
-    void Test_CheckNear_OppositeInfinities_Fails();
-    void Test_CheckNotNear_BothNaN_Passes();
-    void Test_CheckNotNear_EqualInfinities_Fails();
-    void Test_CheckNotNear_Float_NaN_Passes();
-    void Test_CheckNotNear_InfinityAndFinite_Passes();
-    void Test_CheckNotNear_NaN_Passes();
-
-public:
-    TFixture_NearNonFiniteValues();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_NearNonFiniteValues::TFixture_NearNonFiniteValues()
@@ -3081,64 +4035,7 @@ void TFixture_NearNonFiniteValues::Test_CheckNotNear_NaN_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_NullCStringTextChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the C string overloads of the IC Equals,
-// Contains, StartsWith and EndsWith methods, Check and Assert, narrow and wide, and their Not forms, each with a null
-// text, a null part, both null, and a matching non-null pair, so Test_NullCStrings_MatchNothingInTextChecks below
-// can check that a null C string matches nothing in the text checks and equals only another null one in the IC
-// Equals ones. Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations
-// above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_NullCStringTextChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-    // How a method treats a null C string, which decides each case's expected outcome.
-    enum class TNullRule
-    {
-        NeverMatches,    // Contains, StartsWith, EndsWith: fails for any null
-        NotNeverMatches, // their Not forms: passes for any null
-        EqualsOnlyNull,  // EqualsIC: fails for one null, passes for two
-        NotEqualsOnlyNull // NotEqualsIC: passes for one null, fails for two
-    };
-
-    char const* const m_NullNarrow = nullptr;
-    wchar_t const* const m_NullWide = nullptr;
-
-    // Registers 'name''s eight cases: null text, null part, both null and a matching pair, narrow and wide. 'call'
-    // takes the text and the part, as two char const* or two wchar_t const*, and calls the method with them. The
-    // matching pair is "ABC" and "abc" for an IC method and "abc" and "abc" otherwise, which every method matches.
-    template <typename TCall>
-    void RegisterCases(std::string const& name, TNullRule rule, bool ignoreCase, TCall call)
-    {
-        bool const negated = rule == TNullRule::NotNeverMatches || rule == TNullRule::NotEqualsOnlyNull;
-        char const* const outcomeWithOneNull =
-            (rule == TNullRule::NeverMatches || rule == TNullRule::EqualsOnlyNull) ? "_Fails" : "_Passes";
-        char const* const outcomeWithBothNull =
-            (rule == TNullRule::NeverMatches || rule == TNullRule::NotEqualsOnlyNull) ? "_Fails" : "_Passes";
-        char const* const outcomeWhenMatching = negated ? "_Fails" : "_Passes";
-        char const* const text = ignoreCase ? "ABC" : "abc";
-        wchar_t const* const wideText = ignoreCase ? L"ABC" : L"abc";
-
-        RegisterTest([this, call]() { call(m_NullNarrow, "abc"); }, name + "_Narrow_NullText" + outcomeWithOneNull);
-        RegisterTest([call, text]() { call(text, static_cast<char const*>(nullptr)); },
-            name + "_Narrow_NullPart" + outcomeWithOneNull);
-        RegisterTest([this, call]() { call(m_NullNarrow, m_NullNarrow); }, name + "_Narrow_BothNull" + outcomeWithBothNull);
-        RegisterTest([call, text]() { call(text, "abc"); }, name + "_Narrow_Matching" + outcomeWhenMatching);
-        RegisterTest([this, call]() { call(m_NullWide, L"abc"); }, name + "_Wide_NullText" + outcomeWithOneNull);
-        RegisterTest([call, wideText]() { call(wideText, static_cast<wchar_t const*>(nullptr)); },
-            name + "_Wide_NullPart" + outcomeWithOneNull);
-        RegisterTest([this, call]() { call(m_NullWide, m_NullWide); }, name + "_Wide_BothNull" + outcomeWithBothNull);
-        RegisterTest([call, wideText]() { call(wideText, L"abc"); }, name + "_Wide_Matching" + outcomeWhenMatching);
-    }
-
-public:
-    TFixture_NullCStringTextChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_NullCStringTextChecks::TFixture_NullCStringTextChecks()
@@ -3272,41 +4169,7 @@ TFixture_NullCStringTextChecks::TFixture_NullCStringTextChecks()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_NullChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertNull()/CheckNull()/AssertNotNull()/
-// CheckNotNull() with null and non-null raw pointers, smart pointers, std::function objects, C strings and a nullptr
-// literal, so Test_NullNotNull_FailureNamesTheExpectedValue below can check each is compared with nullptr and that
-// each failure states the value that was expected. Test names self-document expected outcome via NameEndsWith(), same
-// as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_NullChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNotNull_NonNull_Passes();
-    void Test_AssertNotNull_Null_Fails();
-    void Test_AssertNull_NonNull_Fails();
-    void Test_AssertNull_Null_Passes();
-    void Test_CheckNotNull_EmptyCString_Passes();
-    void Test_CheckNotNull_EmptyFunction_Fails();
-    void Test_CheckNotNull_NonNull_Passes();
-    void Test_CheckNotNull_Null_Fails();
-    void Test_CheckNotNull_SharedPtr_Passes();
-    void Test_CheckNull_EmptyFunction_Passes();
-    void Test_CheckNull_NonNull_Fails();
-    void Test_CheckNull_NullCString_Passes();
-    void Test_CheckNull_Null_Passes();
-    void Test_CheckNull_NullptrLiteral_Passes();
-    void Test_CheckNull_UniquePtr_Fails();
-
-public:
-    TFixture_NullChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_NullChecks::TFixture_NullChecks()
@@ -3424,37 +4287,7 @@ void TFixture_NullChecks::Test_CheckNull_UniquePtr_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_OrderRecorder
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group of 8 trivially-passing tests (A-H)
-// that each record their own name into a caller-owned vector when run, for verifying Run()'s
-// --shuffle ordering and TestFilter application. 8 tests keeps the odds of a shuffled order
-// coincidentally matching the unshuffled one at 1-in-40320 or better, low enough that
-// Test_Run_ShuffleSeedProducesDeterministicOrder below won't flake.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_OrderRecorder : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    std::vector<std::string>& m_ExecutionOrder;
-
-private:
-    void Test_A();
-    void Test_B();
-    void Test_C();
-    void Test_D();
-    void Test_E();
-    void Test_F();
-    void Test_G();
-    void Test_H();
-
-public:
-    explicit TFixture_OrderRecorder(std::vector<std::string>& executionOrder);
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_OrderRecorder::TFixture_OrderRecorder(std::vector<std::string>& executionOrder)
@@ -3517,62 +4350,7 @@ void TFixture_OrderRecorder::Test_H()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_OrderingComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the GreaterThan/GreaterThanOrEqual/
-// LessThan/LessThanOrEqual methods, each called as (value, bound). The "Negative...Max" and "...MaxAndNegative" tests
-// catch a comparison that lets -1 wrap around to an unsigned maximum (the built-in -1 < 4294967295u is false), the
-// "Uint64Max" ones the case where neither value fits the other's type, and the NaN ones that a NaN fails every check.
-// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_OrderingComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertGreaterThanOrEqual_Equal_Passes();
-    void Test_AssertGreaterThanOrEqual_Less_Fails();
-    void Test_AssertGreaterThan_Equal_Fails();
-    void Test_AssertGreaterThan_Greater_Passes();
-    void Test_AssertLessThanOrEqual_Equal_Passes();
-    void Test_AssertLessThanOrEqual_Greater_Fails();
-    void Test_AssertLessThan_Equal_Fails();
-    void Test_AssertLessThan_Less_Passes();
-    void Test_CheckGreaterThanOrEqual_Equal_Passes();
-    void Test_CheckGreaterThanOrEqual_Greater_Passes();
-    void Test_CheckGreaterThanOrEqual_Less_Fails();
-    void Test_CheckGreaterThanOrEqual_NaN_Fails();
-    void Test_CheckGreaterThan_AboveInt64MaxAndInt64Max_Passes();
-    void Test_CheckGreaterThan_DoubleAndInt_Passes();
-    void Test_CheckGreaterThan_Double_Fails();
-    void Test_CheckGreaterThan_Equal_Fails();
-    void Test_CheckGreaterThan_Float_Fails();
-    void Test_CheckGreaterThan_Greater_Passes();
-    void Test_CheckGreaterThan_Infinity_Passes();
-    void Test_CheckGreaterThan_LongDouble_Fails();
-    void Test_CheckGreaterThan_Less_Fails();
-    void Test_CheckGreaterThan_Uint64MaxAndNegative_Passes();
-    void Test_CheckGreaterThan_UnsignedMaxAndNegative_Passes();
-    void Test_CheckLessThanOrEqual_Equal_Passes();
-    void Test_CheckLessThanOrEqual_Greater_Fails();
-    void Test_CheckLessThanOrEqual_IntAndInt64_Passes();
-    void Test_CheckLessThanOrEqual_Less_Passes();
-    void Test_CheckLessThanOrEqual_NaNBound_Fails();
-    void Test_CheckLessThan_CloseDoubles_Fails();
-    void Test_CheckLessThan_Equal_Fails();
-    void Test_CheckLessThan_Greater_Fails();
-    void Test_CheckLessThan_Less_Passes();
-    void Test_CheckLessThan_NaN_Fails();
-    void Test_CheckLessThan_NegativeAndUint64Max_Passes();
-    void Test_CheckLessThan_NegativeAndUnsignedMax_Passes();
-    void Test_CheckLessThan_Uint64MaxAndNegative_Fails();
-
-public:
-    TFixture_OrderingComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_OrderingComparisons::TFixture_OrderingComparisons()
@@ -3831,56 +4609,7 @@ void TFixture_OrderingComparisons::Test_CheckLessThan_Uint64MaxAndNegative_Fails
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_PointerComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEquals()/CheckEquals()/
-// AssertNotEquals()/CheckNotEquals() with two pointers. Without the pointer overloads, two pointers convert to bool
-// and match the bool overload, so two different non-null pointers compare equal and the "DifferentPointers" tests
-// pass/fail the wrong way round. The tests compare the addresses of First and Second, so
-// Test_Equals_ComparesPointersByAddress below can check the addresses a failure shows. Test names self-document
-// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_PointerComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-    struct TBase
-    {
-        int Value = 0;
-    };
-
-    struct TDerived : TBase
-    {
-    };
-
-    // Different bodies, so a linker that merges identical functions (e.g. MSVC's /OPT:ICF) can't give them one address.
-    static int FirstFunction() { return 1; }
-    static int SecondFunction() { return 2; }
-
-private:
-    void Test_AssertEquals_DifferentPointers_Fails();
-    void Test_AssertEquals_SamePointer_Passes();
-    void Test_AssertNotEquals_DifferentPointers_Passes();
-    void Test_AssertNotEquals_SamePointer_Fails();
-    void Test_CheckEquals_BaseAndDerived_Passes();
-    void Test_CheckEquals_DifferentFunctions_Fails();
-    void Test_CheckEquals_DifferentPointers_Fails();
-    void Test_CheckEquals_MutableCStringBuffer_Passes();
-    void Test_CheckEquals_NullAndNonNull_Fails();
-    void Test_CheckEquals_SamePointer_Passes();
-    void Test_CheckEquals_VoidAndTyped_Passes();
-    void Test_CheckNotEquals_DifferentPointers_Passes();
-    void Test_CheckNotEquals_SamePointer_Fails();
-
-public:
-    int First = 0;
-    int Second = 0;
-
-    TFixture_PointerComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_PointerComparisons::TFixture_PointerComparisons()
@@ -3988,43 +4717,7 @@ void TFixture_PointerComparisons::Test_CheckNotEquals_SamePointer_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_SameChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertSame()/CheckSame()/AssertNotSame()/
-// CheckNotSame() with raw pointers, arrays, smart pointers and C strings, which unlike CheckEquals() are compared by
-// address, not content. The basic tests compare the addresses of First and Second, so
-// Test_Same_ComparesAddressesNotContent below can check the addresses a failure shows. Test names self-document
-// expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_SameChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNotSame_DifferentObjects_Passes();
-    void Test_AssertNotSame_SameObject_Fails();
-    void Test_AssertSame_DifferentObjects_Fails();
-    void Test_AssertSame_SameObject_Passes();
-    void Test_CheckNotSame_CStringsSameContent_Passes();
-    void Test_CheckNotSame_SameObject_Fails();
-    void Test_CheckSame_ArrayAndPointer_Passes();
-    void Test_CheckSame_BothNull_Passes();
-    void Test_CheckSame_CStringsSameContent_Fails();
-    void Test_CheckSame_DifferentObjects_Fails();
-    void Test_CheckSame_RawAndSharedPtr_Passes();
-    void Test_CheckSame_SameObject_Passes();
-    void Test_CheckSame_SharedPtrCopies_Passes();
-    void Test_CheckSame_UniquePtrs_Fails();
-
-public:
-    int First = 0;
-    int Second = 0;
-
-    TFixture_SameChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_SameChecks::TFixture_SameChecks()
@@ -4136,30 +4829,7 @@ void TFixture_SameChecks::Test_CheckSame_UniquePtrs_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_ShortTest
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that busy-waits for
-// BusyWaitDuration, far less than a millisecond, timed with std::chrono::steady_clock. Logging is left on, for a
-// run observer to collect. Used by Test_Run_RecordsDurationOfShortTest below to prove a short test's duration is
-// measured, rather than read from a clock too coarse to see it (RAD Studio's 32-bit high_resolution_clock only
-// advances about every 10 ms).
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ShortTest : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_BusyWaits();
-
-public:
-    static constexpr std::chrono::microseconds BusyWaitDuration{ 200 };
-
-public:
-    TFixture_ShortTest();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ShortTest::TFixture_ShortTest()
@@ -4181,30 +4851,7 @@ void TFixture_ShortTest::Test_BusyWaits()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_SlowTest
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that hangs forever,
-// followed by one that must never run if RunWithTimeout() correctly abandons the hung test and
-// TTestGroupBase::Run() correctly aborts the rest of the group afterward. Used by
-// Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_SlowTest : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_HangsForever();
-    void Test_NeverRuns();
-
-public:
-    bool NeverRunReached = false;
-
-public:
-    TFixture_SlowTest();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_SlowTest::TFixture_SlowTest()
@@ -4234,131 +4881,7 @@ void TFixture_SlowTest::Test_NeverRuns()
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_SourceLocations
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling each std::source_location
-// overload. Each "_Fails"/"_Skips" test records the line of its call in ExpectedLines, so
-// Test_SourceLocation_ReportsCallerFunctionAndLine below can check the failure names that test's
-// function and line. "_Passes" tests check that arguments forward to the same overloads as the
-// method/line form (C strings, mixed integers, wide substrings, exception expectations), and the "IC" ones that
-// they reach the case-insensitive overloads. The StartsWith/EndsWith texts are chosen so that forwarding to the wrong
-// overload (IC or not, start or end, Not or not) changes the outcome of at least one test. CheckIsEven() is a custom
-// helper of the kind a test author might write, passing its caller's location through.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_SourceLocations : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void CheckIsEven(int value, std::source_location loc = std::source_location::current());
-
-    void Test_AssertContainsIC_Passes();
-    void Test_AssertContains_Fails();
-    void Test_AssertEmpty_Fails();
-    void Test_AssertEndsWithIC_Passes();
-    void Test_AssertEndsWith_Fails();
-    void Test_AssertEqualsIC_Passes();
-    void Test_AssertEqualsMem_Fails();
-    void Test_AssertEquals_CStrings_Passes();
-    void Test_AssertEquals_Fails();
-    void Test_AssertFalse_Fails();
-    void Test_AssertGreaterThanOrEqual_Passes();
-    void Test_AssertGreaterThan_Fails();
-    void Test_AssertIsNotType_Fails();
-    void Test_AssertIsType_Fails();
-    void Test_AssertLessThanOrEqual_Passes();
-    void Test_AssertLessThan_Fails();
-    void Test_AssertMatches_Fails();
-    void Test_AssertNear_Fails();
-    void Test_AssertNoThrow_Fails();
-    void Test_AssertNotContainsIC_Fails();
-    void Test_AssertNotContains_Fails();
-    void Test_AssertNotEmpty_Fails();
-    void Test_AssertNotEndsWithIC_Fails();
-    void Test_AssertNotEndsWith_DifferentCase_Passes();
-    void Test_AssertNotEndsWith_Fails();
-    void Test_AssertNotEqualsIC_Fails();
-    void Test_AssertNotEqualsMem_Fails();
-    void Test_AssertNotEquals_Fails();
-    void Test_AssertNotMatches_Fails();
-    void Test_AssertNotNear_Fails();
-    void Test_AssertNotNull_Fails();
-    void Test_AssertNotSame_Fails();
-    void Test_AssertNotStartsWithIC_Fails();
-    void Test_AssertNotStartsWith_DifferentCase_Passes();
-    void Test_AssertNotStartsWith_Fails();
-    void Test_AssertNull_Fails();
-    void Test_AssertSame_Fails();
-    void Test_AssertStartsWithIC_Passes();
-    void Test_AssertStartsWith_Fails();
-    void Test_AssertThrows_Fails();
-    void Test_AssertTrue_Fails();
-    void Test_CheckContainsIC_Passes();
-    void Test_CheckContains_Fails();
-    void Test_CheckContains_Wide_Passes();
-    void Test_CheckEmpty_Fails();
-    void Test_CheckEndsWithIC_Passes();
-    void Test_CheckEndsWith_Fails();
-    void Test_CheckEndsWith_Wide_Passes();
-    void Test_CheckEqualsIC_Passes();
-    void Test_CheckEqualsMem_Fails();
-    void Test_CheckEquals_EnumClass_Fails();
-    void Test_CheckEquals_Fails();
-    void Test_CheckEquals_MixedIntegers_Passes();
-    void Test_CheckFalse_Fails();
-    void Test_CheckGreaterThanOrEqual_Passes();
-    void Test_CheckGreaterThan_Fails();
-    void Test_CheckIsNotType_Fails();
-    void Test_CheckIsType_Fails();
-    void Test_CheckLessThanOrEqual_Passes();
-    void Test_CheckLessThan_Fails();
-    void Test_CheckMatches_Fails();
-    void Test_CheckMatches_Wide_Passes();
-    void Test_CheckNear_Fails();
-    void Test_CheckNear_Passes();
-    void Test_CheckNoThrow_Fails();
-    void Test_CheckNotContainsIC_Fails();
-    void Test_CheckNotContains_Fails();
-    void Test_CheckNotEmpty_Fails();
-    void Test_CheckNotEndsWithIC_Fails();
-    void Test_CheckNotEndsWith_DifferentCase_Passes();
-    void Test_CheckNotEndsWith_Fails();
-    void Test_CheckNotEqualsIC_Fails();
-    void Test_CheckNotEqualsMem_Fails();
-    void Test_CheckNotEquals_Fails();
-    void Test_CheckNotMatches_Fails();
-    void Test_CheckNotNear_Fails();
-    void Test_CheckNotNull_Fails();
-    void Test_CheckNotSame_Fails();
-    void Test_CheckNotSame_UniquePtrs_Passes();
-    void Test_CheckNotStartsWithIC_Fails();
-    void Test_CheckNotStartsWith_DifferentCase_Passes();
-    void Test_CheckNotStartsWith_Fails();
-    void Test_CheckNull_Fails();
-    void Test_CheckNull_UniquePtr_Passes();
-    void Test_CheckSame_Fails();
-    void Test_CheckStartsWithIC_Passes();
-    void Test_CheckStartsWith_Fails();
-    void Test_CheckStartsWith_Wide_Passes();
-    void Test_CheckThrows_Fails();
-    void Test_CheckThrows_MessageMatches_Passes();
-    void Test_CheckTrue_Fails();
-    void Test_CheckTrue_ThroughHelper_Fails();
-    void Test_Fail_Fails();
-    void Test_SetExceptionExpected_Bool_NoneThrown_Fails();
-    void Test_SetExceptionExpected_Bool_Passes();
-    void Test_SetExceptionExpected_TypeAndMessage_Passes();
-    void Test_SetExceptionExpected_Type_NoneThrown_Fails();
-    void Test_Skip_Skips();
-
-public:
-    std::map<std::string, int> ExpectedLines; // Test name to the line of its failing/skipping call.
-
-    TFixture_SourceLocations();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_SourceLocations::TFixture_SourceLocations()
@@ -5089,55 +5612,7 @@ void TFixture_SourceLocations::Test_Skip_Skips()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_StartsWithComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWith()/CheckStartsWith()/
-// AssertNotStartsWith()/CheckNotStartsWith(), narrow and wide. "PrefixOnlyAtEnd" and "PrefixOnlyInMiddle" catch a
-// check that matches anywhere but the start, and "PrefixLongerThanText" one that doesn't check the length first.
-// "Wide_NonASCII" checks that a wide failure shows its text as UTF-8. Test names self-document expected outcome via
-// NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_StartsWithComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNotStartsWith_Absent_Passes();
-    void Test_AssertNotStartsWith_Present_Fails();
-    void Test_AssertNotStartsWith_Wide_Absent_Passes();
-    void Test_AssertNotStartsWith_Wide_Present_Fails();
-    void Test_AssertStartsWith_Absent_Fails();
-    void Test_AssertStartsWith_Present_Passes();
-    void Test_AssertStartsWith_Wide_Absent_Fails();
-    void Test_AssertStartsWith_Wide_Present_Passes();
-    void Test_CheckNotStartsWith_Absent_Passes();
-    void Test_CheckNotStartsWith_BothEmpty_Fails();
-    void Test_CheckNotStartsWith_EmptyPrefix_Fails();
-    void Test_CheckNotStartsWith_PrefixLongerThanText_Passes();
-    void Test_CheckNotStartsWith_PrefixOnlyAtEnd_Passes();
-    void Test_CheckNotStartsWith_PrefixOnlyInMiddle_Passes();
-    void Test_CheckNotStartsWith_Present_Fails();
-    void Test_CheckNotStartsWith_Wide_Absent_Passes();
-    void Test_CheckNotStartsWith_Wide_Present_Fails();
-    void Test_CheckStartsWith_Absent_Fails();
-    void Test_CheckStartsWith_BothEmpty_Passes();
-    void Test_CheckStartsWith_DifferentCase_Fails();
-    void Test_CheckStartsWith_EmptyPrefix_Passes();
-    void Test_CheckStartsWith_EmptyText_Fails();
-    void Test_CheckStartsWith_PrefixLongerThanText_Fails();
-    void Test_CheckStartsWith_PrefixOnlyAtEnd_Fails();
-    void Test_CheckStartsWith_PrefixOnlyInMiddle_Fails();
-    void Test_CheckStartsWith_Present_Passes();
-    void Test_CheckStartsWith_Wide_Absent_Fails();
-    void Test_CheckStartsWith_Wide_NonASCII_Fails();
-    void Test_CheckStartsWith_Wide_Present_Passes();
-
-public:
-    TFixture_StartsWithComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_StartsWithComparisons::TFixture_StartsWithComparisons()
@@ -5354,53 +5829,7 @@ void TFixture_StartsWithComparisons::Test_CheckStartsWith_Wide_Present_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_StartsWithICComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertStartsWithIC()/CheckStartsWithIC()/
-// AssertNotStartsWithIC()/CheckNotStartsWithIC(), narrow and wide. Only the ASCII letters A-Z are case-folded, as in
-// TFixture_ContainsICComparisons above. Test names self-document expected outcome via NameEndsWith(), same as
-// TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_StartsWithICComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNotStartsWithIC_Absent_Passes();
-    void Test_AssertNotStartsWithIC_DifferentCase_Fails();
-    void Test_AssertNotStartsWithIC_Wide_Absent_Passes();
-    void Test_AssertNotStartsWithIC_Wide_DifferentCase_Fails();
-    void Test_AssertStartsWithIC_Absent_Fails();
-    void Test_AssertStartsWithIC_DifferentCase_Passes();
-    void Test_AssertStartsWithIC_Wide_Absent_Fails();
-    void Test_AssertStartsWithIC_Wide_DifferentCase_Passes();
-    void Test_CheckNotStartsWithIC_Absent_Passes();
-    void Test_CheckNotStartsWithIC_DifferentCase_Fails();
-    void Test_CheckNotStartsWithIC_EmptyPrefix_Fails();
-    void Test_CheckNotStartsWithIC_PrefixLongerThanText_Passes();
-    void Test_CheckNotStartsWithIC_PrefixOnlyAtEnd_Passes();
-    void Test_CheckNotStartsWithIC_Wide_Absent_Passes();
-    void Test_CheckNotStartsWithIC_Wide_DifferentCase_Fails();
-    void Test_CheckStartsWithIC_Absent_Fails();
-    void Test_CheckStartsWithIC_BothEmpty_Passes();
-    void Test_CheckStartsWithIC_DifferentCase_Passes();
-    void Test_CheckStartsWithIC_EmptyPrefix_Passes();
-    void Test_CheckStartsWithIC_EmptyText_Fails();
-    void Test_CheckStartsWithIC_NonASCII_Fails();
-    void Test_CheckStartsWithIC_NonLetters_Fails();
-    void Test_CheckStartsWithIC_PrefixLongerThanText_Fails();
-    void Test_CheckStartsWithIC_PrefixOnlyAtEnd_Fails();
-    void Test_CheckStartsWithIC_PrefixOnlyInMiddle_Fails();
-    void Test_CheckStartsWithIC_Wide_Absent_Fails();
-    void Test_CheckStartsWithIC_Wide_DifferentCase_Passes();
-    void Test_CheckStartsWithIC_Wide_NonASCII_Fails();
-
-public:
-    TFixture_StartsWithICComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_StartsWithICComparisons::TFixture_StartsWithICComparisons()
@@ -5615,38 +6044,7 @@ void TFixture_StartsWithICComparisons::Test_CheckStartsWithIC_Wide_NonASCII_Fail
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_StringComparisons
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one deliberately failing test per string
-// overload of AssertEquals()/CheckEquals()/AssertNotEquals()/CheckNotEquals() whose failure message didn't use to
-// show the values: wide text (shown as UTF-8), the NotEquals overloads (which show the shared value), and null wide
-// C strings (shown as "(null)", like narrow ones). Used by Test_Equals_ShowsStringValues below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_StringComparisons : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertEquals_WideCStringNull_Fails();
-    void Test_AssertEquals_Wide_Fails();
-    void Test_AssertNotEquals_CStringBothNull_Fails();
-    void Test_AssertNotEquals_String_Fails();
-    void Test_AssertNotEquals_WideCStringBothNull_Fails();
-    void Test_AssertNotEquals_Wide_Fails();
-    void Test_CheckEquals_WideCStringNull_Fails();
-    void Test_CheckEquals_WideCString_Fails();
-    void Test_CheckEquals_Wide_Fails();
-    void Test_CheckNotEquals_CStringBothNull_Fails();
-    void Test_CheckNotEquals_String_Fails();
-    void Test_CheckNotEquals_WideCStringBothNull_Fails();
-    void Test_CheckNotEquals_Wide_Fails();
-
-public:
-    TFixture_StringComparisons();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_StringComparisons::TFixture_StringComparisons()
@@ -5756,40 +6154,7 @@ void TFixture_StringComparisons::Test_CheckNotEquals_Wide_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_ThrowingSetUpTearDown
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose SetUp_Test() or TearDown_Test(), as chosen
-// by 'ThrowFrom', throws a std::runtime_error for its first test. That test expects an exception and throws one,
-// so the exception from TearDown_Test() arrives while one is expected, and must not be taken for it. The second
-// test records whether it ran. Used by Test_Run_EndsRunOnSetUpOrTearDownTestException below.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ThrowingSetUpTearDown : public TTestGroupBase
-{
-public:
-    enum class TThrowFrom
-    {
-        SetUp,
-        TearDown
-    };
-
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_RunsAfterThrowingTest();
-    void Test_ThrowsExpectedException();
-
-public:
-    bool RunsAfterThrowingTestReached = false;
-    TThrowFrom const ThrowFrom;
-
-public:
-    explicit TFixture_ThrowingSetUpTearDown(TThrowFrom throwFrom);
-
-    void SetUp_Group() override {}
-    void SetUp_Test(ITestCase& testCase) override;
-    void TearDown_Group() override {}
-    void TearDown_Test(ITestCase& testCase) override;
-};
 
 //---------------------------------------------------------------------------
 TFixture_ThrowingSetUpTearDown::TFixture_ThrowingSetUpTearDown(TThrowFrom throwFrom)
@@ -5830,43 +6195,7 @@ void TFixture_ThrowingSetUpTearDown::Test_ThrowsExpectedException()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_ThrowsChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertThrows()/CheckThrows()/
-// AssertNoThrow()/CheckNoThrow(), so Test_Throws_ChecksTypeAndMessageAndContinues below can check their outcomes
-// and messages. ReachedAfterCheckNoThrow shows a failed Check lets the test continue; ReachedAfterInnerAssert shows
-// an Assert failure inside the callable still ends the test instead of counting as the exception thrown. Test names
-// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ThrowsChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertNoThrow_NoException_Passes();
-    void Test_AssertNoThrow_Throws_Fails();
-    void Test_AssertThrows_NoException_Fails();
-    void Test_AssertThrows_RightType_Passes();
-    void Test_CheckNoThrow_Throws_Fails();
-    void Test_CheckThrows_AssertFailureInside_Fails();
-    void Test_CheckThrows_FrameworkTypeRequested_Passes();
-    void Test_CheckThrows_MessageMatches_Passes();
-    void Test_CheckThrows_MessageMismatch_Fails();
-    void Test_CheckThrows_NoException_Fails();
-    void Test_CheckThrows_NonStdException_Fails();
-    void Test_CheckThrows_SeveralCalls_Passes();
-    void Test_CheckThrows_Subclass_Passes();
-    void Test_CheckThrows_WrongType_Fails();
-
-public:
-    bool ReachedAfterCheckNoThrow = false;
-    bool ReachedAfterInnerAssert = false;
-
-    TFixture_ThrowsChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ThrowsChecks::TFixture_ThrowsChecks()
@@ -6003,33 +6332,7 @@ void TFixture_ThrowsChecks::Test_CheckThrows_WrongType_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_TrueFalseChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling AssertTrue()/CheckTrue()/AssertFalse()/
-// CheckFalse() with a value that passes and one that fails, so Test_TrueFalse_FailureNamesTheExpectedValue below can
-// check that each failure states the value that was expected, not the opposite. Test names self-document expected
-// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_TrueFalseChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertFalse_False_Passes();
-    void Test_AssertFalse_True_Fails();
-    void Test_AssertTrue_False_Fails();
-    void Test_AssertTrue_True_Passes();
-    void Test_CheckFalse_False_Passes();
-    void Test_CheckFalse_True_Fails();
-    void Test_CheckTrue_False_Fails();
-    void Test_CheckTrue_True_Passes();
-
-public:
-    TFixture_TrueFalseChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_TrueFalseChecks::TFixture_TrueFalseChecks()
@@ -6091,57 +6394,7 @@ void TFixture_TrueFalseChecks::Test_CheckTrue_True_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_TypeChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertIsType()/CheckIsType()/
-// AssertIsNotType()/CheckIsNotType() with a small class hierarchy, through raw and smart pointers and a reference, so
-// Test_IsType_UsesDynamicTypeAndShowsNames below can check their outcomes and messages. A subclass counts as its base
-// class's type, and a null pointer is never any type. Test names self-document expected outcome via NameEndsWith(),
-// same as TFixture_ExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_TypeChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-    struct TShape
-    {
-        virtual ~TShape() = default;
-    };
-
-    struct TCircle : TShape
-    {
-    };
-
-    struct TBigCircle : TCircle
-    {
-    };
-
-    struct TSquare : TShape
-    {
-    };
-
-private:
-    void Test_AssertIsNotType_OtherType_Passes();
-    void Test_AssertIsNotType_SameType_Fails();
-    void Test_AssertIsType_RightType_Passes();
-    void Test_AssertIsType_WrongType_Fails();
-    void Test_CheckIsNotType_Null_Passes();
-    void Test_CheckIsNotType_OtherType_Passes();
-    void Test_CheckIsNotType_Subclass_Fails();
-    void Test_CheckIsType_BaseObject_Fails();
-    void Test_CheckIsType_Null_Fails();
-    void Test_CheckIsType_Reference_Passes();
-    void Test_CheckIsType_RightType_Passes();
-    void Test_CheckIsType_SharedPtr_Passes();
-    void Test_CheckIsType_Subclass_Passes();
-    void Test_CheckIsType_UniquePtr_Fails();
-
-public:
-    TFixture_TypeChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_TypeChecks::TFixture_TypeChecks()
@@ -6262,35 +6515,7 @@ void TFixture_TypeChecks::Test_CheckIsType_UniquePtr_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_UnexpectedExceptions
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group whose tests throw without expecting it: a
-// std::exception, an object that isn't an exception at all, and a std::exception after a failed Check. Each of
-// the first two is followed by a test that passes. Registration order matters: each throwing test must run before
-// the test after it. Used by the Run_*UnexpectedException* tests below to prove an unexpected exception only fails
-// the test that threw it, after which TearDown_Test() and the remaining tests still run.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_UnexpectedExceptions : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_CheckFailsThenThrowsStdException();
-    void Test_RunsAfterNonException();
-    void Test_RunsAfterStdException();
-    void Test_ThrowsNonException();
-    void Test_ThrowsStdException();
-
-public:
-    std::vector<std::string> TornDownTests; // The tests TearDown_Test() ran for, in order.
-
-public:
-    TFixture_UnexpectedExceptions();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-    void TearDown_Test(ITestCase& testCase) override;
-};
 
 //---------------------------------------------------------------------------
 TFixture_UnexpectedExceptions::TFixture_UnexpectedExceptions()
@@ -6342,36 +6567,7 @@ void TFixture_UnexpectedExceptions::Test_ThrowsStdException()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_CrashingTest
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that crashes (an
-// integer divide by zero), followed by one that records whether it ran. Used by
-// Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet below to prove --catch-crashes' central
-// behavior: unlike a timeout, which can only abandon-and-abort, a caught crash lets the group
-// continue running its remaining tests. Deliberately not a null-pointer write: that's a SIGSEGV on
-// POSIX, and TCrashGuard::Run() treats every SIGSEGV there as abort-worthy (it can't tell an
-// ordinary one apart from a stack overflow - see its comment), which would make this fixture's
-// crashing test abort the group instead of letting it continue, defeating the point of this test.
-// An integer divide by zero (SIGFPE on POSIX, EXCEPTION_INT_DIVIDE_BY_ZERO on Windows) is never
-// abort-worthy on either platform, so it exercises "ordinary crash, group continues" portably.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_CrashingTest : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_CrashesButDoesNotAbort();
-    void Test_RunsAfterTheCrash();
-
-public:
-    bool RunsAfterTheCrashReached = false;
-
-public:
-    TFixture_CrashingTest();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_CrashingTest::TFixture_CrashingTest()

@@ -42,44 +42,6 @@ namespace
 
 using namespace ASWUnitTests;
 
-TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
-bool NameEndsWith(std::string const& name, std::string const& suffix);
-System::String Text();
-
-//---------------------------------------------------------------------------
-
-// The record for 'testName' in 'results', or nullptr if there isn't one.
-TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
-{
-    for (TTestCaseRecord const& record : results.CaseRecords)
-    {
-        if (record.TestName == testName)
-            return &record;
-    }
-
-    return nullptr;
-}
-
-//---------------------------------------------------------------------------
-// True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
-// "..._Fails") documents its expected outcome, and the outer verifying test can check every
-// registered test generically instead of hand-maintaining a separate expected-outcome table.
-bool NameEndsWith(std::string const& name, std::string const& suffix)
-{
-    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-//---------------------------------------------------------------------------
-// The text most tests below compare with: "Hello" at the start, "hello" at the end and "World" in the middle, so a
-// prefix, suffix or substring check matches at one place only, and only with the right case.
-System::String Text()
-{
-    return System::String(L"Hello World hello");
-}
-
-//---------------------------------------------------------------------------
-
-
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_RTLStringComparisons
 //
@@ -183,6 +145,58 @@ public:
     void SetUp_Group() override {}
     void TearDown_Group() override {}
 };
+
+//---------------------------------------------------------------------------
+
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
+bool NameEndsWith(std::string const& name, std::string const& suffix);
+System::String Text();
+
+//---------------------------------------------------------------------------
+/*
+    FindRecord
+
+    The record for 'testName' in 'results', or nullptr if there isn't one.
+*/
+TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName)
+{
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (record.TestName == testName)
+            return &record;
+    }
+
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+/*
+    NameEndsWith
+
+    True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
+    "..._Fails") documents its expected outcome, and the outer verifying test can check every
+    registered test generically instead of hand-maintaining a separate expected-outcome table.
+*/
+bool NameEndsWith(std::string const& name, std::string const& suffix)
+{
+    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+//---------------------------------------------------------------------------
+/*
+    Text
+
+    The text most tests below compare with: "Hello" at the start, "hello" at the end and "World" in the middle, so a
+    prefix, suffix or substring check matches at one place only, and only with the right case.
+*/
+System::String Text()
+{
+    return System::String(L"Hello World hello");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLStringComparisons
+/////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
 TFixture_RTLStringComparisons::TFixture_RTLStringComparisons()

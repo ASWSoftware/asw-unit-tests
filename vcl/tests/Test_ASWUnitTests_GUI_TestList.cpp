@@ -38,32 +38,40 @@ namespace
 
 using namespace ASWUnitTests;
 
+//---------------------------------------------------------------------------
+
 std::vector<TTestId> SampleTests();
 std::vector<TTestId> SuiteTests();
 
 //---------------------------------------------------------------------------
+/*
+    SampleTests
 
-// Four tests in three groups, one with a '.' in its name: indexes 0 and 1 in "Alpha", 2 in "Beta", 3 in
-// "Alpha.Sub".
+    Four tests in three groups, one with a '.' in its name: indexes 0 and 1 in "Alpha", 2 in "Beta", 3 in "Alpha.Sub".
+*/
 std::vector<TTestId> SampleTests()
 {
     return { { "Alpha", "One" }, { "Alpha", "Two" }, { "Beta", "Three" }, { "Alpha.Sub", "Four" } };
 }
+//---------------------------------------------------------------------------
+/*
+    SuiteTests
 
-// Six tests, with groups in suites: index 0 in top-level group "Top"; 1 and 2 in group
-// "Deep" in suite "Outer.Inner"; 3 in group "Mid" in suite "Outer"; 4 in group "Solo" in suite "Other"; and
-// 5 in group "Near" in suite "Outermost", whose path starts with "Outer" but isn't inside it.
+    Six tests, with groups in suites: index 0 in top-level group "Top"; 1 and 2 in group
+    "Deep" in suite "Outer.Inner"; 3 in group "Mid" in suite "Outer"; 4 in group "Solo" in suite "Other"; and
+    5 in group "Near" in suite "Outermost", whose path starts with "Outer" but isn't inside it.
+*/
 std::vector<TTestId> SuiteTests()
 {
     return { { "Top", "One", "" }, { "Outer.Inner.Deep", "Two", "Outer.Inner" },
         { "Outer.Inner.Deep", "Three", "Outer.Inner" }, { "Outer.Mid", "Four", "Outer" },
         { "Other.Solo", "Five", "Other" }, { "Outermost.Near", "Six", "Outermost" } };
 }
-
 //---------------------------------------------------------------------------
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

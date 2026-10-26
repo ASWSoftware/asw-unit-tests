@@ -43,16 +43,6 @@ limitations under the License.
 namespace ASWUnitTests
 {
 
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-// Returns "ClassName: Message" for 'ex' (e.g. "EConvertError: 'abc' is not a
-// valid integer value"), converted to UTF-8 so non-ASCII text survives.
-std::string DescribeRTLException(System::Sysutils::Exception& ex);
-// Returns just 'ex.Message', converted to UTF-8.
-std::string RTLExceptionMessage(System::Sysutils::Exception& ex);
-#endif
-
-//---------------------------------------------------------------------------
-
 /////////////////////////////////////////////////////////////////////////////
 // TTestException
 /////////////////////////////////////////////////////////////////////////////
@@ -498,6 +488,16 @@ public:
     System::TClass RTLClass() const noexcept;
 };
 
+#endif
+
+//---------------------------------------------------------------------------
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+// Returns "ClassName: Message" for 'ex' (e.g. "EConvertError: 'abc' is not a
+// valid integer value"), converted to UTF-8 so non-ASCII text survives.
+std::string DescribeRTLException(System::Sysutils::Exception& ex);
+// Returns just 'ex.Message', converted to UTF-8.
+std::string RTLExceptionMessage(System::Sysutils::Exception& ex);
 #endif
 
 } // namespace ASWUnitTests

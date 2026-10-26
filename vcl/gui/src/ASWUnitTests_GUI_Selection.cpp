@@ -40,6 +40,8 @@ char const SelectionFileComment[] =
     "; ASWUnitTests VCL GUI test selection: \"+\" checked or \"-\" unchecked, then the group and test names, "
     "separated by a tab";
 
+//---------------------------------------------------------------------------
+
 bool IsStorableName(std::string const& name);
 
 //---------------------------------------------------------------------------

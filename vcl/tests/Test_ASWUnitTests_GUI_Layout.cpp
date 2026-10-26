@@ -44,12 +44,18 @@ namespace
 
 using System::Types::TRect;
 
-// An empty, in-memory INI file; nothing is read from or written to disk.
+//---------------------------------------------------------------------------
+
 std::unique_ptr<System::Inifiles::TMemIniFile> NewMemIniFile();
 
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+/*
+    NewMemIniFile
+
+    An empty, in-memory INI file; nothing is read from or written to disk.
+*/
 std::unique_ptr<System::Inifiles::TMemIniFile> NewMemIniFile()
 {
     return std::unique_ptr<System::Inifiles::TMemIniFile>(new System::Inifiles::TMemIniFile(System::UnicodeString()));
