@@ -43,6 +43,8 @@ versioned baseline.
 - The VCL GUI runner's progress bar kept showing the progress it had when a test first failed and it
   turned red, instead of following the rest of the run, and the next run could then start with it
   full. It now shows every finished test, and starts each run empty.
+- The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
+  twice, e.g. "(F9) (F9)".
 
 ## [1.4.0] - 2026-10-14
 
