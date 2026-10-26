@@ -27,7 +27,6 @@ limitations under the License.
 #include <algorithm>
 #include <cmath>
 //---------------------------------------------------------------------------
-#include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
 
@@ -104,17 +103,6 @@ void WriteOrDelete(System::Inifiles::TCustomIniFile& ini, char const* section, c
 namespace ASWUnitTests
 {
 
-//---------------------------------------------------------------------------
-System::UnicodeString GUILayoutFilePath()
-{
-    // GetHomePath() is %APPDATA% on Windows.
-    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetHomePath(),
-        "ASWUnitTests");
-    System::UnicodeString const fileName = System::Sysutils::ChangeFileExt(
-        System::Sysutils::ExtractFileName(System::ParamStr(0)), ".ini");
-
-    return System::Ioutils::TPath::Combine(folder, fileName);
-}
 //---------------------------------------------------------------------------
 bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::Types::TRect> const& workAreas)
 {

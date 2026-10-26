@@ -27,17 +27,13 @@ limitations under the License.
 #include <map>
 #include <utility>
 //---------------------------------------------------------------------------
-#include <System.SysUtils.hpp>
-//---------------------------------------------------------------------------
-#include "ASWUnitTests_GUI_Layout.h"
-//---------------------------------------------------------------------------
 
 namespace
 {
 
 // The selection file's first line, describing the lines after it for anyone who opens it.
 char const SelectionFileComment[] =
-    "; ASWUnitTests VCL GUI test selection: \"+\" checked or \"-\" unchecked, then the group and test names, "
+    "; ASWUnitTests GUI test selection: \"+\" checked or \"-\" unchecked, then the group and test names, "
     "separated by a tab";
 
 //---------------------------------------------------------------------------
@@ -110,11 +106,6 @@ std::string FormatGUISelection(std::vector<TGUISavedTest> const& tests)
     }
 
     return text;
-}
-//---------------------------------------------------------------------------
-System::UnicodeString GUISelectionFilePath()
-{
-    return System::Sysutils::ChangeFileExt(GUILayoutFilePath(), ".selection");
 }
 //---------------------------------------------------------------------------
 std::vector<TGUISavedTest> ParseGUISelection(std::string const& text)

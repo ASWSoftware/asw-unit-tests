@@ -51,6 +51,10 @@ call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.cpp" "gui\src\ASWUnitTests_
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.h" "gui\src\ASWUnitTests_GUI_RunObserver.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Selection.cpp" "gui\src\ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Selection.h" "gui\src\ASWUnitTests_GUI_Selection.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.cpp" "gui\src\ASWUnitTests_GUI_Shuffle.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.h" "gui\src\ASWUnitTests_GUI_Shuffle.h"
@@ -66,6 +70,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_RunObserver.h" "gui\tests\Test_ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Selection.cpp" "gui\tests\Test_ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Selection.h" "gui\tests\Test_ASWUnitTests_GUI_Selection.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp" "gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp"
 if errorlevel 1 exit /b 1
@@ -237,10 +245,6 @@ call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.dfm" "vcl\gui\src\ASWUnitT
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.h" "vcl\gui\src\ASWUnitTests_GUI_MainForm.h"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp" "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.h" "vcl\gui\src\ASWUnitTests_GUI_Selection.h"
-if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.cpp" "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.h" "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.h"
@@ -260,10 +264,6 @@ if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.h" "vcl\tests\Test_ASWUnitTests_GUI_Layout.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.h" "vcl\tests\Test_ASWUnitTests_GUI_Selection.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp"
 if errorlevel 1 exit /b 1

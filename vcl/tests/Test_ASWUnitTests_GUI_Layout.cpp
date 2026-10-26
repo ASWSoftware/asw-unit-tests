@@ -30,13 +30,11 @@ limitations under the License.
 #include <vector>
 //---------------------------------------------------------------------------
 #include <System.IniFiles.hpp>
-#include <System.SysUtils.hpp>
 #include <System.Types.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Layout.h"
-#include "ASWUnitTests_GUI_Strings.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -77,8 +75,6 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_GUI_Layout::TTest_ASWUnitTests_GUI_Layout()
     : inherited("ASWUnitTests_GUI_Layout_Tests")
 {
-    RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_GUILayoutFilePath_IsPerExeUnderAppData,
-        "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_FalseOffScreen, "IsWindowReachable_FalseOffScreen");
     RegisterTest(&TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_FalseWhenTitleBarIsHidden,
         "IsWindowReachable_FalseWhenTitleBarIsHidden");
@@ -118,26 +114,6 @@ void TTest_ASWUnitTests_GUI_Layout::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_GUI_Layout::Test_GUILayoutFilePath_IsPerExeUnderAppData()
-{
-    // Arrange
-    System::UnicodeString const exeName = System::Sysutils::ExtractFileName(System::ParamStr(0));
-    System::UnicodeString const appData = System::Sysutils::GetEnvironmentVariable("APPDATA");
-
-    // Act
-    System::UnicodeString const path = GUILayoutFilePath();
-
-    // Assert
-    System::UnicodeString const folder = System::Sysutils::ExtractFileDir(path);
-    CheckEquals(ToUTF8(System::Sysutils::ChangeFileExt(exeName, ".ini")),
-        ToUTF8(System::Sysutils::ExtractFileName(path)), __func__, __LINE__, "named after this executable");
-    CheckEquals(std::string("ASWUnitTests"), ToUTF8(System::Sysutils::ExtractFileName(folder)), __func__, __LINE__,
-        "in an ASWUnitTests folder");
-    AssertFalse(appData.IsEmpty(), __func__, __LINE__, "%APPDATA% is set");
-    CheckTrue(System::Sysutils::SameText(System::Sysutils::ExtractFileDir(folder),
-        System::Sysutils::ExcludeTrailingPathDelimiter(appData)), __func__, __LINE__, "under %APPDATA%");
-}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Layout::Test_IsWindowReachable_FalseOffScreen()
 {

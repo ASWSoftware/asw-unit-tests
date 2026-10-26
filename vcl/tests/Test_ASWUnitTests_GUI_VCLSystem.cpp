@@ -28,9 +28,11 @@ limitations under the License.
 #include <vector>
 //---------------------------------------------------------------------------
 #include <System.hpp>
+#include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 
@@ -45,6 +47,10 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
     : inherited("ASWUnitTests_GUI_VCLSystem_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUILayoutFilePath_IsPerExeUnderAppData,
+        "GUILayoutFilePath_IsPerExeUnderAppData");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
+        "GUISelectionFilePath_IsBesideTheLayoutFile");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
 }
 //---------------------------------------------------------------------------
@@ -71,6 +77,37 @@ void TTest_ASWUnitTests_GUI_VCLSystem::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUILayoutFilePath_IsPerExeUnderAppData()
+{
+    // Arrange
+    System::UnicodeString const exeName = System::Sysutils::ExtractFileName(System::ParamStr(0));
+    System::UnicodeString const appData = System::Sysutils::GetEnvironmentVariable("APPDATA");
+
+    // Act
+    System::UnicodeString const path = GUILayoutFilePath();
+
+    // Assert
+    System::UnicodeString const folder = System::Sysutils::ExtractFileDir(path);
+    CheckEquals(ToUTF8(System::Sysutils::ChangeFileExt(exeName, ".ini")),
+        ToUTF8(System::Sysutils::ExtractFileName(path)), __func__, __LINE__, "named after this executable");
+    CheckEquals(std::string("ASWUnitTests"), ToUTF8(System::Sysutils::ExtractFileName(folder)), __func__, __LINE__,
+        "in an ASWUnitTests folder");
+    AssertFalse(appData.IsEmpty(), __func__, __LINE__, "%APPDATA% is set");
+    CheckTrue(System::Sysutils::SameText(System::Sysutils::ExtractFileDir(folder),
+        System::Sysutils::ExcludeTrailingPathDelimiter(appData)), __func__, __LINE__, "under %APPDATA%");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayoutFile()
+{
+    // Act
+    System::UnicodeString const selectionPath = GUISelectionFilePath();
+    System::UnicodeString const layoutPath = GUILayoutFilePath();
+
+    // Assert
+    CheckEquals(ToUTF8(System::Sysutils::ChangeFileExt(layoutPath, ".selection")), ToUTF8(selectionPath), __func__,
+        __LINE__, "the layout file's path with a .selection extension");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount()
 {

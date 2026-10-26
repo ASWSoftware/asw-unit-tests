@@ -41,7 +41,6 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
-    void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_IsWindowReachable_FalseOffScreen();
     void Test_IsWindowReachable_FalseWhenTitleBarIsHidden();
     void Test_IsWindowReachable_TrueOnAWorkArea();

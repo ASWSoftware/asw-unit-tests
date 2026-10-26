@@ -28,10 +28,18 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
+#include <System.hpp>
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
 
+// This executable's layout file, %APPDATA%\ASWUnitTests\<exe name>.ini, so each test app built on the GUI
+// keeps its own layout, shared by all of its build configurations.
+System::UnicodeString GUILayoutFilePath();
+// This executable's selection file, beside its layout file (see GUILayoutFilePath()): its name with a
+// ".selection" extension.
+System::UnicodeString GUISelectionFilePath();
 // This process's command-line arguments, without the program name, converted to UTF-8, for
 // TGUICommandLine::Parse().
 std::vector<std::string> ProcessArguments();

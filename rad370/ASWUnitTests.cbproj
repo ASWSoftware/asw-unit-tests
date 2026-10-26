@@ -152,6 +152,10 @@
             <DependentOn>..\gui\src\ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>29</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\gui\src\ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\gui\src\ASWUnitTests_GUI_Selection.h</DependentOn>
+            <BuildOrder>36</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\gui\src\ASWUnitTests_GUI_Shuffle.cpp">
             <DependentOn>..\gui\src\ASWUnitTests_GUI_Shuffle.h</DependentOn>
             <BuildOrder>30</BuildOrder>
@@ -167,6 +171,10 @@
         <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp">
             <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>33</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
+            <BuildOrder>37</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp">
             <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_Shuffle.h</DependentOn>

@@ -51,6 +51,7 @@ limitations under the License.
 #include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 
 namespace

@@ -26,8 +26,6 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.hpp>
-//---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_TestList.h"
 //---------------------------------------------------------------------------
 
@@ -37,7 +35,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TGUISavedTest
 //
-// A test's check state, as the VCL GUI runner saves it between sessions.
+// A test's check state, as a GUI runner saves it between sessions.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUISavedTest
 {
@@ -64,10 +62,11 @@ struct TGUISelectionRestore
 
 //---------------------------------------------------------------------------
 
-// The VCL GUI runner's test selection, saved when the window closes and restored when it next opens, so the
-// tests checked in one session stay checked in the next, even as tests are added, removed, or renamed in
-// between. Contains no VCL UI code, so it's unit tested from the VCL console runner (see
-// vcl/tests/Test_ASWUnitTests_GUI_Selection.cpp).
+// A GUI runner's test selection, saved when the window closes and restored when it next opens, so the tests
+// checked in one session stay checked in the next, even as tests are added, removed, or renamed in between.
+// Contains no UI code, so it's unit tested from the console runners (see
+// gui/tests/Test_ASWUnitTests_GUI_Selection.cpp). Each GUI reads and writes the file itself, e.g. the VCL
+// GUI's at GUISelectionFilePath() in vcl/gui/src/ASWUnitTests_GUI_VCLSystem.h.
 
 // The selection to save: every test, checked only if it's both checked and shown, i.e. if Run Selected would
 // run it.
@@ -78,9 +77,6 @@ std::string DescribeGUISelectionRestore(TGUISelectionRestore const& restore);
 // group name, a tab, and its test name. A test whose name has a tab or line break is left out, since its line
 // couldn't be read back; it's then treated as new when restored.
 std::string FormatGUISelection(std::vector<TGUISavedTest> const& tests);
-// This executable's selection file, beside its layout file (see GUILayoutFilePath()): its name with a
-// ".selection" extension.
-System::UnicodeString GUISelectionFilePath();
 // Reads the tests FormatGUISelection() wrote, skipping any line it can't read.
 std::vector<TGUISavedTest> ParseGUISelection(std::string const& text);
 // Checks 'testList's tests to match 'saved', best-guessing for tests the saved selection doesn't have. A saved

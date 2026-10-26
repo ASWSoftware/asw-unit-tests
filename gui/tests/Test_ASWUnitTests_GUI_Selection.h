@@ -42,7 +42,6 @@ private: // Test methods
     void Test_DescribeGUISelectionRestore_NotesWhenEveryTestWasChecked();
     void Test_FormatGUISelection_LeavesOutNamesItCannotStore();
     void Test_FormatGUISelection_RoundTripsThroughParse();
-    void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
     void Test_ParseGUISelection_SkipsLinesItCannotRead();
     void Test_RestoreGUISelection_ChecksEveryTestIfNoSavedCheckedTestExists();
     void Test_RestoreGUISelection_ChecksNewTestsLikeTheirGroup();

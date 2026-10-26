@@ -41,6 +41,8 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_GUILayoutFilePath_IsPerExeUnderAppData();
+    void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
     void Test_ProcessArguments_MatchesParamCount();
 
 public:

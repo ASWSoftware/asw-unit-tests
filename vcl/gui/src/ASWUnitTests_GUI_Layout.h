@@ -70,9 +70,6 @@ struct TGUILayout
 
 //---------------------------------------------------------------------------
 
-// This executable's layout file, %APPDATA%\ASWUnitTests\<exe name>.ini, so each test app built on the GUI
-// keeps its own layout, shared by all of its build configurations.
-System::UnicodeString GUILayoutFilePath();
 // Whether enough of a window's top edge, where its title bar is, lies on one of 'workAreas' for the window to
 // be dragged; e.g. false once the monitor it was on has been disconnected. All in screen pixels.
 bool IsWindowReachable(System::Types::TRect const& bounds, std::vector<System::Types::TRect> const& workAreas);

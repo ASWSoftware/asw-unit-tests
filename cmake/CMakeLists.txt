@@ -12,10 +12,12 @@ add_executable(ASWUnitTests
     ${ASWUNITTESTS_SOURCES}
     ../gui/src/ASWUnitTests_GUI_CommandLine.cpp
     ../gui/src/ASWUnitTests_GUI_RunObserver.cpp
+    ../gui/src/ASWUnitTests_GUI_Selection.cpp
     ../gui/src/ASWUnitTests_GUI_Shuffle.cpp
     ../gui/src/ASWUnitTests_GUI_TestList.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_RunObserver.cpp
+    ../gui/tests/Test_ASWUnitTests_GUI_Selection.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Shuffle.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_TestList.cpp
     ../tests/Test_ASWTools_Random.cpp

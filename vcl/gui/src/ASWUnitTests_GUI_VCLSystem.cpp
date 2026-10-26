@@ -24,7 +24,8 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
-#include <System.hpp>
+#include <System.IOUtils.hpp>
+#include <System.SysUtils.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Strings.h"
 //---------------------------------------------------------------------------
@@ -32,6 +33,22 @@ limitations under the License.
 namespace ASWUnitTests
 {
 
+//---------------------------------------------------------------------------
+System::UnicodeString GUILayoutFilePath()
+{
+    // GetHomePath() is %APPDATA% on Windows.
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetHomePath(),
+        "ASWUnitTests");
+    System::UnicodeString const fileName = System::Sysutils::ChangeFileExt(
+        System::Sysutils::ExtractFileName(System::ParamStr(0)), ".ini");
+
+    return System::Ioutils::TPath::Combine(folder, fileName);
+}
+//---------------------------------------------------------------------------
+System::UnicodeString GUISelectionFilePath()
+{
+    return System::Sysutils::ChangeFileExt(GUILayoutFilePath(), ".selection");
+}
 //---------------------------------------------------------------------------
 std::vector<std::string> ProcessArguments()
 {

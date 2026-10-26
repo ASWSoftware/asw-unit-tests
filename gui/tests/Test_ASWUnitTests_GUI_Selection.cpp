@@ -27,13 +27,9 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.SysUtils.hpp>
-//---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_GUI_Layout.h"
 #include "ASWUnitTests_GUI_Selection.h"
-#include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TestList.h"
 //---------------------------------------------------------------------------
 
@@ -81,8 +77,6 @@ TTest_ASWUnitTests_GUI_Selection::TTest_ASWUnitTests_GUI_Selection()
         "FormatGUISelection_LeavesOutNamesItCannotStore");
     RegisterTest(&TTest_ASWUnitTests_GUI_Selection::Test_FormatGUISelection_RoundTripsThroughParse,
         "FormatGUISelection_RoundTripsThroughParse");
-    RegisterTest(&TTest_ASWUnitTests_GUI_Selection::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
-        "GUISelectionFilePath_IsBesideTheLayoutFile");
     RegisterTest(&TTest_ASWUnitTests_GUI_Selection::Test_ParseGUISelection_SkipsLinesItCannotRead,
         "ParseGUISelection_SkipsLinesItCannotRead");
     RegisterTest(&TTest_ASWUnitTests_GUI_Selection::Test_RestoreGUISelection_ChecksEveryTestIfNoSavedCheckedTestExists,
@@ -219,17 +213,6 @@ void TTest_ASWUnitTests_GUI_Selection::Test_FormatGUISelection_RoundTripsThrough
         CheckEquals(tests[i].TestName, parsed[i].TestName, __func__, __LINE__, "test name " + std::to_string(i));
         CheckEquals(tests[i].Checked, parsed[i].Checked, __func__, __LINE__, "check state " + std::to_string(i));
     }
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_GUI_Selection::Test_GUISelectionFilePath_IsBesideTheLayoutFile()
-{
-    // Act
-    System::UnicodeString const selectionPath = GUISelectionFilePath();
-    System::UnicodeString const layoutPath = GUILayoutFilePath();
-
-    // Assert
-    CheckEquals(ToUTF8(System::Sysutils::ChangeFileExt(layoutPath, ".selection")), ToUTF8(selectionPath), __func__,
-        __LINE__, "the layout file's path with a .selection extension");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Selection::Test_ParseGUISelection_SkipsLinesItCannotRead()
