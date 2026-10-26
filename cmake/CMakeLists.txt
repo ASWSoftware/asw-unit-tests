@@ -19,6 +19,7 @@ add_executable(ASWUnitTests
     ../gui/src/ASWUnitTests_GUI_Shuffle.cpp
     ../gui/src/ASWUnitTests_GUI_TestList.cpp
     ../gui/src/ASWUnitTests_GUI_Tree.cpp
+    ../gui/src/ASWUnitTests_GUI_View.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Commands.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_INIDocument.cpp
@@ -28,6 +29,7 @@ add_executable(ASWUnitTests
     ../gui/tests/Test_ASWUnitTests_GUI_Shuffle.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_TestList.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Tree.cpp
+    ../gui/tests/Test_ASWUnitTests_GUI_View.cpp
     ../tests/Test_ASWTools_Random.cpp
     ../tests/Test_ASWTools_String.cpp
     ../tests/Test_ASWUnitTests_AutoTest.cpp
