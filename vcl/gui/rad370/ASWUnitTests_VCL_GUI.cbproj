@@ -302,6 +302,10 @@
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_CommandLine.h</DependentOn>
             <BuildOrder>2</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Commands.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Commands.h</DependentOn>
+            <BuildOrder>52</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_INIDocument.cpp">
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_INIDocument.h</DependentOn>
             <BuildOrder>48</BuildOrder>
@@ -355,6 +359,10 @@
         <CppCompile Include="..\src\ASWUnitTests_GUI_VCLSystem.cpp">
             <DependentOn>..\src\ASWUnitTests_GUI_VCLSystem.h</DependentOn>
             <BuildOrder>46</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Commands.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Commands.h</DependentOn>
+            <BuildOrder>53</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_INIDocument.cpp">
             <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_INIDocument.h</DependentOn>

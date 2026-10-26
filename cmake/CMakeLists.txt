@@ -11,6 +11,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../src/ASWUnitTests_Sources.cmake)
 add_executable(ASWUnitTests
     ${ASWUNITTESTS_SOURCES}
     ../gui/src/ASWUnitTests_GUI_CommandLine.cpp
+    ../gui/src/ASWUnitTests_GUI_Commands.cpp
     ../gui/src/ASWUnitTests_GUI_INIDocument.cpp
     ../gui/src/ASWUnitTests_GUI_Layout.cpp
     ../gui/src/ASWUnitTests_GUI_RunObserver.cpp
@@ -19,6 +20,7 @@ add_executable(ASWUnitTests
     ../gui/src/ASWUnitTests_GUI_TestList.cpp
     ../gui/src/ASWUnitTests_GUI_Tree.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp
+    ../gui/tests/Test_ASWUnitTests_GUI_Commands.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_INIDocument.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Layout.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_RunObserver.cpp

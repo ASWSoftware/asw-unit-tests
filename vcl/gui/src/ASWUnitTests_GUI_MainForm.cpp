@@ -46,6 +46,7 @@ limitations under the License.
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Commands.h"
 #include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
@@ -653,9 +654,8 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
     RefreshAllNodeImages();
     SyncTreeChecks();
 
-    // e.g. while the filter hides every test.
-    Act_CollapseAll->Enabled = (TV_Tests->Items->Count > 0);
-    Act_ExpandAll->Enabled = (TV_Tests->Items->Count > 0);
+    // Expand All and Collapse All, e.g. while the filter hides every test.
+    UpdateCommands();
 
     if (TV_Tests->Items->Count > 0)
         TV_Tests->Items->GetFirstNode()->MakeVisible();
@@ -1218,29 +1218,7 @@ void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
 void TFormASWUnitTestsGUIMain::SetRunning(bool running)
 {
     m_Running = running;
-
-    // A modal dialog opened mid-run would hold up the rest of the run until it was closed, since the tests
-    // run on this thread.
-    Act_About->Enabled = !running;
-    Act_CommandLineOptions->Enabled = !running;
-    Act_ExportJUnitReport->Enabled = !running && m_LastRunJUnitTestCases.has_value();
-
-    // Nor once a run has been aborted; see RunTests().
-    Act_RunFailed->Enabled = !running && !m_RunAborted && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_RunSelected->Enabled = !running && !m_RunAborted;
-    Act_SelectAll->Enabled = !running;
-    Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_SelectNone->Enabled = !running;
-    Act_Stop->Enabled = running;
-
-    // The run in progress already has its order, so a change now would only mislead.
-    Act_ShuffleOrder->Enabled = !running;
-    Act_ShuffleSeed->Enabled = !running;
-
-    // Rebuilding the tree mid-run would discard the nodes the run is updating.
-    Act_FocusFilter->Enabled = !running;
-    Edt_Filter->Enabled = !running;
-
+    UpdateCommands();
     UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
@@ -1459,10 +1437,42 @@ void TFormASWUnitTestsGUIMain::UpdateCaption()
     Caption = FromUTF8(caption);
 }
 //---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::UpdateCommands()
+{
+    TGUICommandContext context;
+    context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
+    context.HasReport = m_LastRunJUnitTestCases.has_value();
+    context.HasSelection = (TV_Tests->Selected != nullptr);
+    context.RunAborted = m_RunAborted;
+    context.Running = m_Running;
+    context.TreeHasNodes = (TV_Tests->Items->Count > 0);
+
+    TGUICommandStates const states = GUICommandStates(context);
+
+    Act_About->Enabled = states.About;
+    Act_CollapseAll->Enabled = states.CollapseAll;
+    Act_CommandLineOptions->Enabled = states.CommandLineOptions;
+    Act_CopyDetails->Enabled = states.CopyDetails;
+    Act_Exit->Enabled = states.Exit;
+    Act_ExpandAll->Enabled = states.ExpandAll;
+    Act_ExportJUnitReport->Enabled = states.ExportJUnitReport;
+    Act_FocusFilter->Enabled = states.FocusFilter;
+    Act_ResetLayout->Enabled = states.ResetLayout;
+    Act_RunFailed->Enabled = states.RunFailed;
+    Act_RunSelected->Enabled = states.RunSelected;
+    Act_SelectAll->Enabled = states.SelectAll;
+    Act_SelectFailed->Enabled = states.SelectFailed;
+    Act_SelectNone->Enabled = states.SelectNone;
+    Act_ShuffleOrder->Enabled = states.ShuffleOrder;
+    Act_ShuffleSeed->Enabled = states.ShuffleSeed;
+    Act_Stop->Enabled = states.Stop;
+    Edt_Filter->Enabled = states.FilterBox;
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateDetail()
 {
     TTreeNode* const node = TV_Tests->Selected;
-    Act_CopyDetails->Enabled = (node != nullptr);
+    UpdateCommands(); // Copy Details, with or without a selection.
 
     if (node == nullptr)
     {

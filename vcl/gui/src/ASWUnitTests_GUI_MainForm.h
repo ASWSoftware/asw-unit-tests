@@ -252,6 +252,8 @@ private:
     // Watches for the tree's window being destroyed; see m_TreeNodesStale.
     void __fastcall TV_TestsWindowProc(TMessage& message);
     void UpdateCaption();
+    // Enables or disables every action, and the filter box, by GUICommandStates()'s rules.
+    void UpdateCommands();
     // Shows the selected test's, group's or suite's details in the detail pane.
     void UpdateDetail();
     void UpdateStatusBar();
