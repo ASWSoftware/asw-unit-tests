@@ -331,7 +331,19 @@ call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp" "win32\gui\src\ASWU
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.h" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp"
 if errorlevel 1 exit /b 1
@@ -348,6 +360,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp"
 if errorlevel 1 exit /b 1

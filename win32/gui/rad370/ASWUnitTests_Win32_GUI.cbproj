@@ -319,9 +319,25 @@
             <BuildOrder>0</BuildOrder>
             <PCH>true</PCH>
         </PCHCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h</DependentOn>
+            <BuildOrder>54</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_DPI.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_DPI.h</DependentOn>
             <BuildOrder>50</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MainLayout.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_MainLayout.h</DependentOn>
+            <BuildOrder>53</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MainWindow.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_MainWindow.h</DependentOn>
+            <BuildOrder>55</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_Splitter.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_Splitter.h</DependentOn>
+            <BuildOrder>56</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_System.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_System.h</DependentOn>

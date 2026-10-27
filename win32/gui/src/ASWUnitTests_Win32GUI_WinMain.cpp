@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_MainWindow.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
 //---------------------------------------------------------------------------
@@ -39,24 +40,11 @@ namespace
 
 // The title of windows that have no other, as the VCL GUI runner's Application->Title.
 char const ApplicationTitle[] = "ASWUnitTests";
-wchar_t const MainWindowClassName[] = L"ASWUnitTests_Win32GUI_Main";
 
 //---------------------------------------------------------------------------
 
-LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 void ShowUnhandledException(std::string const& description);
 
-//---------------------------------------------------------------------------
-LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    if (message == WM_DESTROY)
-    {
-        PostQuitMessage(0);
-        return 0;
-    }
-
-    return DefWindowProcW(window, message, wParam, lParam);
-}
 //---------------------------------------------------------------------------
 /*
     ShowUnhandledException
@@ -90,7 +78,7 @@ void ShowUnhandledException(std::string const& description)
 
 //---------------------------------------------------------------------------
 
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
 {
     int exitCode = ASWUnitTests::ExitCode_Success;
 
@@ -114,31 +102,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int showCommand)
             return *commandLine.EarlyExitCode;
         }
 
-        WNDCLASSEXW windowClass = {};
-        windowClass.cbSize = sizeof(windowClass);
-        windowClass.lpfnWndProc = MainWindowProc;
-        windowClass.hInstance = instance;
-        windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512)); // IDC_ARROW
-        windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
-        windowClass.lpszClassName = MainWindowClassName;
+        ASWUnitTests::TWin32GUIMainWindow mainWindow;
+        mainWindow.Create();
+        mainWindow.Show(showCommand);
+        mainWindow.RunMessageLoop();
 
-        if (RegisterClassExW(&windowClass) == 0)
-            return ASWUnitTests::ExitCode_UnhandledException;
-
-        HWND const mainWindow = CreateWindowExW(0, MainWindowClassName, L"ASWUnitTests", WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, instance, nullptr);
-
-        if (mainWindow == nullptr)
-            return ASWUnitTests::ExitCode_UnhandledException;
-
-        ShowWindow(mainWindow, showCommand);
-
-        MSG message;
-        while (GetMessageW(&message, nullptr, 0, 0) > 0)
-        {
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
+        exitCode = mainWindow.ExitCode();
     }
     catch (std::exception const& exception)
     {
