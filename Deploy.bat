@@ -327,15 +327,27 @@ call :CopyFile "win32\gui\rad370\Build_Win32_Release.bat" "win32\gui\rad370\Buil
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI.manifest" "win32\gui\src\ASWUnitTests_Win32GUI.manifest"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.h" "win32\gui\src\ASWUnitTests_Win32GUI_System.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp"
 if errorlevel 1 exit /b 1

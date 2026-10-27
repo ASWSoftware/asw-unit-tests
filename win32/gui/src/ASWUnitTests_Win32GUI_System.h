@@ -39,6 +39,9 @@ limitations under the License.
 namespace ASWUnitTests
 {
 
+// The text with every line break made CRLF, which an EDIT control needs: a lone LF or CR becomes CRLF, much as
+// the VCL's AdjustLineBreaks() does for the VCL GUI runner.
+std::string AdjustLineBreaks(std::string const& text);
 // The arguments in a Windows command line such as GetCommandLineW()'s, without the program name, converted to
 // UTF-8. Split by CommandLineToArgvW(), whose quoting rules are those of the C runtime's argv in the console
 // runner.

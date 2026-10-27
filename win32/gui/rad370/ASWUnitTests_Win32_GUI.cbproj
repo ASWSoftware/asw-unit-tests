@@ -40,12 +40,6 @@
         <Cfg_1>true</Cfg_1>
         <Base>true</Base>
     </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win64x' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win64x)'!=''">
-        <Cfg_1_Win64x>true</Cfg_1_Win64x>
-        <CfgParent>Cfg_1</CfgParent>
-        <Cfg_1>true</Cfg_1>
-        <Base>true</Base>
-    </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
@@ -137,10 +131,6 @@
         <TASM_Debugging>None</TASM_Debugging>
     </PropertyGroup>
     <ItemGroup>
-        <PCHCompile Include="ASWUnitTests_Win32_GUIPCH1.h">
-            <BuildOrder>0</BuildOrder>
-            <PCH>true</PCH>
-        </PCHCompile>
         <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_CommandLine.cpp">
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_CommandLine.h</DependentOn>
             <BuildOrder>1</BuildOrder>
@@ -325,16 +315,32 @@
             <DependentOn>..\..\..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>46</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_System.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_System.h</DependentOn>
-            <BuildOrder>49</BuildOrder>
+        <PCHCompile Include="ASWUnitTests_Win32_GUIPCH1.h">
+            <BuildOrder>0</BuildOrder>
+            <PCH>true</PCH>
+        </PCHCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_DPI.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_DPI.h</DependentOn>
+            <BuildOrder>50</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_System.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_System.h</DependentOn>
             <BuildOrder>48</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_TextDialog.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_TextDialog.h</DependentOn>
+            <BuildOrder>51</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_WinMain.cpp">
             <BuildOrder>47</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_DPI.h</DependentOn>
+            <BuildOrder>52</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_System.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_System.h</DependentOn>
+            <BuildOrder>49</BuildOrder>
         </CppCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

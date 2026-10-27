@@ -180,6 +180,30 @@ bool TFileHandle::IsValid() const
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
+std::string AdjustLineBreaks(std::string const& text)
+{
+    std::string adjusted;
+    adjusted.reserve(text.size() + text.size() / 16);
+
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] == '\r' || text[i] == '\n')
+        {
+            adjusted += "\r\n";
+
+            // A CRLF pair is one line break.
+            if (text[i] == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                ++i;
+        }
+        else
+        {
+            adjusted += text[i];
+        }
+    }
+
+    return adjusted;
+}
+//---------------------------------------------------------------------------
 std::vector<std::string> CommandLineArguments(std::wstring const& commandLine)
 {
     int count = 0;

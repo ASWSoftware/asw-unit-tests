@@ -50,6 +50,7 @@ private:
     std::string ScratchPath(std::string const& name) const;
 
 private: // Test methods
+    void Test_AdjustLineBreaks_MakesEveryLineBreakCRLF();
     void Test_CommandLineArguments_ConvertsNonASCIIToUTF8();
     void Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules();
     void Test_CommandLineArguments_SkipsTheProgramName();

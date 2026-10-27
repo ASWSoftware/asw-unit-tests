@@ -118,6 +118,8 @@ void RemoveFolderTree(std::wstring const& folder)
 TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
     : inherited("ASWUnitTests_Win32GUI_System_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_AdjustLineBreaks_MakesEveryLineBreakCRLF,
+        "AdjustLineBreaks_MakesEveryLineBreakCRLF");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_ConvertsNonASCIIToUTF8,
         "CommandLineArguments_ConvertsNonASCIIToUTF8");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules,
@@ -189,6 +191,19 @@ void TTest_ASWUnitTests_Win32GUI_System::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_AdjustLineBreaks_MakesEveryLineBreakCRLF()
+{
+    // Act, Assert
+    CheckEquals(std::string("a\r\nb\r\n"), AdjustLineBreaks("a\nb\n"), __func__, __LINE__, "LF becomes CRLF");
+    CheckEquals(std::string("a\r\nb"), AdjustLineBreaks("a\r\nb"), __func__, __LINE__, "CRLF stays as it is");
+    CheckEquals(std::string("a\r\nb"), AdjustLineBreaks("a\rb"), __func__, __LINE__, "a lone CR becomes CRLF");
+    CheckEquals(std::string("\r\n\r\n\r\n"), AdjustLineBreaks("\r\n\n\r"), __func__, __LINE__,
+        "each break counts once: CRLF, LF, CR");
+    CheckEquals(std::string("a\r\n\r\nb"), AdjustLineBreaks("a\n\r\nb"), __func__, __LINE__,
+        "an LF before a CRLF is a break of its own");
+    CheckEmpty(AdjustLineBreaks(std::string()), __func__, __LINE__, "empty stays empty");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_ConvertsNonASCIIToUTF8()
 {
