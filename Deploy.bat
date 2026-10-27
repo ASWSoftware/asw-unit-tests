@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake gui\src gui\tests rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests) do (
+for %%D in (build cmake gui\src gui\tests rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -312,6 +312,26 @@ if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp" "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.h" "vcl\tests\Test_ASWUnitTests_RTLStrings.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj" "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\ASWUnitTests_Win32_GUIPCH1.h" "win32\gui\rad370\ASWUnitTests_Win32_GUIPCH1.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win64x_Debug.bat" "win32\gui\rad370\Build_Win64x_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win64x_Release.bat" "win32\gui\rad370\Build_Win64x_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win32_Debug.bat" "win32\gui\rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win32_Release.bat" "win32\gui\rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI.manifest" "win32\gui\src\ASWUnitTests_Win32GUI.manifest"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
 if errorlevel 1 exit /b 1
 
 echo Deployment completed successfully.

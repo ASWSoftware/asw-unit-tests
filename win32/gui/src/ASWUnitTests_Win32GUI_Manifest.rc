@@ -1,0 +1,30 @@
+/* **************************************************************************
+ASWUnitTests_Win32GUI_Manifest.rc
+Author: Anthony S. West - ASW Software
+
+Embeds the Win32 GUI runner's manifest in MinGW-w64 builds (GCC and Clang),
+which have no other way to embed one; MSVC and RAD Studio embed the same
+.manifest file themselves. Resource 1 of type 24 is
+CREATEPROCESS_MANIFEST_RESOURCE_ID of type RT_MANIFEST.
+
+No LANGUAGE statement: GNU ld silently drops a language-neutral manifest
+when another one is linked, which would drop this one in favor of the
+default manifest some MinGW-w64 distributions link into every program.
+
+Copyright 2026 ASW Software
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+************************************************************************** */
+
+1 24 "ASWUnitTests_Win32GUI.manifest"

@@ -8,8 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../src/ASWUnitTests_Sources.cmake)
 
-add_executable(ASWUnitTests
-    ${ASWUNITTESTS_SOURCES}
+# The shared GUI core, the framework's self-tests and the example code they test, which every runner compiles.
+set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../gui/src/ASWUnitTests_GUI_CommandLine.cpp
     ../gui/src/ASWUnitTests_GUI_Commands.cpp
     ../gui/src/ASWUnitTests_GUI_INIDocument.cpp
@@ -46,6 +46,11 @@ add_executable(ASWUnitTests
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp
     ../toTest/ASWTools_String.cpp
+)
+
+add_executable(ASWUnitTests
+    ${ASWUNITTESTS_SOURCES}
+    ${ASWUNITTESTS_SELF_TEST_SOURCES}
 )
 
 target_include_directories(ASWUnitTests PRIVATE
@@ -87,3 +92,58 @@ endif()
 set_target_properties(ASWUnitTests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+if(WIN32)
+    # The Win32 GUI runner: the same tests as the console runner, in a window. Its WinMain takes the place of
+    # the console runner's main.cpp.
+    set(ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES ${ASWUNITTESTS_SOURCES})
+    list(REMOVE_ITEM ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES "${ASWUNITTESTS_SOURCE_DIR}/main.cpp")
+
+    add_executable(ASWUnitTests_Win32_GUI WIN32
+        ${ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES}
+        ${ASWUNITTESTS_SELF_TEST_SOURCES}
+        ../win32/gui/src/ASWUnitTests_Win32GUI_WinMain.cpp
+    )
+
+    target_include_directories(ASWUnitTests_Win32_GUI PRIVATE
+        ../gui/src
+        ../gui/tests
+        ../src
+        ../tests
+        ../toTest
+        ../win32/gui/src
+    )
+
+    target_link_libraries(ASWUnitTests_Win32_GUI PRIVATE
+        Threads::Threads
+        comctl32
+        comdlg32
+        ole32
+        rpcrt4
+        shell32
+    )
+
+    if(MSVC)
+        target_compile_options(ASWUnitTests_Win32_GUI PRIVATE /W4 /Zc:__cplusplus)
+        # The linker merges the manifest into the one it generates. /MANIFESTUAC:NO leaves the execution level
+        # to the manifest's own trustInfo, rather than adding a second one.
+        target_sources(ASWUnitTests_Win32_GUI PRIVATE ../win32/gui/src/ASWUnitTests_Win32GUI.manifest)
+        target_link_options(ASWUnitTests_Win32_GUI PRIVATE /MANIFESTUAC:NO)
+    else()
+        target_compile_options(ASWUnitTests_Win32_GUI PRIVATE -Wall -Wextra -Wpedantic)
+        # The manifest as a resource. GCC also links its distribution's default manifest, if it has one; GNU ld
+        # drops a language-neutral default one silently, but WinLibs' has a language, so ld reports ".rsrc merge
+        # failure: multiple non-default manifests". The link still succeeds and Windows uses this manifest,
+        # which comes first.
+        target_sources(ASWUnitTests_Win32_GUI PRIVATE ../win32/gui/src/ASWUnitTests_Win32GUI_Manifest.rc)
+    endif()
+
+    if(MINGW)
+        # Statically linked, as the console runner is.
+        target_link_options(ASWUnitTests_Win32_GUI PRIVATE -static-libgcc -static-libstdc++ -static)
+    endif()
+
+    set_target_properties(ASWUnitTests_Win32_GUI PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+endif()
