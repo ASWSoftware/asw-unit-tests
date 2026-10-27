@@ -260,6 +260,7 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_RunFinishedCount(0),
       m_Running(false),
       m_RunTotalCount(0),
+      m_SettingFilterText(false),
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
       m_TreeNodesStale(false)
@@ -701,6 +702,9 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Edt_FilterChange(TObject* /*Sender*/)
 {
+    if (m_SettingFilterText)
+        return; // Start() builds the tree once it has set the text.
+
     RunGuarded("the filter box", [this]()
     {
         ApplyFilterBox();
@@ -1259,10 +1263,14 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
     if (m_Options.CLI.HasFilter)
+    {
+        // Without OnChange's rebuild, which may or may not happen before the window is showing, so the tree
+        // is built once either way, just below.
+        TScopedFlag const settingFilterText(m_SettingFilterText);
         Edt_Filter->Text = FromUTF8(m_Options.CLI.FilterPattern);
+    }
 
-    // Called directly, since setting the text above doesn't necessarily raise OnChange before the window
-    // is showing. Builds the tree.
+    // Builds the tree.
     ApplyFilterBox();
 
     // Centered here rather than with the DFM's Position, which is poDesigned because LoadLayout() would

@@ -189,6 +189,9 @@ private: // User declarations
     bool m_Running;
     std::optional<std::chrono::steady_clock::time_point> m_RunStart;
     size_t m_RunTotalCount;
+    // True while Start() puts --filter's pattern in the filter box, so Edt_FilterChange() leaves building the
+    // tree to Start(), which then builds it once.
+    bool m_SettingFilterText;
     // Whether runs are shuffled, and with which seed; starts from --shuffle and --shuffle-seed.
     ASWUnitTests::TGUIShuffle m_Shuffle;
     std::string m_StatusMessage;

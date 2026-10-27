@@ -468,6 +468,7 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_DPI(USER_DEFAULT_SCREEN_DPI),
       m_FocusedControl(nullptr),
       m_RichEditLibrary(nullptr),
+      m_SettingFilterText(false),
       m_StatusImages(nullptr),
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
@@ -1062,6 +1063,9 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
 
             if (reinterpret_cast<HWND>(lParam) == m_Edt_Filter && HIWORD(wParam) == EN_CHANGE)
             {
+                if (m_SettingFilterText)
+                    return 0; // Start() builds the tree once it has set the text.
+
                 RunGuarded("the filter box", [this]()
                     {
                         ApplyFilterBox();
@@ -1458,9 +1462,14 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
     if (m_Options.CLI.HasFilter)
+    {
+        // Without EN_CHANGE's rebuild, which only happens if the text changes, so the tree is built once either
+        // way, just below.
+        TScopedFlag const settingFilterText(m_SettingFilterText);
         SetWindowTextW(m_Edt_Filter, UTF8ToWide(m_Options.CLI.FilterPattern).c_str());
+    }
 
-    // Called directly, since setting the text above only builds the tree (through EN_CHANGE) if it changes it.
+    // Builds the tree.
     ApplyFilterBox();
 }
 //---------------------------------------------------------------------------

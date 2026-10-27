@@ -141,6 +141,9 @@ private:
     std::mutex m_QueueMutex;
     // Msftedit.dll, which provides the rich edit control the log uses.
     HMODULE m_RichEditLibrary;
+    // Set while Start() puts --filter's pattern in the filter box, so its EN_CHANGE leaves building the tree to
+    // Start(), which then builds it once.
+    bool m_SettingFilterText;
     TGUIShuffle m_Shuffle;
     // The test tree's status dots, one per TGUITestStatus, drawn for m_DPI by CreateStatusImages().
     HIMAGELIST m_StatusImages;
