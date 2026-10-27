@@ -4,8 +4,8 @@ Author: Anthony S. West - ASW Software
 
 What the Win32 GUI runner needs from its process and system: text
 conversion between the framework's UTF-8 and Windows' UTF-16, its
-command-line arguments, where it keeps its settings, and file access
-through wide paths. The Win32 counterpart of the VCL GUI runner's
+command-line arguments, where it keeps its settings, file access through
+wide paths, and the clipboard. The Win32 counterpart of the VCL GUI runner's
 ASWUnitTests_GUI_VCLSystem, with the same function names, so the two GUIs
 can be compared side by side.
 
@@ -31,6 +31,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #ifndef ASWUnitTests_Win32GUI_SystemH
 #define ASWUnitTests_Win32GUI_SystemH
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_Windows.h"
 //---------------------------------------------------------------------------
 #include <string>
 #include <vector>
@@ -70,6 +72,9 @@ std::vector<std::string> ProcessArguments();
 std::string ReadFileBytes(std::string const& path);
 // Deletes the file. False if it couldn't be deleted, e.g. because it doesn't exist.
 bool RemoveFile(std::string const& path);
+// Replaces the clipboard's content with the text, for 'owner' (a window of this process). Throws
+// std::runtime_error if it can't, e.g. while another program has the clipboard open.
+void SetClipboardText(HWND owner, std::string const& text);
 // Converts UTF-8 text to UTF-16 for Windows. Invalid UTF-8 becomes U+FFFD. The framework's WideToUTF8()
 // (ASWUnitTests_Utils.h) converts back.
 std::wstring UTF8ToWide(std::string const& text);

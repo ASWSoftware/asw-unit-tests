@@ -61,5 +61,6 @@ limitations under the License.
 #include <richedit.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <uxtheme.h>
 //---------------------------------------------------------------------------
 #endif

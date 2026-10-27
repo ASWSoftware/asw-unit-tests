@@ -32,10 +32,17 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <deque>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Handler.h"
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_Commands.h"
+#include "ASWUnitTests_GUI_RunObserver.h"
+#include "ASWUnitTests_GUI_Shuffle.h"
+#include "ASWUnitTests_GUI_TestList.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_DPI.h"
 #include "ASWUnitTests_Win32GUI_Splitter.h"
@@ -124,12 +131,24 @@ private:
     UINT m_DPI;
     // The control that had the focus when the window was last deactivated, given it back on activation.
     HWND m_FocusedControl;
+    // Holds the registered tests; created by Start(). Reports to m_Observer, so the destructor destroys it first.
+    std::unique_ptr<TTestHandler> m_Handler;
     TWin32GUIFont m_MonospaceFont;
+    TGUIRunObserver m_Observer;
+    TGUIOptions m_Options;
     // Actions PostToUI() queued, run by RunQueued().
     std::deque<std::function<void()> > m_Queue;
     std::mutex m_QueueMutex;
     // Msftedit.dll, which provides the rich edit control the log uses.
     HMODULE m_RichEditLibrary;
+    TGUIShuffle m_Shuffle;
+    // The test tree's status dots, one per TGUITestStatus, drawn for m_DPI by CreateStatusImages().
+    HIMAGELIST m_StatusImages;
+    // The status bar's last panel.
+    std::string m_StatusMessage;
+    // Set while SyncTreeChecks() sets the tree's check boxes, so OnTreeItemChanging() lets the changes through.
+    bool m_SyncingChecks;
+    TGUITestList m_TestList;
     int m_TestTreeWidth;
     TWin32GUIFont m_UIFont;
     HWND m_Window;
@@ -138,13 +157,20 @@ private:
     static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
-    // Recreates the fonts for m_DPI and applies them, with everything else sized by the DPI: the status bar's
-    // parts and the failure list's columns.
+    // Appends the framework's log output to the log, each line colored as ClassifyGUILogLine() says.
+    void AppendLog(std::string const& text);
+    // Recreates the fonts and status images for m_DPI and applies them, with everything else sized by the DPI:
+    // the tree's indent, the status bar's parts and the failure list's columns.
     void ApplyDPI();
+    // Shows only the tests the filter box's text matches, and rebuilds the tree for them.
+    void ApplyFilterBox();
+    // Rebuilds the test tree from m_TestList's visible tests, fully expanded; see the definition.
+    void BuildTestTree();
     void CenterOnMonitor();
     HWND CreateChild(DWORD exStyle, wchar_t const* className, wchar_t const* text, DWORD style, WORD id = 0);
     void CreateControls();
     void CreateMenuBar();
+    void CreateStatusImages();
     // Runs a command from its menu item, toolbar button or hot key, if it's enabled; see the definition.
     void DoCommand(EWin32GUICommand command);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
@@ -152,16 +178,32 @@ private:
     void OnDetailSplitterDrag(int position);
     void OnDPIChanged(UINT dpi, RECT const& suggested);
     void OnTestsSplitterDrag(int position);
+    // Handles TVN_ITEMCHANGINGW; true vetoes the change. See the definition.
+    bool OnTreeItemChanging(NMTVITEMCHANGE const& change);
+    // Sets every test tree node's status image from m_TestList.
+    void RefreshAllNodeImages();
     // Reports an error that escaped from 'where' in a message box.
     void ReportUnexpectedError(std::string const& where, std::string const& description);
     // Runs an event handler's body, reporting any exception from it by name; see the definition.
     void RunGuarded(std::string const& where, std::function<void()> const& body);
     // Runs the actions PostToUI() queued.
     void RunQueued();
+    // The test tree's selected node, or nullptr if none is.
+    HTREEITEM SelectedTreeItem() const;
+    // Sets a test tree node's status image from m_TestList.
+    void SetNodeImage(HTREEITEM item);
+    // Expands or collapses every node of the test tree.
+    void SetTreeExpanded(bool expanded);
     // Shows the results page whose tab is selected.
     void ShowResultsPage();
+    // Sets every test tree node's check box from m_TestList; see the definition.
+    void SyncTreeChecks();
+    void UpdateCaption();
     // Enables or disables every command, and the filter box, by GUICommandStates()'s rules.
     void UpdateCommands();
+    // Shows the selected node's details in the detail pane.
+    void UpdateDetail();
+    void UpdateStatusBar();
 
 public:
     TWin32GUIMainWindow();
@@ -182,6 +224,9 @@ public:
     // Runs the window's message loop until it's closed.
     void RunMessageLoop();
     void Show(int showCommand);
+    // Loads the registered tests and applies the command line's options; see the definition. Call after
+    // Create(), before Show().
+    void Start(TGUIOptions const& options);
 };
 
 } // namespace ASWUnitTests

@@ -349,6 +349,51 @@ bool RemoveFile(std::string const& path)
     return DeleteFileW(UTF8ToWide(path).c_str()) != 0;
 }
 //---------------------------------------------------------------------------
+/*
+    SetClipboardText
+
+    Puts the text on the clipboard as CF_UNICODETEXT, which Windows also offers to programs that ask for
+    CF_TEXT. Once SetClipboardData() succeeds, the clipboard owns the memory.
+*/
+void SetClipboardText(HWND owner, std::string const& text)
+{
+    std::wstring const wide = UTF8ToWide(text);
+    HGLOBAL const memory = GlobalAlloc(GMEM_MOVEABLE, (wide.size() + 1) * sizeof(wchar_t));
+
+    if (memory == nullptr)
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(GetLastError()));
+
+    wchar_t* const target = static_cast<wchar_t*>(GlobalLock(memory));
+
+    if (target == nullptr)
+    {
+        DWORD const error = GetLastError();
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(error));
+    }
+
+    std::copy(wide.c_str(), wide.c_str() + wide.size() + 1, target);
+    GlobalUnlock(memory);
+
+    if (OpenClipboard(owner) == 0)
+    {
+        DWORD const error = GetLastError();
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't open the clipboard: " + SystemErrorText(error));
+    }
+
+    EmptyClipboard();
+    bool const placed = SetClipboardData(CF_UNICODETEXT, memory) != nullptr;
+    DWORD const error = GetLastError();
+    CloseClipboard();
+
+    if (!placed)
+    {
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(error));
+    }
+}
+//---------------------------------------------------------------------------
 std::wstring UTF8ToWide(std::string const& text)
 {
     if (text.empty())

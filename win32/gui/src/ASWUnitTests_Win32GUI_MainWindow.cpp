@@ -24,19 +24,31 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Win32GUI_MainWindow.h"
 //---------------------------------------------------------------------------
+#include <cstddef>
+#include <cstdint>
 #include <exception>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_GUI_CommandLine.h"
+#include "ASWUnitTests_GUI_Tree.h"
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_MainLayout.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
+//---------------------------------------------------------------------------
+
+// RAD Studio's Win32 (bcc32c) links its own Windows import libraries, which don't include SetWindowTheme()'s.
+// CMake links uxtheme for the other compilers, and RAD Studio's Win64x links it already.
+#if defined(__BORLANDC__) && !defined(_WIN64)
+#  pragma comment(lib, "uxtheme.lib")
+#endif
+
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -45,9 +57,13 @@ namespace ASWUnitTests
 namespace
 {
 
+// The log's color for failure lines, as the VCL GUI runner's.
+COLORREF const FailureColor = RGB(200, 0, 0);
 wchar_t const MainWindowClassName[] = L"ASWUnitTests_Win32GUI_Main";
 // Posted by PostToUI(), so the message loop runs the queued actions.
 UINT const RunQueuedMessage = WM_APP + 1;
+// The log's color for skip lines, as the VCL GUI runner's.
+COLORREF const SkipColor = RGB(190, 120, 0);
 // The title of the GUI's windows, as the VCL GUI runner's Application->Title.
 char const Title[] = "ASWUnitTests";
 
@@ -74,10 +90,58 @@ EWin32GUICommand const AllCommands[] = {
 
 //---------------------------------------------------------------------------
 
+/////////////////////////////////////////////////////////////////////////////
+// TRedrawScope
+//
+// Stops a control from redrawing for the lifetime of this object, e.g.
+// while the test tree is rebuilt, then redraws it once, even if an
+// exception leaves the scope.
+/////////////////////////////////////////////////////////////////////////////
+class TRedrawScope
+{
+private:
+    HWND const m_Control;
+
+public:
+    explicit TRedrawScope(HWND control);
+    ~TRedrawScope();
+
+    TRedrawScope(TRedrawScope const&) = delete;
+    TRedrawScope& operator=(TRedrawScope const&) = delete;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TScopedFlag
+//
+// Sets a bool for the lifetime of this object, clearing it again even if
+// an exception leaves the scope.
+/////////////////////////////////////////////////////////////////////////////
+class TScopedFlag
+{
+private:
+    bool& m_Flag;
+
+public:
+    explicit TScopedFlag(bool& flag);
+    ~TScopedFlag();
+
+    TScopedFlag(TScopedFlag const&) = delete;
+    TScopedFlag& operator=(TScopedFlag const&) = delete;
+};
+
+//---------------------------------------------------------------------------
+
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption);
 HMENU AppendSubmenu(HMENU menuBar, wchar_t const* caption);
 char const* CommandName(EWin32GUICommand command);
 bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command);
+COLORREF LogLineColor(std::string const& line);
+HTREEITEM NextTreeItem(HWND tree, HTREEITEM item);
+HTREEITEM RelatedTreeItem(HWND tree, HTREEITEM item, UINT relation);
+UINT StateImageIndex(TGUICheckState state);
+TGUINodeRef TreeItemRef(HWND tree, HTREEITEM item);
+std::string WindowText(HWND window);
 
 //---------------------------------------------------------------------------
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption)
@@ -219,6 +283,145 @@ bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command)
     return false;
 }
 //---------------------------------------------------------------------------
+/*
+    LogLineColor
+
+    The log's color for one line of the framework's log output; see ClassifyGUILogLine().
+*/
+COLORREF LogLineColor(std::string const& line)
+{
+    switch (ClassifyGUILogLine(line))
+    {
+        case TGUILogLineKind::Failure:
+            return FailureColor;
+
+        case TGUILogLineKind::Skip:
+            return SkipColor;
+
+        case TGUILogLineKind::Normal:
+            break;
+    }
+
+    return GetSysColor(COLOR_WINDOWTEXT);
+}
+//---------------------------------------------------------------------------
+/*
+    NextTreeItem
+
+    The node after 'item' in the tree's full order, expanded or not: its first child, or else the next sibling
+    of it or of the nearest of its parents that has one; nullptr after the last node. The first node is
+    RelatedTreeItem(tree, nullptr, TVGN_ROOT).
+*/
+HTREEITEM NextTreeItem(HWND tree, HTREEITEM item)
+{
+    HTREEITEM const child = RelatedTreeItem(tree, item, TVGN_CHILD);
+
+    if (child != nullptr)
+        return child;
+
+    for (HTREEITEM node = item; node != nullptr; node = RelatedTreeItem(tree, node, TVGN_PARENT))
+    {
+        HTREEITEM const sibling = RelatedTreeItem(tree, node, TVGN_NEXT);
+
+        if (sibling != nullptr)
+            return sibling;
+    }
+
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+/*
+    RelatedTreeItem
+
+    TVM_GETNEXTITEM: the node 'relation' (e.g. TVGN_CHILD) names, relative to 'item'; nullptr if there's none.
+*/
+HTREEITEM RelatedTreeItem(HWND tree, HTREEITEM item, UINT relation)
+{
+    return reinterpret_cast<HTREEITEM>(SendMessageW(tree, TVM_GETNEXTITEM, relation, reinterpret_cast<LPARAM>(item)));
+}
+//---------------------------------------------------------------------------
+/*
+    StateImageIndex
+
+    A test tree check box's state image, as TVS_EX_PARTIALCHECKBOXES numbers them.
+*/
+UINT StateImageIndex(TGUICheckState state)
+{
+    switch (state)
+    {
+        case TGUICheckState::Checked:
+            return 2;
+
+        case TGUICheckState::Partial:
+            return 3;
+
+        case TGUICheckState::Unchecked:
+            break;
+    }
+
+    return 1;
+}
+//---------------------------------------------------------------------------
+/*
+    TreeItemRef
+
+    Which suite, group or test a test tree node stands for, from the data BuildTestTree() gave it.
+*/
+TGUINodeRef TreeItemRef(HWND tree, HTREEITEM item)
+{
+    TVITEMW data = {};
+    data.mask = TVIF_HANDLE | TVIF_PARAM;
+    data.hItem = item;
+    SendMessageW(tree, TVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&data));
+
+    return DecodeGUINodeRef(static_cast<std::uintptr_t>(data.lParam));
+}
+//---------------------------------------------------------------------------
+std::string WindowText(HWND window)
+{
+    std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(window)) + 1, L'\0');
+    text.resize(static_cast<std::size_t>(GetWindowTextW(window, &text[0], static_cast<int>(text.size()))));
+
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TRedrawScope
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TRedrawScope::TRedrawScope(HWND control)
+    : m_Control(control)
+{
+    SendMessageW(m_Control, WM_SETREDRAW, FALSE, 0);
+}
+//---------------------------------------------------------------------------
+TRedrawScope::~TRedrawScope()
+{
+    SendMessageW(m_Control, WM_SETREDRAW, TRUE, 0);
+    RedrawWindow(m_Control, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TScopedFlag
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TScopedFlag::TScopedFlag(bool& flag)
+    : m_Flag(flag)
+{
+    m_Flag = true;
+}
+//---------------------------------------------------------------------------
+TScopedFlag::~TScopedFlag()
+{
+    m_Flag = false;
+}
+//---------------------------------------------------------------------------
 
 } // namespace
 
@@ -265,6 +468,9 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_DPI(USER_DEFAULT_SCREEN_DPI),
       m_FocusedControl(nullptr),
       m_RichEditLibrary(nullptr),
+      m_StatusImages(nullptr),
+      m_StatusMessage("Ready."),
+      m_SyncingChecks(false),
       m_TestTreeWidth(TWin32GUIMainSizes::DefaultTestTreeWidth),
       m_Window(nullptr)
 {
@@ -272,16 +478,55 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
 //---------------------------------------------------------------------------
 TWin32GUIMainWindow::~TWin32GUIMainWindow()
 {
+    // Its tests' groups are destroyed while m_Observer, declared after it, still exists.
+    m_Handler.reset();
+
     if (m_Window != nullptr)
         DestroyWindow(m_Window);
     else if (m_MM_Main != nullptr)
         DestroyMenu(m_MM_Main); // Created, but never given to a window, which would have destroyed it.
+
+    // After the tree that used it.
+    if (m_StatusImages != nullptr)
+        ImageList_Destroy(m_StatusImages);
 
     if (m_Accelerators != nullptr)
         DestroyAcceleratorTable(m_Accelerators);
 
     if (m_RichEditLibrary != nullptr)
         FreeLibrary(m_RichEditLibrary);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::AppendLog(std::string const& text)
+{
+    // One line at a time, so each can have its own color. A trailing piece with no line break (from
+    // LogAppend()) is appended as-is, and the next piece continues its line.
+    std::size_t start = 0;
+
+    while (start < text.size())
+    {
+        std::size_t const end = text.find('\n', start);
+        bool const endsLine = end != std::string::npos;
+        std::string const line = text.substr(start, endsLine ? end - start : std::string::npos);
+
+        // Past the end is clamped to the end, which sidesteps the rich edit counting a line break as one
+        // character here but two in GetWindowTextLengthW().
+        int const length = GetWindowTextLengthW(m_RE_Log);
+        SendMessageW(m_RE_Log, EM_SETSEL, static_cast<WPARAM>(length), length);
+
+        CHARFORMAT2W format = {};
+        format.cbSize = sizeof(format);
+        format.dwMask = CFM_COLOR;
+        format.crTextColor = LogLineColor(line);
+        SendMessageW(m_RE_Log, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
+
+        SendMessageW(m_RE_Log, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(UTF8ToWide(line +
+            (endsLine ? "\r\n" : "")).c_str()));
+
+        start = endsLine ? end + 1 : text.size();
+    }
+
+    SendMessageW(m_RE_Log, WM_VSCROLL, SB_BOTTOM, 0);
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::ApplyDPI()
@@ -294,6 +539,9 @@ void TWin32GUIMainWindow::ApplyDPI()
         HFONT const font = child == m_Mem_Detail || child == m_RE_Log ? m_MonospaceFont.Get() : m_UIFont.Get();
         SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(font), FALSE);
     }
+
+    CreateStatusImages();
+    SendMessageW(m_TV_Tests, TVM_SETINDENT, static_cast<WPARAM>(ScaleForDPI(19, m_DPI)), 0);
 
     // The status bar's parts' widths, from the .dfm's panels.
     std::vector<int> rightEdges;
@@ -313,6 +561,77 @@ void TWin32GUIMainWindow::ApplyDPI()
 
     LayOut();
     InvalidateRect(m_Window, nullptr, TRUE);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ApplyFilterBox
+
+    The text matches as GUIFilterBoxFilter() describes.
+*/
+void TWin32GUIMainWindow::ApplyFilterBox()
+{
+    m_TestList.SetVisibleFilter(GUIFilterBoxFilter(WindowText(m_Edt_Filter)));
+
+    BuildTestTree();
+    UpdateDetail();
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::BuildTestTree
+
+    Rebuilds the tree from m_TestList: one node per group, in order, each with one child node per test, and
+    one node per suite, holding the nodes of the groups and suites in it. A group's and a suite's node show
+    just its own name.
+*/
+void TWin32GUIMainWindow::BuildTestTree()
+{
+    {
+        // Each step redraws the tree once, when it's done: WM_SETREDRAW doesn't nest, so one step can't
+        // bracket the others. Nothing is painted until the window processes messages again anyway.
+        TRedrawScope const updating(m_TV_Tests);
+        // Each new node starts unchecked, which SyncTreeChecks() below then corrects.
+        TScopedFlag const syncing(m_SyncingChecks);
+
+        SendMessageW(m_TV_Tests, TVM_DELETEITEM, 0, reinterpret_cast<LPARAM>(TVI_ROOT));
+
+        // Each node comes after its parent, so its parent's tree node already exists.
+        std::vector<TGUITreeNode> const nodes = BuildGUITree(m_TestList);
+        std::vector<HTREEITEM> treeItems;
+        treeItems.reserve(nodes.size());
+
+        for (TGUITreeNode const& node : nodes)
+        {
+            std::wstring text = UTF8ToWide(node.Text);
+
+            TVINSERTSTRUCTW insert = {};
+            insert.hParent = node.Parent.has_value() ? treeItems[*node.Parent] : TVI_ROOT;
+            insert.hInsertAfter = TVI_LAST;
+            insert.item.mask = TVIF_TEXT | TVIF_PARAM;
+            insert.item.pszText = &text[0];
+            insert.item.lParam = static_cast<LPARAM>(EncodeGUINodeRef(node.Ref));
+
+            HTREEITEM const item = reinterpret_cast<HTREEITEM>(SendMessageW(m_TV_Tests, TVM_INSERTITEMW, 0,
+                reinterpret_cast<LPARAM>(&insert)));
+
+            if (item == nullptr)
+                throw std::runtime_error("Couldn't add a node to the test tree");
+
+            treeItems.push_back(item);
+        }
+    }
+
+    SetTreeExpanded(true);
+    RefreshAllNodeImages();
+    SyncTreeChecks();
+
+    // Expand All and Collapse All, e.g. while the filter hides every test.
+    UpdateCommands();
+
+    HTREEITEM const first = RelatedTreeItem(m_TV_Tests, nullptr, TVGN_ROOT);
+
+    if (first != nullptr)
+        SendMessageW(m_TV_Tests, TVM_ENSUREVISIBLE, 0, reinterpret_cast<LPARAM>(first));
 }
 //---------------------------------------------------------------------------
 /*
@@ -435,6 +754,13 @@ void TWin32GUIMainWindow::CreateControls()
 
     m_TV_Tests = CreateChild(WS_EX_CLIENTEDGE, WC_TREEVIEWW, L"", WS_TABSTOP | TVS_HASBUTTONS | TVS_HASLINES |
         TVS_LINESATROOT | TVS_SHOWSELALWAYS);
+    // The partial state, for a group or suite with only some of its tests checked, has to be asked for before
+    // the check boxes, which create the check box images. The check boxes only once the tree exists, as
+    // TVS_CHECKBOXES' documentation says, or they may not show their state.
+    SendMessageW(m_TV_Tests, TVM_SETEXTENDEDSTYLE, TVS_EX_PARTIALCHECKBOXES, TVS_EX_PARTIALCHECKBOXES);
+    SetWindowLongPtrW(m_TV_Tests, GWL_STYLE, GetWindowLongPtrW(m_TV_Tests, GWL_STYLE) | TVS_CHECKBOXES);
+    // Drawn like File Explorer's tree (arrows to expand, a light selection), as the VCL draws its trees.
+    SetWindowTheme(m_TV_Tests, L"Explorer", nullptr);
     m_Spl_Tests.Create(m_Window, TWin32GUISplitter::EOrientation::Vertical, [this](int position)
         {
             OnTestsSplitterDrag(position);
@@ -532,10 +858,90 @@ void TWin32GUIMainWindow::CreateMenuBar()
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUIMainWindow::CreateStatusImages
+
+    Draws one colored dot per TGUITestStatus into a new image list for the test tree, in the enum's order, so
+    a status converts directly to its image index. Drawn at runtime, scaled to m_DPI, as the VCL GUI runner
+    draws its own, rather than stored as images.
+*/
+void TWin32GUIMainWindow::CreateStatusImages()
+{
+    // In TGUITestStatus order: NotRun, Running, Passed, Failed, Skipped.
+    COLORREF const colors[] = {
+        RGB(190, 190, 190),
+        RGB(0, 120, 215),
+        RGB(16, 160, 16),
+        RGB(215, 40, 40),
+        RGB(230, 165, 0),
+    };
+    // Each dot's background, left out by ImageList_AddMasked().
+    COLORREF const transparent = RGB(255, 0, 255);
+
+    int const size = ScaleForDPI(16, m_DPI);
+    int const inset = ScaleForDPI(3, m_DPI);
+
+    HIMAGELIST const images = ImageList_Create(size, size, ILC_COLOR24 | ILC_MASK, 5, 0);
+
+    if (images == nullptr)
+        throw std::runtime_error("Couldn't create the test tree's status images");
+
+    HDC const screen = GetDC(nullptr);
+    HDC const context = CreateCompatibleDC(screen);
+    HBITMAP const bitmap = CreateCompatibleBitmap(screen, size, size);
+    ReleaseDC(nullptr, screen);
+
+    bool drawn = context != nullptr && bitmap != nullptr;
+
+    if (drawn)
+    {
+        HGDIOBJ const oldPen = SelectObject(context, GetStockObject(DC_PEN));
+        HGDIOBJ const oldBrush = SelectObject(context, GetStockObject(DC_BRUSH));
+        RECT const whole = { 0, 0, size, size };
+
+        for (COLORREF const color : colors)
+        {
+            HGDIOBJ const oldBitmap = SelectObject(context, bitmap);
+
+            SetDCBrushColor(context, transparent);
+            FillRect(context, &whole, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+            SetDCBrushColor(context, color);
+            SetDCPenColor(context, color);
+            Ellipse(context, inset, inset, size - inset, size - inset);
+
+            // A bitmap selected into a device context can't be added to an image list.
+            SelectObject(context, oldBitmap);
+            drawn = ImageList_AddMasked(images, bitmap, transparent) >= 0 && drawn;
+        }
+
+        SelectObject(context, oldBrush);
+        SelectObject(context, oldPen);
+    }
+
+    if (bitmap != nullptr)
+        DeleteObject(bitmap);
+
+    if (context != nullptr)
+        DeleteDC(context);
+
+    if (!drawn)
+    {
+        ImageList_Destroy(images);
+        throw std::runtime_error("Couldn't draw the test tree's status images");
+    }
+
+    SendMessageW(m_TV_Tests, TVM_SETIMAGELIST, TVSIL_NORMAL, reinterpret_cast<LPARAM>(images));
+
+    if (m_StatusImages != nullptr)
+        ImageList_Destroy(m_StatusImages);
+
+    m_StatusImages = images;
+}
+//---------------------------------------------------------------------------
+/*
     TWin32GUIMainWindow::DoCommand
 
     A disabled command does nothing, since a hot key still sends it when its menu item and button are
-    disabled. The commands that need the tests aren't connected yet.
+    disabled. The commands for running tests and their results aren't connected yet.
 */
 void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 {
@@ -550,17 +956,55 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     ShowTextDialog(m_Window, std::string("About ") + Title, GUIAboutText("Win32 GUI runner"));
                     break;
 
+                case EWin32GUICommand::CollapseAll:
+                    SetTreeExpanded(false);
+                    // A selected node that's now hidden passes the selection to the top-level node above it.
+                    UpdateDetail();
+                    break;
+
                 case EWin32GUICommand::CommandLineOptions:
                     ShowTextDialog(m_Window, std::string(Title) + " - Command Line Options", TGUICommandLine::HelpText());
+                    break;
+
+                case EWin32GUICommand::CopyDetails:
+                    SetClipboardText(m_Window, WindowText(m_Mem_Detail));
+                    m_StatusMessage = "Details copied to the clipboard.";
+                    UpdateStatusBar();
                     break;
 
                 case EWin32GUICommand::Exit:
                     PostMessageW(m_Window, WM_CLOSE, 0, 0);
                     break;
 
+                case EWin32GUICommand::ExpandAll:
+                {
+                    SetTreeExpanded(true);
+                    HTREEITEM const selected = SelectedTreeItem();
+
+                    if (selected != nullptr)
+                        SendMessageW(m_TV_Tests, TVM_ENSUREVISIBLE, 0, reinterpret_cast<LPARAM>(selected));
+
+                    break;
+                }
+
                 case EWin32GUICommand::FocusFilter:
                     SetFocus(m_Edt_Filter);
                     SendMessageW(m_Edt_Filter, EM_SETSEL, 0, -1);
+                    break;
+
+                case EWin32GUICommand::SelectAll:
+                    m_TestList.SetAllChecked(true);
+                    SyncTreeChecks();
+                    break;
+
+                case EWin32GUICommand::SelectFailed:
+                    m_TestList.CheckOnlyFailed();
+                    SyncTreeChecks();
+                    break;
+
+                case EWin32GUICommand::SelectNone:
+                    m_TestList.SetAllChecked(false);
+                    SyncTreeChecks();
                     break;
 
                 default:
@@ -616,6 +1060,15 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
                 return 0;
             }
 
+            if (reinterpret_cast<HWND>(lParam) == m_Edt_Filter && HIWORD(wParam) == EN_CHANGE)
+            {
+                RunGuarded("the filter box", [this]()
+                    {
+                        ApplyFilterBox();
+                    });
+                return 0;
+            }
+
             break;
         }
 
@@ -653,6 +1106,21 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
             {
                 ShowResultsPage();
                 return 0;
+            }
+
+            if (header->hwndFrom == m_TV_Tests)
+            {
+                if (header->code == TVN_ITEMCHANGINGW)
+                    return OnTreeItemChanging(*reinterpret_cast<NMTVITEMCHANGE const*>(lParam)) ? TRUE : FALSE;
+
+                if (header->code == TVN_SELCHANGEDW)
+                {
+                    RunGuarded("the test tree", [this]()
+                        {
+                            UpdateDetail();
+                        });
+                    return 0;
+                }
             }
 
             break;
@@ -781,6 +1249,47 @@ void TWin32GUIMainWindow::OnTestsSplitterDrag(int position)
         });
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::OnTreeItemChanging
+
+    With partial check boxes, a click (or Space) can cycle a check box into its partial state, which only a
+    group's or suite's own tests should decide. So every check box change the user makes is vetoed here, and
+    instead toggles the node's test, or all of its group's or suite's tests, in m_TestList; the tree is then
+    updated from m_TestList, which also works out each group's and suite's partial state. Other changes to a
+    node (selecting or expanding it), SyncTreeChecks()' own, and the tree giving an item its first check box
+    go through. The tree does that on its own, even for an item of its own with no text or data.
+*/
+bool TWin32GUIMainWindow::OnTreeItemChanging(NMTVITEMCHANGE const& change)
+{
+    if (m_SyncingChecks || (change.uChanged & TVIF_STATE) == 0 ||
+        ((change.uStateNew ^ change.uStateOld) & TVIS_STATEIMAGEMASK) == 0 ||
+        (change.uStateOld & TVIS_STATEIMAGEMASK) == 0)
+    {
+        return false;
+    }
+
+    RunGuarded("a test tree check box", [this, &change]()
+        {
+            // From the notification: the item's own state already reads as the new one here.
+            bool const checked = (change.uStateOld & TVIS_STATEIMAGEMASK) ==
+                INDEXTOSTATEIMAGEMASK(StateImageIndex(TGUICheckState::Checked));
+
+            SetGUINodeChecked(m_TestList, TreeItemRef(m_TV_Tests, change.hItem), !checked);
+
+            // Changing check boxes from inside the tree's own notification isn't safe, so the update waits until
+            // this change has been fully handled.
+            PostToUI([this]()
+            {
+                RunGuarded("a test tree check box", [this]()
+                {
+                    SyncTreeChecks();
+                });
+            });
+        });
+
+    return true;
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::PostToUI(std::function<void()> action)
 {
     {
@@ -789,6 +1298,17 @@ void TWin32GUIMainWindow::PostToUI(std::function<void()> action)
     }
 
     PostMessageW(m_Window, RunQueuedMessage, 0, 0);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::RefreshAllNodeImages()
+{
+    TRedrawScope const updating(m_TV_Tests);
+
+    for (HTREEITEM item = RelatedTreeItem(m_TV_Tests, nullptr, TVGN_ROOT); item != nullptr;
+         item = NextTreeItem(m_TV_Tests, item))
+    {
+        SetNodeImage(item);
+    }
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::ReportUnexpectedError(std::string const& where, std::string const& description)
@@ -854,6 +1374,35 @@ void TWin32GUIMainWindow::RunQueued()
         RunGuarded("a queued action", action);
 }
 //---------------------------------------------------------------------------
+HTREEITEM TWin32GUIMainWindow::SelectedTreeItem() const
+{
+    return RelatedTreeItem(m_TV_Tests, nullptr, TVGN_CARET);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SetNodeImage(HTREEITEM item)
+{
+    int const image = static_cast<int>(GUINodeStatus(m_TestList, TreeItemRef(m_TV_Tests, item)));
+
+    TVITEMW data = {};
+    data.mask = TVIF_HANDLE | TVIF_IMAGE | TVIF_SELECTEDIMAGE;
+    data.hItem = item;
+    data.iImage = image;
+    data.iSelectedImage = image;
+    SendMessageW(m_TV_Tests, TVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&data));
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SetTreeExpanded(bool expanded)
+{
+    TRedrawScope const updating(m_TV_Tests);
+
+    for (HTREEITEM item = RelatedTreeItem(m_TV_Tests, nullptr, TVGN_ROOT); item != nullptr;
+         item = NextTreeItem(m_TV_Tests, item))
+    {
+        if (RelatedTreeItem(m_TV_Tests, item, TVGN_CHILD) != nullptr)
+            SendMessageW(m_TV_Tests, TVM_EXPAND, expanded ? TVE_EXPAND : TVE_COLLAPSE, reinterpret_cast<LPARAM>(item));
+    }
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::Show(int showCommand)
 {
     ShowWindow(m_Window, showCommand);
@@ -868,10 +1417,94 @@ void TWin32GUIMainWindow::ShowResultsPage()
     ShowWindow(m_RE_Log, logSelected ? SW_SHOW : SW_HIDE);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::Start
+
+    Loads the registered tests and applies the command line's options: --project-name to the caption, and
+    --filter and the partition options to which tests start out checked, and --filter to the filter box,
+    and --shuffle and --shuffle-seed to the shuffle setting.
+*/
+void TWin32GUIMainWindow::Start(TGUIOptions const& options)
+{
+    m_Options = options;
+
+    m_Observer.LogTextCallback = [this](std::string const& text)
+        {
+            AppendLog(text);
+        };
+
+    m_Handler = std::make_unique<TTestHandler>();
+    m_Handler->SetRunObserver(&m_Observer); // Before Initialize(), so its output goes to the observer too.
+    m_Handler->Initialize(m_Options.CLI.ProjectName);
+    m_Observer.Flush();
+
+    m_TestList.Load(m_Handler->GetTests());
+
+    std::string filterDescription;
+    TestFilter const initialFilter = TCLIParser::BuildTestFilter(*m_Handler, m_Options.CLI, filterDescription);
+    m_TestList.CheckMatching(initialFilter);
+
+    // Notes about the command line, in the log, where they stay until the first run clears it.
+    if (initialFilter != nullptr)
+        AppendLog("Initially checked: " + filterDescription + "\n");
+
+    for (std::string const& note : GUICommandLineNotes(m_Options, "windows or controls"))
+        AppendLog(note + "\n");
+
+    UpdateCaption();
+
+    m_Shuffle.ApplyCommandLine(m_Options.CLI.Shuffle, m_Options.CLI.ShuffleSeed);
+
+    // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
+    // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
+    if (m_Options.CLI.HasFilter)
+        SetWindowTextW(m_Edt_Filter, UTF8ToWide(m_Options.CLI.FilterPattern).c_str());
+
+    // Called directly, since setting the text above only builds the tree (through EN_CHANGE) if it changes it.
+    ApplyFilterBox();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SyncTreeChecks
+
+    Sets every node's check box from m_TestList: a test's to whether it's checked, and a group's or suite's
+    to whether all, none, or only some of its tests are.
+*/
+void TWin32GUIMainWindow::SyncTreeChecks()
+{
+    {
+        TRedrawScope const updating(m_TV_Tests);
+        TScopedFlag const syncing(m_SyncingChecks);
+
+        for (HTREEITEM item = RelatedTreeItem(m_TV_Tests, nullptr, TVGN_ROOT); item != nullptr;
+             item = NextTreeItem(m_TV_Tests, item))
+        {
+            TVITEMW data = {};
+            data.mask = TVIF_HANDLE | TVIF_STATE;
+            data.hItem = item;
+            data.stateMask = TVIS_STATEIMAGEMASK;
+            data.state = INDEXTOSTATEIMAGEMASK(StateImageIndex(GUINodeCheckState(m_TestList,
+                TreeItemRef(m_TV_Tests, item))));
+            SendMessageW(m_TV_Tests, TVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&data));
+        }
+    }
+
+    UpdateStatusBar(); // For its checked count.
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::UpdateCaption()
+{
+    SetWindowTextW(m_Window, UTF8ToWide(GUICaption(m_Options.CLI.ProjectName)).c_str());
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::UpdateCommands()
 {
-    // Nothing is loaded or running yet.
-    m_CommandStates = GUICommandStates(TGUICommandContext());
+    TGUICommandContext context;
+    context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
+    context.HasSelection = SelectedTreeItem() != nullptr;
+    context.TreeHasNodes = SendMessageW(m_TV_Tests, TVM_GETCOUNT, 0, 0) > 0;
+
+    m_CommandStates = GUICommandStates(context);
 
     for (EWin32GUICommand const command : AllCommands)
     {
@@ -883,6 +1516,26 @@ void TWin32GUIMainWindow::UpdateCommands()
         EnableWindow(this->*button.Control, IsCommandEnabled(m_CommandStates, button.Command) ? TRUE : FALSE);
 
     EnableWindow(m_Edt_Filter, m_CommandStates.FilterBox ? TRUE : FALSE);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::UpdateDetail()
+{
+    HTREEITEM const item = SelectedTreeItem();
+    UpdateCommands(); // Copy Details, with or without a selection.
+
+    std::string const text = item != nullptr ? AdjustLineBreaks(GUINodeDetailText(m_TestList,
+        TreeItemRef(m_TV_Tests, item))) : std::string();
+    SetWindowTextW(m_Mem_Detail, UTF8ToWide(text).c_str());
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::UpdateStatusBar()
+{
+    // Nothing has run yet.
+    std::vector<std::string> const panels = GUIStatusPanels(m_TestList, 0, 0, std::nullopt, m_Shuffle.StatusText(),
+        m_StatusMessage);
+
+    for (std::size_t i = 0; i < panels.size(); ++i)
+        SendMessageW(m_SB_Status, SB_SETTEXTW, i, reinterpret_cast<LPARAM>(UTF8ToWide(panels[i]).c_str()));
 }
 //---------------------------------------------------------------------------
 /*

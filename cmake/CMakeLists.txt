@@ -146,6 +146,7 @@ if(WIN32)
         ole32
         rpcrt4
         shell32
+        uxtheme
     )
 
     if(MSVC)

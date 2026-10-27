@@ -104,6 +104,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
 
         ASWUnitTests::TWin32GUIMainWindow mainWindow;
         mainWindow.Create();
+        mainWindow.Start(options);
         mainWindow.Show(showCommand);
         mainWindow.RunMessageLoop();
 
