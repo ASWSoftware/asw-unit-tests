@@ -77,6 +77,17 @@ if(WIN32)
     # toTest/ASWTools_String.cpp uses the Win32 UUID/RPC string APIs. MSVC picks up
     # rpcrt4.lib via a #pragma comment, but MinGW/Clang need it linked explicitly.
     target_link_libraries(ASWUnitTests PRIVATE rpcrt4)
+
+    # The Win32 GUI runner's units that need no window, and their tests, so they also run without the GUI.
+    target_sources(ASWUnitTests PRIVATE
+        ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp
+    )
+    target_include_directories(ASWUnitTests PRIVATE
+        ../win32/gui/src
+        ../win32/tests
+    )
+    target_link_libraries(ASWUnitTests PRIVATE shell32)
 endif()
 
 if(MINGW)
@@ -102,7 +113,9 @@ if(WIN32)
     add_executable(ASWUnitTests_Win32_GUI WIN32
         ${ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES}
         ${ASWUNITTESTS_SELF_TEST_SOURCES}
+        ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_WinMain.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp
     )
 
     target_include_directories(ASWUnitTests_Win32_GUI PRIVATE
@@ -112,6 +125,7 @@ if(WIN32)
         ../tests
         ../toTest
         ../win32/gui/src
+        ../win32/tests
     )
 
     target_link_libraries(ASWUnitTests_Win32_GUI PRIVATE

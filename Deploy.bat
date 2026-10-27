@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake gui\src gui\tests rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src) do (
+for %%D in (build cmake gui\src gui\tests rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src win32\tests) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -329,9 +329,17 @@ call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI.manifest" "win32\gui\src\ASW
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.h" "win32\gui\src\ASWUnitTests_Win32GUI_System.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.h" "win32\tests\Test_ASWUnitTests_Win32GUI_System.h"
 if errorlevel 1 exit /b 1
 
 echo Deployment completed successfully.

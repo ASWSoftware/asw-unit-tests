@@ -62,9 +62,9 @@
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <Multithreaded>true</Multithreaded>
         <SanitizedProjectName>ASWUnitTests</SanitizedProjectName>
-        <IncludePath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;$(IncludePath)</IncludePath>
+        <IncludePath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;$(IncludePath)</IncludePath>
         <_TCHARMapping>char</_TCHARMapping>
-        <ILINK_LibraryPath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <ILINK_LibraryPath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
         <BCC_AllWarnings>true</BCC_AllWarnings>
         <BCC_SelectedWarnings>false</BCC_SelectedWarnings>
         <BCC_SelectedWarnings_v15>false</BCC_SelectedWarnings_v15>
@@ -330,6 +330,14 @@
         <CppCompile Include="..\toTest\ASWTools_String.cpp">
             <DependentOn>..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>4</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\win32\gui\src\ASWUnitTests_Win32GUI_System.cpp">
+            <DependentOn>..\win32\gui\src\ASWUnitTests_Win32GUI_System.h</DependentOn>
+            <BuildOrder>48</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp">
+            <DependentOn>..\win32\tests\Test_ASWUnitTests_Win32GUI_System.h</DependentOn>
+            <BuildOrder>49</BuildOrder>
         </CppCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

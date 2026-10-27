@@ -60,5 +60,6 @@ limitations under the License.
 #include <commdlg.h>
 #include <richedit.h>
 #include <shellapi.h>
+#include <shlobj.h>
 //---------------------------------------------------------------------------
 #endif

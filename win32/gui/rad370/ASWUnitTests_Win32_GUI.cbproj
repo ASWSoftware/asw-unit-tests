@@ -325,6 +325,14 @@
             <DependentOn>..\..\..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>46</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_System.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_System.h</DependentOn>
+            <BuildOrder>49</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_System.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_System.h</DependentOn>
+            <BuildOrder>48</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_WinMain.cpp">
             <BuildOrder>47</BuildOrder>
         </CppCompile>
