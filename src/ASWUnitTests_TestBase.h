@@ -343,6 +343,30 @@ private:
     {
     };
 
+    // A lock on a group's m_RecordingMutex, like a std::unique_lock, that also counts its holds in m_RecordingHolds,
+    // so ReleaseRecordingHolds() can release the ones a crash left behind.
+    class TRecordingLock
+    {
+    private:
+        TTestGroupBase& m_Group;
+        bool m_Locked;
+
+    public:
+        explicit TRecordingLock(TTestGroupBase& group);
+        TRecordingLock(TRecordingLock const&) = delete;
+        TRecordingLock& operator=(TRecordingLock const&) = delete;
+        ~TRecordingLock();
+
+        void Lock();
+        bool OwnsLock() const;
+        void Unlock();
+    };
+
+private:
+    // How many times m_RecordingMutex's owner holds it through TRecordingLocks. Only read or changed while holding it.
+    unsigned int m_RecordingHolds;
+
+private:
     // Used by the Assert ordering methods: throws TExceptOrdering unless 'value' has relation 'ordering' to 'bound'.
     template <typename TValue, typename TBound>
     void AssertOrdering(TValue value, TBound bound, TOrdering ordering, std::string const& method, int line,
@@ -355,13 +379,13 @@ private:
         }
     }
 
-    // Locks m_RecordingMutex in 'lock', for a change to this group's results or log, and returns true, unless the
-    // calling thread runs a test of this group that timed out and was abandoned (see RunWithTimeout()), which must
-    // leave both alone; it then returns false, with 'lock' still locked.
-    bool BeginRecording(std::unique_lock<std::recursive_mutex>& lock);
+    // Locks 'lock', for a change to this group's results or log, and returns true, unless the calling thread runs a
+    // test of this group that timed out and was abandoned (see RunWithTimeout()), which must leave both alone; it
+    // then returns false, with 'lock' still locked.
+    bool BeginRecording(TRecordingLock& lock);
     // The same, for recording a test's outcome, after which a test running on a worker thread counts as finished in
     // time, however long its thread then takes to end.
-    bool BeginRecordingOutcome(std::unique_lock<std::recursive_mutex>& lock);
+    bool BeginRecordingOutcome(TRecordingLock& lock);
 
     // Runs 'callable' for the Throws/NoThrow methods and returns a description of what it threw (see
     // DescribeException()), or nullopt when it threw nothing. A failure signal from this framework (a TTestException,
@@ -579,6 +603,10 @@ private:
     // The operator for 'ordering' in a failure message, e.g. ">=".
     static char const* OrderingSymbol(TOrdering ordering);
 
+    // Releases every hold of m_RecordingMutex this thread has left, after a crash caught on it skipped the
+    // TRecordingLocks' destructors.
+    void ReleaseRecordingHolds();
+
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     // Returns 'text' as UTF-8 for the System::String overloads, which forward to the std::string ones. A null C string
     // is empty text, as it is for System::String.
@@ -749,7 +777,8 @@ protected:
     std::string m_Name;
     std::string m_QualifiedName; // See GetQualifiedTestGroupName().
     // Held while a test records a result or logs, and while RunWithTimeout() decides to abandon a test that timed out,
-    // so an abandoned test can't change the results or the log; see BeginRecording().
+    // so an abandoned test can't change the results or the log; see BeginRecording(). The framework locks it through
+    // TRecordingLocks, so a crash can't leave it locked (see ReleaseRecordingHolds()).
     std::recursive_mutex m_RecordingMutex;
     TTestResults m_Results;
     ITestRunObserver* m_RunObserver; // Not owned; nullptr when none is set.

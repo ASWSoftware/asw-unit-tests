@@ -70,8 +70,10 @@ private: // Test methods
     void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
+    void Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
     void Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished();
+    void Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread();
     void Test_Run_EndsRunOnSetUpOrTearDownTestException();
     void Test_Run_IgnoresTestThatEndsAfterItsTimeout();
     void Test_Run_LogsEachCheckFailureOnce();

@@ -562,7 +562,8 @@ TTestGroupBase::TTestGroupBase(std::string const& name)
 }
 //---------------------------------------------------------------------------
 TTestGroupBase::TTestGroupBase(TSuitePath const& suitePath, std::string const& name)
-    : m_ExceptionExpected(false),
+    : m_RecordingHolds(0),
+      m_ExceptionExpected(false),
       m_LogSuppressed(false),
       m_TestFailedCheck(false),
       m_Name(name),
@@ -1341,15 +1342,15 @@ void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int lin
         throw TExceptTrue(method, line, msg);
 }
 //---------------------------------------------------------------------------
-bool TTestGroupBase::BeginRecording(std::unique_lock<std::recursive_mutex>& lock)
+bool TTestGroupBase::BeginRecording(TRecordingLock& lock)
 {
-    if (!lock.owns_lock())
-        lock = std::unique_lock<std::recursive_mutex>(m_RecordingMutex);
+    if (!lock.OwnsLock())
+        lock.Lock();
 
     return t_WorkerState == nullptr || t_WorkerState->Group != this || !t_WorkerState->Abandoned;
 }
 //---------------------------------------------------------------------------
-bool TTestGroupBase::BeginRecordingOutcome(std::unique_lock<std::recursive_mutex>& lock)
+bool TTestGroupBase::BeginRecordingOutcome(TRecordingLock& lock)
 {
     if (!BeginRecording(lock))
         return false;
@@ -2352,7 +2353,7 @@ void TTestGroupBase::Log(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2370,7 +2371,7 @@ void TTestGroupBase::LogAppend(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2487,6 +2488,33 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
 }
 //---------------------------------------------------------------------------
 /*
+    TTestGroupBase::ReleaseRecordingHolds
+
+    Called by RunCatchingCrashes() when TCrashGuard::Run() has caught a crash on this thread. The
+    jump out of a crash skips the destructors of the TRecordingLocks it leaves, so a crash in code
+    run while m_RecordingMutex is held (a run observer's OnLog(), say) leaves this thread holding it.
+    That's harmless while one thread runs every test, as the mutex is recursive, but a test's worker
+    thread (see RunWithTimeout()) would end still holding it, and the next thread to record would
+    wait for it forever.
+
+    Locks it once more, so that every hold m_RecordingHolds counts is this thread's, then releases
+    them all. No thread calls RunCatchingCrashes() while holding it, so every hold left is one the
+    crash skipped.
+*/
+void TTestGroupBase::ReleaseRecordingHolds()
+{
+    m_RecordingMutex.lock();
+
+    unsigned int const holds = m_RecordingHolds;
+    m_RecordingHolds = 0;
+
+    for (unsigned int i = 0; i < holds; ++i)
+        m_RecordingMutex.unlock();
+
+    m_RecordingMutex.unlock();
+}
+//---------------------------------------------------------------------------
+/*
     TTestGroupBase::ReportCrashedTest
 
     Called by RunCatchingCrashes() when TCrashGuard::Run() catches a native crash while running
@@ -2506,7 +2534,7 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
 
     // On a worker thread, a crash that comes after its test timed out is ignored, like the rest of what it does then.
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecordingOutcome(lock))
         return;
 
@@ -2665,7 +2693,8 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
     normal completion, including via an ordinary C++ exception, passes through unaffected. A caught
     crash is handed to ReportCrashedTest(), which either records it as a failure and returns (the
     common case: the next test still runs) or additionally throws to abort the rest of the run, for
-    the specific crash types TCrashGuard::Run() considers too severe to continue past.
+    the specific crash types TCrashGuard::Run() considers too severe to continue past. First, though,
+    ReleaseRecordingHolds() releases m_RecordingMutex, in case the crash came while it was held.
 */
 void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
 {
@@ -2681,7 +2710,10 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
         });
 
     if (result.Crashed)
+    {
+        ReleaseRecordingHolds();
         ReportCrashedTest(testCase, result.Description, result.ShouldAbortRun);
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -2748,11 +2780,12 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     {
         // Waits for a Check failure or a log line the worker is recording, then abandons the test, unless it has
         // begun recording its outcome, in which case it counts as finished in time and is waited for below.
-        std::unique_lock<std::recursive_mutex> lock(m_RecordingMutex);
+        TRecordingLock lock(*this);
+        lock.Lock();
         if (!state->RecordingOutcome)
         {
             state->Abandoned = true;
-            lock.unlock();
+            lock.Unlock();
 
             worker.detach();
             ReportTimedOutTest(testCase, *testTimeoutSeconds);
@@ -2797,7 +2830,7 @@ void TTestGroupBase::SetSuitePath(std::string const& suitePath)
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
 {
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2971,7 +3004,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
     // Held from when the test, its SetUp_Test() and its TearDown_Test() are over until Test() returns or throws, while
     // the outcome is recorded. On a worker thread whose test has timed out (see RunWithTimeout()), nothing is recorded:
     // Test() just returns, even for a fatal exception.
-    std::unique_lock<std::recursive_mutex> outcomeLock;
+    TRecordingLock outcomeLock(*this);
 
     auto tearDown = [&]()
         {
@@ -3165,6 +3198,44 @@ std::string TTestGroupBase::TypeName(std::type_info const& type)
 #endif
 
     return type.name();
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TTestGroupBase::TRecordingLock
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TTestGroupBase::TRecordingLock::TRecordingLock(TTestGroupBase& group)
+    : m_Group(group),
+      m_Locked(false)
+{
+}
+//---------------------------------------------------------------------------
+TTestGroupBase::TRecordingLock::~TRecordingLock()
+{
+    if (m_Locked)
+        Unlock();
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::TRecordingLock::Lock()
+{
+    m_Group.m_RecordingMutex.lock();
+    ++m_Group.m_RecordingHolds;
+    m_Locked = true;
+}
+//---------------------------------------------------------------------------
+bool TTestGroupBase::TRecordingLock::OwnsLock() const
+{
+    return m_Locked;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::TRecordingLock::Unlock()
+{
+    m_Locked = false;
+    --m_Group.m_RecordingHolds;
+    m_Group.m_RecordingMutex.unlock();
 }
 //---------------------------------------------------------------------------
 

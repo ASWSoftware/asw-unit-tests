@@ -1756,6 +1756,40 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TCrashOnLogObserver
+//
+// A TRecordingObserver whose first OnLog() crashes, for the Run_*CrashInRunObserver* tests below: the crash
+// comes while the group holds the lock it records and logs under. An integer divide by zero, like
+// TFixture_CrashingTest's, so the run continues on POSIX too. It crashes before TRecordingObserver::OnLog()
+// takes its own lock, which the crash would leave locked.
+/////////////////////////////////////////////////////////////////////////////
+class TCrashOnLogObserver : public TRecordingObserver
+{
+private:
+    std::atomic<bool> m_Crashed;
+
+public:
+    TCrashOnLogObserver()
+        : m_Crashed(false)
+    {
+    }
+
+    void OnLog(std::string const& text) override
+    {
+        if (!m_Crashed.exchange(true))
+        {
+            volatile int numerator = 42;
+            volatile int denominator = 0;
+            volatile int const quotient = numerator / denominator;
+            (void)quotient;
+        }
+
+        TRecordingObserver::OnLog(text);
+    }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TSlowFinishObserver
 //
 // A TRecordingObserver that takes 1.5 seconds over a test's "Finished test" log line, which a test logs while
@@ -6651,10 +6685,14 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
         "Run_AppliesFilterToSkipNonMatchingTests");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout,
+        "Run_ContinuesAfterCrashInRunObserverUnderTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished,
         "Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread,
+        "Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
         "Run_EndsRunOnSetUpOrTearDownTestException");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout,
@@ -7909,6 +7947,39 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         "CaseRecords has an entry only for the tests that ran, not the full registered set");
 }
 //---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout
+
+    The first test crashes in its "Running test" log line, on its worker thread, while that thread
+    holds the group's recording lock. The jump out of the crash skips the lock's destructor, so
+    unless the framework releases it, the worker thread ends still holding it: the next test then
+    waits for it forever at its first log line, and so does Run() once that test times out, so
+    Run() never returns (under --test-timeout-seconds, this test times out instead).
+*/
+void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logs, so the observer's OnLog() is called.
+    TCrashOnLogObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, true); // Only long enough never to fire; catchCrashes = true.
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "every test recorded");
+    CheckEquals(static_cast<size_t>(6), observer.FinishedRecords.size(), __func__, __LINE__, "every test reported");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "the one passing test, after the crash, passed");
+
+    TTestCaseRecord const& crashedRecord = results.CaseRecords.front();
+    CheckEquals(std::string("ContinuesAfterCheckFailure"), crashedRecord.TestName, __func__, __LINE__,
+        "the first test is the one that crashed");
+    CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "and its record says so");
+    CheckContains(observer.LogText(), "Running test: Fixture_MixedOutcomes.Skip", __func__, __LINE__,
+        "the last test still logged");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet()
 {
     // Arrange
@@ -7963,6 +8034,40 @@ void TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeou
     CheckEquals(static_cast<size_t>(1), results.CaseRecords.size(), __func__, __LINE__, "one record, the test's own");
     CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "it passed, as it finished in time");
     CheckEquals(0u, results.FailedCount, __func__, __LINE__, "and nothing failed");
+}
+//---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread
+
+    Without a timeout, the crash in the first test's "Running test" log line comes on this thread,
+    while it holds the group's recording lock. Unless the framework releases the lock, this thread
+    keeps holding it (harmless to this thread, as it's recursive), and a later run on another thread
+    waits for it forever at its first log line, so the join below never returns.
+*/
+void TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logs, so the observer's OnLog() is called.
+    TCrashOnLogObserver observer;
+    fixture.SetRunObserver(&observer);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, true); // catchCrashes = true; the first test crashes.
+
+    auto runAgain = [&fixture]()
+        {
+            fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        };
+
+    // Act
+    std::thread other(runAgain);
+    other.join();
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__,
+        "the run on the other thread recorded every test");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "the passing test passed");
+    CheckNotContains(results.CaseRecords.front().Message, "crashed", __func__, __LINE__,
+        "the first test didn't crash this time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException()
