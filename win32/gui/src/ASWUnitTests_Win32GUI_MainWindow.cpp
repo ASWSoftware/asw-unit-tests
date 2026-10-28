@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_Win32GUI_MainWindow.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -463,11 +464,17 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_SB_Status(nullptr),
       m_TV_Tests(nullptr),
       m_Accelerators(nullptr),
+      m_CloseAfterRun(false),
       m_Closing(false),
       m_DetailHeight(TWin32GUIMainSizes::DefaultDetailHeight),
       m_DPI(USER_DEFAULT_SCREEN_DPI),
       m_FocusedControl(nullptr),
+      m_LastRunExitCode(ExitCode_Success),
       m_RichEditLibrary(nullptr),
+      m_RunAborted(false),
+      m_RunFinishedCount(0),
+      m_Running(false),
+      m_RunTotalCount(0),
       m_SettingFilterText(false),
       m_StatusImages(nullptr),
       m_StatusMessage("Ready."),
@@ -496,6 +503,42 @@ TWin32GUIMainWindow::~TWin32GUIMainWindow()
 
     if (m_RichEditLibrary != nullptr)
         FreeLibrary(m_RichEditLibrary);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::AddFailureItem
+
+    Each row keeps its test's index into m_TestList, for its color and for a double-click.
+*/
+void TWin32GUIMainWindow::AddFailureItem(std::size_t testIndex)
+{
+    TTestId const& test = m_TestList.Test(testIndex);
+    TGUITestResult const* const result = m_TestList.Result(testIndex);
+
+    std::wstring const columns[] = {
+        UTF8ToWide(StatusName(m_TestList.Status(testIndex))),
+        UTF8ToWide(test.GroupName + "." + test.TestName),
+        UTF8ToWide(result != nullptr ? GUIFirstLine(result->Record.Message) : std::string()),
+    };
+
+    LVITEMW item = {};
+    item.mask = LVIF_TEXT | LVIF_PARAM;
+    item.iItem = static_cast<int>(SendMessageW(m_LV_Failures, LVM_GETITEMCOUNT, 0, 0));
+    item.pszText = const_cast<wchar_t*>(columns[0].c_str());
+    item.lParam = static_cast<LPARAM>(testIndex);
+
+    int const row = static_cast<int>(SendMessageW(m_LV_Failures, LVM_INSERTITEMW, 0, reinterpret_cast<LPARAM>(&item)));
+
+    if (row < 0)
+        throw std::runtime_error("Couldn't add a test to the Failures & Skips list");
+
+    for (int column = 1; column < 3; ++column)
+    {
+        LVITEMW text = {};
+        text.iSubItem = column;
+        text.pszText = const_cast<wchar_t*>(columns[column].c_str());
+        SendMessageW(m_LV_Failures, LVM_SETITEMTEXTW, static_cast<WPARAM>(row), reinterpret_cast<LPARAM>(&text));
+    }
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::AppendLog(std::string const& text)
@@ -595,6 +638,7 @@ void TWin32GUIMainWindow::BuildTestTree()
         TScopedFlag const syncing(m_SyncingChecks);
 
         SendMessageW(m_TV_Tests, TVM_DELETEITEM, 0, reinterpret_cast<LPARAM>(TVI_ROOT));
+        m_TestNodes.assign(m_TestList.Count(), nullptr);
 
         // Each node comes after its parent, so its parent's tree node already exists.
         std::vector<TGUITreeNode> const nodes = BuildGUITree(m_TestList);
@@ -619,6 +663,9 @@ void TWin32GUIMainWindow::BuildTestTree()
                 throw std::runtime_error("Couldn't add a node to the test tree");
 
             treeItems.push_back(item);
+
+            if (node.Ref.Kind == TGUINodeKind::Test)
+                m_TestNodes[node.Ref.Index] = item;
         }
     }
 
@@ -779,6 +826,8 @@ void TWin32GUIMainWindow::CreateControls()
         LVS_SHOWSELALWAYS);
     SendMessageW(m_LV_Failures, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+    // As the VCL draws its list views; it also keeps a selected row's text in its result's color.
+    SetWindowTheme(m_LV_Failures, L"Explorer", nullptr);
 
     wchar_t const* const columns[] = { L"Result", L"Test", L"Detail" };
 
@@ -942,7 +991,7 @@ void TWin32GUIMainWindow::CreateStatusImages()
     TWin32GUIMainWindow::DoCommand
 
     A disabled command does nothing, since a hot key still sends it when its menu item and button are
-    disabled. The commands for running tests and their results aren't connected yet.
+    disabled. Export JUnit Report, Reset Layout and the Options menu's commands aren't connected yet.
 */
 void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 {
@@ -993,6 +1042,25 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     SendMessageW(m_Edt_Filter, EM_SETSEL, 0, -1);
                     break;
 
+                case EWin32GUICommand::RunFailed:
+                    if (m_TestList.StatusCount(TGUITestStatus::Failed) == 0)
+                        break;
+
+                    // Built before RunTests() resets every result, while the failures are still known.
+                    RunTests(m_TestList.FailedFilter(), "the previous run's failures");
+                    break;
+
+                case EWin32GUICommand::RunSelected:
+                    if (m_TestList.CheckedCount() == 0)
+                    {
+                        m_StatusMessage = "No tests are checked.";
+                        UpdateStatusBar();
+                        break;
+                    }
+
+                    RunCheckedTests();
+                    break;
+
                 case EWin32GUICommand::SelectAll:
                     m_TestList.SetAllChecked(true);
                     SyncTreeChecks();
@@ -1008,6 +1076,12 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     SyncTreeChecks();
                     break;
 
+                case EWin32GUICommand::Stop:
+                    m_Observer.RequestStop();
+                    m_StatusMessage = "Stopping after the current test...";
+                    UpdateStatusBar();
+                    break;
+
                 default:
                     break;
             }
@@ -1016,7 +1090,27 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 //---------------------------------------------------------------------------
 int TWin32GUIMainWindow::ExitCode() const
 {
-    return ExitCode_Success;
+    return m_Options.ExitAfterRun ? m_LastRunExitCode : ExitCode_Success;
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::FailRunOnUnhandledException(std::string const& description)
+{
+    m_Observer.Flush();
+
+    // The test that was running when the exception escaped never finished, so it's the one that failed.
+    if (m_CurrentTestIndex.has_value())
+    {
+        m_TestList.SetResult(*m_CurrentTestIndex,
+            GUIUnhandledExceptionRecord(m_TestList.Test(*m_CurrentTestIndex), description), std::string());
+        UpdateTestNodeImages(*m_CurrentTestIndex);
+        AddFailureItem(*m_CurrentTestIndex);
+        m_CurrentTestIndex.reset();
+    }
+
+    SendMessageW(m_PB_Progress, PBM_SETSTATE, PBST_ERROR, 0);
+    m_StatusMessage = GUIUnhandledExceptionStatus(description);
+    AppendLog(m_StatusMessage + "\n");
+    UpdateDetail();
 }
 //---------------------------------------------------------------------------
 HWND TWin32GUIMainWindow::Handle() const
@@ -1047,8 +1141,7 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
             return 0;
 
         case WM_CLOSE:
-            m_Closing = true;
-            DestroyWindow(m_Window);
+            OnClose();
             return 0;
 
         case WM_COMMAND:
@@ -1110,6 +1203,23 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
             {
                 ShowResultsPage();
                 return 0;
+            }
+
+            if (header->hwndFrom == m_LV_Failures)
+            {
+                // Not RunGuarded(): this runs while painting, where showing an error would only cause more
+                // painting.
+                if (header->code == NM_CUSTOMDRAW)
+                    return OnFailuresCustomDraw(*reinterpret_cast<NMLVCUSTOMDRAW*>(lParam));
+
+                if (header->code == NM_DBLCLK)
+                {
+                    RunGuarded("the Failures & Skips list", [this]()
+                        {
+                            OnFailuresDoubleClick();
+                        });
+                    return 0;
+                }
             }
 
             if (header->hwndFrom == m_TV_Tests)
@@ -1210,6 +1320,30 @@ void TWin32GUIMainWindow::LayOut()
     SendMessageW(m_LV_Failures, LVM_SETCOLUMNWIDTH, 2, LVSCW_AUTOSIZE_USEHEADER);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::OnClose
+
+    A run can't be interrupted partway through a test, so closing during one asks it to stop after the
+    current test, and closes the window once it has (see RunTests()).
+*/
+void TWin32GUIMainWindow::OnClose()
+{
+    if (m_Running)
+    {
+        RunGuarded("closing the window", [this]()
+            {
+                m_CloseAfterRun = true;
+                m_Observer.RequestStop();
+                m_StatusMessage = "Closing after the current test...";
+                UpdateStatusBar();
+            });
+        return;
+    }
+
+    m_Closing = true;
+    DestroyWindow(m_Window);
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::OnDetailSplitterDrag(int position)
 {
     RunGuarded("the detail pane's splitter", [this, position]()
@@ -1240,6 +1374,103 @@ void TWin32GUIMainWindow::OnDPIChanged(UINT dpi, RECT const& suggested)
                 suggested.bottom - suggested.top, SWP_NOZORDER | SWP_NOACTIVATE);
             ApplyDPI();
         });
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::OnFailuresCustomDraw
+
+    A row it can't match to a test is simply drawn in the default color.
+*/
+LRESULT TWin32GUIMainWindow::OnFailuresCustomDraw(NMLVCUSTOMDRAW& draw) const
+{
+    if (draw.nmcd.dwDrawStage == CDDS_PREPAINT)
+        return CDRF_NOTIFYITEMDRAW;
+
+    if (draw.nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
+    {
+        std::size_t const index = static_cast<std::size_t>(draw.nmcd.lItemlParam);
+
+        if (index < m_TestList.Count())
+            draw.clrText = m_TestList.Status(index) == TGUITestStatus::Failed ? FailureColor : SkipColor;
+    }
+
+    return CDRF_DODEFAULT;
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::OnFailuresDoubleClick
+
+    Selects the double-clicked failure's test in the tree, which shows its details.
+*/
+void TWin32GUIMainWindow::OnFailuresDoubleClick()
+{
+    int const row = static_cast<int>(SendMessageW(m_LV_Failures, LVM_GETNEXTITEM, static_cast<WPARAM>(-1),
+        LVNI_SELECTED));
+
+    if (row < 0)
+        return;
+
+    LVITEMW item = {};
+    item.mask = LVIF_PARAM;
+    item.iItem = row;
+    SendMessageW(m_LV_Failures, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&item));
+
+    std::size_t const testIndex = static_cast<std::size_t>(item.lParam);
+
+    if (testIndex >= m_TestList.Count())
+        return;
+
+    // A failure the filter box is hiding can't be selected, so the filter is cleared to show it.
+    if (TestNode(testIndex) == nullptr)
+        SetWindowTextW(m_Edt_Filter, L""); // Its EN_CHANGE rebuilds the tree.
+
+    HTREEITEM const node = TestNode(testIndex);
+
+    if (node == nullptr)
+        return;
+
+    SendMessageW(m_TV_Tests, TVM_SELECTITEM, TVGN_CARET, reinterpret_cast<LPARAM>(node));
+    SendMessageW(m_TV_Tests, TVM_ENSUREVISIBLE, 0, reinterpret_cast<LPARAM>(node));
+    SetFocus(m_TV_Tests);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::OnTestFinished(TTestCaseRecord const& record, std::string const& testLog)
+{
+    std::optional<std::size_t> const index = m_TestList.IndexOf(record.GroupName, record.TestName);
+
+    if (index.has_value())
+    {
+        m_TestList.SetResult(*index, record, testLog);
+        UpdateTestNodeImages(*index);
+
+        if (record.Outcome != TTestOutcome::Pass)
+            AddFailureItem(*index);
+    }
+
+    m_CurrentTestIndex.reset();
+    ++m_RunFinishedCount;
+    SetProgressPosition(static_cast<int>(m_RunFinishedCount));
+
+    if (record.Outcome == TTestOutcome::Fail)
+        SendMessageW(m_PB_Progress, PBM_SETSTATE, PBST_ERROR, 0);
+
+    UpdateDetail();
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::OnTestStarted(std::string const& groupName, std::string const& testName)
+{
+    m_CurrentTestIndex = m_TestList.IndexOf(groupName, testName);
+
+    if (m_CurrentTestIndex.has_value())
+    {
+        m_TestList.SetStatus(*m_CurrentTestIndex, TGUITestStatus::Running);
+        UpdateTestNodeImages(*m_CurrentTestIndex);
+    }
+
+    m_StatusMessage = "Running " + groupName + "." + testName;
+    UpdateDetail();
+    UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::OnTestsSplitterDrag(int position)
@@ -1274,6 +1505,10 @@ bool TWin32GUIMainWindow::OnTreeItemChanging(NMTVITEMCHANGE const& change)
 
     RunGuarded("a test tree check box", [this, &change]()
         {
+            // The run in progress already decided which tests it runs, so a change now would only mislead.
+            if (m_Running)
+                return;
+
             // From the notification: the item's own state already reads as the new one here.
             bool const checked = (change.uStateOld & TVIS_STATEIMAGEMASK) ==
                 INDEXTOSTATEIMAGEMASK(StateImageIndex(TGUICheckState::Checked));
@@ -1304,6 +1539,42 @@ void TWin32GUIMainWindow::PostToUI(std::function<void()> action)
     PostMessageW(m_Window, RunQueuedMessage, 0, 0);
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::ProcessMessage(MSG& message)
+{
+    if (m_Window != nullptr)
+    {
+        // Hot keys first, then a dialog's keyboard handling: Tab between controls, and their & hot keys.
+        if (TranslateAcceleratorW(m_Window, m_Accelerators, &message) != 0 ||
+            IsDialogMessageW(m_Window, &message) != 0)
+        {
+            return;
+        }
+    }
+
+    TranslateMessage(&message);
+    DispatchMessageW(&message);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ProcessMessages
+
+    The observer's YieldCallback while tests run on this thread, between tests: the counterpart of the VCL's
+    Application->ProcessMessages(). A WM_QUIT found here (e.g. one a test posted) would otherwise be lost, so
+    it's kept and posted again when the run ends, which then ends the GUI as the VCL GUI runner's does.
+*/
+void TWin32GUIMainWindow::ProcessMessages()
+{
+    MSG message;
+
+    while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) != 0)
+    {
+        if (message.message == WM_QUIT)
+            m_PendingQuitCode = static_cast<int>(message.wParam);
+        else
+            ProcessMessage(message);
+    }
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::RefreshAllNodeImages()
 {
     TRedrawScope const updating(m_TV_Tests);
@@ -1319,6 +1590,11 @@ void TWin32GUIMainWindow::ReportUnexpectedError(std::string const& where, std::s
 {
     std::string const message = "An unexpected error occurred in " + where + ": " + description;
     MessageBoxW(m_Window, UTF8ToWide(message).c_str(), UTF8ToWide(Title).c_str(), MB_OK | MB_ICONERROR);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::RunCheckedTests()
+{
+    RunTests(m_TestList.CheckedFilter(), "the checked tests");
 }
 //---------------------------------------------------------------------------
 /*
@@ -1349,20 +1625,7 @@ void TWin32GUIMainWindow::RunMessageLoop()
     MSG message;
 
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
-    {
-        if (m_Window != nullptr)
-        {
-            // Hot keys first, then a dialog's keyboard handling: Tab between controls, and their & hot keys.
-            if (TranslateAcceleratorW(m_Window, m_Accelerators, &message) != 0 ||
-                IsDialogMessageW(m_Window, &message) != 0)
-            {
-                continue;
-            }
-        }
-
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
-    }
+        ProcessMessage(message);
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::RunQueued()
@@ -1376,6 +1639,82 @@ void TWin32GUIMainWindow::RunQueued()
 
     for (std::function<void()> const& action : actions)
         RunGuarded("a queued action", action);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::RunTests
+
+    Runs on this (the main) thread, so tests that create windows work; the observer's YieldCallback lets the
+    window repaint and respond to Stop between tests. Every test's result, the Failures & Skips list, and the
+    log are cleared first, so they only ever show one run.
+
+    A shuffled run's seed comes from m_Shuffle, rather than being left to TTestHandler::Run() to choose, so
+    the GUI knows it and can show it.
+*/
+void TWin32GUIMainWindow::RunTests(TestFilter const& filter, std::string const& filterDescription)
+{
+    if (m_Running || m_RunAborted)
+        return;
+
+    m_TestList.ResetResults();
+    RefreshAllNodeImages();
+    SendMessageW(m_LV_Failures, LVM_DELETEALLITEMS, 0, 0);
+    SetWindowTextW(m_RE_Log, L"");
+    UpdateDetail();
+
+    m_RunTotalCount = m_TestList.CountMatching(filter);
+    m_RunFinishedCount = 0;
+    m_CurrentTestIndex.reset();
+    m_RunStart = std::chrono::steady_clock::now();
+    m_RunEnd.reset();
+
+    // Back to the normal state first, since the error state wouldn't draw the new position; see
+    // SetProgressPosition().
+    SendMessageW(m_PB_Progress, PBM_SETSTATE, PBST_NORMAL, 0);
+    SendMessageW(m_PB_Progress, PBM_SETRANGE32, 0, static_cast<LPARAM>((std::max<std::size_t>)(m_RunTotalCount, 1)));
+    SetProgressPosition(0);
+
+    m_Observer.ResetStop();
+    m_StatusMessage = "Running...";
+    std::optional<unsigned int> const shuffleSeed = m_Shuffle.NextRunSeed();
+    SetRunning(true); // Also shows the seed just chosen.
+
+    try
+    {
+        TTestResults const results = m_Handler->Run(filter, filterDescription, shuffleSeed.has_value(), shuffleSeed,
+            m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
+        m_Observer.Flush();
+
+        // After an aborted run, nothing runs again until the GUI is restarted (see WasRunAborted()).
+        TGUIRunSummary const summary = SummarizeGUIRun(results);
+        m_RunAborted = summary.Aborted;
+        m_StatusMessage = summary.StatusMessage;
+        m_LastRunExitCode = summary.ExitCode;
+    }
+    // As in the console runner, an unhandled exception ends the run, with its own exit code.
+    catch (std::exception const& ex)
+    {
+        m_LastRunExitCode = ExitCode_UnhandledException;
+        FailRunOnUnhandledException(ex.what());
+    }
+    catch (...)
+    {
+        m_LastRunExitCode = ExitCode_UnhandledExceptionUnknown;
+        FailRunOnUnhandledException("an object that isn't a std::exception");
+    }
+
+    m_RunEnd = std::chrono::steady_clock::now();
+    SetRunning(false);
+
+    if (m_PendingQuitCode.has_value())
+    {
+        PostQuitMessage(*m_PendingQuitCode);
+        m_PendingQuitCode.reset();
+    }
+
+    // Posted, not closed directly: this may still be inside a button's click handling.
+    if (m_CloseAfterRun)
+        PostMessageW(m_Window, WM_CLOSE, 0, 0);
 }
 //---------------------------------------------------------------------------
 HTREEITEM TWin32GUIMainWindow::SelectedTreeItem() const
@@ -1393,6 +1732,28 @@ void TWin32GUIMainWindow::SetNodeImage(HTREEITEM item)
     data.iImage = image;
     data.iSelectedImage = image;
     SendMessageW(m_TV_Tests, TVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&data));
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SetProgressPosition
+
+    In the error state (red), a themed progress bar takes a new position without drawing it, so it stays where
+    it was when it turned red, and back in the normal state it then shows the position it last took. Setting the
+    position a second time draws it, as the VCL GUI runner found.
+*/
+void TWin32GUIMainWindow::SetProgressPosition(int position)
+{
+    SendMessageW(m_PB_Progress, PBM_SETPOS, static_cast<WPARAM>(position), 0);
+
+    if (SendMessageW(m_PB_Progress, PBM_GETSTATE, 0, 0) != PBST_NORMAL)
+        SendMessageW(m_PB_Progress, PBM_SETPOS, static_cast<WPARAM>(position), 0);
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SetRunning(bool running)
+{
+    m_Running = running;
+    UpdateCommands();
+    UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::SetTreeExpanded(bool expanded)
@@ -1436,6 +1797,18 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
         {
             AppendLog(text);
         };
+    m_Observer.TestStartedCallback = [this](std::string const& groupName, std::string const& testName)
+        {
+            OnTestStarted(groupName, testName);
+        };
+    m_Observer.TestFinishedCallback = [this](TTestCaseRecord const& record, std::string const& testLog)
+        {
+            OnTestFinished(record, testLog);
+        };
+    m_Observer.YieldCallback = [this]()
+        {
+            ProcessMessages();
+        };
 
     m_Handler = std::make_unique<TTestHandler>();
     m_Handler->SetRunObserver(&m_Observer); // Before Initialize(), so its output goes to the observer too.
@@ -1471,6 +1844,23 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
 
     // Builds the tree.
     ApplyFilterBox();
+
+    if (m_Options.RunOnStart)
+    {
+        // Queued, so it starts once the message loop is running and the window is showing.
+        PostToUI([this]()
+            {
+                RunGuarded("--run", [this]()
+                {
+                    // Unlike Run Selected, runs even if nothing is checked, so --exit still reports and exits
+                    // the way the console runner does when its filter matches nothing.
+                    RunCheckedTests();
+
+                    if (m_Options.ExitAfterRun)
+                        PostMessageW(m_Window, WM_CLOSE, 0, 0);
+                });
+            });
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -1501,6 +1891,11 @@ void TWin32GUIMainWindow::SyncTreeChecks()
     UpdateStatusBar(); // For its checked count.
 }
 //---------------------------------------------------------------------------
+HTREEITEM TWin32GUIMainWindow::TestNode(std::size_t testIndex) const
+{
+    return testIndex < m_TestNodes.size() ? m_TestNodes[testIndex] : nullptr;
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::UpdateCaption()
 {
     SetWindowTextW(m_Window, UTF8ToWide(GUICaption(m_Options.CLI.ProjectName)).c_str());
@@ -1511,6 +1906,8 @@ void TWin32GUIMainWindow::UpdateCommands()
     TGUICommandContext context;
     context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
     context.HasSelection = SelectedTreeItem() != nullptr;
+    context.RunAborted = m_RunAborted;
+    context.Running = m_Running;
     context.TreeHasNodes = SendMessageW(m_TV_Tests, TVM_GETCOUNT, 0, 0) > 0;
 
     m_CommandStates = GUICommandStates(context);
@@ -1539,12 +1936,36 @@ void TWin32GUIMainWindow::UpdateDetail()
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::UpdateStatusBar()
 {
-    // Nothing has run yet.
-    std::vector<std::string> const panels = GUIStatusPanels(m_TestList, 0, 0, std::nullopt, m_Shuffle.StatusText(),
-        m_StatusMessage);
+    std::optional<double> elapsedSeconds;
+
+    if (m_RunStart.has_value())
+    {
+        std::chrono::steady_clock::time_point const end = m_RunEnd.value_or(std::chrono::steady_clock::now());
+        elapsedSeconds = std::chrono::duration<double>(end - *m_RunStart).count();
+    }
+
+    std::vector<std::string> const panels = GUIStatusPanels(m_TestList, m_RunFinishedCount, m_RunTotalCount,
+        elapsedSeconds, m_Shuffle.StatusText(), m_StatusMessage);
 
     for (std::size_t i = 0; i < panels.size(); ++i)
         SendMessageW(m_SB_Status, SB_SETTEXTW, i, reinterpret_cast<LPARAM>(UTF8ToWide(panels[i]).c_str()));
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::UpdateTestNodeImages(std::size_t testIndex)
+{
+    HTREEITEM const testNode = TestNode(testIndex);
+
+    if (testNode == nullptr)
+        return; // Hidden by the filter box, e.g. a hidden failure rerun by Run Failed.
+
+    // The test's own image, then those of its group and the suites holding it, whose status depends on it.
+    for (HTREEITEM item = testNode; item != nullptr; item = RelatedTreeItem(m_TV_Tests, item, TVGN_PARENT))
+        SetNodeImage(item);
+}
+//---------------------------------------------------------------------------
+bool TWin32GUIMainWindow::WasRunAborted() const
+{
+    return m_RunAborted;
 }
 //---------------------------------------------------------------------------
 /*

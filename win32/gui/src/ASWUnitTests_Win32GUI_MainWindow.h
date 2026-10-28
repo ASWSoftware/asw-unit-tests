@@ -30,11 +30,15 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_Windows.h"
 //---------------------------------------------------------------------------
+#include <chrono>
+#include <cstddef>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
 //---------------------------------------------------------------------------
@@ -122,10 +126,14 @@ private:
     HWND m_TV_Tests;
 
     HACCEL m_Accelerators;
+    // Set when the window was asked to close during a run, which then closes it once the run has stopped.
+    bool m_CloseAfterRun;
     // Set by WM_CLOSE, so destroying the window ends the message loop; destroying it otherwise (e.g. as this
     // object is destroyed after an error) doesn't.
     bool m_Closing;
     TGUICommandStates m_CommandStates;
+    // The test that has started but not yet finished, if any.
+    std::optional<std::size_t> m_CurrentTestIndex;
     // The detail pane's height and the test tree's width, in pixels at m_DPI.
     int m_DetailHeight;
     UINT m_DPI;
@@ -133,14 +141,27 @@ private:
     HWND m_FocusedControl;
     // Holds the registered tests; created by Start(). Reports to m_Observer, so the destructor destroys it first.
     std::unique_ptr<TTestHandler> m_Handler;
+    // The exit code the console runner would have returned for the latest run; see ExitCode().
+    int m_LastRunExitCode;
     TWin32GUIFont m_MonospaceFont;
     TGUIRunObserver m_Observer;
     TGUIOptions m_Options;
+    // The exit code of a WM_QUIT that ProcessMessages() took from the queue during a run, posted again when the
+    // run ends.
+    std::optional<int> m_PendingQuitCode;
     // Actions PostToUI() queued, run by RunQueued().
     std::deque<std::function<void()> > m_Queue;
     std::mutex m_QueueMutex;
     // Msftedit.dll, which provides the rich edit control the log uses.
     HMODULE m_RichEditLibrary;
+    // Set when a run ends with a test that timed out or crashed, after which no further run can start; see
+    // WasRunAborted().
+    bool m_RunAborted;
+    std::optional<std::chrono::steady_clock::time_point> m_RunEnd;
+    std::size_t m_RunFinishedCount;
+    bool m_Running;
+    std::optional<std::chrono::steady_clock::time_point> m_RunStart;
+    std::size_t m_RunTotalCount;
     // Set while Start() puts --filter's pattern in the filter box, so its EN_CHANGE leaves building the tree to
     // Start(), which then builds it once.
     bool m_SettingFilterText;
@@ -152,6 +173,9 @@ private:
     // Set while SyncTreeChecks() sets the tree's check boxes, so OnTreeItemChanging() lets the changes through.
     bool m_SyncingChecks;
     TGUITestList m_TestList;
+    // Each test's tree node, by index into m_TestList; nullptr while the filter box hides it. Set by
+    // BuildTestTree(); a Win32 tree's nodes stay valid until they're deleted.
+    std::vector<HTREEITEM> m_TestNodes;
     int m_TestTreeWidth;
     TWin32GUIFont m_UIFont;
     HWND m_Window;
@@ -160,6 +184,8 @@ private:
     static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
+    // Adds a failed or skipped test to the Failures & Skips list.
+    void AddFailureItem(std::size_t testIndex);
     // Appends the framework's log output to the log, each line colored as ClassifyGUILogLine() says.
     void AppendLog(std::string const& text);
     // Recreates the fonts and status images for m_DPI and applies them, with everything else sized by the DPI:
@@ -176,37 +202,63 @@ private:
     void CreateStatusImages();
     // Runs a command from its menu item, toolbar button or hot key, if it's enabled; see the definition.
     void DoCommand(EWin32GUICommand command);
+    // Ends the run on an unhandled exception that escaped TTestHandler::Run(), described by 'description'.
+    void FailRunOnUnhandledException(std::string const& description);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void LayOut();
+    // Handles WM_CLOSE; see the definition.
+    void OnClose();
     void OnDetailSplitterDrag(int position);
     void OnDPIChanged(UINT dpi, RECT const& suggested);
+    // The Failures & Skips list's NM_CUSTOMDRAW: each row's text in its result's color.
+    LRESULT OnFailuresCustomDraw(NMLVCUSTOMDRAW& draw) const;
+    // Selects the double-clicked failure's test in the tree; see the definition.
+    void OnFailuresDoubleClick();
+    void OnTestFinished(TTestCaseRecord const& record, std::string const& testLog);
+    void OnTestStarted(std::string const& groupName, std::string const& testName);
     void OnTestsSplitterDrag(int position);
     // Handles TVN_ITEMCHANGINGW; true vetoes the change. See the definition.
     bool OnTreeItemChanging(NMTVITEMCHANGE const& change);
+    // Handles one message from the queue, as the message loop does: hot keys first, then a dialog's keyboard
+    // handling, then the window it's for.
+    void ProcessMessage(MSG& message);
+    // Handles the messages waiting in the queue, so the window stays responsive while tests run; see the
+    // definition.
+    void ProcessMessages();
     // Sets every test tree node's status image from m_TestList.
     void RefreshAllNodeImages();
     // Reports an error that escaped from 'where' in a message box.
     void ReportUnexpectedError(std::string const& where, std::string const& description);
+    void RunCheckedTests();
     // Runs an event handler's body, reporting any exception from it by name; see the definition.
     void RunGuarded(std::string const& where, std::function<void()> const& body);
     // Runs the actions PostToUI() queued.
     void RunQueued();
+    // Runs the tests 'filter' matches; see the definition.
+    void RunTests(TestFilter const& filter, std::string const& filterDescription);
     // The test tree's selected node, or nullptr if none is.
     HTREEITEM SelectedTreeItem() const;
     // Sets a test tree node's status image from m_TestList.
     void SetNodeImage(HTREEITEM item);
+    // Sets the progress bar's position; see the definition.
+    void SetProgressPosition(int position);
+    void SetRunning(bool running);
     // Expands or collapses every node of the test tree.
     void SetTreeExpanded(bool expanded);
     // Shows the results page whose tab is selected.
     void ShowResultsPage();
     // Sets every test tree node's check box from m_TestList; see the definition.
     void SyncTreeChecks();
+    // A test's tree node, or nullptr while the filter box hides it.
+    HTREEITEM TestNode(std::size_t testIndex) const;
     void UpdateCaption();
     // Enables or disables every command, and the filter box, by GUICommandStates()'s rules.
     void UpdateCommands();
     // Shows the selected node's details in the detail pane.
     void UpdateDetail();
     void UpdateStatusBar();
+    // Sets the status images of a test's node and of the group and suite nodes holding it.
+    void UpdateTestNodeImages(std::size_t testIndex);
 
 public:
     TWin32GUIMainWindow();
@@ -218,7 +270,8 @@ public:
     // Creates the window, hidden, at its default size, centered on its monitor. Throws std::runtime_error if it
     // can't be created.
     void Create();
-    // The process exit code: ExitCode_Success, since the GUI was used interactively.
+    // The process exit code: with --exit, the one the console runner would have returned for the --run run;
+    // otherwise ExitCode_Success, since the GUI was used interactively.
     int ExitCode() const;
     HWND Handle() const;
     // Queues 'action' to run on the window's thread from its message loop, after the messages already waiting:
@@ -230,6 +283,10 @@ public:
     // Loads the registered tests and applies the command line's options; see the definition. Call after
     // Create(), before Show().
     void Start(TGUIOptions const& options);
+    // Whether a run ended with a test that timed out or crashed. A timed-out test's abandoned thread may still be
+    // running, using one of the test groups, and after a crash their state may be corrupted, so the caller should
+    // then end the process, as the console runner does, without destroying this window and its tests.
+    bool WasRunAborted() const;
 };
 
 } // namespace ASWUnitTests

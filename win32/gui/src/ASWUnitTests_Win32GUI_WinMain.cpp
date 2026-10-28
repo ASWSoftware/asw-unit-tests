@@ -109,6 +109,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
         mainWindow.RunMessageLoop();
 
         exitCode = mainWindow.ExitCode();
+
+        // After a timeout, the abandoned test's thread may still be running, using one of the window's test groups,
+        // and after a crash their state may be corrupted, so the process ends here, as the console runner's does,
+        // without destroying them.
+        if (mainWindow.WasRunAborted())
+            ExitProcess(static_cast<UINT>(exitCode));
     }
     catch (std::exception const& exception)
     {
