@@ -62,8 +62,8 @@
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <AllPackageLibs>rtl.lib;vcl.lib</AllPackageLibs>
         <Multithreaded>true</Multithreaded>
-        <IncludePath>..\..\..\src\;..\..\..\tests\;..\..\..\toTest\;..\..\tests\;..\..\gui\src\;$(IncludePath)</IncludePath>
-        <ILINK_LibraryPath>..\..\..\src\;..\..\..\tests\;..\..\..\toTest\;..\..\tests\;..\..\gui\src\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <IncludePath>..\..\..\src\;..\..\..\tests\;..\..\..\toTest\;..\..\tests\;..\..\gui\src\;..\..\..\gui\src\;..\..\..\gui\tests\;$(IncludePath)</IncludePath>
+        <ILINK_LibraryPath>..\..\..\src\;..\..\..\tests\;..\..\..\toTest\;..\..\tests\;..\..\gui\src\;..\..\..\gui\src\;..\..\..\gui\tests\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
         <_TCHARMapping>char</_TCHARMapping>
         <BCC_AllWarnings>true</BCC_AllWarnings>
         <BCC_SelectedWarnings>false</BCC_SelectedWarnings>
@@ -258,61 +258,101 @@
             <BuildOrder>0</BuildOrder>
             <PCH>true</PCH>
         </PCHCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_CommandLine.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_CommandLine.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_CommandLine.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_CommandLine.h</DependentOn>
             <BuildOrder>22</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Layout.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Layout.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Commands.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Commands.h</DependentOn>
+            <BuildOrder>49</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_INIDocument.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_INIDocument.h</DependentOn>
+            <BuildOrder>45</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Layout.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Layout.h</DependentOn>
             <BuildOrder>31</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_RunObserver.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_RunObserver.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_RunObserver.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>23</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Selection.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Selection.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>34</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Shuffle.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Shuffle.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Shuffle.h</DependentOn>
             <BuildOrder>39</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\gui\src\ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>24</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_TestList.cpp">
-            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_TestList.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_TestList.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>25</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_CommandLine.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_CommandLine.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Tree.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Tree.h</DependentOn>
+            <BuildOrder>47</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_View.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_View.h</DependentOn>
+            <BuildOrder>51</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_CommandLine.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_CommandLine.h</DependentOn>
             <BuildOrder>27</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Layout.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Layout.h</DependentOn>
+        <CppCompile Include="..\..\gui\src\ASWUnitTests_GUI_VCLSystem.cpp">
+            <DependentOn>..\..\gui\src\ASWUnitTests_GUI_VCLSystem.h</DependentOn>
+            <BuildOrder>43</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Commands.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Commands.h</DependentOn>
+            <BuildOrder>50</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_INIDocument.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_INIDocument.h</DependentOn>
+            <BuildOrder>46</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Layout.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Layout.h</DependentOn>
             <BuildOrder>32</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_RunObserver.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_RunObserver.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_RunObserver.h</DependentOn>
             <BuildOrder>28</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Selection.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Selection.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Selection.h</DependentOn>
             <BuildOrder>35</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Shuffle.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Shuffle.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Shuffle.h</DependentOn>
             <BuildOrder>40</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_Strings.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_Strings.h</DependentOn>
             <BuildOrder>29</BuildOrder>
         </CppCompile>
-        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_TestList.cpp">
-            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_TestList.h</DependentOn>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>30</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.h</DependentOn>
+            <BuildOrder>48</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_View.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_View.h</DependentOn>
+            <BuildOrder>52</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.h</DependentOn>
+            <BuildOrder>44</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_RTLExceptions.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_RTLExceptions.h</DependentOn>

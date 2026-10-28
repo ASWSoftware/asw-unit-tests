@@ -15,11 +15,49 @@ versioned baseline.
 - `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
   `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
   operating system), describing the build the framework was compiled for.
+- A Win32 GUI runner, `ASWUnitTests_Win32_GUI`, with the same window, features and command line
+  options as the VCL GUI runner, built on the Windows API alone, so it needs neither the VCL nor
+  RAD Studio: it builds with CMake (MSVC, MinGW, Clang) as well as with RAD Studio, for Win32 and
+  Win64x. It needs Windows 10 version 1703 or later. This repository's CMake project builds it on
+  Windows, and a project of your own can build it with your tests by including
+  `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`; the README's "Win32 GUI Runner" section
+  covers both, and RAD Studio.
+- `ASWUNITTESTS_CORE_SOURCES` in `src\ASWUnitTests_Sources.cmake`: the framework's sources without
+  `main.cpp`, for a runner with its own entry point. `ASWUNITTESTS_SOURCES` lists the same files as
+  before.
+- `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
+  `ASWUNITTESTS_GUI_SOURCES`.
 
 ### Changed
 
 - The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
   build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
+- The VCL GUI runner's units that don't need the VCL moved from `vcl\gui\src` to a new `gui\src`
+  folder, so other GUI runners can share them: `ASWUnitTests_GUI_CommandLine`,
+  `ASWUnitTests_GUI_Layout`, `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`,
+  `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, plus the new
+  `ASWUnitTests_GUI_Commands`, `ASWUnitTests_GUI_INIDocument`, `ASWUnitTests_GUI_Tree` and
+  `ASWUnitTests_GUI_View`. A project that builds the VCL GUI must compile them from `gui\src` and add
+  that folder to its include path.
+  Their VCL-only parts moved to the new `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h`, which the
+  project must also compile: `GUILayoutFilePath()`, `GUISelectionFilePath()`, and
+  `TGUICommandLine::ProcessArguments()`, now the free function `ProcessArguments()`. A `WinMain()`
+  modeled on `ASWUnitTests_VCL_GUI.cpp` must include that header and call
+  `ASWUnitTests::ProcessArguments()` instead. The layout functions now take a `TGUIINIDocument`
+  instead of a `TCustomIniFile`, and a `TGUIRect` instead of a `TRect`.
+- The VCL GUI runner reads and writes its layout file (`%APPDATA%\ASWUnitTests\<exe name>.ini`)
+  itself, the same way `TMemIniFile` did, so files saved by earlier versions load as before and are
+  written the same way. A size or position written in hexadecimal by hand is now ignored, as an
+  invalid value. The selection file's first line, a comment, now reads "ASWUnitTests GUI test
+  selection" instead of "ASWUnitTests VCL GUI test selection"; files saved before still load.
+
+### Fixed
+
+- The VCL GUI runner's progress bar kept showing the progress it had when a test first failed and it
+  turned red, instead of following the rest of the run, and the next run could then start with it
+  full. It now shows every finished test, and starts each run empty.
+- The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
+  twice, e.g. "(F9) (F9)".
 
 ## [1.4.0] - 2026-10-14
 

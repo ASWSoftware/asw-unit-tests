@@ -189,6 +189,9 @@ private: // User declarations
     bool m_Running;
     std::optional<std::chrono::steady_clock::time_point> m_RunStart;
     size_t m_RunTotalCount;
+    // True while Start() puts --filter's pattern in the filter box, so Edt_FilterChange() leaves building the
+    // tree to Start(), which then builds it once.
+    bool m_SettingFilterText;
     // Whether runs are shuffled, and with which seed; starts from --shuffle and --shuffle-seed.
     ASWUnitTests::TGUIShuffle m_Shuffle;
     std::string m_StatusMessage;
@@ -243,6 +246,8 @@ private:
     // Sets a tree node's status image from m_TestList: a test's own status, or a group's or suite's, from its
     // tests.
     void SetNodeImage(TTreeNode* node);
+    // Sets the progress bar's position so it's also drawn in the error state; see the definition.
+    void SetProgressPosition(int position);
     void SetRunning(bool running);
     // Shows m_Shuffle's state: Run in Shuffled Order's check mark, and the status bar.
     void ShowShuffleState();
@@ -252,6 +257,8 @@ private:
     // Watches for the tree's window being destroyed; see m_TreeNodesStale.
     void __fastcall TV_TestsWindowProc(TMessage& message);
     void UpdateCaption();
+    // Enables or disables every action, and the filter box, by GUICommandStates()'s rules.
+    void UpdateCommands();
     // Shows the selected test's, group's or suite's details in the detail pane.
     void UpdateDetail();
     void UpdateStatusBar();

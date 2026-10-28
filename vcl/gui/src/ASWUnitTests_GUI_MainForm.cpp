@@ -32,14 +32,12 @@ limitations under the License.
 #include <cstdint>
 #include <exception>
 #include <functional>
-#include <iomanip>
 #include <memory>
-#include <sstream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.IniFiles.hpp>
 #include <System.IOUtils.hpp>
 #include <Vcl.Clipbrd.hpp>
 //---------------------------------------------------------------------------
@@ -47,10 +45,14 @@ limitations under the License.
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Commands.h"
 #include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_Tree.h"
+#include "ASWUnitTests_GUI_VCLSystem.h"
+#include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -61,28 +63,16 @@ using namespace ASWUnitTests;
 TColor const FailureColor = static_cast<TColor>(RGB(200, 0, 0));
 TColor const SkipColor = static_cast<TColor>(RGB(190, 120, 0));
 
-// What a test tree node stands for. A node's Data holds its kind and an index (see NodeData()): a suite
-// node's into TGUITestList::SuitePaths(), a group node's into its GroupNames(), and a test node's into the
-// list itself.
-enum class TNodeKind
-{
-    Suite,
-    Group,
-    Test,
-};
-
 //---------------------------------------------------------------------------
 
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
 size_t DataToIndex(void* data);
-std::string FirstLine(std::string const& text);
-std::string FormatSeconds(double seconds);
 void* IndexToData(size_t index);
 TColor LogLineColor(std::string const& line);
-std::vector<TRect> MonitorWorkAreas();
-void* NodeData(TNodeKind kind, size_t index);
-size_t NodeIndex(void* data);
-TNodeKind NodeKind(void* data);
+std::vector<TGUIRect> MonitorWorkAreas();
+void* NodeData(TGUINodeRef const& ref);
+TGUINodeRef NodeRef(void* data);
+TGUIRect ToGUIRect(TRect const& rect);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
 //---------------------------------------------------------------------------
@@ -111,18 +101,6 @@ size_t DataToIndex(void* data)
     return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
-std::string FirstLine(std::string const& text)
-{
-    return text.substr(0, text.find('\n'));
-}
-//---------------------------------------------------------------------------
-std::string FormatSeconds(double seconds)
-{
-    std::ostringstream text;
-    text << std::fixed << std::setprecision(2) << seconds << " s";
-    return text.str();
-}
-//---------------------------------------------------------------------------
 void* IndexToData(size_t index)
 {
     return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index));
@@ -131,20 +109,21 @@ void* IndexToData(size_t index)
 /*
     LogLineColor
 
-    The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
-    check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
-    or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
+    The Log tab's color for one line of the framework's log output; see ClassifyGUILogLine().
 */
 TColor LogLineColor(std::string const& line)
 {
-    if (line.find("***Test failed") != std::string::npos || line.find("**Check failed") != std::string::npos ||
-        line.find("\" - failed (") != std::string::npos || line.find("Unhandled exception") != std::string::npos ||
-        line.find("!!FATAL ERROR!!") != std::string::npos || line.find("!!ERROR!!") != std::string::npos ||
-        line.find("!!TIMEOUT!!") != std::string::npos || line.find("!!CRASH!!") != std::string::npos)
-        return FailureColor;
+    switch (ClassifyGUILogLine(line))
+    {
+        case TGUILogLineKind::Failure:
+            return FailureColor;
 
-    if (line.find("***Test skipped") != std::string::npos || line.find("\" - skipped (") != std::string::npos)
-        return SkipColor;
+        case TGUILogLineKind::Skip:
+            return SkipColor;
+
+        case TGUILogLineKind::Normal:
+            break;
+    }
 
     return clWindowText;
 }
@@ -154,12 +133,12 @@ TColor LogLineColor(std::string const& line)
 
     Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
 */
-std::vector<TRect> MonitorWorkAreas()
+std::vector<TGUIRect> MonitorWorkAreas()
 {
-    std::vector<TRect> workAreas;
+    std::vector<TGUIRect> workAreas;
 
     for (int i = 0; i < Screen->MonitorCount; ++i)
-        workAreas.push_back(Screen->Monitors[i]->WorkareaRect);
+        workAreas.push_back(ToGUIRect(Screen->Monitors[i]->WorkareaRect));
 
     return workAreas;
 }
@@ -167,21 +146,21 @@ std::vector<TRect> MonitorWorkAreas()
 /*
     NodeData
 
-    A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
+    A test tree node's Data: which suite, group or test it stands for, encoded by EncodeGUINodeRef().
 */
-void* NodeData(TNodeKind kind, size_t index)
+void* NodeData(TGUINodeRef const& ref)
 {
-    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index) * 4 + static_cast<std::uintptr_t>(kind));
+    return reinterpret_cast<void*>(EncodeGUINodeRef(ref));
 }
 //---------------------------------------------------------------------------
-size_t NodeIndex(void* data)
+TGUINodeRef NodeRef(void* data)
 {
-    return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data) / 4);
+    return DecodeGUINodeRef(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
-TNodeKind NodeKind(void* data)
+TGUIRect ToGUIRect(TRect const& rect)
 {
-    return static_cast<TNodeKind>(reinterpret_cast<std::uintptr_t>(data) % 4);
+    return TGUIRect(rect.Left, rect.Top, rect.Right, rect.Bottom);
 }
 //---------------------------------------------------------------------------
 TNodeCheckState ToNodeCheckState(TGUICheckState state)
@@ -281,6 +260,7 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_RunFinishedCount(0),
       m_Running(false),
       m_RunTotalCount(0),
+      m_SettingFilterText(false),
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
       m_TreeNodesStale(false)
@@ -314,21 +294,7 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
 {
     RunGuarded("About", []()
     {
-        ShowTextDialog(System::UnicodeString("About ") + Application->Title,
-            TTestHandler::GetVersionFullStr() + "\n"
-            "VCL GUI runner\n"
-            "\n"
-            "App bits: "
-#if defined (_WIN64)
-            "64"
-#else
-            "32"
-#endif
-            "\n\n"
-            "https://github.com/ASWSoftware/asw-unit-tests\n"
-            "\n"
-            "Copyright 2026 ASW Software\n"
-            "Licensed under the Apache License, Version 2.0.\n");
+        ShowTextDialog(System::UnicodeString("About ") + Application->Title, GUIAboutText("VCL GUI runner"));
     });
 }
 //---------------------------------------------------------------------------
@@ -409,8 +375,8 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_ExportJUnitReportExecute(TObject* 
         else if (SD_JUnitReport->FileName.IsEmpty())
         {
             // e.g. "ASWUnitTests_VCL_GUI_JUnit.xml", in the dialog's default folder.
-            SD_JUnitReport->FileName = System::Sysutils::ChangeFileExt(
-                System::Sysutils::ExtractFileName(System::ParamStr(0)), "_JUnit.xml");
+            SD_JUnitReport->FileName = FromUTF8(GUIDefaultJUnitReportFileName(
+                ToUTF8(System::Sysutils::ExtractFileName(System::ParamStr(0)))));
         }
 
         if (!SD_JUnitReport->Execute(Handle))
@@ -549,7 +515,7 @@ void TFormASWUnitTestsGUIMain::AddFailureItem(size_t testIndex)
     TListItem* const item = LV_Failures->Items->Add();
     item->Caption = FromUTF8(StatusName(m_TestList.Status(testIndex)));
     item->SubItems->Add(FromUTF8(test.GroupName + "." + test.TestName));
-    item->SubItems->Add(FromUTF8(result != nullptr ? FirstLine(result->Record.Message) : std::string()));
+    item->SubItems->Add(FromUTF8(result != nullptr ? GUIFirstLine(result->Record.Message) : std::string()));
     item->Data = IndexToData(testIndex);
 }
 //---------------------------------------------------------------------------
@@ -580,26 +546,11 @@ void TFormASWUnitTestsGUIMain::AppendLog(std::string const& text)
 /*
     TFormASWUnitTestsGUIMain::ApplyFilterBox
 
-    The text matches anywhere in a test's "Group.Test" full name, ignoring case, and may use the same '*'
-    and '?' wildcards as --filter. Unlike --filter, it's never anchored to the whole name, so "Parse?rg"
-    finds "...ParseArguments...", just as plain text would.
+    The text matches as GUIFilterBoxFilter() describes.
 */
 void TFormASWUnitTestsGUIMain::ApplyFilterBox()
 {
-    std::string const text = ToUTF8(Edt_Filter->Text.Trim());
-
-    if (text.empty())
-    {
-        m_TestList.SetVisibleFilter(TestFilter());
-    }
-    else
-    {
-        std::string const pattern = "*" + text + "*";
-        m_TestList.SetVisibleFilter([pattern](std::string const& fullTestName)
-        {
-            return TTestHandler::WildcardMatch(pattern, fullTestName, true);
-        });
-    }
+    m_TestList.SetVisibleFilter(GUIFilterBoxFilter(ToUTF8(Edt_Filter->Text)));
 
     BuildTestTree();
     UpdateDetail();
@@ -639,44 +590,18 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
         TV_Tests->Items->Clear();
         m_TestNodes.assign(m_TestList.Count(), nullptr);
 
-        // By index into m_TestList.SuitePaths(). A suite's node, and those of the suites holding it, are added
-        // just before its first group's, so suites and groups keep m_TestList's order, where each suite's
-        // groups are together.
-        std::vector<TTreeNode*> suiteNodes(m_TestList.SuitePaths().size(), nullptr);
-        std::function<TTreeNode* (std::string const&)> suiteNode = [&](std::string const& suitePath) -> TTreeNode*
-            {
-                if (suitePath.empty())
-                    return nullptr;
+        // Each node comes after its parent, so its parent's tree node already exists.
+        std::vector<TGUITreeNode> const nodes = BuildGUITree(m_TestList);
+        std::vector<TTreeNode*> treeNodes;
+        treeNodes.reserve(nodes.size());
 
-                size_t const suiteIndex = m_TestList.SuiteIndexOf(suitePath).value();
-
-                if (suiteNodes[suiteIndex] == nullptr)
-                {
-                    std::string const parentPath = ParentSuitePath(suitePath);
-                    suiteNodes[suiteIndex] = AddTreeNode(TV_Tests->Items, suiteNode(parentPath),
-                        NameInSuite(suitePath, parentPath), NodeData(TNodeKind::Suite, suiteIndex));
-                }
-
-                return suiteNodes[suiteIndex];
-            };
-
-        // Only visible tests get nodes, and a group or suite only gets one if any of its tests are visible.
-        std::vector<std::string> const& groupNames = m_TestList.GroupNames();
-        for (size_t groupIndex = 0; groupIndex < groupNames.size(); ++groupIndex)
+        for (TGUITreeNode const& node : nodes)
         {
-            std::vector<size_t> const testIndexes = m_TestList.TestsInGroup(groupNames[groupIndex]);
-            if (testIndexes.empty())
-                continue;
+            TTreeNode* const parent = node.Parent.has_value() ? treeNodes[*node.Parent] : nullptr;
+            treeNodes.push_back(AddTreeNode(TV_Tests->Items, parent, node.Text, NodeData(node.Ref)));
 
-            std::string const suitePath = m_TestList.GroupSuitePath(groupNames[groupIndex]);
-            TTreeNode* const groupNode = AddTreeNode(TV_Tests->Items, suiteNode(suitePath),
-                NameInSuite(groupNames[groupIndex], suitePath), NodeData(TNodeKind::Group, groupIndex));
-
-            for (size_t testIndex : testIndexes)
-            {
-                m_TestNodes[testIndex] = AddTreeNode(TV_Tests->Items, groupNode, m_TestList.Test(testIndex).TestName,
-                    NodeData(TNodeKind::Test, testIndex));
-            }
+            if (node.Ref.Kind == TGUINodeKind::Test)
+                m_TestNodes[node.Ref.Index] = treeNodes.back();
         }
 
         // The nodes just added are the tree's current ones, even if its window was recreated before this.
@@ -688,9 +613,8 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
     RefreshAllNodeImages();
     SyncTreeChecks();
 
-    // e.g. while the filter hides every test.
-    Act_CollapseAll->Enabled = (TV_Tests->Items->Count > 0);
-    Act_ExpandAll->Enabled = (TV_Tests->Items->Count > 0);
+    // Expand All and Collapse All, e.g. while the filter hides every test.
+    UpdateCommands();
 
     if (TV_Tests->Items->Count > 0)
         TV_Tests->Items->GetFirstNode()->MakeVisible();
@@ -759,8 +683,8 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 
     if (::GetWindowPlacement(Handle, &placement))
     {
-        TRect const bounds = WorkspaceToScreen(TRect(placement.rcNormalPosition), Screen->PrimaryMonitor->BoundsRect,
-            Screen->PrimaryMonitor->WorkareaRect);
+        TGUIRect const bounds = WorkspaceToScreen(ToGUIRect(TRect(placement.rcNormalPosition)),
+            ToGUIRect(Screen->PrimaryMonitor->BoundsRect), ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
 
         TGUIWindowBounds window;
         window.Height = ScaleTo96(bounds.Height(), pixelsPerInch);
@@ -778,6 +702,9 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Edt_FilterChange(TObject* /*Sender*/)
 {
+    if (m_SettingFilterText)
+        return; // Start() builds the tree once it has set the text.
+
     RunGuarded("the filter box", [this]()
     {
         ApplyFilterBox();
@@ -796,17 +723,15 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
     // The test that was running when the exception escaped never finished, so it's the one that failed.
     if (m_CurrentTestIndex.has_value())
     {
-        TTestId const& test = m_TestList.Test(*m_CurrentTestIndex);
-        m_TestList.SetResult(*m_CurrentTestIndex, TTestCaseRecord{ test.GroupName, test.TestName, 0.0,
-                                                                   TTestOutcome::Fail, "Unhandled exception: " + description,
-                                                                   test.SuitePath }, std::string());
+        m_TestList.SetResult(*m_CurrentTestIndex,
+            GUIUnhandledExceptionRecord(m_TestList.Test(*m_CurrentTestIndex), description), std::string());
         UpdateTestNodeImages(*m_CurrentTestIndex);
         AddFailureItem(*m_CurrentTestIndex);
         m_CurrentTestIndex.reset();
     }
 
     PB_Progress->State = pbsError;
-    m_StatusMessage = "The run was ended by an unhandled exception: " + description;
+    m_StatusMessage = GUIUnhandledExceptionStatus(description);
     AppendLog(m_StatusMessage + "\n");
     UpdateDetail();
 }
@@ -861,8 +786,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
         if (!System::Sysutils::FileExists(path))
             return;
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        layout = LoadGUILayout(*ini);
+        layout = LoadGUILayout(TGUIINIDocument(ReadFileBytes(path)));
     }
     catch (...)
     {
@@ -872,7 +796,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
     if (layout.Window.has_value())
     {
         TGUIWindowBounds const& window = *layout.Window;
-        TRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
+        TGUIRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
             window.Top + ScaleFrom96(window.Height, CurrentPPI));
 
         // Not where it can't be reached, e.g. on a monitor that's since been disconnected. Set as the window
@@ -883,8 +807,8 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
 
         if (IsWindowReachable(bounds, MonitorWorkAreas()) && ::GetWindowPlacement(Handle, &placement))
         {
-            TRect const normal = ScreenToWorkspace(bounds, Screen->PrimaryMonitor->BoundsRect,
-                Screen->PrimaryMonitor->WorkareaRect);
+            TGUIRect const normal = ScreenToWorkspace(bounds, ToGUIRect(Screen->PrimaryMonitor->BoundsRect),
+                ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
             placement.rcNormalPosition.left = normal.Left;
             placement.rcNormalPosition.top = normal.Top;
             placement.rcNormalPosition.right = normal.Right;
@@ -985,7 +909,7 @@ void TFormASWUnitTestsGUIMain::OnTestFinished(TTestCaseRecord const& record, std
 
     m_CurrentTestIndex.reset();
     ++m_RunFinishedCount;
-    PB_Progress->Position = static_cast<int>(m_RunFinishedCount);
+    SetProgressPosition(static_cast<int>(m_RunFinishedCount));
 
     if (record.Outcome == TTestOutcome::Fail)
         PB_Progress->State = pbsError;
@@ -1021,10 +945,10 @@ void TFormASWUnitTestsGUIMain::RebuildNodeCache()
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
     {
-        size_t const index = NodeIndex(node->Data);
+        TGUINodeRef const ref = NodeRef(node->Data);
 
-        if (NodeKind(node->Data) == TNodeKind::Test && index < m_TestNodes.size())
-            m_TestNodes[index] = node;
+        if (ref.Kind == TGUINodeKind::Test && ref.Index < m_TestNodes.size())
+            m_TestNodes[ref.Index] = node;
     }
 
     m_TreeNodesStale = false;
@@ -1140,9 +1064,11 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
     m_RunEnd.reset();
     m_LastRunJUnitTestCases.reset();
 
-    PB_Progress->Max = static_cast<int>(std::max<size_t>(m_RunTotalCount, 1));
-    PB_Progress->Position = 0;
+    // Back to the normal state first, since the error state wouldn't draw the new position; see
+    // SetProgressPosition().
     PB_Progress->State = pbsNormal;
+    PB_Progress->Max = static_cast<int>(std::max<size_t>(m_RunTotalCount, 1));
+    SetProgressPosition(0);
 
     m_Observer.ResetStop();
     m_StatusMessage = "Running...";
@@ -1155,20 +1081,11 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
             m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
         m_Observer.Flush();
 
-        // A timed-out test's abandoned thread may still be running one of the groups' tests, and a crash may have
-        // left their state corrupted, so nothing runs again until the GUI is restarted (see WasRunAborted()).
-        m_RunAborted = results.TimedOut || results.Crashed;
-
-        if (results.Stopped)
-            m_StatusMessage = "Stopped before every test ran.";
-        else if (results.TimedOut)
-            m_StatusMessage = "A test timed out, so the rest of the run was abandoned. Restart to run tests again.";
-        else if (results.Crashed)
-            m_StatusMessage = "A test crashed, so the rest of the run was abandoned. Restart to run tests again.";
-        else
-            m_StatusMessage = "Done.";
-
-        m_LastRunExitCode = ExitCodeForResults(results);
+        // After an aborted run, nothing runs again until the GUI is restarted (see WasRunAborted()).
+        TGUIRunSummary const summary = SummarizeGUIRun(results);
+        m_RunAborted = summary.Aborted;
+        m_StatusMessage = summary.StatusMessage;
+        m_LastRunExitCode = summary.ExitCode;
         m_LastRunJUnitTestCases = ToJUnitTestCases(results.CaseRecords);
 
         // A failure is only noted in the log, so it can't hold up --exit.
@@ -1217,9 +1134,10 @@ void TFormASWUnitTestsGUIMain::SaveLayout()
         System::UnicodeString const path = GUILayoutFilePath();
         System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        SaveGUILayout(*ini, CurrentLayout());
-        ini->UpdateFile();
+        // Starting from the file's current text keeps any other values in it.
+        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUILayout(ini, CurrentLayout());
+        WriteFileBytes(path, ini.Text());
     }
     catch (...)
     {
@@ -1245,55 +1163,31 @@ void TFormASWUnitTestsGUIMain::SaveSelection()
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
 {
-    size_t const index = NodeIndex(node->Data);
-    TGUITestStatus status = TGUITestStatus::NotRun;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            status = m_TestList.SuiteStatus(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            status = m_TestList.GroupStatus(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            status = m_TestList.Status(index);
-            break;
-    }
-
-    int const image = static_cast<int>(status);
+    int const image = static_cast<int>(GUINodeStatus(m_TestList, NodeRef(node->Data)));
     node->ImageIndex = image;
     node->SelectedIndex = image;
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetProgressPosition
+
+    In the error state (red), a themed progress bar takes a new position without drawing it, so it stays where
+    it was when it turned red, and back in the normal state it then shows the position it last took. Setting the
+    position a second time draws it. Found by experiment on Windows 10 with Common Controls 6; the VCL passes
+    Position straight to the control.
+*/
+void TFormASWUnitTestsGUIMain::SetProgressPosition(int position)
+{
+    PB_Progress->Position = position;
+
+    if (PB_Progress->State != pbsNormal)
+        PB_Progress->Position = position;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetRunning(bool running)
 {
     m_Running = running;
-
-    // A modal dialog opened mid-run would hold up the rest of the run until it was closed, since the tests
-    // run on this thread.
-    Act_About->Enabled = !running;
-    Act_CommandLineOptions->Enabled = !running;
-    Act_ExportJUnitReport->Enabled = !running && m_LastRunJUnitTestCases.has_value();
-
-    // Nor once a run has been aborted; see RunTests().
-    Act_RunFailed->Enabled = !running && !m_RunAborted && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_RunSelected->Enabled = !running && !m_RunAborted;
-    Act_SelectAll->Enabled = !running;
-    Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_SelectNone->Enabled = !running;
-    Act_Stop->Enabled = running;
-
-    // The run in progress already has its order, so a change now would only mislead.
-    Act_ShuffleOrder->Enabled = !running;
-    Act_ShuffleSeed->Enabled = !running;
-
-    // Rebuilding the tree mid-run would discard the nodes the run is updating.
-    Act_FocusFilter->Enabled = !running;
-    Edt_Filter->Enabled = !running;
-
+    UpdateCommands();
     UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
@@ -1354,17 +1248,8 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     if (m_KeepSelection)
         LoadSelection();
 
-    for (std::string const& ignored : m_Options.IgnoredOptions)
-        AppendLog("Note: " + ignored + " has no effect in the GUI, so it was ignored.\n");
-
-    if (m_Options.CLI.TestTimeoutSeconds.has_value())
-    {
-        AppendLog("Note: --test-timeout-seconds runs each test on a worker thread, so a test that creates VCL "
-            "forms or controls won't work with it.\n");
-    }
-
-    if (m_Options.LayoutIgnore)
-        AppendLog("Note: --layout-ignore: the window layout isn't loaded or saved, so it opens with the defaults.\n");
+    for (std::string const& note : GUICommandLineNotes(m_Options, "VCL forms or controls"))
+        AppendLog(note + "\n");
 
     if (m_Options.LayoutReset)
         ResetSavedLayout();
@@ -1378,10 +1263,14 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
     if (m_Options.CLI.HasFilter)
+    {
+        // Without OnChange's rebuild, which may or may not happen before the window is showing, so the tree
+        // is built once either way, just below.
+        TScopedFlag const settingFilterText(m_SettingFilterText);
         Edt_Filter->Text = FromUTF8(m_Options.CLI.FilterPattern);
+    }
 
-    // Called directly, since setting the text above doesn't necessarily raise OnChange before the window
-    // is showing. Builds the tree.
+    // Builds the tree.
     ApplyFilterBox();
 
     // Centered here rather than with the DFM's Position, which is poDesigned because LoadLayout() would
@@ -1424,24 +1313,7 @@ void TFormASWUnitTestsGUIMain::SyncTreeChecks()
     TScopedFlag const syncing(m_SyncingChecks);
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
-    {
-        size_t const index = NodeIndex(node->Data);
-
-        switch (NodeKind(node->Data))
-        {
-            case TNodeKind::Suite:
-                node->CheckState = ToNodeCheckState(m_TestList.SuiteCheckState(m_TestList.SuitePaths()[index]));
-                break;
-
-            case TNodeKind::Group:
-                node->CheckState = ToNodeCheckState(m_TestList.GroupCheckState(m_TestList.GroupNames()[index]));
-                break;
-
-            case TNodeKind::Test:
-                node->CheckState = m_TestList.IsChecked(index) ? ncsChecked : ncsUnchecked;
-                break;
-        }
-    }
+        node->CheckState = ToNodeCheckState(GUINodeCheckState(m_TestList, NodeRef(node->Data)));
 
     UpdateStatusBar(); // For its checked count.
 }
@@ -1484,23 +1356,7 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging(TCustomTree
         if (m_Running)
             return;
 
-        bool const check = (OldCheckState != ncsChecked);
-        size_t const index = NodeIndex(Node->Data);
-
-        switch (NodeKind(Node->Data))
-        {
-            case TNodeKind::Suite:
-                m_TestList.SetSuiteChecked(m_TestList.SuitePaths()[index], check);
-                break;
-
-            case TNodeKind::Group:
-                m_TestList.SetGroupChecked(m_TestList.GroupNames()[index], check);
-                break;
-
-            case TNodeKind::Test:
-                m_TestList.SetChecked(index, check);
-                break;
-        }
+        SetGUINodeChecked(m_TestList, NodeRef(Node->Data), OldCheckState != ncsChecked);
 
         // Changing check boxes from inside the tree's own change notification isn't safe, so the update
         // waits until this click has been fully handled.
@@ -1529,26 +1385,47 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsWindowProc(TMessage& message)
     m_TreeViewWindowProc(message);
 }
 //---------------------------------------------------------------------------
-/*
-    TFormASWUnitTestsGUIMain::UpdateCaption
-
-    "ASWUnitTests - Framework version: <version>", plus " - <project name>" when --project-name gave one
-    other than the default.
-*/
 void TFormASWUnitTestsGUIMain::UpdateCaption()
 {
-    std::string caption = "ASWUnitTests - Framework version: " + TTestHandler::GetVersionStr();
+    Caption = FromUTF8(GUICaption(m_Options.CLI.ProjectName));
+}
+//---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::UpdateCommands()
+{
+    TGUICommandContext context;
+    context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
+    context.HasReport = m_LastRunJUnitTestCases.has_value();
+    context.HasSelection = (TV_Tests->Selected != nullptr);
+    context.RunAborted = m_RunAborted;
+    context.Running = m_Running;
+    context.TreeHasNodes = (TV_Tests->Items->Count > 0);
 
-    if (m_Options.CLI.ProjectName != TCLIOptions().ProjectName)
-        caption += " - " + m_Options.CLI.ProjectName;
+    TGUICommandStates const states = GUICommandStates(context);
 
-    Caption = FromUTF8(caption);
+    Act_About->Enabled = states.About;
+    Act_CollapseAll->Enabled = states.CollapseAll;
+    Act_CommandLineOptions->Enabled = states.CommandLineOptions;
+    Act_CopyDetails->Enabled = states.CopyDetails;
+    Act_Exit->Enabled = states.Exit;
+    Act_ExpandAll->Enabled = states.ExpandAll;
+    Act_ExportJUnitReport->Enabled = states.ExportJUnitReport;
+    Act_FocusFilter->Enabled = states.FocusFilter;
+    Act_ResetLayout->Enabled = states.ResetLayout;
+    Act_RunFailed->Enabled = states.RunFailed;
+    Act_RunSelected->Enabled = states.RunSelected;
+    Act_SelectAll->Enabled = states.SelectAll;
+    Act_SelectFailed->Enabled = states.SelectFailed;
+    Act_SelectNone->Enabled = states.SelectNone;
+    Act_ShuffleOrder->Enabled = states.ShuffleOrder;
+    Act_ShuffleSeed->Enabled = states.ShuffleSeed;
+    Act_Stop->Enabled = states.Stop;
+    Edt_Filter->Enabled = states.FilterBox;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateDetail()
 {
     TTreeNode* const node = TV_Tests->Selected;
-    Act_CopyDetails->Enabled = (node != nullptr);
+    UpdateCommands(); // Copy Details, with or without a selection.
 
     if (node == nullptr)
     {
@@ -1556,56 +1433,25 @@ void TFormASWUnitTestsGUIMain::UpdateDetail()
         return;
     }
 
-    size_t const index = NodeIndex(node->Data);
-    std::string text;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            text = m_TestList.SuiteDetailText(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            text = m_TestList.GroupDetailText(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            text = m_TestList.DetailText(index);
-            break;
-    }
-
-    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(text));
+    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(GUINodeDetailText(m_TestList,
+        NodeRef(node->Data))));
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateStatusBar()
 {
-    auto setPanel = [this](int panel, std::string const& text)
-        {
-            SB_Status->Panels->Items[panel]->Text = FromUTF8(text);
-        };
-
-    // Counts only the tests the filter box shows, since those are the ones Run Selected runs.
-    std::string checked = "Checked: " + std::to_string(m_TestList.CheckedCount()) + " / " +
-        std::to_string(m_TestList.VisibleCount());
-    if (m_TestList.VisibleCount() != m_TestList.Count())
-        checked += " shown";
-    setPanel(0, checked);
-    setPanel(1, "Run: " + std::to_string(m_RunFinishedCount) + " / " + std::to_string(m_RunTotalCount));
-    setPanel(2, "Passed: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Passed)));
-    setPanel(3, "Failed: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Failed)));
-    setPanel(4, "Skipped: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Skipped)));
-
-    std::string elapsed;
+    std::optional<double> elapsedSeconds;
 
     if (m_RunStart.has_value())
     {
         std::chrono::steady_clock::time_point const end = m_RunEnd.value_or(std::chrono::steady_clock::now());
-        elapsed = FormatSeconds(std::chrono::duration<double>(end - *m_RunStart).count());
+        elapsedSeconds = std::chrono::duration<double>(end - *m_RunStart).count();
     }
 
-    setPanel(5, elapsed);
-    setPanel(6, m_Shuffle.StatusText());
-    setPanel(7, m_StatusMessage);
+    std::vector<std::string> const panels = GUIStatusPanels(m_TestList, m_RunFinishedCount, m_RunTotalCount,
+        elapsedSeconds, m_Shuffle.StatusText(), m_StatusMessage);
+
+    for (size_t i = 0; i < panels.size() && static_cast<int>(i) < SB_Status->Panels->Count; ++i)
+        SB_Status->Panels->Items[static_cast<int>(i)]->Text = FromUTF8(panels[i]);
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)

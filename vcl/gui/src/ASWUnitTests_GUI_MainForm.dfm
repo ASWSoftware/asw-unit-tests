@@ -267,7 +267,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     Top = 80
     object Act_RunSelected: TAction
       Caption = '&Run Selected'
-      Hint = 'Run the checked tests that are shown (F9)'
+      Hint = 'Run the checked tests that are shown'
       ShortCut = 120
       OnExecute = Act_RunSelectedExecute
     end
@@ -296,7 +296,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     object Act_CopyDetails: TAction
       Caption = '&Copy Details'
       Enabled = False
-      Hint = 'Copy the selected test'#39's details to the clipboard (Ctrl+Shift+C)'
+      Hint = 'Copy the selected test'#39's details to the clipboard'
       ShortCut = 24643
       OnExecute = Act_CopyDetailsExecute
     end
@@ -313,7 +313,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     end
     object Act_FocusFilter: TAction
       Caption = '&Filter'
-      Hint = 'Move to the filter box (Ctrl+F)'
+      Hint = 'Move to the filter box'
       ShortCut = 16454
       OnExecute = Act_FocusFilterExecute
     end
