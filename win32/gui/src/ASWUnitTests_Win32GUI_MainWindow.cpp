@@ -36,6 +36,8 @@ limitations under the License.
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_INIDocument.h"
+#include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_Tree.h"
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
@@ -134,16 +136,44 @@ public:
 
 //---------------------------------------------------------------------------
 
+BOOL CALLBACK AddMonitorWorkArea(HMONITOR monitor, HDC context, LPRECT bounds, LPARAM workAreas);
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption);
 HMENU AppendSubmenu(HMENU menuBar, wchar_t const* caption);
 char const* CommandName(EWin32GUICommand command);
 bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command);
 COLORREF LogLineColor(std::string const& line);
+std::vector<TGUIRect> MonitorWorkAreas();
 HTREEITEM NextTreeItem(HWND tree, HTREEITEM item);
+MONITORINFO PrimaryMonitorInfo();
 HTREEITEM RelatedTreeItem(HWND tree, HTREEITEM item, UINT relation);
 UINT StateImageIndex(TGUICheckState state);
+TGUIRect ToGUIRect(RECT const& rect);
 TGUINodeRef TreeItemRef(HWND tree, HTREEITEM item);
 
+//---------------------------------------------------------------------------
+/*
+    AddMonitorWorkArea
+
+    EnumDisplayMonitors()'s callback for MonitorWorkAreas(): adds the monitor's work area to 'workAreas', a
+    std::vector<TGUIRect>. No exception may leave it, so one that would ends the enumeration.
+*/
+BOOL CALLBACK AddMonitorWorkArea(HMONITOR monitor, HDC /*context*/, LPRECT /*bounds*/, LPARAM workAreas)
+{
+    try
+    {
+        MONITORINFO info = {};
+        info.cbSize = sizeof(info);
+
+        if (GetMonitorInfoW(monitor, &info) != 0)
+            reinterpret_cast<std::vector<TGUIRect>*>(workAreas)->push_back(ToGUIRect(info.rcWork));
+
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
 //---------------------------------------------------------------------------
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption)
 {
@@ -307,6 +337,19 @@ COLORREF LogLineColor(std::string const& line)
 }
 //---------------------------------------------------------------------------
 /*
+    MonitorWorkAreas
+
+    Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
+*/
+std::vector<TGUIRect> MonitorWorkAreas()
+{
+    std::vector<TGUIRect> workAreas;
+    EnumDisplayMonitors(nullptr, nullptr, &AddMonitorWorkArea, reinterpret_cast<LPARAM>(&workAreas));
+
+    return workAreas;
+}
+//---------------------------------------------------------------------------
+/*
     NextTreeItem
 
     The node after 'item' in the tree's full order, expanded or not: its first child, or else the next sibling
@@ -329,6 +372,21 @@ HTREEITEM NextTreeItem(HWND tree, HTREEITEM item)
     }
 
     return nullptr;
+}
+//---------------------------------------------------------------------------
+/*
+    PrimaryMonitorInfo
+
+    The primary monitor's bounds and work area, which window placements' workspace coordinates are relative to.
+*/
+MONITORINFO PrimaryMonitorInfo()
+{
+    MONITORINFO info = {};
+    info.cbSize = sizeof(info);
+    POINT const origin = { 0, 0 };
+    GetMonitorInfoW(MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY), &info);
+
+    return info;
 }
 //---------------------------------------------------------------------------
 /*
@@ -361,6 +419,11 @@ UINT StateImageIndex(TGUICheckState state)
     }
 
     return 1;
+}
+//---------------------------------------------------------------------------
+TGUIRect ToGUIRect(RECT const& rect)
+{
+    return TGUIRect(rect.left, rect.top, rect.right, rect.bottom);
 }
 //---------------------------------------------------------------------------
 /*
@@ -462,7 +525,9 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_DPI(USER_DEFAULT_SCREEN_DPI),
       m_FocusBeforeRun(nullptr),
       m_FocusedControl(nullptr),
+      m_KeepSelection(false),
       m_LastRunExitCode(ExitCode_Success),
+      m_OpenMaximized(false),
       m_RichEditLibrary(nullptr),
       m_RunAborted(false),
       m_RunFinishedCount(0),
@@ -612,6 +677,22 @@ void TWin32GUIMainWindow::ApplyFilterBox()
     BuildTestTree();
     UpdateDetail();
     UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::ApplyPanelSizes(TGUILayout const& layout)
+{
+    // Kept within what the splitters allow, so each can still be dragged and nothing is squeezed out of view.
+    RECT client;
+    GetClientRect(m_Window, &client);
+    int const pixelsPerInch = static_cast<int>(m_DPI);
+
+    if (layout.TestTreeWidth.has_value())
+        m_TestTreeWidth = ClampTestTreeWidth(ScaleFrom96(*layout.TestTreeWidth, pixelsPerInch), client.right, m_DPI);
+
+    if (layout.DetailHeight.has_value())
+        m_DetailHeight = ClampDetailHeight(ScaleFrom96(*layout.DetailHeight, pixelsPerInch), client.bottom, m_DPI);
+
+    LayOut();
 }
 //---------------------------------------------------------------------------
 /*
@@ -981,10 +1062,46 @@ void TWin32GUIMainWindow::CreateStatusImages()
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUIMainWindow::CurrentLayout
+
+    The window's restored bounds come from GetWindowPlacement(), so a maximized (or minimized) window still
+    saves the size it restores to.
+*/
+TGUILayout TWin32GUIMainWindow::CurrentLayout() const
+{
+    TGUILayout layout;
+    int const pixelsPerInch = static_cast<int>(m_DPI);
+
+    layout.DetailHeight = ScaleTo96(m_DetailHeight, pixelsPerInch);
+    layout.TestTreeWidth = ScaleTo96(m_TestTreeWidth, pixelsPerInch);
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+
+    if (GetWindowPlacement(m_Window, &placement) != 0)
+    {
+        MONITORINFO const primary = PrimaryMonitorInfo();
+        TGUIRect const bounds = WorkspaceToScreen(ToGUIRect(placement.rcNormalPosition), ToGUIRect(primary.rcMonitor),
+            ToGUIRect(primary.rcWork));
+
+        TGUIWindowBounds window;
+        window.Height = ScaleTo96(bounds.Height(), pixelsPerInch);
+        window.Left = bounds.Left;
+        window.Top = bounds.Top;
+        window.Width = ScaleTo96(bounds.Width(), pixelsPerInch);
+        layout.Window = window;
+
+        layout.Maximized = placement.showCmd == SW_SHOWMAXIMIZED ||
+            (placement.showCmd == SW_SHOWMINIMIZED && (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
+    }
+
+    return layout;
+}
+//---------------------------------------------------------------------------
+/*
     TWin32GUIMainWindow::DoCommand
 
-    A disabled command does nothing, since a hot key still sends it when its menu item and button are
-    disabled. Reset Layout isn't connected yet.
+    A disabled command does nothing, since a hot key still sends it when its menu item and button are disabled.
 */
 void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 {
@@ -1037,6 +1154,10 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                 case EWin32GUICommand::FocusFilter:
                     SetFocus(m_Edt_Filter);
                     SendMessageW(m_Edt_Filter, EM_SETSEL, 0, -1);
+                    break;
+
+                case EWin32GUICommand::ResetLayout:
+                    ResetLayout();
                     break;
 
                 case EWin32GUICommand::RunFailed:
@@ -1421,6 +1542,88 @@ void TWin32GUIMainWindow::LayOut()
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUIMainWindow::LoadLayout
+
+    Called from Start(), before the window is first shown. The panel sizes are applied once it's showing,
+    since a window about to open maximized doesn't have the size they have to fit into until then.
+*/
+void TWin32GUIMainWindow::LoadLayout()
+{
+    TGUILayout layout;
+
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+
+        if (!FileExists(path))
+            return;
+
+        layout = LoadGUILayout(TGUIINIDocument(ReadFileBytes(path)));
+    }
+    catch (...)
+    {
+        return; // A layout that can't be read only means the window opens with its defaults.
+    }
+
+    if (layout.Window.has_value())
+    {
+        TGUIWindowBounds const& window = *layout.Window;
+        int const pixelsPerInch = static_cast<int>(m_DPI);
+        TGUIRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, pixelsPerInch),
+            window.Top + ScaleFrom96(window.Height, pixelsPerInch));
+
+        // Not where it can't be reached, e.g. on a monitor that's since been disconnected. Set as the window
+        // placement's normal position, which is also where a window that opens maximized restores to.
+        WINDOWPLACEMENT placement = {};
+        placement.length = sizeof(placement);
+
+        if (IsWindowReachable(bounds, MonitorWorkAreas()) && GetWindowPlacement(m_Window, &placement) != 0)
+        {
+            MONITORINFO const primary = PrimaryMonitorInfo();
+            TGUIRect const normal = ScreenToWorkspace(bounds, ToGUIRect(primary.rcMonitor), ToGUIRect(primary.rcWork));
+            placement.rcNormalPosition.left = normal.Left;
+            placement.rcNormalPosition.top = normal.Top;
+            placement.rcNormalPosition.right = normal.Right;
+            placement.rcNormalPosition.bottom = normal.Bottom;
+            placement.showCmd = SW_HIDE; // Show() shows it.
+            SetWindowPlacement(m_Window, &placement);
+        }
+    }
+
+    m_OpenMaximized = layout.Maximized;
+
+    PostToUI([this, layout]()
+        {
+            RunGuarded("restoring the layout", [this, &layout]()
+            {
+                ApplyPanelSizes(layout);
+            });
+        });
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::LoadSelection()
+{
+    std::vector<TGUISavedTest> saved;
+
+    try
+    {
+        std::string const path = GUISelectionFilePath();
+
+        if (!FileExists(path))
+            return;
+
+        saved = ParseGUISelection(ReadFileBytes(path));
+    }
+    catch (...)
+    {
+        return; // A selection that can't be read only means every test starts out checked.
+    }
+
+    if (!saved.empty())
+        AppendLog(DescribeGUISelectionRestore(RestoreGUISelection(m_TestList, saved)) + "\n");
+}
+//---------------------------------------------------------------------------
+/*
     TWin32GUIMainWindow::OnClose
 
     A run can't be interrupted partway through a test, so closing during one asks it to stop after the
@@ -1439,6 +1642,16 @@ void TWin32GUIMainWindow::OnClose()
             });
         return;
     }
+
+    RunGuarded("closing the window", [this]()
+        {
+            // An --exit run is automated, so nobody arranged its window.
+            if (!m_Options.ExitAfterRun && !m_Options.LayoutIgnore)
+                SaveLayout();
+
+            if (m_KeepSelection)
+                SaveSelection();
+        });
 
     m_Closing = true;
     DestroyWindow(m_Window);
@@ -1692,6 +1905,46 @@ void TWin32GUIMainWindow::ReportUnexpectedError(std::string const& where, std::s
     MessageBoxW(m_Window, UTF8ToWide(message).c_str(), UTF8ToWide(Title).c_str(), MB_OK | MB_ICONERROR);
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::ResetLayout()
+{
+    if (IsZoomed(m_Window) != FALSE)
+        ShowWindow(m_Window, SW_RESTORE);
+
+    // The default size, centered on the monitor the window is on now.
+    CenterOnMonitor();
+
+    TGUILayout defaults;
+    defaults.DetailHeight = TWin32GUIMainSizes::DefaultDetailHeight;
+    defaults.TestTreeWidth = TWin32GUIMainSizes::DefaultTestTreeWidth;
+    ApplyPanelSizes(defaults);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ResetSavedLayout
+
+    For --layout-reset. The file is deleted now, rather than only not loaded, so a layout that caused a
+    problem is gone even if the window doesn't get to close normally this time.
+*/
+void TWin32GUIMainWindow::ResetSavedLayout()
+{
+    std::string const path = GUILayoutFilePath();
+    std::string outcome;
+
+    if (!FileExists(path))
+    {
+        outcome = "there was no saved window layout to delete";
+    }
+    else
+    {
+        RemoveFile(path); // Reported below, from whether the file is still there.
+        outcome = FileExists(path) ?
+                "the saved window layout couldn't be deleted (" + path + "), so it's ignored this time" :
+                "the saved window layout was deleted, so the window opens with the defaults";
+    }
+
+    AppendLog("Note: --layout-reset: " + outcome + ".\n");
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::RunCheckedTests()
 {
     RunTests(m_TestList.CheckedFilter(), "the checked tests");
@@ -1826,6 +2079,38 @@ void TWin32GUIMainWindow::RunTests(TestFilter const& filter, std::string const& 
         PostMessageW(m_Window, WM_CLOSE, 0, 0);
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SaveLayout()
+{
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+        CreateFolderPath(GUISettingsFolderPath());
+
+        // Starting from the file's current text keeps any other values in it.
+        TGUIINIDocument ini(FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUILayout(ini, CurrentLayout());
+        WriteFileBytes(path, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the defaults.
+    }
+}
+//---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SaveSelection()
+{
+    try
+    {
+        std::string const path = GUISelectionFilePath();
+        CreateFolderPath(GUISettingsFolderPath());
+        WriteFileBytes(path, FormatGUISelection(CaptureGUISelection(m_TestList)));
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start checks every test.
+    }
+}
+//---------------------------------------------------------------------------
 HTREEITEM TWin32GUIMainWindow::SelectedTreeItem() const
 {
     return RelatedTreeItem(m_TV_Tests, nullptr, TVGN_CARET);
@@ -1893,8 +2178,17 @@ void TWin32GUIMainWindow::SetTreeExpanded(bool expanded)
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::Show
+
+    WinMain()'s 'showCommand' is usually SW_SHOWNORMAL, unless e.g. a shortcut asks for the window minimized or
+    maximized.
+*/
 void TWin32GUIMainWindow::Show(int showCommand)
 {
+    if (m_OpenMaximized && (showCommand == SW_SHOWNORMAL || showCommand == SW_SHOWDEFAULT || showCommand == SW_SHOW))
+        showCommand = SW_SHOWMAXIMIZED;
+
     ShowWindow(m_Window, showCommand);
     UpdateWindow(m_Window);
 }
@@ -1919,7 +2213,8 @@ void TWin32GUIMainWindow::ShowShuffleState()
 
     Loads the registered tests and applies the command line's options: --project-name to the caption, and
     --filter and the partition options to which tests start out checked, and --filter to the filter box,
-    and --shuffle and --shuffle-seed to the Options menu.
+    and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout and the test
+    selection saved when it last closed.
 */
 void TWin32GUIMainWindow::Start(TGUIOptions const& options)
 {
@@ -1957,8 +2252,17 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
     if (initialFilter != nullptr)
         AppendLog("Initially checked: " + filterDescription + "\n");
 
+    // Only when the command line chooses no tests (see m_KeepSelection). Before the tree is built below.
+    m_KeepSelection = !m_Options.RunOnStart && initialFilter == nullptr;
+
+    if (m_KeepSelection)
+        LoadSelection();
+
     for (std::string const& note : GUICommandLineNotes(m_Options, "windows or controls"))
         AppendLog(note + "\n");
+
+    if (m_Options.LayoutReset)
+        ResetSavedLayout();
 
     UpdateCaption();
 
@@ -1977,6 +2281,10 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
 
     // Builds the tree.
     ApplyFilterBox();
+
+    // Before --run is queued below, so the panel sizes LoadLayout() queues are applied before the run starts.
+    if (!m_Options.LayoutIgnore && !m_Options.LayoutReset)
+        LoadLayout();
 
     if (m_Options.RunOnStart)
     {

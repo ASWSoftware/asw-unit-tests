@@ -45,6 +45,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_Commands.h"
+#include "ASWUnitTests_GUI_Layout.h"
 #include "ASWUnitTests_GUI_RunObserver.h"
 #include "ASWUnitTests_GUI_Shuffle.h"
 #include "ASWUnitTests_GUI_TestList.h"
@@ -146,6 +147,9 @@ private:
     HWND m_FocusedControl;
     // Holds the registered tests; created by Start(). Reports to m_Observer, so the destructor destroys it first.
     std::unique_ptr<TTestHandler> m_Handler;
+    // Set when the selection is restored at start and saved at close: only when the command line chooses no
+    // tests, so an automated --run or a --filter launch never replaces the selection saved interactively.
+    bool m_KeepSelection;
     // The exit code the console runner would have returned for the latest run; see ExitCode().
     int m_LastRunExitCode;
     // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
@@ -153,6 +157,8 @@ private:
     std::optional<std::vector<TJUnitTestCase> > m_LastRunJUnitTestCases;
     TWin32GUIFont m_MonospaceFont;
     TGUIRunObserver m_Observer;
+    // Set by LoadLayout() when the saved layout was maximized, so Show() opens the window maximized.
+    bool m_OpenMaximized;
     TGUIOptions m_Options;
     // The exit code of a WM_QUIT that ProcessMessages() took from the queue during a run, posted again when the
     // run ends.
@@ -201,6 +207,9 @@ private:
     void ApplyDPI();
     // Shows only the tests the filter box's text matches, and rebuilds the tree for them.
     void ApplyFilterBox();
+    // Sets the test tree's width and the detail pane's height that 'layout' has, within what the splitters
+    // allow.
+    void ApplyPanelSizes(TGUILayout const& layout);
     // Rebuilds the test tree from m_TestList's visible tests, fully expanded; see the definition.
     void BuildTestTree();
     void CenterOnMonitor();
@@ -208,6 +217,8 @@ private:
     void CreateControls();
     void CreateMenuBar();
     void CreateStatusImages();
+    // The window's layout as it would be saved; see the definition.
+    TGUILayout CurrentLayout() const;
     // Runs a command from its menu item, toolbar button or hot key, if it's enabled; see the definition.
     void DoCommand(EWin32GUICommand command);
     // Saves the latest run's JUnit report where the user chooses; see the definition.
@@ -217,6 +228,10 @@ private:
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     bool IsToolbarButton(HWND control) const;
     void LayOut();
+    // Restores the layout saved when the window last closed; see the definition.
+    void LoadLayout();
+    // Restores the test selection saved when the window last closed, noting what it did in the log.
+    void LoadSelection();
     // Handles WM_CLOSE; see the definition.
     void OnClose();
     void OnDetailSplitterDrag(int position);
@@ -240,6 +255,10 @@ private:
     void RefreshAllNodeImages();
     // Reports an error that escaped from 'where' in a message box.
     void ReportUnexpectedError(std::string const& where, std::string const& description);
+    // Gives the window its default size, centered on its monitor, and the panels their default sizes.
+    void ResetLayout();
+    // Deletes the saved layout, for --layout-reset; see the definition.
+    void ResetSavedLayout();
     void RunCheckedTests();
     // Runs an event handler's body, reporting any exception from it by name; see the definition.
     void RunGuarded(std::string const& where, std::function<void()> const& body);
@@ -247,6 +266,12 @@ private:
     void RunQueued();
     // Runs the tests 'filter' matches; see the definition.
     void RunTests(TestFilter const& filter, std::string const& filterDescription);
+    // Saves the window's layout to GUILayoutFilePath(), keeping any other values in the file. Not saving it
+    // (e.g. a read-only profile) only means the next start uses the defaults.
+    void SaveLayout();
+    // Saves the test selection to GUISelectionFilePath(). Not saving it only means the next start checks every
+    // test.
+    void SaveSelection();
     // The test tree's selected node, or nullptr if none is.
     HTREEITEM SelectedTreeItem() const;
     // Sets a test tree node's status image from m_TestList.
@@ -296,9 +321,11 @@ public:
     void PostToUI(std::function<void()> action);
     // Runs the window's message loop until it's closed.
     void RunMessageLoop();
+    // Shows the window as WinMain()'s 'showCommand' says, but maximized if the restored layout was and nothing
+    // else was asked for.
     void Show(int showCommand);
-    // Loads the registered tests and applies the command line's options; see the definition. Call after
-    // Create(), before Show().
+    // Loads the registered tests, applies the command line's options, and restores the saved layout and selection;
+    // see the definition. Call after Create(), before Show().
     void Start(TGUIOptions const& options);
     // Whether a run ended with a test that timed out or crashed. A timed-out test's abandoned thread may still be
     // running, using one of the test groups, and after a crash their state may be corrupted, so the caller should
