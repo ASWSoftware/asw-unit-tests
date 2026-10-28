@@ -46,6 +46,8 @@ private:
     // A folder of its own for each test, in the temp folder, with a name outside every ANSI code page; deleted
     // with its content after the test.
     std::string m_ScratchFolder;
+    // The scratch folders made so far, which numbers each test's own; see SetUp_Test().
+    unsigned int m_ScratchFolderCount;
 
     std::string ScratchPath(std::string const& name) const;
 

@@ -116,7 +116,8 @@ void RemoveFolderTree(std::wstring const& folder)
 
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
-    : inherited("ASWUnitTests_Win32GUI_System_Tests")
+    : inherited("ASWUnitTests_Win32GUI_System_Tests"),
+      m_ScratchFolderCount(0)
 {
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_AdjustLineBreaks_MakesEveryLineBreakCRLF,
         "AdjustLineBreaks_MakesEveryLineBreakCRLF");
@@ -175,14 +176,17 @@ void TTest_ASWUnitTests_Win32GUI_System::SetUp_Test(ITestCase& /*testCase*/)
     if (GetTempPathW(MAX_PATH + 1, tempFolder) == 0)
         throw std::runtime_error("no temp folder");
 
-    // e.g. "C:\Users\...\Temp\ASWUnitTests_Win32GUI_System_1234_" followed by U+4E2D.
+    // e.g. "C:\Users\...\Temp\ASWUnitTests_Win32GUI_System_1234_5_" followed by U+4E2D. Numbered per test, since
+    // the previous test's folder may outlive its TearDown_Test(): another program with one of its files open,
+    // such as a virus scanner, keeps it from being deleted.
     m_ScratchFolder = WideToUTF8(tempFolder) + "ASWUnitTests_Win32GUI_System_" + std::to_string(GetCurrentProcessId()) +
-        "_\xE4\xB8\xAD";
+        "_" + std::to_string(++m_ScratchFolderCount) + "_\xE4\xB8\xAD";
 
     RemoveFolderTree(UTF8ToWide(m_ScratchFolder));
 
     if (CreateDirectoryW(UTF8ToWide(m_ScratchFolder).c_str(), nullptr) == 0)
-        throw std::runtime_error("couldn't create " + m_ScratchFolder);
+        throw std::runtime_error("couldn't create " + m_ScratchFolder + " (error " + std::to_string(GetLastError()) +
+            ")");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::TearDown_Group()
