@@ -25,6 +25,7 @@ limitations under the License.
 #include "Test_ASWUnitTests_CrashGuard.h"
 //---------------------------------------------------------------------------
 #include <stdexcept>
+#include <string>
 #include <thread>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
@@ -35,9 +36,14 @@ limitations under the License.
 namespace
 {
 
-// Written through by CrashInsideTryBlock() below. At namespace scope, not a local: GCC 13 and 14 at
-// -O3 drop the write through a local 'int* volatile' initialized to nullptr in the same function, so
-// nothing crashes (seen in the Linux CI build; GCC 15 and Clang keep it).
+// Written through by CrashInsideTryBlock() and RecurseDeeplyThenCrash() below. volatile, so no
+// compiler can prove the write is through a null pointer, which is undefined behavior it may assume
+// never happens: Clang in a Release build (RAD Studio's bcc64x, llvm-mingw) treated the branch that
+// wrote through a plain local null pointer in RecurseDeeplyThenCrash() as unreachable and dropped it
+// with its depth check, so the recursion never stopped and overflowed the stack instead. At namespace
+// scope, not a local: GCC 13 and 14 at -O3 drop the write through a local 'int* volatile' initialized
+// to nullptr in the same function, so nothing crashes (seen in the Linux CI build; GCC 15 and Clang
+// keep it).
 int* volatile g_NullPointer = nullptr;
 
 //---------------------------------------------------------------------------
@@ -77,10 +83,11 @@ void CrashInsideTryBlock()
 /*
     RecurseDeeplyThenCrash
 
-    A small per-frame footprint (unlike RecurseUntilStackOverflows() above), so 20 frames of this
+    A small per-frame footprint (unlike RecurseUntilStackOverflows() below), so 20 frames of this
     use only a few tens of KB and never overflows the stack on its own; the crash at the bottom is
-    an ordinary access violation, deliberately reached from deep in the call stack. Used by
-    Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
+    an ordinary access violation, deliberately reached from deep in the call stack. It writes through
+    g_NullPointer, not a local null pointer, so the optimizer can't drop it (see g_NullPointer). Used
+    by Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
 */
 int RecurseDeeplyThenCrash(int depth)
 {
@@ -89,8 +96,7 @@ int RecurseDeeplyThenCrash(int depth)
 
     if (depth >= 20)
     {
-        int* const nullPointer = nullptr;
-        *const_cast<int*>(nullPointer) = 1;
+        *g_NullPointer = 1;
         return buffer[0];
     }
 
@@ -206,6 +212,8 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbo
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "a null-pointer write is caught");
 #if defined(_WIN32)
+    CheckEquals(std::string("access violation"), result.Description, __func__, __LINE__,
+        "the null-pointer write itself crashed, not something the optimizer turned it into");
     CheckFalse(result.ShouldAbortRun, __func__, __LINE__,
         "an ordinary access violation isn't severe enough to force an abort");
 #else
@@ -255,25 +263,15 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_LaterExceptionStill
 /*
     TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort
 
-    Not merely a handful of frames deep, deliberately: an ordinary crash a couple thousand frames
-    deep was found to be misclassified as abort-worthy specifically on RAD Studio's Clang-based
-    compilers (bcc32c/bcc64) in a Release build, while MinGW handled the exact same code correctly
-    at every depth tried. bcc64x remains unreliable at this specifically, in ways further tuning (a
-    larger SetThreadStackGuarantee(), a shallower depth) did not resolve cleanly - see Skip() below
-    and the commit that added it for the full investigation. This test is Skip()ped on that compiler
-    rather than deleted, since MinGW, bcc32c (and, unverified so far, MSVC) still need real coverage
-    of "an ordinary crash, meaningfully deep, still doesn't force an abort." bcc32c passes it in
-    Debug and Release builds, while bcc64x still fails it in a Release build (checked 2026-10-14,
-    RAD Studio 13.1).
+    Not merely a handful of frames deep, deliberately: an ordinary crash deep in the call stack is
+    still only an access violation, not a stack overflow, and mustn't force an abort. This test was
+    once skipped on RAD Studio's bcc64x, whose Release build reported a stack overflow: Clang had
+    dropped the helper's write through a plain null pointer as undefined behavior, and the depth
+    check with it, so the recursion never stopped (see g_NullPointer). The description is checked
+    so a crash that turns into a different fault fails with a clear message.
 */
 void TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort()
 {
-#if defined(__BORLANDC__) && defined(_WIN64)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's bcc64x in a Release build: an ordinary crash this deep was "
-        "misclassified as abort-worthy. MinGW and bcc32c handle this correctly; investigation ongoing.");
-#endif
-
     // Arrange, Act
     TCrashGuardResult const result = TCrashGuard::Run([]()
         {
@@ -283,6 +281,8 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNo
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "an access violation 20 stack frames deep is still caught");
 #if defined(_WIN32)
+    CheckEquals(std::string("access violation"), result.Description, __func__, __LINE__,
+        "the null-pointer write at the bottom crashed, not a stack overflow from unbounded recursion");
     CheckFalse(result.ShouldAbortRun, __func__, __LINE__,
         "an ordinary access violation, even this deep, still isn't severe enough to force an abort");
 #else
