@@ -41,6 +41,7 @@ limitations under the License.
 #include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
+#include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_Commands.h"
@@ -137,12 +138,19 @@ private:
     // The detail pane's height and the test tree's width, in pixels at m_DPI.
     int m_DetailHeight;
     UINT m_DPI;
+    // The path last chosen in Export JUnit Report's dialog, where it starts next time.
+    std::string m_ExportJUnitReportPath;
+    // The control that had the focus as the current or latest run started; see SetRunning().
+    HWND m_FocusBeforeRun;
     // The control that had the focus when the window was last deactivated, given it back on activation.
     HWND m_FocusedControl;
     // Holds the registered tests; created by Start(). Reports to m_Observer, so the destructor destroys it first.
     std::unique_ptr<TTestHandler> m_Handler;
     // The exit code the console runner would have returned for the latest run; see ExitCode().
     int m_LastRunExitCode;
+    // The latest run's JUnit report entries, for --report-junit and Export JUnit Report. Unset until a run
+    // finishes, and after a run an unhandled exception ended, which has no report, as in the console runner.
+    std::optional<std::vector<TJUnitTestCase> > m_LastRunJUnitTestCases;
     TWin32GUIFont m_MonospaceFont;
     TGUIRunObserver m_Observer;
     TGUIOptions m_Options;
@@ -202,9 +210,12 @@ private:
     void CreateStatusImages();
     // Runs a command from its menu item, toolbar button or hot key, if it's enabled; see the definition.
     void DoCommand(EWin32GUICommand command);
+    // Saves the latest run's JUnit report where the user chooses; see the definition.
+    void ExportJUnitReport();
     // Ends the run on an unhandled exception that escaped TTestHandler::Run(), described by 'description'.
     void FailRunOnUnhandledException(std::string const& description);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    bool IsToolbarButton(HWND control) const;
     void LayOut();
     // Handles WM_CLOSE; see the definition.
     void OnClose();
@@ -242,6 +253,7 @@ private:
     void SetNodeImage(HTREEITEM item);
     // Sets the progress bar's position; see the definition.
     void SetProgressPosition(int position);
+    // Enables or disables the commands for a run starting or ending; see the definition.
     void SetRunning(bool running);
     // Expands or collapses every node of the test tree.
     void SetTreeExpanded(bool expanded);
@@ -259,6 +271,9 @@ private:
     void UpdateStatusBar();
     // Sets the status images of a test's node and of the group and suite nodes holding it.
     void UpdateTestNodeImages(std::size_t testIndex);
+    // Writes the latest run's JUnit report to 'path', noting the outcome in the log. False, with 'error' set to
+    // why, if it couldn't be written. See the definition.
+    bool WriteJUnitReport(std::string const& path, std::string& error);
 
 public:
     TWin32GUIMainWindow();

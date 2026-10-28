@@ -132,6 +132,10 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "CreateFolderPath_ThrowsWhenAFileIsInTheWay");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ExeFileName_IsThisExecutablesNameWithoutItsFolder,
         "ExeFileName_IsThisExecutablesNameWithoutItsFolder");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ExpandFileName_MakesARelativePathAbsolute,
+        "ExpandFileName_MakesARelativePathAbsolute");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ExpandFileName_ResolvesDotFolders,
+        "ExpandFileName_ResolvesDotFolders");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_FileExists_IsTrueOnlyForAFile, "FileExists_IsTrueOnlyForAFile");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUILayoutFilePath_IsPerExeUnderAppData,
         "GUILayoutFilePath_IsPerExeUnderAppData");
@@ -296,6 +300,34 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_ExeFileName_IsThisExecutablesNameW
     // GetModuleHandleW() finds a loaded module by its file name alone.
     CheckTrue(GetModuleHandleW(UTF8ToWide(name).c_str()) == GetModuleHandleW(nullptr), __func__, __LINE__,
         "names this process's executable");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_ExpandFileName_MakesARelativePathAbsolute()
+{
+    // Arrange
+    wchar_t currentFolder[MAX_PATH + 1] = {};
+    DWORD const currentLength = GetCurrentDirectoryW(MAX_PATH + 1, currentFolder);
+    AssertTrue(currentLength > 0 && currentLength <= MAX_PATH, __func__, __LINE__, "the current folder is known");
+
+    std::string folder = WideToUTF8(currentFolder);
+
+    if (folder.back() != '\\')
+        folder += "\\"; // Unless it's a drive's root, such as "C:\".
+
+    // Act
+    std::string const expanded = ExpandFileName("report\xC3\xA9.xml");
+
+    // Assert
+    CheckEquals(folder + "report\xC3\xA9.xml", expanded, __func__, __LINE__, "in the current folder");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_ExpandFileName_ResolvesDotFolders()
+{
+    // Act
+    std::string const expanded = ExpandFileName(ScratchPath("sub\xE4\xB8\xAD\\..\\.\\report.xml"));
+
+    // Assert
+    CheckEquals(ScratchPath("report.xml"), expanded, __func__, __LINE__, "without the dot folders");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_FileExists_IsTrueOnlyForAFile()

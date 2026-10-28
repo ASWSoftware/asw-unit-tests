@@ -53,6 +53,10 @@ std::vector<std::string> CommandLineArguments(std::wstring const& commandLine);
 void CreateFolderPath(std::string const& folderPath);
 // This executable's file name, without its folder, e.g. "ASWUnitTests_Win32_GUI.exe".
 std::string ExeFileName();
+// The path made absolute, relative to the current folder, with any "." and ".." folders resolved, much as the
+// VCL's ExpandFileName() does for the VCL GUI runner. The file needn't exist. Throws std::runtime_error if the
+// path isn't valid.
+std::string ExpandFileName(std::string const& path);
 // Whether a file (not a folder) exists at the path.
 bool FileExists(std::string const& path);
 // This executable's layout file, %APPDATA%\ASWUnitTests\<exe name>.ini, so each test app built on the GUI

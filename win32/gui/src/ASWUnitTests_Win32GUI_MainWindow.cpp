@@ -468,6 +468,7 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_Closing(false),
       m_DetailHeight(TWin32GUIMainSizes::DefaultDetailHeight),
       m_DPI(USER_DEFAULT_SCREEN_DPI),
+      m_FocusBeforeRun(nullptr),
       m_FocusedControl(nullptr),
       m_LastRunExitCode(ExitCode_Success),
       m_RichEditLibrary(nullptr),
@@ -991,7 +992,7 @@ void TWin32GUIMainWindow::CreateStatusImages()
     TWin32GUIMainWindow::DoCommand
 
     A disabled command does nothing, since a hot key still sends it when its menu item and button are
-    disabled. Export JUnit Report, Reset Layout and the Options menu's commands aren't connected yet.
+    disabled. Reset Layout and the Options menu's commands aren't connected yet.
 */
 void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 {
@@ -1036,6 +1037,10 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 
                     break;
                 }
+
+                case EWin32GUICommand::ExportJUnitReport:
+                    ExportJUnitReport();
+                    break;
 
                 case EWin32GUICommand::FocusFilter:
                     SetFocus(m_Edt_Filter);
@@ -1093,6 +1098,81 @@ int TWin32GUIMainWindow::ExitCode() const
     return m_Options.ExitAfterRun ? m_LastRunExitCode : ExitCode_Success;
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ExportJUnitReport
+
+    Saves the latest run's JUnit report, the same one --report-junit writes, e.g. when --report-junit wasn't
+    given. The dialog starts at --report-junit's path if there is one, and then at the last one chosen. It's
+    given the folder and the file name separately, so a folder that doesn't exist (any more) only means it
+    starts in its default folder.
+*/
+void TWin32GUIMainWindow::ExportJUnitReport()
+{
+    if (m_Running || !m_LastRunJUnitTestCases.has_value())
+        return;
+
+    if (m_ExportJUnitReportPath.empty() && !m_Options.CLI.JunitReportPath.empty())
+    {
+        m_ExportJUnitReportPath = ExpandFileName(m_Options.CLI.JunitReportPath);
+    }
+    else if (m_ExportJUnitReportPath.empty())
+    {
+        // e.g. "ASWUnitTests_Win32_GUI_JUnit.xml", in the dialog's default folder.
+        m_ExportJUnitReportPath = GUIDefaultJUnitReportFileName(ExeFileName());
+    }
+
+    std::wstring const initialPath = UTF8ToWide(m_ExportJUnitReportPath);
+    std::size_t const separator = initialPath.find_last_of(L"\\/");
+    std::wstring const initialFolder = separator == std::wstring::npos ? std::wstring() :
+            initialPath.substr(0, separator + 1);
+    std::wstring const initialName = separator == std::wstring::npos ? initialPath : initialPath.substr(separator + 1);
+
+    // Room for the longest path Windows allows, plus the terminating null.
+    std::vector<wchar_t> fileName(32768, L'\0');
+    std::copy(initialName.begin(), initialName.begin() +
+        static_cast<std::ptrdiff_t>((std::min)(initialName.size(), fileName.size() - 1)), fileName.begin());
+
+    // The .dfm's SD_JUnitReport: its filter, default extension, title and options.
+    OPENFILENAMEW dialog = {};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = m_Window;
+    dialog.lpstrFilter = L"JUnit XML reports (*.xml)\0*.xml\0All files (*.*)\0*.*\0";
+    dialog.lpstrFile = fileName.data();
+    dialog.nMaxFile = static_cast<DWORD>(fileName.size());
+    dialog.lpstrInitialDir = initialFolder.empty() ? nullptr : initialFolder.c_str();
+    dialog.lpstrTitle = L"Export JUnit Report";
+    dialog.Flags = OFN_ENABLESIZING | OFN_EXPLORER | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    dialog.lpstrDefExt = L"xml";
+
+    if (GetSaveFileNameW(&dialog) == 0)
+    {
+        DWORD const error = CommDlgExtendedError();
+
+        if (error != 0)
+        {
+            throw std::runtime_error("Couldn't show the Export JUnit Report dialog (error " + std::to_string(error) +
+                ")");
+        }
+
+        return; // Canceled.
+    }
+
+    m_ExportJUnitReportPath = WideToUTF8(fileName.data());
+
+    std::string error;
+
+    if (!WriteJUnitReport(m_ExportJUnitReportPath, error))
+    {
+        std::string const message = "The JUnit report couldn't be written to:\n" + m_ExportJUnitReportPath + "\n\n" +
+            error;
+        MessageBoxW(m_Window, UTF8ToWide(message).c_str(), UTF8ToWide(Title).c_str(), MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    m_StatusMessage = "JUnit report exported.";
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::FailRunOnUnhandledException(std::string const& description)
 {
     m_Observer.Flush();
@@ -1135,7 +1215,13 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
             }
             else if (HIWORD(wParam) == 0) // Not minimized
             {
-                SetFocus(m_FocusedControl != nullptr ? m_FocusedControl : GetNextDlgTabItem(m_Window, nullptr, FALSE));
+                // Unless it's been disabled since, e.g. by a run, when the next control takes it.
+                HWND focus = m_FocusedControl;
+
+                if (focus == nullptr || IsWindowEnabled(focus) == FALSE)
+                    focus = GetNextDlgTabItem(m_Window, focus, FALSE);
+
+                SetFocus(focus);
             }
 
             return 0;
@@ -1257,6 +1343,17 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
     }
 
     return DefWindowProcW(window, message, wParam, lParam);
+}
+//---------------------------------------------------------------------------
+bool TWin32GUIMainWindow::IsToolbarButton(HWND control) const
+{
+    for (TToolbarButton const& button : ToolbarButtons)
+    {
+        if (control != nullptr && control == this->*button.Control)
+            return true;
+    }
+
+    return false;
 }
 //---------------------------------------------------------------------------
 /*
@@ -1667,6 +1764,7 @@ void TWin32GUIMainWindow::RunTests(TestFilter const& filter, std::string const& 
     m_CurrentTestIndex.reset();
     m_RunStart = std::chrono::steady_clock::now();
     m_RunEnd.reset();
+    m_LastRunJUnitTestCases.reset();
 
     // Back to the normal state first, since the error state wouldn't draw the new position; see
     // SetProgressPosition().
@@ -1690,8 +1788,16 @@ void TWin32GUIMainWindow::RunTests(TestFilter const& filter, std::string const& 
         m_RunAborted = summary.Aborted;
         m_StatusMessage = summary.StatusMessage;
         m_LastRunExitCode = summary.ExitCode;
+        m_LastRunJUnitTestCases = ToJUnitTestCases(results.CaseRecords);
+
+        // A failure is only noted in the log, so it can't hold up --exit.
+        if (!m_Options.CLI.JunitReportPath.empty())
+        {
+            std::string error;
+            WriteJUnitReport(m_Options.CLI.JunitReportPath, error);
+        }
     }
-    // As in the console runner, an unhandled exception ends the run, with its own exit code.
+    // As in the console runner, an unhandled exception ends the run without a report, with its own exit code.
     catch (std::exception const& ex)
     {
         m_LastRunExitCode = ExitCode_UnhandledException;
@@ -1749,11 +1855,27 @@ void TWin32GUIMainWindow::SetProgressPosition(int position)
         SendMessageW(m_PB_Progress, PBM_SETPOS, static_cast<WPARAM>(position), 0);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SetRunning
+
+    Disabling the control with the focus moves the focus on (see UpdateCommands()), e.g. from Run Selected to
+    Stop as a run starts. So when the run ends, the control that had the focus gets it back, as in the VCL GUI
+    runner, unless the user has put it somewhere other than a toolbar button since.
+*/
 void TWin32GUIMainWindow::SetRunning(bool running)
 {
+    if (running)
+        m_FocusBeforeRun = GetFocus();
+
     m_Running = running;
     UpdateCommands();
     UpdateStatusBar();
+
+    if (!running && m_FocusBeforeRun != nullptr && IsWindowEnabled(m_FocusBeforeRun) != FALSE &&
+        IsToolbarButton(GetFocus()))
+    {
+        SetFocus(m_FocusBeforeRun);
+    }
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::SetTreeExpanded(bool expanded)
@@ -1905,12 +2027,14 @@ void TWin32GUIMainWindow::UpdateCommands()
 {
     TGUICommandContext context;
     context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
+    context.HasReport = m_LastRunJUnitTestCases.has_value();
     context.HasSelection = SelectedTreeItem() != nullptr;
     context.RunAborted = m_RunAborted;
     context.Running = m_Running;
     context.TreeHasNodes = SendMessageW(m_TV_Tests, TVM_GETCOUNT, 0, 0) > 0;
 
     m_CommandStates = GUICommandStates(context);
+    HWND const focus = GetFocus();
 
     for (EWin32GUICommand const command : AllCommands)
     {
@@ -1922,6 +2046,17 @@ void TWin32GUIMainWindow::UpdateCommands()
         EnableWindow(this->*button.Control, IsCommandEnabled(m_CommandStates, button.Command) ? TRUE : FALSE);
 
     EnableWindow(m_Edt_Filter, m_CommandStates.FilterBox ? TRUE : FALSE);
+
+    // A disabled control can't keep the focus, e.g. Run Selected as a run starts, and with no control holding it,
+    // IsDialogMessageW() keeps Alt+letter from opening the menu. So it moves on to the next control, as a dialog's
+    // does.
+    if (focus != nullptr && IsChild(m_Window, focus) && IsWindowEnabled(focus) == FALSE)
+    {
+        HWND const next = GetNextDlgTabItem(m_Window, focus, FALSE);
+
+        if (next != nullptr)
+            SetFocus(next);
+    }
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::UpdateDetail()
@@ -2017,6 +2152,36 @@ LRESULT CALLBACK TWin32GUIMainWindow::WindowProc(HWND window, UINT message, WPAR
     }
 
     return DefWindowProcW(window, message, wParam, lParam);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::WriteJUnitReport
+
+    Writes the file itself, rather than with TJUnitReportWriter::Write(), whose std::ofstream can't open a
+    path with characters outside the system code page (e.g. a user folder's name) from a std::string.
+*/
+bool TWin32GUIMainWindow::WriteJUnitReport(std::string const& path, std::string& error)
+{
+    error.clear();
+
+    try
+    {
+        if (!m_LastRunJUnitTestCases.has_value())
+            throw std::runtime_error("no run has finished");
+
+        WriteFileBytes(path, TJUnitReportWriter::BuildXML(m_Handler->GetProjectName(), *m_LastRunJUnitTestCases));
+    }
+    catch (std::exception const& ex)
+    {
+        error = ex.what();
+    }
+
+    if (error.empty())
+        AppendLog("JUnit report written to: " + path + "\n");
+    else
+        AppendLog("Error: could not write JUnit report to: " + path + " (" + error + ")\n");
+
+    return error.empty();
 }
 //---------------------------------------------------------------------------
 

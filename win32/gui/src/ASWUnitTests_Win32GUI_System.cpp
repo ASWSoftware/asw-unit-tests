@@ -272,6 +272,25 @@ std::string ExeFileName()
     return WideToUTF8(separator == std::wstring::npos ? path : path.substr(separator + 1));
 }
 //---------------------------------------------------------------------------
+std::string ExpandFileName(std::string const& path)
+{
+    std::wstring const relative = UTF8ToWide(path);
+    // The length GetFullPathNameW() needs, including the terminating null; 0 if the path isn't valid.
+    DWORD const needed = GetFullPathNameW(relative.c_str(), 0, nullptr, nullptr);
+
+    if (needed == 0)
+        throw FileError("expand the path", path, GetLastError());
+
+    std::wstring full(needed, L'\0');
+    DWORD const length = GetFullPathNameW(relative.c_str(), needed, &full[0], nullptr);
+
+    if (length == 0 || length >= needed)
+        throw FileError("expand the path", path, length == 0 ? GetLastError() : ERROR_INSUFFICIENT_BUFFER);
+
+    full.resize(length);
+    return WideToUTF8(full);
+}
+//---------------------------------------------------------------------------
 bool FileExists(std::string const& path)
 {
     DWORD const attributes = GetFileAttributesW(UTF8ToWide(path).c_str());

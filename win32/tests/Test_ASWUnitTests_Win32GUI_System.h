@@ -57,6 +57,8 @@ private: // Test methods
     void Test_CreateFolderPath_CreatesEveryMissingFolder();
     void Test_CreateFolderPath_ThrowsWhenAFileIsInTheWay();
     void Test_ExeFileName_IsThisExecutablesNameWithoutItsFolder();
+    void Test_ExpandFileName_MakesARelativePathAbsolute();
+    void Test_ExpandFileName_ResolvesDotFolders();
     void Test_FileExists_IsTrueOnlyForAFile();
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
