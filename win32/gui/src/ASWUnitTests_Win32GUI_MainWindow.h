@@ -92,13 +92,14 @@ enum class EWin32GUICommand : WORD
 class TWin32GUIMainWindow
 {
 private:
-    // A toolbar button: its command, caption, and left edge and width at 96 DPI, from the .dfm.
+    // A toolbar button: its command, caption, left edge and width at 96 DPI, and tooltip, from the .dfm.
     struct TToolbarButton
     {
         EWin32GUICommand Command;
         wchar_t const* Caption;
         int Left;
         int Width;
+        wchar_t const* Hint;
         HWND TWin32GUIMainWindow::* Control;
     };
 
@@ -125,6 +126,8 @@ private:
     HWND m_SB_Status;
     TWin32GUISplitter m_Spl_Detail;
     TWin32GUISplitter m_Spl_Tests;
+    // The tooltips of the toolbar's buttons and the filter box, the .dfm's Hints.
+    HWND m_TT_Hints;
     HWND m_TV_Tests;
 
     HACCEL m_Accelerators;
@@ -217,6 +220,7 @@ private:
     void CreateControls();
     void CreateMenuBar();
     void CreateStatusImages();
+    void CreateTooltips();
     // The window's layout as it would be saved; see the definition.
     TGUILayout CurrentLayout() const;
     // Runs a command from its menu item, toolbar button or hot key, if it's enabled; see the definition.
@@ -232,6 +236,10 @@ private:
     void LoadLayout();
     // Restores the test selection saved when the window last closed, noting what it did in the log.
     void LoadSelection();
+    // Moves the focus to 'control' as Tab does; see the definition.
+    void MoveFocusTo(HWND control);
+    // The control Tab (or Shift+Tab, if not 'forward') moves the focus to from 'from'; see the definition.
+    HWND NextTabStop(HWND from, bool forward) const;
     // Handles WM_CLOSE; see the definition.
     void OnClose();
     void OnDetailSplitterDrag(int position);
@@ -240,6 +248,8 @@ private:
     LRESULT OnFailuresCustomDraw(NMLVCUSTOMDRAW& draw) const;
     // Selects the double-clicked failure's test in the tree; see the definition.
     void OnFailuresDoubleClick();
+    // Handles Tab, Shift+Tab and Ctrl+Tab before the dialog keyboard handling does; see the definition.
+    bool OnTabKey(MSG const& message);
     void OnTestFinished(TTestCaseRecord const& record, std::string const& testLog);
     void OnTestStarted(std::string const& groupName, std::string const& testName);
     void OnTestsSplitterDrag(int position);
@@ -272,6 +282,8 @@ private:
     // Saves the test selection to GUISelectionFilePath(). Not saving it only means the next start checks every
     // test.
     void SaveSelection();
+    // Shows the results page 'page' (0 Failures & Skips, 1 Log), as clicking its tab does.
+    void SelectResultsPage(int page);
     // The test tree's selected node, or nullptr if none is.
     HTREEITEM SelectedTreeItem() const;
     // Sets a test tree node's status image from m_TestList.
@@ -282,7 +294,7 @@ private:
     void SetRunning(bool running);
     // Expands or collapses every node of the test tree.
     void SetTreeExpanded(bool expanded);
-    // Shows the results page whose tab is selected.
+    // Shows the results page whose tab is selected; see the definition.
     void ShowResultsPage();
     // Shows whether shuffling is on, in the Options menu's check mark and the status bar.
     void ShowShuffleState();

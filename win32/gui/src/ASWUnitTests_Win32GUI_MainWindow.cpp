@@ -489,14 +489,22 @@ TScopedFlag::~TScopedFlag()
 /////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
+// The hints are the actions', with their shortcut added as the VCL adds it to an action's control's hint.
 TWin32GUIMainWindow::TToolbarButton const TWin32GUIMainWindow::ToolbarButtons[7] = {
-    { EWin32GUICommand::RunSelected, L"R&un Selected", 8, 110, &TWin32GUIMainWindow::m_Btn_RunSelected },
-    { EWin32GUICommand::RunFailed, L"Run Faile&d", 124, 100, &TWin32GUIMainWindow::m_Btn_RunFailed },
-    { EWin32GUICommand::Stop, L"&Stop", 230, 80, &TWin32GUIMainWindow::m_Btn_Stop },
-    { EWin32GUICommand::SelectAll, L"Select &All", 328, 90, &TWin32GUIMainWindow::m_Btn_SelectAll },
-    { EWin32GUICommand::SelectNone, L"Select &None", 424, 90, &TWin32GUIMainWindow::m_Btn_SelectNone },
-    { EWin32GUICommand::SelectFailed, L"Select Fai&led", 520, 90, &TWin32GUIMainWindow::m_Btn_SelectFailed },
-    { EWin32GUICommand::CopyDetails, L"&Copy Details", 628, 110, &TWin32GUIMainWindow::m_Btn_CopyDetails },
+    { EWin32GUICommand::RunSelected, L"R&un Selected", 8, 110, L"Run the checked tests that are shown (F9)",
+      &TWin32GUIMainWindow::m_Btn_RunSelected },
+    { EWin32GUICommand::RunFailed, L"Run Faile&d", 124, 100, L"Rerun the tests that failed in the last run",
+      &TWin32GUIMainWindow::m_Btn_RunFailed },
+    { EWin32GUICommand::Stop, L"&Stop", 230, 80, L"Stop the run after the current test",
+      &TWin32GUIMainWindow::m_Btn_Stop },
+    { EWin32GUICommand::SelectAll, L"Select &All", 328, 90, L"Check every shown test",
+      &TWin32GUIMainWindow::m_Btn_SelectAll },
+    { EWin32GUICommand::SelectNone, L"Select &None", 424, 90, L"Uncheck every shown test",
+      &TWin32GUIMainWindow::m_Btn_SelectNone },
+    { EWin32GUICommand::SelectFailed, L"Select Fai&led", 520, 90,
+      L"Check only the shown tests that failed in the last run", &TWin32GUIMainWindow::m_Btn_SelectFailed },
+    { EWin32GUICommand::CopyDetails, L"&Copy Details", 628, 110,
+      L"Copy the selected test's details to the clipboard (Ctrl+Shift+C)", &TWin32GUIMainWindow::m_Btn_CopyDetails },
 };
 
 //---------------------------------------------------------------------------
@@ -517,6 +525,7 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_PC_Results(nullptr),
       m_RE_Log(nullptr),
       m_SB_Status(nullptr),
+      m_TT_Hints(nullptr),
       m_TV_Tests(nullptr),
       m_Accelerators(nullptr),
       m_CloseAfterRun(false),
@@ -662,7 +671,9 @@ void TWin32GUIMainWindow::ApplyDPI()
     SendMessageW(m_LV_Failures, LVM_SETCOLUMNWIDTH, 1, ScaleForDPI(240, m_DPI));
 
     LayOut();
-    InvalidateRect(m_Window, nullptr, TRUE);
+    // Every control too, in its new font: resizing one keeps what it had drawn and redraws only the part it
+    // gained, which would leave e.g. the filter label's old, smaller text showing.
+    RedrawWindow(m_Window, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 //---------------------------------------------------------------------------
 /*
@@ -821,6 +832,7 @@ void TWin32GUIMainWindow::Create()
     m_DetailHeight = ScaleForDPI(TWin32GUIMainSizes::DefaultDetailHeight, m_DPI);
 
     CreateControls();
+    CreateTooltips();
     CenterOnMonitor();
     ApplyDPI();
     UpdateCommands();
@@ -1059,6 +1071,39 @@ void TWin32GUIMainWindow::CreateStatusImages()
         ImageList_Destroy(m_StatusImages);
 
     m_StatusImages = images;
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::CreateTooltips
+
+    The VCL shows a control's Hint as its tooltip while the window is active, and not for a disabled control,
+    which a Windows tooltip that subclasses its control doesn't either, since the control gets no mouse
+    messages.
+*/
+void TWin32GUIMainWindow::CreateTooltips()
+{
+    m_TT_Hints = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr, WS_POPUP | TTS_NOPREFIX, CW_USEDEFAULT,
+        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, m_Window, nullptr, GetModuleHandleW(nullptr), nullptr);
+
+    if (m_TT_Hints == nullptr)
+        throw std::runtime_error("Couldn't create the tooltips");
+
+    auto const addTool = [this](HWND control, wchar_t const* text)
+        {
+            TTTOOLINFOW tool = {};
+            tool.cbSize = sizeof(tool);
+            tool.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+            tool.hwnd = m_Window;
+            tool.uId = reinterpret_cast<UINT_PTR>(control);
+            tool.lpszText = const_cast<wchar_t*>(text);
+            SendMessageW(m_TT_Hints, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
+        };
+
+    for (TToolbarButton const& button : ToolbarButtons)
+        addTool(this->*button.Control, button.Hint);
+
+    addTool(m_Edt_Filter, L"Show only tests whose \"Group.Test\" name contains this text, which may use the * and ? "
+        L"wildcards of --filter; not case-sensitive");
 }
 //---------------------------------------------------------------------------
 /*
@@ -1343,7 +1388,7 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
                 HWND focus = m_FocusedControl;
 
                 if (focus == nullptr || IsWindowEnabled(focus) == FALSE)
-                    focus = GetNextDlgTabItem(m_Window, focus, FALSE);
+                    focus = NextTabStop(focus, true);
 
                 SetFocus(focus);
             }
@@ -1624,6 +1669,58 @@ void TWin32GUIMainWindow::LoadSelection()
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUIMainWindow::MoveFocusTo
+
+    Also selects the filter box's text, as the VCL's TEdit does when it's tabbed to (AutoSelect), and shows the
+    focus rectangle, which Windows hides until the keyboard is used.
+*/
+void TWin32GUIMainWindow::MoveFocusTo(HWND control)
+{
+    SetFocus(control);
+
+    if (control == m_Edt_Filter)
+        SendMessageW(m_Edt_Filter, EM_SETSEL, 0, -1);
+
+    SendMessageW(m_Window, WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEFOCUS), 0);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::NextTabStop
+
+    The VCL GUI runner's tab order: the toolbar's buttons, the filter box, the test tree, the detail pane, the
+    results' tabs, and the results' pages, skipping a control that's disabled or hidden. Windows' own order
+    would put the results' pages before their tabs, since they're above them in z-order to get the mouse's
+    clicks. From a control that isn't in the order (e.g. nullptr), the first or, going back, the last. nullptr
+    if no control can take the focus.
+*/
+HWND TWin32GUIMainWindow::NextTabStop(HWND from, bool forward) const
+{
+    std::vector<HWND> order;
+
+    for (TToolbarButton const& button : ToolbarButtons)
+        order.push_back(this->*button.Control);
+
+    order.insert(order.end(), { m_Edt_Filter, m_TV_Tests, m_Mem_Detail, m_PC_Results, m_LV_Failures, m_RE_Log });
+
+    std::size_t const count = order.size();
+    std::vector<HWND>::const_iterator const found = std::find(order.begin(), order.end(), from);
+    // Stepping once from here reaches the first control, or going back, the last.
+    std::size_t const start = found != order.end() ? static_cast<std::size_t>(found - order.begin()) :
+            (forward ? count - 1 : 0);
+
+    for (std::size_t step = 1; step <= count; ++step)
+    {
+        HWND const control = order[forward ? (start + step) % count : (start + count - step) % count];
+
+        if (IsWindowVisible(control) != FALSE && IsWindowEnabled(control) != FALSE)
+            return control;
+    }
+
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+/*
     TWin32GUIMainWindow::OnClose
 
     A run can't be interrupted partway through a test, so closing during one asks it to stop after the
@@ -1747,6 +1844,45 @@ void TWin32GUIMainWindow::OnFailuresDoubleClick()
     SetFocus(m_TV_Tests);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::OnTabKey
+
+    Tab and Shift+Tab move through NextTabStop()'s order, rather than IsDialogMessageW()'s, which would also
+    let the detail pane and the log keep Tab, as multiline edit controls do. Ctrl+Tab and Ctrl+Shift+Tab switch
+    the results' pages while the focus is on them, as the VCL's TPageControl does, and do nothing elsewhere.
+    True if 'message' was one of these keys, which it then handled.
+*/
+bool TWin32GUIMainWindow::OnTabKey(MSG const& message)
+{
+    if (message.message != WM_KEYDOWN || message.wParam != VK_TAB || (GetKeyState(VK_MENU) & 0x8000) != 0 ||
+        IsChild(m_Window, message.hwnd) == FALSE)
+    {
+        return false;
+    }
+
+    bool const back = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    HWND const focus = GetFocus();
+
+    if ((GetKeyState(VK_CONTROL) & 0x8000) != 0)
+    {
+        if (focus == m_PC_Results || focus == m_LV_Failures || focus == m_RE_Log)
+        {
+            int const count = static_cast<int>(SendMessageW(m_PC_Results, TCM_GETITEMCOUNT, 0, 0));
+            int const current = static_cast<int>(SendMessageW(m_PC_Results, TCM_GETCURSEL, 0, 0));
+            SelectResultsPage((current + (back ? count - 1 : 1)) % count);
+        }
+
+        return true;
+    }
+
+    HWND const next = NextTabStop(focus, !back);
+
+    if (next != nullptr)
+        MoveFocusTo(next);
+
+    return true;
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::OnTestFinished(TTestCaseRecord const& record, std::string const& testLog)
 {
     std::optional<std::size_t> const index = m_TestList.IndexOf(record.GroupName, record.TestName);
@@ -1856,8 +1992,8 @@ void TWin32GUIMainWindow::ProcessMessage(MSG& message)
 {
     if (m_Window != nullptr)
     {
-        // Hot keys first, then a dialog's keyboard handling: Tab between controls, and their & hot keys.
-        if (TranslateAcceleratorW(m_Window, m_Accelerators, &message) != 0 ||
+        // Hot keys first, then Tab, then a dialog's keyboard handling: the controls' & hot keys and arrow keys.
+        if (TranslateAcceleratorW(m_Window, m_Accelerators, &message) != 0 || OnTabKey(message) ||
             IsDialogMessageW(m_Window, &message) != 0)
         {
             return;
@@ -2111,6 +2247,13 @@ void TWin32GUIMainWindow::SaveSelection()
     }
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::SelectResultsPage(int page)
+{
+    // Unlike a click on a tab, this sends no TCN_SELCHANGE.
+    SendMessageW(m_PC_Results, TCM_SETCURSEL, static_cast<WPARAM>(page), 0);
+    ShowResultsPage();
+}
+//---------------------------------------------------------------------------
 HTREEITEM TWin32GUIMainWindow::SelectedTreeItem() const
 {
     return RelatedTreeItem(m_TV_Tests, nullptr, TVGN_CARET);
@@ -2193,12 +2336,23 @@ void TWin32GUIMainWindow::Show(int showCommand)
     UpdateWindow(m_Window);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ShowResultsPage
+
+    The focus, if it's on the page being hidden, goes to the one shown, as in the VCL.
+*/
 void TWin32GUIMainWindow::ShowResultsPage()
 {
     bool const logSelected = SendMessageW(m_PC_Results, TCM_GETCURSEL, 0, 0) == 1;
+    HWND const shown = logSelected ? m_RE_Log : m_LV_Failures;
+    HWND const hidden = logSelected ? m_LV_Failures : m_RE_Log;
 
-    ShowWindow(m_LV_Failures, logSelected ? SW_HIDE : SW_SHOW);
-    ShowWindow(m_RE_Log, logSelected ? SW_SHOW : SW_HIDE);
+    ShowWindow(shown, SW_SHOW);
+
+    if (GetFocus() == hidden)
+        SetFocus(shown);
+
+    ShowWindow(hidden, SW_HIDE);
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::ShowShuffleState()
@@ -2371,7 +2525,7 @@ void TWin32GUIMainWindow::UpdateCommands()
     // does.
     if (focus != nullptr && IsChild(m_Window, focus) && IsWindowEnabled(focus) == FALSE)
     {
-        HWND const next = GetNextDlgTabItem(m_Window, focus, FALSE);
+        HWND const next = NextTabStop(focus, true);
 
         if (next != nullptr)
             SetFocus(next);
