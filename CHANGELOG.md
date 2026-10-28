@@ -15,6 +15,18 @@ versioned baseline.
 - `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
   `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
   operating system), describing the build the framework was compiled for.
+- A Win32 GUI runner, `ASWUnitTests_Win32_GUI`, with the same window, features and command line
+  options as the VCL GUI runner, built on the Windows API alone, so it needs neither the VCL nor
+  RAD Studio: it builds with CMake (MSVC, MinGW, Clang) as well as with RAD Studio, for Win32 and
+  Win64x. It needs Windows 10 version 1703 or later. This repository's CMake project builds it on
+  Windows, and a project of your own can build it with your tests by including
+  `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`; the README's "Win32 GUI Runner" section
+  covers both, and RAD Studio.
+- `ASWUNITTESTS_CORE_SOURCES` in `src\ASWUnitTests_Sources.cmake`: the framework's sources without
+  `main.cpp`, for a runner with its own entry point. `ASWUNITTESTS_SOURCES` lists the same files as
+  before.
+- `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
+  `ASWUNITTESTS_GUI_SOURCES`.
 
 ### Changed
 

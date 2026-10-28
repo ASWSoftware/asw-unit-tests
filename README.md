@@ -14,7 +14,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   method and registers it with its group, so a test can't be written but left out of the group's
   constructor.
 - **[Test suites](#organizing-groups-into-suites)** - `TSuitePath` puts groups in nested suites, so
-  `--filter "Framework.*"` selects a whole suite, and the VCL GUI runner shows suites in its tree.
+  `--filter "Framework.*"` selects a whole suite, and the GUI runners show suites in their tree.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*`
   fails the test immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`,
   `Same`/`NotSame`, `Empty`/`NotEmpty`, `IsType`/`IsNotType`, `Near`/`NotNear`,
@@ -53,8 +53,10 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   failed test instead of losing the whole process.
 - **Unexpected exceptions** - An exception a test throws without expecting it fails only that test,
   with the exception's message, and the run carries on.
-- **[VCL GUI runner](#vcl-gui-runner)** - A RAD Studio VCL app that runs the same tests, with a
-  checkbox tree to choose them, live pass/fail/skip status, and each failure's details and log.
+- **[GUI runners](#gui-runners)** - A Windows app that runs the same tests, with a checkbox tree to
+  choose them, live pass/fail/skip status, and each failure's details and log: the
+  [Win32 GUI runner](#win32-gui-runner), built with CMake or RAD Studio, or the
+  [VCL GUI runner](#vcl-gui-runner), a RAD Studio VCL app.
 
 ## Reporting
 
@@ -111,8 +113,9 @@ cmake --build build --config Release
 ```
 
 The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration
-generators. The RAD Studio project writes its final executable to the same `build/bin/<Config>`
-directory.
+generators. On Windows it also builds the [Win32 GUI runner](#win32-gui-runner),
+`ASWUnitTests_Win32_GUI.exe`, in the same directory. The RAD Studio project writes its final
+executable to the same `build/bin/<Config>` directory.
 
 The CMake project does not need a separate version declaration (see [Versions](#versions)) because
 it currently builds the test executable directly rather than packaging or installing it.
@@ -314,13 +317,14 @@ that would have run fails, with `SetUp_Group() exception: ` and the exception's 
 detail, `TearDown_Group()` still runs, and the run carries on with the next group (exit code `1`).
 Skipped tests never affect the exit code.
 
-## VCL GUI Runner
+## GUI Runners
 
-`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj` builds a RAD Studio VCL application that runs the same
-tests as the console runner, in a window for choosing tests and reading their results. It runs this
-repository's full self-test suite, and its `Build_*.bat` scripts write the executable to
-`vcl\gui\rad370\<Platform>\<Config>`. `vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj` opens it
-together with the VCL console project.
+Two GUI runners run the same tests as the console runner, in a window for choosing tests and
+reading their results: the [VCL GUI runner](#vcl-gui-runner), a RAD Studio VCL application, and the
+[Win32 GUI runner](#win32-gui-runner), which uses only what ships with Windows and builds with CMake
+(MSVC, MinGW, Clang) or RAD Studio. They look and work the same, so this section describes both, and
+their own sections cover building them and running your own tests in them. Each of this
+repository's builds of them runs its full self-test suite.
 
 The window shows:
 
@@ -365,7 +369,8 @@ When the window closes, it saves its size, position, maximized state, and panel 
 `%APPDATA%\ASWUnitTests\<exe name>.ini`, and restores them the next time it opens. A position on a
 monitor that's no longer connected is ignored. An `--exit` run doesn't save the layout. **View >
 Reset Layout** restores the default layout right away; `--layout-ignore` and `--layout-reset`
-(below) control this from the command line.
+(below) control this from the command line. Since the file is named after the executable, the two
+GUI runners, and each project's own build of them, keep separate layouts.
 
 The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
 as long as the command line doesn't choose them itself (no `--run`, `--filter`, or partition
@@ -380,9 +385,9 @@ box itself starts empty. Since tests come and go between sessions, it adapts:
 The log notes what was restored. So **Select Failed**, closing the window, fixing the code, and
 reopening it leaves just those tests checked for Run Selected.
 
-Tests run on the main (VCL) thread, so a test can create forms and controls.
-`--test-timeout-seconds` runs each test on a worker thread instead, so it can't be combined with
-tests like that; the log says so when it's given.
+Tests run on the GUI's main thread, the one that runs its window, so a test can create windows (or,
+in the VCL GUI runner, forms and controls). `--test-timeout-seconds` runs each test on a worker
+thread instead, so it can't be combined with tests like that; the log says so when it's given.
 
 A run that a test's timeout or crash abandoned leaves **Run Selected** and **Run Failed** disabled
 until the GUI is restarted, since the timed-out test may still be running, and a crash may have left
@@ -414,24 +419,84 @@ these differences:
   window closes.
 
 A GUI process doesn't make a Windows command prompt wait for it, so a script that needs `--exit`'s
-exit code should start it with `start /wait` (or its own language's equivalent):
+exit code should start it with `start /wait` (or its own language's equivalent; Bash, including Git
+Bash, waits for it anyway):
 
 ```
 start /wait ASWUnitTests_VCL_GUI.exe --filter "*String*" --run --exit --report-junit results.xml
 echo %ERRORLEVEL%
 ```
 
-To run your own tests in the GUI, create a RAD Studio VCL application that defines
+The GUI runners are built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
+`TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
+`std::cout`, as plain text without the console's color codes, is told as each test starts and
+finishes, and can stop a run between tests, so it can drive other kinds of runners too.
+
+### VCL GUI Runner
+
+`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj` builds the VCL GUI runner, for Win32 and Win64x, and
+its `Build_*.bat` scripts write the executable to `vcl\gui\rad370\<Platform>\<Config>`.
+`vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj` opens it together with the VCL console project.
+It defines `ASWUNITTESTS_RTL_EXCEPTIONS`, so it has
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), and its tests can use the VCL.
+
+To run your own tests in it, create a RAD Studio VCL application that defines
 `ASWUNITTESTS_RTL_EXCEPTIONS`, and add to it: the framework's `src` files except `main.cpp`; the
 files in `gui\src` (shared by the GUI runners) and `vcl\gui\src`, including
 `ASWUnitTests_GUI_MainForm.dfm`, with both folders on the include path; your own test modules; and
 a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line
 and starts the main form.
 
-The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
-`TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
-`std::cout`, as plain text without the console's color codes, is told as each test starts and
-finishes, and can stop a run between tests, so it can drive other kinds of runners too.
+### Win32 GUI Runner
+
+The Win32 GUI runner uses only the Windows API, with the common controls and dialogs that ship with
+Windows, and no VCL or third-party code, so it builds with the [CMake](#cmake) toolchains on Windows
+(MSVC, MinGW, Clang) as well as with RAD Studio. It needs Windows 10 version 1703 or later. Win32 is
+the name of the API: it builds as a 32-bit or a 64-bit program. Since it doesn't link the VCL, it
+has no [RTL exception support](#rad-studio-rtl-exceptions-vclfmx); tests of VCL code belong in the
+[VCL GUI runner](#vcl-gui-runner).
+
+On Windows, this repository's CMake project builds it as the `ASWUnitTests_Win32_GUI` target, next
+to the console runner (e.g. `build/bin/Release/ASWUnitTests_Win32_GUI.exe`).
+`win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj` builds it with RAD Studio, for Win32 and Win64x,
+and its `Build_*.bat` scripts write the executable to `win32\gui\rad370\<Platform>\<Config>`.
+
+To run your own tests in it with CMake, include `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`
+after `project()`. Its `ASWUNITTESTS_WIN32_GUI_SOURCES` lists the framework's `src` files except
+`main.cpp`, the files in `gui\src` (shared by the GUI runners) and `win32\gui\src`, including the
+runner's own `WinMain()`, and its manifest, and it exports the include path, libraries and linker
+options they need:
+
+```cmake
+include(third_party/asw-unit-tests/win32/gui/src/ASWUnitTests_Win32GUI_Sources.cmake)
+
+add_executable(MyTestsGUI WIN32
+    ${ASWUNITTESTS_WIN32_GUI_SOURCES}
+    tests/Test_MyClass.cpp
+)
+
+target_include_directories(MyTestsGUI PRIVATE
+    ${ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS}
+    tests
+)
+
+target_link_libraries(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LIBRARIES})
+target_link_options(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS})
+```
+
+Link `Threads::Threads` too, as for the console runner (see [CMake](#cmake-1) under Submodule
+Integration). With MinGW, also link its runtime statically
+(`-static-libgcc -static-libstdc++ -static`, as this repository's `cmake\CMakeLists.txt` does) or
+put its DLLs next to the executable, or the GUI may load another program's older `libstdc++-6.dll`
+from `PATH` and fail to start.
+
+With RAD Studio, the simplest start is a copy of `win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj`,
+with its paths and test files changed. It's a C++ application with no framework
+(`FrameworkType None`), with `TCHAR` mapped to `char`, since the runner's entry point is
+`WinMain()`. It compiles the framework's `src` files except `main.cpp`, the files in `gui\src` and
+`win32\gui\src`, with all three folders on the include path, and the test modules. Its manifest is
+`win32\gui\src\ASWUnitTests_Win32GUI.manifest`, with DPI awareness set to None, so RAD Studio uses
+the manifest as it is (the manifest declares per-monitor DPI awareness itself).
 
 ## Registering Tests
 
@@ -498,8 +563,8 @@ group's qualified name, `Framework.Console.TTest_TConsole`, starts all of its te
 - `--filter "Framework.*"` runs every test in suite `Framework`, including those in `Console`, and
   `--filter "Framework.Console.*"` runs just those in `Console`.
 - `--list`, the console log and the `--report-junit` report show its tests as
-  `Framework.Console.TTest_TConsole.TestName`, and the [VCL GUI runner](#vcl-gui-runner)'s test tree
-  shows each suite as a node, whose check box checks or unchecks all of its tests.
+  `Framework.Console.TTest_TConsole.TestName`, and the [GUI runners](#gui-runners)' test tree shows
+  each suite as a node, whose check box checks or unchecks all of its tests.
 
 The registration can name the suite instead, leaving the constructor as it is:
 
@@ -1023,7 +1088,7 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 A test name can be registered only once per group. Registering one again (with `RegisterTest()`,
 `RegisterTestCases()` or `ASW_TEST`) throws `TExceptDuplicateTestName` from the group's constructor,
 which stops the run at startup with a message naming the group and the test, since `--filter`,
-`--list`, the JUnit report and the VCL GUI runner couldn't tell the two tests apart.
+`--list`, the JUnit report and the GUI runners couldn't tell the two tests apart.
 
 ### Self-Registering Test Methods
 
@@ -1077,7 +1142,7 @@ doesn't derive from `TAutoTestGroup<ClassName>`.
 The order is deterministic: a group runs its `ASW_TEST` tests first, in alphabetical order by name
 (whatever order they're defined in), then any tests its constructor registers with `RegisterTest()`
 or `RegisterTestCases()`, in the order it registers them, so the two styles can be mixed in one
-group. `--shuffle`, `--filter`, `--list`, the JUnit report and the VCL GUI runner treat `ASW_TEST`
+group. `--shuffle`, `--filter`, `--list`, the JUnit report and the GUI runners treat `ASW_TEST`
 tests exactly like any other. Parameterized tests are still registered in the constructor with
 `RegisterTestCases()`, next to their data.
 
@@ -1128,18 +1193,20 @@ especially useful for reading `--filter` matches or a failing row's name in CI o
 ## Submodule Integration
 
 This repository's own `cmake\CMakeLists.txt`, `rad370\ASWUnitTests.cbproj`, and the RAD Studio
-projects under `vcl` only build *this* repo's own example tests and `toTest` code for its own
-development and CI. Don't use them from a consuming project, and don't modify them. Doing either
-means your changes live inside the submodule and get lost or conflict the next time you update it.
-Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference
-its `src` files from your own project's build file, alongside your own test modules:
+projects under `vcl` and `win32` only build *this* repo's own example tests and `toTest` code for
+its own development and CI. Don't use them from a consuming project, and don't modify them. Doing
+either means your changes live inside the submodule and get lost or conflict the next time you
+update it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and
+reference its `src` files from your own project's build file, alongside your own test modules:
 
 ```
 my-project/
 +-- third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
 |   +-- src/                      <- framework core (never touched)
-|   +-- gui/src/, vcl/gui/src/    <- VCL GUI runner, if you use it (never touched)
-|   `-- cmake/, rad370/, tests/, toTest/, other vcl/ folders   <- this framework's own example build, unused by you
+|   +-- gui/src/                  <- shared by the GUI runners, if you use one (never touched)
+|   +-- vcl/gui/src/              <- VCL GUI runner, if you use it (never touched)
+|   +-- win32/gui/src/            <- Win32 GUI runner, if you use it (never touched)
+|   `-- cmake/, rad370/, tests/, toTest/, other vcl/ and win32/ folders   <- this framework's own example build, unused by you
 +-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
 `-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo
 ```
@@ -1177,6 +1244,9 @@ find_package(Threads REQUIRED)
 target_link_libraries(MyTests PRIVATE Threads::Threads)
 ```
 
+For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the same for the
+[Win32 GUI runner](#win32-gui-runner); see that section.
+
 ### RAD Studio / Visual Studio / other IDE projects
 
 Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own
@@ -1186,7 +1256,8 @@ updating the submodule.
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to
 enable [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and
 [`System::String` comparisons](#comparing-systemstring-vclfmx). To run your tests in the
-[VCL GUI runner](#vcl-gui-runner) instead of a console, see that section for the files it needs.
+[VCL GUI runner](#vcl-gui-runner) or the [Win32 GUI runner](#win32-gui-runner) instead of a console,
+see its section for the files it needs.
 
 # Coding Standards
 

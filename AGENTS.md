@@ -14,6 +14,7 @@ ASWUnitTests is a lightweight C++ console unit-testing framework.
 - `toTest/` contains example code under test.
 - `rad370/` contains the RAD Studio 13.1 project and Windows build scripts.
 - `vcl/` contains RAD Studio projects that link the VCL and define `ASWUNITTESTS_RTL_EXCEPTIONS`, exercising the framework's opt-in RTL support (RTL exceptions and the `System::String` overloads): `vcl/console/rad370/` is a VCL console project (with its own build scripts) that runs the full self-test suite plus the RTL-specific and GUI unit tests in `vcl/tests/`. `vcl/gui/rad370/` is the VCL GUI runner project (with its own build scripts, and a project group that also opens the console project), built from the sources in `vcl/gui/src/`. The console project also compiles the GUI's non-form units, so their tests run without the GUI.
+- `win32/` contains the Win32 GUI runner, which uses only the Windows API (no VCL) and has the VCL GUI runner's features: `win32/gui/src/` holds its units, its `WinMain()`, its manifest and `ASWUnitTests_Win32GUI_Sources.cmake`, from which `cmake/CMakeLists.txt` builds the `ASWUnitTests_Win32_GUI` target on Windows. `win32/gui/rad370/` is its RAD Studio project (Win32 and Win64x, with its own build scripts). `win32/tests/` has the tests of its units that need no window, which the CMake console target and the `rad370` console project also compile on Windows.
 - `README.md` contains usage and integration examples.
 - `.uncrustify.cfg` and `.githooks/` define the repository formatting workflow.
 
@@ -53,7 +54,7 @@ Keep all source files (`.cpp`/`.h`) plain ASCII, including comments. MSVC reads 
 - Insert new class methods in alphabetical order within their existing section. If the class has named or visibly separated sections, preserve those sections and alphabetize only within the relevant section.
 - Insert new free functions in alphabetical order within their existing section. Apply the same section rule when functions are grouped.
 - Follow the surrounding naming, indentation, brace, include, and comment style. Avoid unrelated formatting changes.
-- Keep declarations and definitions consistent, and update all relevant project or build files when adding, removing or renaming source files, including `Deploy.bat`, which copies an explicit list of files.
+- Keep declarations and definitions consistent, and update all relevant project or build files when adding, removing or renaming source files, including `Deploy.bat`, which copies an explicit list of files, and the `*_Sources.cmake` files (`src/`, `gui/src/`, `win32/gui/src/`), which list each folder's sources for projects that use this repository as a submodule.
 - Add or update focused tests for behavior changes, including error and platform-specific cases where applicable.
 
 ## Building and Testing
@@ -67,7 +68,8 @@ For other environments, use the repository's CMake configuration when present or
 - Check compiler warnings and errors.
 - Validate both Windows-specific and portable paths when the change touches platform code.
 - When the change touches code guarded by `ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED`, or the exception handling around it, also build and run the VCL console project (`vcl/console/rad370/Build_Win64x_Debug.bat` and the Win32 script), since no other build compiles that code.
-- When the change touches `vcl/gui/src/` or `gui/src/`, or framework code the GUI runner uses (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
+- When the change touches `vcl/gui/src/` or `gui/src/`, or framework code the GUI runners use (such as `ITestRunObserver` or `ASWUnitTests_CLI`), also build the VCL console project (which runs the GUI's unit tests) and the VCL GUI project (`vcl/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand.
+- When the change touches `win32/gui/src/` or `gui/src/`, or framework code the GUI runners use, also build the CMake `ASWUnitTests_Win32_GUI` target with MinGW, with Clang (llvm-mingw) and, when available, with MSVC, and the RAD Studio Win32 GUI project (`win32/gui/rad370/Build_Win64x_Debug.bat` and the Win32 script), then run the GUI and check the affected behavior by hand. A full `--run --exit` of each build (as CI does) checks that it still runs every test.
 
 ## Changelog
 
