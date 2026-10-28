@@ -35,6 +35,19 @@ limitations under the License.
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
 //---------------------------------------------------------------------------
 
+#if defined(__MINGW32__)
+// As in src/main.cpp: MinGW-w64's C runtime can expand wildcards in the command line into the names of matching
+// files before WinMain() runs (WinLibs' builds do by default), and defining _dowildcard as 0 turns that off. The
+// GUI reads its arguments from GetCommandLineW() rather than the runtime's argv, so they'd arrive as given anyway,
+// but the expansion would still search the current folder at every start, and the self-tests check the setting.
+extern "C"
+{
+int _dowildcard = 0;
+}
+#endif
+
+//---------------------------------------------------------------------------
+
 namespace
 {
 
