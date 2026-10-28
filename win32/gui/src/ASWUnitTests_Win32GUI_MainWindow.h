@@ -259,6 +259,8 @@ private:
     void SetTreeExpanded(bool expanded);
     // Shows the results page whose tab is selected.
     void ShowResultsPage();
+    // Shows whether shuffling is on, in the Options menu's check mark and the status bar.
+    void ShowShuffleState();
     // Sets every test tree node's check box from m_TestList; see the definition.
     void SyncTreeChecks();
     // A test's tree node, or nullptr while the filter box hides it.

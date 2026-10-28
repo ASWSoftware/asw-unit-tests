@@ -319,9 +319,17 @@
             <BuildOrder>0</BuildOrder>
             <PCH>true</PCH>
         </PCHCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
+            <BuildOrder>58</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h</DependentOn>
             <BuildOrder>54</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
+            <BuildOrder>57</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_DPI.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_DPI.h</DependentOn>
@@ -334,6 +342,10 @@
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MainWindow.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_MainWindow.h</DependentOn>
             <BuildOrder>55</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h</DependentOn>
+            <BuildOrder>59</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_Splitter.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_Splitter.h</DependentOn>

@@ -40,6 +40,7 @@ limitations under the License.
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_MainLayout.h"
+#include "ASWUnitTests_Win32GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
 //---------------------------------------------------------------------------
@@ -142,7 +143,6 @@ HTREEITEM NextTreeItem(HWND tree, HTREEITEM item);
 HTREEITEM RelatedTreeItem(HWND tree, HTREEITEM item, UINT relation);
 UINT StateImageIndex(TGUICheckState state);
 TGUINodeRef TreeItemRef(HWND tree, HTREEITEM item);
-std::string WindowText(HWND window);
 
 //---------------------------------------------------------------------------
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption)
@@ -376,14 +376,6 @@ TGUINodeRef TreeItemRef(HWND tree, HTREEITEM item)
     SendMessageW(tree, TVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&data));
 
     return DecodeGUINodeRef(static_cast<std::uintptr_t>(data.lParam));
-}
-//---------------------------------------------------------------------------
-std::string WindowText(HWND window)
-{
-    std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(window)) + 1, L'\0');
-    text.resize(static_cast<std::size_t>(GetWindowTextW(window, &text[0], static_cast<int>(text.size()))));
-
-    return WideToUTF8(text);
 }
 //---------------------------------------------------------------------------
 
@@ -992,7 +984,7 @@ void TWin32GUIMainWindow::CreateStatusImages()
     TWin32GUIMainWindow::DoCommand
 
     A disabled command does nothing, since a hot key still sends it when its menu item and button are
-    disabled. Reset Layout and the Options menu's commands aren't connected yet.
+    disabled. Reset Layout isn't connected yet.
 */
 void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
 {
@@ -1079,6 +1071,17 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                 case EWin32GUICommand::SelectNone:
                     m_TestList.SetAllChecked(false);
                     SyncTreeChecks();
+                    break;
+
+                case EWin32GUICommand::ShuffleOrder:
+                    m_Shuffle.SetEnabled(!m_Shuffle.Enabled());
+                    ShowShuffleState();
+                    break;
+
+                case EWin32GUICommand::ShuffleSeed:
+                    if (ShowShuffleSeedDialog(m_Window, m_Shuffle))
+                        ShowShuffleState();
+
                     break;
 
                 case EWin32GUICommand::Stop:
@@ -1904,12 +1907,19 @@ void TWin32GUIMainWindow::ShowResultsPage()
     ShowWindow(m_RE_Log, logSelected ? SW_SHOW : SW_HIDE);
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::ShowShuffleState()
+{
+    CheckMenuItem(m_MM_Main, static_cast<UINT>(EWin32GUICommand::ShuffleOrder),
+        MF_BYCOMMAND | (m_Shuffle.Enabled() ? MF_CHECKED : MF_UNCHECKED));
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 /*
     TWin32GUIMainWindow::Start
 
     Loads the registered tests and applies the command line's options: --project-name to the caption, and
     --filter and the partition options to which tests start out checked, and --filter to the filter box,
-    and --shuffle and --shuffle-seed to the shuffle setting.
+    and --shuffle and --shuffle-seed to the Options menu.
 */
 void TWin32GUIMainWindow::Start(TGUIOptions const& options)
 {
@@ -1953,6 +1963,7 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options)
     UpdateCaption();
 
     m_Shuffle.ApplyCommandLine(m_Options.CLI.Shuffle, m_Options.CLI.ShuffleSeed);
+    ShowShuffleState();
 
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.

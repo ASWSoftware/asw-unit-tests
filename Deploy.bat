@@ -327,6 +327,10 @@ call :CopyFile "win32\gui\rad370\Build_Win32_Release.bat" "win32\gui\rad370\Buil
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI.manifest" "win32\gui\src\ASWUnitTests_Win32GUI.manifest"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h" "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h"
@@ -340,6 +344,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp"
 if errorlevel 1 exit /b 1
@@ -356,6 +364,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp"
 if errorlevel 1 exit /b 1

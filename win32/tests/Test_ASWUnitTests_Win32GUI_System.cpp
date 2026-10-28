@@ -149,6 +149,8 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "RemoveFile_DeletesOnlyAnExistingFile");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ConvertsEveryPlane, "UTF8ToWide_ConvertsEveryPlane");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ReplacesInvalidUTF8, "UTF8ToWide_ReplacesInvalidUTF8");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8,
+        "WindowText_ConvertsNonASCIIToUTF8");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing,
         "WriteFileBytes_ThrowsWhenTheFolderIsMissing");
 }
@@ -447,6 +449,31 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ReplacesInvalidUTF8()
     // Assert
     CheckEquals(std::wstring(L"a\xFFFD" L"b"), invalid, __func__, __LINE__, "0xFF becomes U+FFFD");
     CheckEquals(std::wstring(L"\xFFFD" L"c"), continuation, __func__, __LINE__, "a lone 0x80 becomes U+FFFD");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8()
+{
+    // Arrange: a hidden window titled with ASCII, U+00E9, U+4E2D and U+1F600 (a surrogate pair in UTF-16), and
+    // one with no title.
+    HWND const titled = CreateWindowExW(0, L"STATIC", L"a\x00E9\x4E2D\xD83D\xDE00", WS_POPUP, 0, 0, 10, 10, nullptr,
+        nullptr, GetModuleHandleW(nullptr), nullptr);
+    HWND const untitled = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 10, 10, nullptr, nullptr,
+        GetModuleHandleW(nullptr), nullptr);
+
+    // Act
+    std::string const titledText = titled != nullptr ? WindowText(titled) : std::string("(no window)");
+    std::string const untitledText = untitled != nullptr ? WindowText(untitled) : std::string("(no window)");
+
+    if (titled != nullptr)
+        DestroyWindow(titled);
+
+    if (untitled != nullptr)
+        DestroyWindow(untitled);
+
+    // Assert
+    CheckEquals(std::string("a\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80"), titledText, __func__, __LINE__,
+        "every character converted");
+    CheckEquals(std::string(), untitledText, __func__, __LINE__, "no text");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing()

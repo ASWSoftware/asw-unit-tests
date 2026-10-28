@@ -429,6 +429,14 @@ std::wstring UTF8ToWide(std::string const& text)
     return wide;
 }
 //---------------------------------------------------------------------------
+std::string WindowText(HWND window)
+{
+    std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(window)) + 1, L'\0');
+    text.resize(static_cast<std::size_t>(GetWindowTextW(window, &text[0], static_cast<int>(text.size()))));
+
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
 void WriteFileBytes(std::string const& path, std::string const& bytes)
 {
     TFileHandle const file(CreateFileW(UTF8ToWide(path).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,

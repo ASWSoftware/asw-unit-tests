@@ -331,6 +331,10 @@
             <DependentOn>..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>4</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp">
+            <DependentOn>..\win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
+            <BuildOrder>54</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp">
             <DependentOn>..\win32\gui\src\ASWUnitTests_Win32GUI_DPI.h</DependentOn>
             <BuildOrder>50</BuildOrder>
@@ -342,6 +346,10 @@
         <CppCompile Include="..\win32\gui\src\ASWUnitTests_Win32GUI_System.cpp">
             <DependentOn>..\win32\gui\src\ASWUnitTests_Win32GUI_System.h</DependentOn>
             <BuildOrder>48</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp">
+            <DependentOn>..\win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
+            <BuildOrder>55</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp">
             <DependentOn>..\win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h</DependentOn>

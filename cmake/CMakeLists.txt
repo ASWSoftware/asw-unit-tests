@@ -80,9 +80,11 @@ if(WIN32)
 
     # The Win32 GUI runner's units that need no window, and their tests, so they also run without the GUI.
     target_sources(ASWUnitTests PRIVATE
+        ../win32/gui/src/ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_DPI.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_MainLayout.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DPI.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_MainLayout.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp
@@ -117,13 +119,16 @@ if(WIN32)
     add_executable(ASWUnitTests_Win32_GUI WIN32
         ${ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES}
         ${ASWUNITTESTS_SELF_TEST_SOURCES}
+        ../win32/gui/src/ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_DPI.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_MainLayout.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_MainWindow.cpp
+        ../win32/gui/src/ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_Splitter.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_TextDialog.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_WinMain.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DPI.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_MainLayout.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp

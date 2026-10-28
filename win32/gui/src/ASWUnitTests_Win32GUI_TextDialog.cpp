@@ -26,8 +26,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <stdexcept>
-#include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_DialogTemplate.h"
 #include "ASWUnitTests_Win32GUI_DPI.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 //---------------------------------------------------------------------------
@@ -43,9 +43,6 @@ WORD const TextBoxID = 100;
 // Posted to the dialog when it moves to a monitor with another DPI, so its monospace font is recreated after
 // Windows has rescaled the dialog and its controls.
 UINT const ApplyDPIMessage = WM_APP + 1;
-// The window class atoms of a dialog template's predefined controls.
-WORD const ButtonClassAtom = 0x0080;
-WORD const EditClassAtom = 0x0081;
 
 /////////////////////////////////////////////////////////////////////////////
 // TTextDialogState
@@ -60,53 +57,13 @@ struct TTextDialogState
 
 //---------------------------------------------------------------------------
 
-void AppendDialogItem(std::vector<WORD>& words, DWORD style, DWORD exStyle, WORD id, WORD classAtom,
-    std::wstring const& title);
-void AppendDWORD(std::vector<WORD>& words, DWORD value);
-void AppendString(std::vector<WORD>& words, std::wstring const& text);
 void ApplyDPI(HWND dialog);
-std::vector<WORD> BuildDialogTemplate(std::wstring const& caption);
+TWin32GUIDialogTemplate BuildDialogTemplate(std::wstring const& caption);
 INT_PTR CALLBACK DialogProc(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR HandleDialogMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam);
 void LayOutDialog(HWND dialog);
 void SizeAndCenterDialog(HWND dialog);
 
-//---------------------------------------------------------------------------
-/*
-    AppendDialogItem
-
-    Appends a DLGITEMTEMPLATE for a predefined control class, DWORD-aligned as each must be. Its position
-    and size don't matter: LayOutDialog() sets them in pixels.
-*/
-void AppendDialogItem(std::vector<WORD>& words, DWORD style, DWORD exStyle, WORD id, WORD classAtom,
-    std::wstring const& title)
-{
-    if (words.size() % 2 != 0)
-        words.push_back(0);
-
-    AppendDWORD(words, style);
-    AppendDWORD(words, exStyle);
-    words.insert(words.end(), { 0, 0, 10, 10 }); // x, y, cx, cy
-    words.push_back(id);
-    words.push_back(0xFFFF);
-    words.push_back(classAtom);
-    AppendString(words, title);
-    words.push_back(0); // No creation data.
-}
-//---------------------------------------------------------------------------
-void AppendDWORD(std::vector<WORD>& words, DWORD value)
-{
-    words.push_back(LOWORD(value));
-    words.push_back(HIWORD(value));
-}
-//---------------------------------------------------------------------------
-void AppendString(std::vector<WORD>& words, std::wstring const& text)
-{
-    for (wchar_t const character : text)
-        words.push_back(static_cast<WORD>(character));
-
-    words.push_back(0);
-}
 //---------------------------------------------------------------------------
 /*
     ApplyDPI
@@ -126,29 +83,21 @@ void ApplyDPI(HWND dialog)
 /*
     BuildDialogTemplate
 
-    The dialog as an in-memory DLGTEMPLATE: a resizable window with the GUI's font, Segoe UI 9 pt, holding
-    the OK button and the text box. Windows scales a dialog and the controls in its template to the DPI of
-    the monitor it's on, and rescales them when it moves to another one.
+    A resizable window holding the OK button and the text box. SizeAndCenterDialog() and LayOutDialog() set
+    their positions and sizes in pixels.
 */
-std::vector<WORD> BuildDialogTemplate(std::wstring const& caption)
+TWin32GUIDialogTemplate BuildDialogTemplate(std::wstring const& caption)
 {
-    std::vector<WORD> words;
+    TWin32GUIDialogTemplate dialogTemplate(WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_CLIPCHILDREN,
+        caption);
 
-    AppendDWORD(words, WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_CLIPCHILDREN | DS_SETFONT);
-    AppendDWORD(words, 0); // Extended style
-    words.push_back(2); // Number of controls
-    words.insert(words.end(), { 0, 0, 200, 100 }); // x, y, cx, cy; SizeAndCenterDialog() sets them in pixels.
-    words.push_back(0); // No menu
-    words.push_back(0); // The predefined dialog class
-    AppendString(words, caption);
-    words.push_back(9); // Point size
-    AppendString(words, L"Segoe UI");
+    dialogTemplate.AddControl(EWin32GUIDialogControlClass::Button, IDOK, WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+        BS_DEFPUSHBUTTON, 0, L"OK");
+    dialogTemplate.AddControl(EWin32GUIDialogControlClass::Edit, TextBoxID, WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+        WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE,
+        std::wstring());
 
-    AppendDialogItem(words, WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 0, IDOK, ButtonClassAtom, L"OK");
-    AppendDialogItem(words, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
-        ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL, WS_EX_CLIENTEDGE, TextBoxID, EditClassAtom, std::wstring());
-
-    return words;
+    return dialogTemplate;
 }
 //---------------------------------------------------------------------------
 /*
@@ -297,11 +246,10 @@ void ShowTextDialog(HWND owner, std::string const& caption, std::string const& t
     TTextDialogState state;
     state.Text = UTF8ToWide(AdjustLineBreaks(text));
 
-    std::vector<WORD> const dialogTemplate = BuildDialogTemplate(UTF8ToWide(caption));
+    TWin32GUIDialogTemplate const dialogTemplate = BuildDialogTemplate(UTF8ToWide(caption));
 
-    INT_PTR const result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr),
-        reinterpret_cast<LPCDLGTEMPLATEW>(dialogTemplate.data()), owner, &DialogProc,
-        reinterpret_cast<LPARAM>(&state));
+    INT_PTR const result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr), dialogTemplate.Get(), owner,
+        &DialogProc, reinterpret_cast<LPARAM>(&state));
 
     if (result == -1)
         throw std::runtime_error("Couldn't show the \"" + caption + "\" dialog");

@@ -67,6 +67,7 @@ private: // Test methods
     void Test_RemoveFile_DeletesOnlyAnExistingFile();
     void Test_UTF8ToWide_ConvertsEveryPlane();
     void Test_UTF8ToWide_ReplacesInvalidUTF8();
+    void Test_WindowText_ConvertsNonASCIIToUTF8();
     void Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing();
 
 public:

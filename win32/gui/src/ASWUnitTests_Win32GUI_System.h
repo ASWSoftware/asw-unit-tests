@@ -82,6 +82,8 @@ void SetClipboardText(HWND owner, std::string const& text);
 // Converts UTF-8 text to UTF-16 for Windows. Invalid UTF-8 becomes U+FFFD. The framework's WideToUTF8()
 // (ASWUnitTests_Utils.h) converts back.
 std::wstring UTF8ToWide(std::string const& text);
+// The window's text, e.g. a control's, converted to UTF-8.
+std::string WindowText(HWND window);
 // Replaces the file's content with 'bytes', unchanged, creating the file if needed (but not its folder).
 // Throws std::runtime_error if it can't be written.
 void WriteFileBytes(std::string const& path, std::string const& bytes);
