@@ -61,7 +61,10 @@ find_package(Threads REQUIRED)
 target_link_libraries(ASWUnitTests PRIVATE Threads::Threads)
 
 if(MSVC)
-    target_compile_options(ASWUnitTests PRIVATE /W4 /Zc:__cplusplus)
+    # /MP compiles a target's files in parallel when MSBuild runs cl.exe, which otherwise compiles them one at a
+    # time (MSBuild's own parallelism only builds projects side by side). Other generators, such as Ninja,
+    # already run one compiler per file, and clang-cl ignores the option, so it's given to cl.exe only.
+    target_compile_options(ASWUnitTests PRIVATE /W4 /Zc:__cplusplus $<$<CXX_COMPILER_ID:MSVC>:/MP>)
 else()
     target_compile_options(ASWUnitTests PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -135,7 +138,8 @@ if(WIN32)
     target_link_options(ASWUnitTests_Win32_GUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS})
 
     if(MSVC)
-        target_compile_options(ASWUnitTests_Win32_GUI PRIVATE /W4 /Zc:__cplusplus)
+        # /MP as for the console runner.
+        target_compile_options(ASWUnitTests_Win32_GUI PRIVATE /W4 /Zc:__cplusplus $<$<CXX_COMPILER_ID:MSVC>:/MP>)
     else()
         target_compile_options(ASWUnitTests_Win32_GUI PRIVATE -Wall -Wextra -Wpedantic)
     endif()
