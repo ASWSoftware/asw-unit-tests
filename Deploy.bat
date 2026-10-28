@@ -71,6 +71,8 @@ call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.cpp" "gui\src\ASWUnitTests_GUI_
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.h" "gui\src\ASWUnitTests_GUI_Shuffle.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Sources.cmake" "gui\src\ASWUnitTests_GUI_Sources.cmake"
+if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.cpp" "gui\src\ASWUnitTests_GUI_TestList.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.h" "gui\src\ASWUnitTests_GUI_TestList.h"
@@ -348,6 +350,8 @@ if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake" "win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp"
 if errorlevel 1 exit /b 1

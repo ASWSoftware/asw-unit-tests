@@ -7,19 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../src/ASWUnitTests_Sources.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../gui/src/ASWUnitTests_GUI_Sources.cmake)
 
-# The shared GUI core, the framework's self-tests and the example code they test, which every runner compiles.
+# The framework's self-tests, the shared GUI core's tests and the example code they test, which every runner
+# compiles.
 set(ASWUNITTESTS_SELF_TEST_SOURCES
-    ../gui/src/ASWUnitTests_GUI_CommandLine.cpp
-    ../gui/src/ASWUnitTests_GUI_Commands.cpp
-    ../gui/src/ASWUnitTests_GUI_INIDocument.cpp
-    ../gui/src/ASWUnitTests_GUI_Layout.cpp
-    ../gui/src/ASWUnitTests_GUI_RunObserver.cpp
-    ../gui/src/ASWUnitTests_GUI_Selection.cpp
-    ../gui/src/ASWUnitTests_GUI_Shuffle.cpp
-    ../gui/src/ASWUnitTests_GUI_TestList.cpp
-    ../gui/src/ASWUnitTests_GUI_Tree.cpp
-    ../gui/src/ASWUnitTests_GUI_View.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Commands.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_INIDocument.cpp
@@ -50,6 +42,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
 
 add_executable(ASWUnitTests
     ${ASWUNITTESTS_SOURCES}
+    ${ASWUNITTESTS_GUI_SOURCES}
     ${ASWUNITTESTS_SELF_TEST_SOURCES}
 )
 
@@ -112,22 +105,13 @@ set_target_properties(ASWUnitTests PROPERTIES
 
 if(WIN32)
     # The Win32 GUI runner: the same tests as the console runner, in a window. Its WinMain takes the place of
-    # the console runner's main.cpp.
-    set(ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES ${ASWUNITTESTS_SOURCES})
-    list(REMOVE_ITEM ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES "${ASWUNITTESTS_SOURCE_DIR}/main.cpp")
+    # the console runner's main.cpp. It's built from the same sources file a project using it would include,
+    # so this build also checks that file.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../win32/gui/src/ASWUnitTests_Win32GUI_Sources.cmake)
 
     add_executable(ASWUnitTests_Win32_GUI WIN32
-        ${ASWUNITTESTS_WIN32_GUI_FRAMEWORK_SOURCES}
+        ${ASWUNITTESTS_WIN32_GUI_SOURCES}
         ${ASWUNITTESTS_SELF_TEST_SOURCES}
-        ../win32/gui/src/ASWUnitTests_Win32GUI_DialogTemplate.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_DPI.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_MainLayout.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_MainWindow.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_Splitter.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_TextDialog.cpp
-        ../win32/gui/src/ASWUnitTests_Win32GUI_WinMain.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DPI.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_MainLayout.cpp
@@ -135,48 +119,30 @@ if(WIN32)
     )
 
     target_include_directories(ASWUnitTests_Win32_GUI PRIVATE
-        ../gui/src
+        ${ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS}
         ../gui/tests
-        ../src
         ../tests
         ../toTest
-        ../win32/gui/src
         ../win32/tests
     )
 
     target_link_libraries(ASWUnitTests_Win32_GUI PRIVATE
+        ${ASWUNITTESTS_WIN32_GUI_LIBRARIES}
         Threads::Threads
-        comctl32
-        comdlg32
-        ole32
         rpcrt4
-        shell32
-        uxtheme
     )
+
+    target_link_options(ASWUnitTests_Win32_GUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS})
 
     if(MSVC)
         target_compile_options(ASWUnitTests_Win32_GUI PRIVATE /W4 /Zc:__cplusplus)
-        # The linker merges the manifest into the one it generates. /MANIFESTUAC:NO leaves the execution level
-        # to the manifest's own trustInfo, rather than adding a second one.
-        target_sources(ASWUnitTests_Win32_GUI PRIVATE ../win32/gui/src/ASWUnitTests_Win32GUI.manifest)
-        target_link_options(ASWUnitTests_Win32_GUI PRIVATE /MANIFESTUAC:NO)
     else()
         target_compile_options(ASWUnitTests_Win32_GUI PRIVATE -Wall -Wextra -Wpedantic)
-        # The manifest as a resource. GCC also links its distribution's default manifest, if it has one; GNU ld
-        # drops a language-neutral default one silently, but WinLibs' has a language, so ld reports ".rsrc merge
-        # failure: multiple non-default manifests". The link still succeeds and Windows uses this manifest,
-        # which comes first.
-        target_sources(ASWUnitTests_Win32_GUI PRIVATE ../win32/gui/src/ASWUnitTests_Win32GUI_Manifest.rc)
     endif()
 
     if(MINGW)
         # Statically linked, as the console runner is.
         target_link_options(ASWUnitTests_Win32_GUI PRIVATE -static-libgcc -static-libstdc++ -static)
-        # GNU ld marks the executable for Windows subsystem 5.02 (XP) unless told otherwise, and Windows draws the
-        # windows of an executable older than 6.0 (Vista) without the padded border, so their frames and title
-        # bars would be thinner than in the other builds and the VCL GUI runner. lld already uses 6.0.
-        target_link_options(ASWUnitTests_Win32_GUI PRIVATE -Wl,--major-subsystem-version,6
-            -Wl,--minor-subsystem-version,0)
     endif()
 
     set_target_properties(ASWUnitTests_Win32_GUI PROPERTIES
