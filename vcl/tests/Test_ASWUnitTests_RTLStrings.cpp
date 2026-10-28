@@ -757,6 +757,10 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_AcceptEveryTextKind()
     CheckEquals(System::UTF8String(nonASCII), "caf\xC3\xA9 \xF0\x9F\x98\x80", __func__, __LINE__,
         "UTF8String and its UTF-8 bytes");
     CheckEndsWith(L"caf" L"\x00E9", System::UTF8String(L"\x00E9"), __func__, __LINE__, "a wide literal and UTF8String");
+    CheckEmpty(System::AnsiString(), __func__, __LINE__, "an empty AnsiString");
+    CheckNotEmpty(System::AnsiString("Hello"), __func__, __LINE__, "an AnsiString with text");
+    AssertEmpty(System::UTF8String(), __func__, __LINE__, "an empty UTF8String");
+    AssertNotEmpty(System::UTF8String(nonASCII), __func__, __LINE__, "a UTF8String with text");
 
     // Matched as wide text, where '.' is one UTF-16 code unit.
     CheckMatches(System::String(L"caf" L"\x00E9"), "caf.", __func__, __LINE__, "'.' matches the e-acute");
@@ -925,6 +929,10 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_RejectNonText()
     static_assert(TCanCheckEquals<System::AnsiString, System::UTF8String>::value, "AnsiString and UTF8String");
     static_assert(TCanCheckEquals<char const*, System::AnsiString>::value, "a C string and AnsiString");
     static_assert(TCanCheckEmpty<System::String>::value, "a System::String");
+    static_assert(TCanCheckEmpty<System::AnsiString>::value, "an AnsiString");
+    static_assert(TCanCheckEmpty<System::UTF8String>::value, "a UTF8String");
+    static_assert(TCanCheckEmpty<char const*>::value,
+        "a C string, through its own overload rather than as a System::String (a null one isn't empty)");
 
     static_assert(!TCanCheckEquals<System::String, int>::value, "System::String and a number");
     static_assert(!TCanCheckEquals<double, System::String>::value, "a number and System::String");
@@ -933,7 +941,7 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_RejectNonText()
     static_assert(!TCanCheckContains<System::String, int>::value, "System::String and a number");
     static_assert(!TCanCheckEquals<System::AnsiString, int>::value, "AnsiString and a number");
     static_assert(!TCanCheckContains<std::string, int>::value, "std::string and a number");
-    static_assert(!TCanCheckEmpty<char const*>::value, "a C string, which mustn't convert to System::String");
+    static_assert(!TCanCheckEmpty<wchar_t>::value, "a character, which mustn't convert to System::String");
     static_assert(!TCanCheckEmpty<int>::value, "a number");
 }
 //---------------------------------------------------------------------------

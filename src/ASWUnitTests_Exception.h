@@ -335,6 +335,8 @@ class TExceptNotEmpty : public TTestException
 {
 public:
     TExceptNotEmpty(std::string const& method, int line, std::string const& msg);
+    // With a detail in place of "Expected not empty but was empty", e.g. for a null C string.
+    TExceptNotEmpty(std::string const& method, int line, std::string const& detail, std::string const& msg);
 };
 
 

@@ -43,6 +43,12 @@ versioned baseline.
   `System::String`.
 - In RTL builds, the string checks also take an `AnsiString`, a `UTF8String` or another
   `AnsiStringT`, and two RTL strings or an RTL string with any other text.
+- `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take a C string, narrow or wide,
+  including a character array, which is checked as the text it holds rather than by its size. A
+  null C string fails both, shown as `(null)`. In RTL builds they also take an `AnsiString`, a
+  `UTF8String` or another `AnsiStringT`.
+- A `TExceptNotEmpty` constructor that takes a detail, which `AssertNotEmpty` uses for a null C
+  string.
 
 ### Changed
 

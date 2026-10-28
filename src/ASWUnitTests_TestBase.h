@@ -1457,12 +1457,18 @@ protected: // Assertion/Check methods - Empty (string or container)
         if (!value.empty())
             throw TExceptEmpty(method, line, "Expected empty but " + DescribeContents(value), msg);
     }
+    // A C string, or a character array taken as one (so an array holding "" is empty, whatever its size). A null C
+    // string is neither empty nor not empty: both methods fail, showing it as "(null)".
+    void AssertEmpty(char const* text, std::string const& method, int line, std::string const& msg);
+    void AssertEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg);
     template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
     void AssertNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
     {
         if (value.empty())
             throw TExceptNotEmpty(method, line, msg);
     }
+    void AssertNotEmpty(char const* text, std::string const& method, int line, std::string const& msg);
+    void AssertNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg);
 
     template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
     void CheckEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
@@ -1470,12 +1476,16 @@ protected: // Assertion/Check methods - Empty (string or container)
         if (!value.empty())
             SetTestFailedCheck(method, line, "Expected empty but " + DescribeContents(value) + ". " + msg);
     }
+    void CheckEmpty(char const* text, std::string const& method, int line, std::string const& msg);
+    void CheckEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg);
     template <typename TValue, TEnableIfHasEmpty<TValue> = 0>
     void CheckNotEmpty(TValue const& value, std::string const& method, int line, std::string const& msg)
     {
         if (value.empty())
             SetTestFailedCheck(method, line, "Expected not empty but was empty. " + msg);
     }
+    void CheckNotEmpty(char const* text, std::string const& method, int line, std::string const& msg);
+    void CheckNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg);
 
 protected: // Assertion/Check methods - Contains (substring)
     // A null C string, as the text or the substring, matches nothing: the Contains methods fail, showing it as
@@ -2279,11 +2289,11 @@ protected: // Assertion/Check methods - Mixed string types
 
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 protected: // Assertion/Check methods - System::String (RTL)
-    // The Empty methods for a System::String. Exactly a System::String, so nothing else converts to one implicitly
-    // (e.g. a C string, only in RTL builds).
+    // The Empty methods for an RTL string: a System::String, or an AnsiStringT such as AnsiString or UTF8String.
+    // Exactly those, so nothing else converts to one implicitly (e.g. a C string, only in RTL builds).
     template <typename TText>
-    using TEnableIfRTLString = typename std::enable_if<std::is_same<typename std::decay<TText>::type,
-        System::String>::value, int>::type;
+    using TEnableIfRTLString = typename std::enable_if<TIsRTLText<typename std::decay<TText>::type>::value,
+        int>::type;
 
     template <typename TText, TEnableIfRTLString<TText> = 0>
     void AssertEmpty(TText const& text, std::string const& method, int line, std::string const& msg)

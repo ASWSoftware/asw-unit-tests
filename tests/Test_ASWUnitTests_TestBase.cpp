@@ -241,9 +241,10 @@ public:
 // TFixture_EmptyChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEmpty()/CheckEmpty()/
-// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), and (where the
-// library has it) std::string_view, so Test_Empty_ShowsContentsOnFailure below can check what each failure shows.
-// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), C strings and
+// character arrays (narrow and wide, null included), and (where the library has it) std::string_view, so
+// Test_Empty_ShowsContentsOnFailure below can check what each failure shows. Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_EmptyChecks : public TTestGroupBase
 {
@@ -252,19 +253,36 @@ private:
 
 private:
     void Test_AssertEmpty_EmptyString_Passes();
+    void Test_AssertEmpty_NullCString_Fails();
     void Test_AssertEmpty_String_Fails();
+    void Test_AssertEmpty_WideArray_Passes();
     void Test_AssertNotEmpty_EmptyVector_Fails();
+    void Test_AssertNotEmpty_EmptyWideCString_Fails();
+    void Test_AssertNotEmpty_NullCString_Fails();
     void Test_AssertNotEmpty_Vector_Passes();
+    void Test_AssertNotEmpty_WideCString_Passes();
+    void Test_CheckEmpty_CharArray_Fails();
+    void Test_CheckEmpty_EmptyCharArray_Passes();
     void Test_CheckEmpty_EmptyMap_Passes();
     void Test_CheckEmpty_ForwardList_Fails();
+    void Test_CheckEmpty_NullWideCString_Fails();
     void Test_CheckEmpty_OneElement_Fails();
 #if defined(__cpp_lib_string_view)
     void Test_CheckEmpty_StringView_Fails();
 #endif
     void Test_CheckEmpty_Vector_Fails();
+    void Test_CheckEmpty_WideCString_Fails();
     void Test_CheckEmpty_WideString_Fails();
+    void Test_CheckNotEmpty_CString_Passes();
+    void Test_CheckNotEmpty_EmptyCharPointer_Fails();
     void Test_CheckNotEmpty_EmptyString_Fails();
+    void Test_CheckNotEmpty_NullCString_Fails();
+    void Test_CheckNotEmpty_NullWideCString_Fails();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_CheckNotEmpty_SourceLocation_Passes();
+#endif
     void Test_CheckNotEmpty_String_Passes();
+    void Test_CheckNotEmpty_WideArray_Passes();
 
 public:
     TFixture_EmptyChecks();
@@ -2472,19 +2490,39 @@ TFixture_EmptyChecks::TFixture_EmptyChecks()
     SetLogSuppressed(true);
 
     RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes, "AssertEmpty_EmptyString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_NullCString_Fails, "AssertEmpty_NullCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_String_Fails, "AssertEmpty_String_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_WideArray_Passes, "AssertEmpty_WideArray_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails, "AssertNotEmpty_EmptyVector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyWideCString_Fails,
+        "AssertNotEmpty_EmptyWideCString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_NullCString_Fails, "AssertNotEmpty_NullCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes, "AssertNotEmpty_Vector_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_WideCString_Passes, "AssertNotEmpty_WideCString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_CharArray_Fails, "CheckEmpty_CharArray_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_EmptyCharArray_Passes, "CheckEmpty_EmptyCharArray_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes, "CheckEmpty_EmptyMap_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails, "CheckEmpty_ForwardList_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_NullWideCString_Fails, "CheckEmpty_NullWideCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails, "CheckEmpty_OneElement_Fails");
 #if defined(__cpp_lib_string_view)
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_StringView_Fails, "CheckEmpty_StringView_Fails");
 #endif
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails, "CheckEmpty_Vector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_WideCString_Fails, "CheckEmpty_WideCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails, "CheckEmpty_WideString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_CString_Passes, "CheckNotEmpty_CString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyCharPointer_Fails,
+        "CheckNotEmpty_EmptyCharPointer_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails, "CheckNotEmpty_EmptyString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_NullCString_Fails, "CheckNotEmpty_NullCString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_NullWideCString_Fails,
+        "CheckNotEmpty_NullWideCString_Fails");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_SourceLocation_Passes, "CheckNotEmpty_SourceLocation_Passes");
+#endif
     RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes, "CheckNotEmpty_String_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_WideArray_Passes, "CheckNotEmpty_WideArray_Passes");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes()
@@ -2492,9 +2530,20 @@ void TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes()
     AssertEmpty(std::string(), __func__, __LINE__, "empty string");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_NullCString_Fails()
+{
+    AssertEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertEmpty_String_Fails()
 {
     AssertEmpty(std::string("abc"), __func__, __LINE__, "has text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_WideArray_Passes()
+{
+    wchar_t const buffer[16] = L"";
+    AssertEmpty(buffer, __func__, __LINE__, "an array holding empty text");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails()
@@ -2502,9 +2551,38 @@ void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails()
     AssertNotEmpty(std::vector<int>(), __func__, __LINE__, "no elements");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyWideCString_Fails()
+{
+    wchar_t const* const text = L"";
+    AssertNotEmpty(text, __func__, __LINE__, "empty wide C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_NullCString_Fails()
+{
+    AssertNotEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes()
 {
     AssertNotEmpty(std::vector<int>{ 1 }, __func__, __LINE__, "one element");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_WideCString_Passes()
+{
+    wchar_t const* const text = L"x";
+    AssertNotEmpty(text, __func__, __LINE__, "wide C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_CharArray_Fails()
+{
+    char const buffer[32] = "abc";
+    CheckEmpty(buffer, __func__, __LINE__, "an array shows its text, not its size");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_EmptyCharArray_Passes()
+{
+    char const buffer[32] = "";
+    CheckEmpty(buffer, __func__, __LINE__, "an array holding empty text, whatever its size");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes()
@@ -2516,6 +2594,11 @@ void TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails()
 {
     // std::forward_list has empty() but no size().
     CheckEmpty(std::forward_list<int>{ 1, 2 }, __func__, __LINE__, "no size to show");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_NullWideCString_Fails()
+{
+    CheckEmpty(static_cast<wchar_t const*>(nullptr), __func__, __LINE__, "null wide C string");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails()
@@ -2535,10 +2618,30 @@ void TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails()
     CheckEmpty(std::vector<int>{ 1, 2, 3 }, __func__, __LINE__, "three elements");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_WideCString_Fails()
+{
+    // U+00E9 (e with acute accent) is shown as its UTF-8 bytes.
+    wchar_t const* const text = L"caf\x00E9";
+    CheckEmpty(text, __func__, __LINE__, "wide C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails()
 {
     // U+00E9 (e with acute accent) is shown as its UTF-8 bytes.
     CheckEmpty(std::wstring(L"caf\x00E9"), __func__, __LINE__, "wide text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_CString_Passes()
+{
+    char const* const text = "abc";
+    CheckNotEmpty(text, __func__, __LINE__, "C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyCharPointer_Fails()
+{
+    char buffer[8] = "";
+    char* const text = buffer;
+    CheckNotEmpty(text, __func__, __LINE__, "a char* to empty text");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails()
@@ -2546,9 +2649,33 @@ void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails()
     CheckNotEmpty(std::string(), __func__, __LINE__, "empty string");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_NullCString_Fails()
+{
+    CheckNotEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_NullWideCString_Fails()
+{
+    CheckNotEmpty(static_cast<wchar_t const*>(nullptr), __func__, __LINE__, "null wide C string");
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TFixture_EmptyChecks::Test_CheckNotEmpty_SourceLocation_Passes()
+{
+    wchar_t buffer[8] = L"x";
+    CheckNotEmpty(buffer, "a wchar_t array through the std::source_location form");
+}
+//---------------------------------------------------------------------------
+#endif
 void TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes()
 {
     CheckNotEmpty(std::string("abc"), __func__, __LINE__, "has text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_WideArray_Passes()
+{
+    wchar_t const buffer[16] = L"abc";
+    CheckNotEmpty(buffer, __func__, __LINE__, "an array holding text");
 }
 //---------------------------------------------------------------------------
 
@@ -6986,10 +7113,12 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
 
     // Assert
     TTestResults const& results = fixture.Results();
+    size_t expectedCount = 25;
 #if defined(__cpp_lib_string_view)
-    size_t const expectedCount = 12;
-#else
-    size_t const expectedCount = 11;
+    ++expectedCount;
+#endif
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    ++expectedCount;
 #endif
     CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
@@ -7012,12 +7141,22 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
     };
 
     std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertEmpty_NullCString_Fails", "Not empty: Test_AssertEmpty_NullCString_Fails (",
+          "): Expected empty but was \"(null)\". null C string" },
         { "AssertEmpty_String_Fails", "Not empty: Test_AssertEmpty_String_Fails (",
           "): Expected empty but was \"abc\". has text" },
         { "AssertNotEmpty_EmptyVector_Fails", "Empty: Test_AssertNotEmpty_EmptyVector_Fails (",
           "): Expected not empty but was empty. no elements" },
+        { "AssertNotEmpty_EmptyWideCString_Fails", "Empty: Test_AssertNotEmpty_EmptyWideCString_Fails (",
+          "): Expected not empty but was empty. empty wide C string" },
+        { "AssertNotEmpty_NullCString_Fails", "Empty: Test_AssertNotEmpty_NullCString_Fails (",
+          "): Expected not empty but was \"(null)\". null C string" },
+        { "CheckEmpty_CharArray_Fails", "Check failed for: \"Test_CheckEmpty_CharArray_Fails\" (",
+          "): Expected empty but was \"abc\". an array shows its text, not its size" },
         { "CheckEmpty_ForwardList_Fails", "Check failed for: \"Test_CheckEmpty_ForwardList_Fails\" (",
           "): Expected empty but was not empty. no size to show" },
+        { "CheckEmpty_NullWideCString_Fails", "Check failed for: \"Test_CheckEmpty_NullWideCString_Fails\" (",
+          "): Expected empty but was \"(null)\". null wide C string" },
         { "CheckEmpty_OneElement_Fails", "Check failed for: \"Test_CheckEmpty_OneElement_Fails\" (",
           "): Expected empty but had 1 element. one element" },
 #if defined(__cpp_lib_string_view)
@@ -7030,10 +7169,18 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
             "CheckEmpty_Vector_Fails", "Check failed for: \"Test_CheckEmpty_Vector_Fails\" (",
             "): Expected empty but had 3 elements. three elements"
         },
+        { "CheckEmpty_WideCString_Fails", "Check failed for: \"Test_CheckEmpty_WideCString_Fails\" (",
+          "): Expected empty but was \"caf\xC3\xA9\". wide C string" },
         { "CheckEmpty_WideString_Fails", "Check failed for: \"Test_CheckEmpty_WideString_Fails\" (",
           "): Expected empty but was \"caf\xC3\xA9\". wide text" },
+        { "CheckNotEmpty_EmptyCharPointer_Fails", "Check failed for: \"Test_CheckNotEmpty_EmptyCharPointer_Fails\" (",
+          "): Expected not empty but was empty. a char* to empty text" },
         { "CheckNotEmpty_EmptyString_Fails", "Check failed for: \"Test_CheckNotEmpty_EmptyString_Fails\" (",
           "): Expected not empty but was empty. empty string" },
+        { "CheckNotEmpty_NullCString_Fails", "Check failed for: \"Test_CheckNotEmpty_NullCString_Fails\" (",
+          "): Expected not empty but was \"(null)\". null C string" },
+        { "CheckNotEmpty_NullWideCString_Fails", "Check failed for: \"Test_CheckNotEmpty_NullWideCString_Fails\" (",
+          "): Expected not empty but was \"(null)\". null wide C string" },
     };
 
     for (TExpectedFailure const& expected : expectedFailures)

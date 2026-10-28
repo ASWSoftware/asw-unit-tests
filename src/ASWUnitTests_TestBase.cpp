@@ -73,6 +73,12 @@ thread_local TWorkerState* t_WorkerState = nullptr;
 std::string CStringDisplayText(char const* str);
 std::string CStringDisplayText(wchar_t const* str);
 
+template <typename TChar>
+std::string CStringEmptyFailure(TChar const* text);
+
+template <typename TChar>
+std::string CStringNotEmptyFailure(TChar const* text);
+
 std::string CStringOrEmpty(char const* str);
 std::wstring CStringOrEmpty(wchar_t const* str);
 
@@ -145,6 +151,39 @@ std::string CStringDisplayText(char const* str)
 std::string CStringDisplayText(wchar_t const* str)
 {
     return (str != nullptr) ? ASWUnitTests::WideToUTF8(str) : std::string("(null)");
+}
+//---------------------------------------------------------------------------
+/*
+    CStringEmptyFailure
+
+    Why 'text' fails an Empty method, e.g. Expected empty but was "abc" (or "(null)" for a null C string), or an
+    empty string when it's empty.
+*/
+template <typename TChar>
+std::string CStringEmptyFailure(TChar const* text)
+{
+    if (text != nullptr && *text == TChar())
+        return std::string();
+
+    return "Expected empty but was \"" + CStringDisplayText(text) + "\"";
+}
+//---------------------------------------------------------------------------
+/*
+    CStringNotEmptyFailure
+
+    Why 'text' fails a NotEmpty method, Expected not empty but was empty (or was "(null)" for a null C string), or
+    an empty string when it isn't empty.
+*/
+template <typename TChar>
+std::string CStringNotEmptyFailure(TChar const* text)
+{
+    if (text == nullptr)
+        return "Expected not empty but was \"(null)\"";
+
+    if (*text == TChar())
+        return "Expected not empty but was empty";
+
+    return std::string();
 }
 //---------------------------------------------------------------------------
 /*
@@ -652,6 +691,20 @@ void TTestGroupBase::AssertContainsIC(wchar_t const* text, wchar_t const* substr
     AssertContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptEmpty(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptEmpty(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertEndsWith(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -983,6 +1036,20 @@ void TTestGroupBase::AssertNotContainsIC(wchar_t const* text, wchar_t const* sub
         return;
 
     AssertNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptNotEmpty(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptNotEmpty(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEndsWith(std::string const& text, std::string const& suffix,
@@ -1497,6 +1564,20 @@ void TTestGroupBase::CheckContainsIC(wchar_t const* text, wchar_t const* substri
     CheckContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckEndsWith(std::string const& text, std::string const& suffix,
     std::string const& method, int line, std::string const& msg)
 {
@@ -1885,6 +1966,20 @@ void TTestGroupBase::CheckNotContainsIC(wchar_t const* text, wchar_t const* subs
         return;
 
     CheckNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEndsWith(std::string const& text, std::string const& suffix,

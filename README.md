@@ -1007,16 +1007,26 @@ built-in operators do, and a NaN fails every check.
 ### Checking for Empty
 
 `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take anything with an `empty()`
-member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, and with
-[RTL support](#comparing-systemstring-vclfmx), a `System::String`. Unlike
-`CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element count of a
-container with a `size()`:
+member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, a C string
+(`char const*` or `wchar_t const*`, including character arrays), and with
+[RTL support](#comparing-systemstring-vclfmx), a `System::String`, `AnsiString` or `UTF8String`.
+Unlike `CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element
+count of a container with a `size()`:
 
 ```
 CheckEmpty(errors, __func__, __LINE__, "no errors reported");
 // Check failed for: "Test_Load" (42): Expected empty but had 2 elements. no errors reported
 CheckEmpty(GetWarning(), __func__, __LINE__, "no warning");
 // Check failed for: "Test_Load" (43): Expected empty but was "low disk space". no warning
+```
+
+A character array is checked as the text it holds, whatever its size, so `char name[32] = ""` is
+empty. A null C string is neither empty nor not empty: both checks fail, showing it as `(null)`:
+
+```
+char const* name = nullptr;
+CheckNotEmpty(name, __func__, __LINE__, "has a name");
+// Check failed for: "Test_Load" (44): Expected not empty but was "(null)". has a name
 ```
 
 ### Checking for Null
