@@ -25,6 +25,7 @@ limitations under the License.
 #include "Test_ASWUnitTests_CrashGuard.h"
 //---------------------------------------------------------------------------
 #include <stdexcept>
+#include <thread>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -353,28 +354,28 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_NormalException_PropagatesUnaffecte
 /*
     TTest_ASWUnitTests_CrashGuard::Test_Run_StackOverflow_CaughtAndAbortsRun
 
-    Skip()ped on RAD Studio's Clang-based compilers (bcc32c/bcc64): in a Release build, a genuine
-    stack overflow here was found to not be caught at all, taking the whole process down for real,
-    despite the exact same mechanism working correctly for every other fault type on those same
-    compilers, and for this exact scenario on MinGW. A larger SetThreadStackGuarantee() didn't fix
-    it cleanly (see the commit that added this Skip() for the full investigation); this is Skip()ped
-    rather than deleted since MinGW (and, unverified so far, MSVC) still need real coverage of stack
-    overflow recovery, and because letting this run for real on an unfixed compiler would crash this
-    very test process rather than merely fail a test.
+    The stack overflows on a thread of its own, never on the thread running the tests. A thread's
+    stack takes one overflow at most: the first uses up its guard page, and a second one ends the
+    process. So on the thread running the tests, a second run of this test in one process, as a GUI
+    runner's Run Selected does, ended the GUI (0xC0000005 in the Win32 GUI runner). TCrashGuard::Run()
+    sets up its stack guarantee (Windows) and alternate signal stack (POSIX) on each thread it runs
+    on, so the new thread is guarded the same way.
 */
 void TTest_ASWUnitTests_CrashGuard::Test_Run_StackOverflow_CaughtAndAbortsRun()
 {
-#if defined(__BORLANDC__)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's bcc32c/bcc64 in a Release build: a genuine stack overflow was not "
-        "caught at all, crashing the process for real. MinGW handles this correctly; investigation ongoing.");
-#endif
-
-    // Arrange, Act
-    TCrashGuardResult const result = TCrashGuard::Run([]()
+    // Arrange
+    auto const overflow = []()
         {
             RecurseUntilStackOverflows(0);
-        });
+        };
+    TCrashGuardResult result;
+    auto const runGuarded = [&]()
+        {
+            result = TCrashGuard::Run(overflow);
+        };
+
+    // Act
+    std::thread(runGuarded).join();
 
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "a genuine stack overflow is caught");
