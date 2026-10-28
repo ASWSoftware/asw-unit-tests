@@ -172,6 +172,11 @@ if(WIN32)
     if(MINGW)
         # Statically linked, as the console runner is.
         target_link_options(ASWUnitTests_Win32_GUI PRIVATE -static-libgcc -static-libstdc++ -static)
+        # GNU ld marks the executable for Windows subsystem 5.02 (XP) unless told otherwise, and Windows draws the
+        # windows of an executable older than 6.0 (Vista) without the padded border, so their frames and title
+        # bars would be thinner than in the other builds and the VCL GUI runner. lld already uses 6.0.
+        target_link_options(ASWUnitTests_Win32_GUI PRIVATE -Wl,--major-subsystem-version,6
+            -Wl,--minor-subsystem-version,0)
     endif()
 
     set_target_properties(ASWUnitTests_Win32_GUI PROPERTIES
