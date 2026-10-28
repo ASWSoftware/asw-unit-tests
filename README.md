@@ -350,8 +350,10 @@ The toolbar, whose commands are also in the Run and Tests menus:
 - **Select All** and **Select None** check or uncheck every shown test, and **Select Failed** checks
   only the shown tests that failed in the latest run.
 - **Copy Details** (Ctrl+Shift+C) copies the detail pane to the clipboard.
-- **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, ignoring case,
-  with the same `*` and `?` wildcards as `--filter`. While it hides tests, checking them and Run
+- **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, with the same
+  `*` and `?` wildcards as `--filter`. It ignores the case of the ASCII letters, as
+  [`CheckEqualsIC`](#comparing-strings-ignoring-case) does, so other letters, such as an accented
+  capital and small E, still have to match exactly. While it hides tests, checking them and Run
   Selected only apply to the shown ones, and hidden tests keep their check marks.
 
 **File > Export JUnit Report** saves the latest run's results as the same JUnit XML report
