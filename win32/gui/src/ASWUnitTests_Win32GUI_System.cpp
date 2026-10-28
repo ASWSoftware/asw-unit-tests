@@ -206,6 +206,11 @@ std::string AdjustLineBreaks(std::string const& text)
 //---------------------------------------------------------------------------
 std::vector<std::string> CommandLineArguments(std::wstring const& commandLine)
 {
+    // CommandLineToArgvW() splits an empty command line as if it were this executable's path, unquoted, so a path
+    // with a space in it would become a program name and an argument.
+    if (commandLine.empty())
+        return std::vector<std::string>();
+
     int count = 0;
     TLocalPtr<wchar_t*> const argv(CommandLineToArgvW(commandLine.c_str(), &count), &LocalFree);
 

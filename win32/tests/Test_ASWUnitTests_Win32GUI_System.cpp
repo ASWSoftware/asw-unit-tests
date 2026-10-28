@@ -249,13 +249,16 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_SkipsTheProgr
     // Act
     std::vector<std::string> const programOnly = CommandLineArguments(L"prog.exe");
     std::vector<std::string> const spaced = CommandLineArguments(L"prog.exe   --run   --exit  ");
-    // CommandLineToArgvW() gives an empty command line the executable's path as its program name.
+    // CommandLineToArgvW() gives an empty command line the executable's path, unquoted, as its program name, which
+    // it then splits at any space in the path; so this checks the fix only when the path has one.
     std::vector<std::string> const empty = CommandLineArguments(L"");
+    std::vector<std::string> const blank = CommandLineArguments(L"   ");
 
     // Assert
     CheckEmpty(programOnly, __func__, __LINE__, "no arguments after the program name");
     CheckEquals(std::string("--run|--exit"), Joined(spaced), __func__, __LINE__, "extra spaces separate only");
     CheckEmpty(empty, __func__, __LINE__, "an empty command line has no arguments");
+    CheckEmpty(blank, __func__, __LINE__, "nor has a blank one");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_CreateFolderPath_CreatesEveryMissingFolder()
