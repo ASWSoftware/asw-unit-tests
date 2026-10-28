@@ -91,7 +91,7 @@ void TTest_ASWUnitTests_Console::Test_ConsoleUTF8Output_SetsUTF8UntilRestored()
     // original is put back at the end.
     UINT const outerCodePage = GetConsoleOutputCP();
     if (outerCodePage == 0 || !SetConsoleOutputCP(437))
-        Skip(__func__, __LINE__, "needs a console, which a GUI runner hasn't");
+        Skip(__func__, __LINE__, "needs a console, which a GUI runner doesn't have");
 
     // Act
     UINT duringFirst = 0;
