@@ -209,6 +209,12 @@ listing tests, and `--list` reports how many tests/groups matched out of the tot
 when output is redirected to a file, there's a record of why fewer tests ran or were listed than
 expected. Likewise, it always states whether shuffle is enabled and, if so, the seed in use.
 
+On Windows, the console runner reads its arguments from the UTF-16 command line rather than the C
+runtime's `argv`, which holds them in the ANSI code page, so a `--filter` pattern, a
+`--project-name` or a `--report-junit` path can hold any character. While it runs, it also sets the
+console's output code page to UTF-8, and restores it afterwards, so non-ASCII test names and
+messages show correctly. Output redirected to a file or a pipe is UTF-8 either way.
+
 `--shuffle` is a sanity check against hidden inter-test/inter-group coupling. The deterministic
 alphabetical default (see [Registering Tests](#registering-tests)) is for readable, reproducible
 output day-to-day, while `--shuffle` deliberately breaks that to surface tests that secretly depend
@@ -1254,6 +1260,11 @@ For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the s
 Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own
 project, plus your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after
 updating the submodule.
+
+On Windows, `main.cpp` defines `_tmain` (`main` elsewhere), so a project that maps `TCHAR` to
+`wchar_t`, such as a RAD Studio project with "TCHAR maps to" set to `wchar_t`, links as well as one
+that maps it to `char`. On Windows, the framework also uses `CommandLineToArgvW()`, from `shell32`,
+which MSVC, MinGW and RAD Studio link by default.
 
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to
 enable [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and

@@ -80,7 +80,8 @@ public:
     static std::string EscapeXml(std::string const& text);
 
     // Writes the report BuildXML() builds to 'filePath', byte for byte (LF line ends on every
-    // platform). Returns false if 'filePath' could not be opened for writing.
+    // platform). 'filePath' is UTF-8, on Windows too. Returns false if 'filePath' could not be
+    // opened for writing.
     static bool Write(std::string const& filePath, std::string const& suitesName,
         std::vector<TJUnitTestCase> const& testCases);
 };

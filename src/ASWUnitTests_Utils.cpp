@@ -29,15 +29,38 @@ limitations under the License.
 #include <random>
 #include <utility>
 //---------------------------------------------------------------------------
+#if defined(_WIN32)
+#  include <limits>
+#  include <memory>
+#  include <stdexcept>
+#  if !defined(NOMINMAX)
+#    define NOMINMAX
+#  endif
+#  if !defined(WIN32_LEAN_AND_MEAN)
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  include <shellapi.h>
+#endif
+//---------------------------------------------------------------------------
 
 namespace
 {
+
+#if defined(_WIN32)
+// A buffer from CommandLineToArgvW() or FormatMessageW(), freed with LocalFree().
+template <typename T>
+using TLocalPtr = std::unique_ptr<T, HLOCAL(WINAPI*)(HLOCAL)>;
+#endif
 
 //---------------------------------------------------------------------------
 
 void AppendUTF8(std::string& text, uint32_t codePoint);
 bool IsHighSurrogate(uint32_t codeUnit);
 bool IsLowSurrogate(uint32_t codeUnit);
+#if defined(_WIN32)
+int ToConversionLength(std::size_t length);
+#endif
 
 //---------------------------------------------------------------------------
 /*
@@ -81,6 +104,21 @@ bool IsLowSurrogate(uint32_t codeUnit)
     return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
 }
 //---------------------------------------------------------------------------
+#if defined(_WIN32)
+/*
+    ToConversionLength
+
+    A length for MultiByteToWideChar() or WideCharToMultiByte(), which take an int.
+*/
+int ToConversionLength(std::size_t length)
+{
+    if (length > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
+        throw std::length_error("text too long to convert");
+
+    return static_cast<int>(length);
+}
+#endif
+//---------------------------------------------------------------------------
 
 } // namespace
 
@@ -89,6 +127,29 @@ bool IsLowSurrogate(uint32_t codeUnit)
 namespace ASWUnitTests
 {
 
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+std::vector<std::string> CommandLineArguments(std::wstring const& commandLine)
+{
+    // CommandLineToArgvW() splits an empty command line as if it were this executable's path, unquoted, so a path
+    // with a space in it would become a program name and an argument.
+    if (commandLine.empty())
+        return std::vector<std::string>();
+
+    int count = 0;
+    TLocalPtr<wchar_t*> const argv(CommandLineToArgvW(commandLine.c_str(), &count), &LocalFree);
+
+    if (argv == nullptr)
+        throw std::runtime_error("Couldn't split the command line: " + SystemErrorText(GetLastError()));
+
+    std::vector<std::string> args;
+
+    for (int i = 1; i < count; ++i)
+        args.push_back(WideToUTF8(argv.get()[i]));
+
+    return args;
+}
+#endif
 //---------------------------------------------------------------------------
 uint32_t FNV1aHash(std::string const& text)
 {
@@ -134,6 +195,43 @@ std::vector<std::size_t> ShuffledIndices(std::size_t count, unsigned int seed)
 
     return indices;
 }
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+std::string SystemErrorText(unsigned long error)
+{
+    wchar_t* buffer = nullptr;
+    DWORD const length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, error, 0, reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
+
+    if (length == 0 || buffer == nullptr)
+        return "error " + std::to_string(error);
+
+    TLocalPtr<wchar_t> const owner(buffer, &LocalFree);
+    std::wstring text(buffer, length);
+
+    // FormatMessageW() ends the text with a line break.
+    while (!text.empty() && (text.back() == L'\r' || text.back() == L'\n' || text.back() == L' '))
+        text.pop_back();
+
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+std::wstring UTF8ToWide(std::string const& text)
+{
+    if (text.empty())
+        return std::wstring();
+
+    int const length = ToConversionLength(text.size());
+    int const wideLength = MultiByteToWideChar(CP_UTF8, 0, text.data(), length, nullptr, 0);
+
+    if (wideLength <= 0)
+        throw std::runtime_error("Couldn't convert UTF-8 text: " + SystemErrorText(GetLastError()));
+
+    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, text.data(), length, &wide[0], wideLength);
+    return wide;
+}
+#endif
 //---------------------------------------------------------------------------
 std::string WideToUTF8(std::wstring const& text)
 {

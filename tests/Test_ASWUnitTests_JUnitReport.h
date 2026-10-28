@@ -47,6 +47,7 @@ private: // Test methods
     void Test_EscapeXml_PlainTextUnchanged();
     void Test_EscapeXml_SpecialCharacters();
     void Test_Write_ProducesReadableReport();
+    void Test_Write_TakesAUTF8Path();
     void Test_Write_WritesBuildXMLUnchanged();
 
 public:

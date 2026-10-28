@@ -34,6 +34,18 @@ limitations under the License.
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_JUnitReport.h"
+#include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+#  if !defined(NOMINMAX)
+#    define NOMINMAX
+#  endif
+#  if !defined(WIN32_LEAN_AND_MEAN)
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  include <tchar.h>
+#endif
 //---------------------------------------------------------------------------
 using namespace ASWUnitTests;
 //---------------------------------------------------------------------------
@@ -58,6 +70,9 @@ namespace
 
 void ApplyColorOptions(TCLIOptions const& options);
 void PauseIfRequested(bool pauseOnExit);
+#if defined(_WIN32)
+std::vector<std::string> ProgramArguments();
+#endif
 int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const& filter, std::string const& filterDescription);
 
 //---------------------------------------------------------------------------
@@ -88,6 +103,22 @@ void PauseIfRequested(bool pauseOnExit)
     std::cin.get();
 #endif
 }
+
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+/*
+    ProgramArguments
+
+    The arguments for TCLIParser::ParseArguments(), in UTF-8, from the UTF-16 command line. The C runtime's argv
+    has them in the ANSI code page instead, which turns any character it lacks into a '?' or a lookalike.
+*/
+std::vector<std::string> ProgramArguments()
+{
+    std::vector<std::string> args = CommandLineArguments(GetCommandLineW());
+    args.insert(args.begin(), "ASWUnitTests"); // In place of the program name, which ParseArguments() skips.
+    return args;
+}
+#endif
 
 //---------------------------------------------------------------------------
 int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const& filter, std::string const& filterDescription)
@@ -121,11 +152,23 @@ int RunTests(TTestHandler& tester, TCLIOptions const& options, TestFilter const&
 
 //---------------------------------------------------------------------------
 
+#if defined(_WIN32)
+// _tmain is main, or wmain where TCHAR is wchar_t, as in a RAD Studio project whose "TCHAR maps to" is wchar_t. It
+// takes no arguments: on Windows they come from ProgramArguments().
+int _tmain()
+#else
 int main(int argc, char* argv[])
+#endif
 {
+    // UTF-8 while the tests run, so non-ASCII test names and messages show correctly in the console.
+    TConsoleUTF8Output consoleOutput;
     TCLIOptions options;
 
+#if defined(_WIN32)
+    std::optional<int> const earlyExitCode = TCLIParser::ParseArguments(ProgramArguments(), options);
+#else
     std::optional<int> const earlyExitCode = TCLIParser::ParseArguments(argc, argv, options);
+#endif
     if (earlyExitCode.has_value())
         return *earlyExitCode;
 
@@ -168,6 +211,9 @@ int main(int argc, char* argv[])
     }
 
     PauseIfRequested(options.PauseOnExit);
+
+    // Now, since the std::_Exit() calls below skip its destructor.
+    consoleOutput.Restore();
 
     if (returnCode == ExitCode_TestTimedOut)
     {

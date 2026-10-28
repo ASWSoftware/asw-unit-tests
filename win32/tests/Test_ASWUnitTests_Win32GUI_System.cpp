@@ -45,7 +45,6 @@ namespace
 //---------------------------------------------------------------------------
 
 bool IsFolder(std::string const& path);
-std::string Joined(std::vector<std::string> const& items);
 void RemoveFolderTree(std::wstring const& folder);
 
 //---------------------------------------------------------------------------
@@ -54,21 +53,6 @@ bool IsFolder(std::string const& path)
     DWORD const attributes = GetFileAttributesW(UTF8ToWide(path).c_str());
 
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-}
-//---------------------------------------------------------------------------
-/*
-    Joined
-
-    The items separated by '|', to compare a list with one CheckEquals().
-*/
-std::string Joined(std::vector<std::string> const& items)
-{
-    std::string joined;
-
-    for (std::size_t i = 0; i < items.size(); ++i)
-        joined += (i == 0 ? "" : "|") + items[i];
-
-    return joined;
 }
 //---------------------------------------------------------------------------
 /*
@@ -121,12 +105,6 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
 {
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_AdjustLineBreaks_MakesEveryLineBreakCRLF,
         "AdjustLineBreaks_MakesEveryLineBreakCRLF");
-    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_ConvertsNonASCIIToUTF8,
-        "CommandLineArguments_ConvertsNonASCIIToUTF8");
-    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules,
-        "CommandLineArguments_FollowsTheCRuntimeQuotingRules");
-    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_SkipsTheProgramName,
-        "CommandLineArguments_SkipsTheProgramName");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CreateFolderPath_CreatesEveryMissingFolder,
         "CreateFolderPath_CreatesEveryMissingFolder");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_CreateFolderPath_ThrowsWhenAFileIsInTheWay,
@@ -148,8 +126,6 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "ReadFileBytes_ThrowsForAMissingFile");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_RemoveFile_DeletesOnlyAnExistingFile,
         "RemoveFile_DeletesOnlyAnExistingFile");
-    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ConvertsEveryPlane, "UTF8ToWide_ConvertsEveryPlane");
-    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ReplacesInvalidUTF8, "UTF8ToWide_ReplacesInvalidUTF8");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8,
         "WindowText_ConvertsNonASCIIToUTF8");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing,
@@ -213,52 +189,6 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_AdjustLineBreaks_MakesEveryLineBre
     CheckEquals(std::string("a\r\n\r\nb"), AdjustLineBreaks("a\n\r\nb"), __func__, __LINE__,
         "an LF before a CRLF is a break of its own");
     CheckEmpty(AdjustLineBreaks(std::string()), __func__, __LINE__, "empty stays empty");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_ConvertsNonASCIIToUTF8()
-{
-    // Arrange: U+00E9 (two UTF-8 bytes), U+4E2D (three) and U+1F600 (four; a surrogate pair in UTF-16).
-    std::wstring const commandLine = std::wstring(L"prog.exe \x00E9t\x00E9 \x4E2D ") + L"\xD83D\xDE00";
-
-    // Act
-    std::vector<std::string> const args = CommandLineArguments(commandLine);
-
-    // Assert
-    CheckEquals(std::string("\xC3\xA9t\xC3\xA9|\xE4\xB8\xAD|\xF0\x9F\x98\x80"), Joined(args), __func__, __LINE__,
-        "each argument in UTF-8");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules()
-{
-    // Arrange: a quoted program name with a space, a quoted argument with a space, an empty quoted argument, an
-    // escaped quote, an escaped backslash before a closing quote, and backslashes that precede no quote.
-    std::wstring const commandLine =
-        L"\"C:\\Program Files\\prog.exe\" --filter \"a b\" \"\" a\\\"b \"c\\\\\" d\\\\e";
-
-    // Act
-    std::vector<std::string> const args = CommandLineArguments(commandLine);
-
-    // Assert
-    CheckEquals(std::string("--filter|a b||a\"b|c\\|d\\\\e"), Joined(args), __func__, __LINE__,
-        "split and unquoted as the C runtime splits argv");
-    CheckEquals(6u, args.size(), __func__, __LINE__, "the empty argument is kept");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_Win32GUI_System::Test_CommandLineArguments_SkipsTheProgramName()
-{
-    // Act
-    std::vector<std::string> const programOnly = CommandLineArguments(L"prog.exe");
-    std::vector<std::string> const spaced = CommandLineArguments(L"prog.exe   --run   --exit  ");
-    // CommandLineToArgvW() gives an empty command line the executable's path, unquoted, as its program name, which
-    // it then splits at any space in the path; so this checks the fix only when the path has one.
-    std::vector<std::string> const empty = CommandLineArguments(L"");
-    std::vector<std::string> const blank = CommandLineArguments(L"   ");
-
-    // Assert
-    CheckEmpty(programOnly, __func__, __LINE__, "no arguments after the program name");
-    CheckEquals(std::string("--run|--exit"), Joined(spaced), __func__, __LINE__, "extra spaces separate only");
-    CheckEmpty(empty, __func__, __LINE__, "an empty command line has no arguments");
-    CheckEmpty(blank, __func__, __LINE__, "nor has a blank one");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_CreateFolderPath_CreatesEveryMissingFolder()
@@ -430,32 +360,6 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_RemoveFile_DeletesOnlyAnExistingFi
     CheckTrue(removed, __func__, __LINE__, "an existing file is deleted");
     CheckFalse(exists, __func__, __LINE__, "and is gone");
     CheckFalse(removedAgain, __func__, __LINE__, "a missing file can't be deleted");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ConvertsEveryPlane()
-{
-    // Arrange: ASCII, U+00E9, U+4E2D and U+1F600 (a surrogate pair in UTF-16), and a NUL, which ends neither.
-    std::string const utf8 = std::string("a\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80") + std::string("\0z", 2);
-    std::wstring const expected = std::wstring(L"a\x00E9\x4E2D\xD83D\xDE00") + std::wstring(L"\0z", 2);
-
-    // Act
-    std::wstring const wide = UTF8ToWide(utf8);
-
-    // Assert
-    CheckEquals(expected, wide, __func__, __LINE__, "every character converted");
-    CheckEquals(utf8, WideToUTF8(wide), __func__, __LINE__, "and back again");
-    CheckEmpty(UTF8ToWide(std::string()), __func__, __LINE__, "empty stays empty");
-}
-//---------------------------------------------------------------------------
-void TTest_ASWUnitTests_Win32GUI_System::Test_UTF8ToWide_ReplacesInvalidUTF8()
-{
-    // Act: a byte that never appears in UTF-8, and a continuation byte with no lead byte.
-    std::wstring const invalid = UTF8ToWide("a\xFF" "b");
-    std::wstring const continuation = UTF8ToWide("\x80" "c");
-
-    // Assert
-    CheckEquals(std::wstring(L"a\xFFFD" L"b"), invalid, __func__, __LINE__, "0xFF becomes U+FFFD");
-    CheckEquals(std::wstring(L"\xFFFD" L"c"), continuation, __func__, __LINE__, "a lone 0x80 becomes U+FFFD");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8()

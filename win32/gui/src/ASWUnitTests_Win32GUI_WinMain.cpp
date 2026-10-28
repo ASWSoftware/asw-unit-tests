@@ -27,6 +27,7 @@ limitations under the License.
 #include <string>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 //---------------------------------------------------------------------------

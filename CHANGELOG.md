@@ -27,6 +27,13 @@ versioned baseline.
   before.
 - `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
   `ASWUNITTESTS_GUI_SOURCES`.
+- A `TCLIParser::ParseArguments()` overload that takes the arguments as a
+  `std::vector<std::string>`, the program name first, as in `argv`.
+- On Windows, `CommandLineArguments()`, `SystemErrorText()` and `UTF8ToWide()` in
+  `ASWUnitTests_Utils.h`: a command line split into UTF-8 arguments, a `GetLastError()` code's
+  description, and UTF-8 converted to UTF-16.
+- `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
+  to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
 
 ### Changed
 
@@ -50,6 +57,16 @@ versioned baseline.
   written the same way. A size or position written in hexadecimal by hand is now ignored, as an
   invalid value. The selection file's first line, a comment, now reads "ASWUnitTests GUI test
   selection" instead of "ASWUnitTests VCL GUI test selection"; files saved before still load.
+- On Windows, the console runner reads its arguments from the UTF-16 command line instead of
+  `argv`, which holds them in the ANSI code page, so a `--filter` pattern, `--project-name` or
+  `--report-junit` path can hold characters outside that code page; before, those became `?` or a
+  lookalike. While it runs, it also sets the console's output code page to UTF-8, so non-ASCII test
+  names and messages show correctly, and restores it afterwards.
+- On Windows, `main.cpp` defines `_tmain` instead of `main`, so a project whose `TCHAR` maps to
+  `wchar_t` (in RAD Studio, "TCHAR maps to" set to `wchar_t`) links too. It stays `main` elsewhere.
+- `TJUnitReportWriter::Write()` now takes its path as UTF-8 on Windows too, as the console runner
+  passes it. Code that calls it with a path in the ANSI code page that has non-ASCII characters must
+  convert the path to UTF-8 first.
 
 ### Fixed
 

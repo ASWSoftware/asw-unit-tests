@@ -89,6 +89,8 @@ if(WIN32)
         ../win32/gui/src
         ../win32/tests
     )
+    # CommandLineToArgvW(), used by src/ASWUnitTests_Utils.cpp and the Win32 GUI's units. MSVC and MinGW link
+    # shell32 by default; naming it doesn't depend on that.
     target_link_libraries(ASWUnitTests PRIVATE shell32)
 endif()
 

@@ -26,9 +26,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <chrono>
 #include <ctime>
+#include <exception>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -208,8 +212,24 @@ bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& s
 {
     std::string const xml = BuildXML(suitesName, testCases);
 
+    // On Windows, a std::string path is read in the ANSI code page, so 'filePath''s UTF-8 is converted first.
+#if defined(_WIN32)
+    std::filesystem::path path;
+
+    try
+    {
+        path = UTF8ToWide(filePath);
+    }
+    catch (std::exception const&)
+    {
+        return false;
+    }
+#else
+    std::filesystem::path const path(filePath);
+#endif
+
     // Binary, so the file holds BuildXML()'s bytes unchanged, with LF line ends, rather than CRLF on Windows.
-    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    std::ofstream file(path, std::ios::out | std::ios::trunc | std::ios::binary);
     if (!file.is_open())
         return false;
 

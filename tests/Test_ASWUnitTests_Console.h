@@ -37,6 +37,9 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+#if defined(_WIN32)
+    void Test_ConsoleUTF8Output_SetsUTF8UntilRestored();
+#endif
     void Test_ParseColorName_RejectsInvalid();
     void Test_ParseColorName_Recognizes();
     void Test_StripColor_RemovesColorCodesOnly();

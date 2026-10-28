@@ -37,6 +37,7 @@ limitations under the License.
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_JUnitReport.h"
+#include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -45,6 +46,7 @@ namespace
 //---------------------------------------------------------------------------
 
 unsigned long GetCurrentProcessIdPortable();
+std::string PathToUTF8(std::filesystem::path const& path);
 std::string WithoutTimestamps(std::string xml);
 
 //---------------------------------------------------------------------------
@@ -61,6 +63,21 @@ unsigned long GetCurrentProcessIdPortable()
     return ::GetCurrentProcessId();
 #else
     return static_cast<unsigned long>(::getpid());
+#endif
+}
+//---------------------------------------------------------------------------
+/*
+    PathToUTF8
+
+    The path in UTF-8, as TJUnitReportWriter::Write() takes it. On Windows, path::string() gives the ANSI code
+    page instead, and MSVC's throws for a character it lacks.
+*/
+std::string PathToUTF8(std::filesystem::path const& path)
+{
+#if defined(_WIN32)
+    return ASWUnitTests::WideToUTF8(path.wstring());
+#else
+    return path.string();
 #endif
 }
 //---------------------------------------------------------------------------
@@ -108,6 +125,7 @@ TTest_ASWUnitTests_JUnitReport::TTest_ASWUnitTests_JUnitReport()
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_PlainTextUnchanged, "EscapeXml_PlainTextUnchanged");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_EscapeXml_SpecialCharacters, "EscapeXml_SpecialCharacters");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport, "Write_ProducesReadableReport");
+    RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_TakesAUTF8Path, "Write_TakesAUTF8Path");
     RegisterTest(&TTest_ASWUnitTests_JUnitReport::Test_Write_WritesBuildXMLUnchanged, "Write_WritesBuildXMLUnchanged");
 }
 //---------------------------------------------------------------------------
@@ -117,26 +135,26 @@ TTest_ASWUnitTests_JUnitReport::~TTest_ASWUnitTests_JUnitReport()
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::SetUp_Group()
 {
-    Log("Setting up temp group folder: " + m_GroupBaseTempDir.string());
+    Log("Setting up temp group folder: " + PathToUTF8(m_GroupBaseTempDir));
     std::filesystem::create_directories(m_GroupBaseTempDir);
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::SetUp_Test(ITestCase& testCase)
 {
     m_TestTempDir = m_GroupBaseTempDir / testCase.GetName();
-    Log("  Setting up temp folder for " + testCase.GetName() + ": " + m_TestTempDir.string());
+    Log("  Setting up temp folder for " + testCase.GetName() + ": " + PathToUTF8(m_TestTempDir));
     std::filesystem::create_directories(m_TestTempDir);
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::TearDown_Group()
 {
-    Log("Cleaning up temp group folder: " + m_GroupBaseTempDir.string());
+    Log("Cleaning up temp group folder: " + PathToUTF8(m_GroupBaseTempDir));
     std::filesystem::remove_all(m_GroupBaseTempDir);
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::TearDown_Test(ITestCase& testCase)
 {
-    Log("  Cleaning up temp folder for " + testCase.GetName() + ": " + m_TestTempDir.string());
+    Log("  Cleaning up temp folder for " + testCase.GetName() + ": " + PathToUTF8(m_TestTempDir));
     std::filesystem::remove_all(m_TestTempDir);
 }
 //---------------------------------------------------------------------------
@@ -212,7 +230,7 @@ void TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport()
     };
 
     // Act
-    bool const written = TJUnitReportWriter::Write(reportPath.string(), "MyProject", testCases);
+    bool const written = TJUnitReportWriter::Write(PathToUTF8(reportPath), "MyProject", testCases);
 
     // Assert
     AssertTrue(written, __func__, __LINE__, "Write() reports success");
@@ -230,6 +248,24 @@ void TTest_ASWUnitTests_JUnitReport::Test_Write_ProducesReadableReport()
     CheckContains(content, "<skipped", __func__, __LINE__, "skipped element present for TestSkip");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_JUnitReport::Test_Write_TakesAUTF8Path()
+{
+    // Arrange: a file name with U+03A9, which the Windows-1252 code page lacks.
+#if defined(_WIN32)
+    std::filesystem::path const reportPath = m_TestTempDir / L"report-\x03A9.xml";
+#else
+    std::filesystem::path const reportPath = m_TestTempDir / "report-\xCE\xA9.xml";
+#endif
+    std::vector<TJUnitTestCase> const testCases = { { "GroupA", "TestPass", 0.0, TJUnitOutcome::Pass, "" } };
+
+    // Act
+    bool const written = TJUnitReportWriter::Write(PathToUTF8(reportPath), "MyProject", testCases);
+
+    // Assert
+    CheckTrue(written, __func__, __LINE__, "Write() reports success");
+    CheckTrue(std::filesystem::exists(reportPath), __func__, __LINE__, "the report has the name it was given");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_JUnitReport::Test_Write_WritesBuildXMLUnchanged()
 {
     // Arrange
@@ -242,7 +278,7 @@ void TTest_ASWUnitTests_JUnitReport::Test_Write_WritesBuildXMLUnchanged()
     };
 
     // Act
-    bool const written = TJUnitReportWriter::Write(reportPath.string(), "MyProject", testCases);
+    bool const written = TJUnitReportWriter::Write(PathToUTF8(reportPath), "MyProject", testCases);
     std::string const expected = TJUnitReportWriter::BuildXML("MyProject", testCases);
 
     // Assert

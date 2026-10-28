@@ -96,6 +96,9 @@ public:
     // parse/validation error), or std::nullopt if 'options' was parsed successfully and the program
     // should proceed to run tests.
     static std::optional<int> ParseArguments(int argc, char* argv[], TCLIOptions& options);
+    // The same, with the arguments as strings, in UTF-8 for non-ASCII text. Like argv, 'args' starts with the
+    // program name, which is skipped.
+    static std::optional<int> ParseArguments(std::vector<std::string> const& args, TCLIOptions& options);
 
     // Parses "auto"/"always"/"never" as accepted by --color; returns std::nullopt if 'text' isn't
     // recognized.

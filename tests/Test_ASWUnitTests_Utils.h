@@ -39,9 +39,20 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+#if defined(_WIN32)
+    void Test_CommandLineArguments_ConvertsNonASCIIToUTF8();
+    void Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules();
+    void Test_CommandLineArguments_SkipsTheProgramName();
+#endif
     void Test_FNV1aHash_MatchesReferenceValues();
     void Test_ShuffledIndices_GivesSameOrderEverywhere();
     void Test_ShuffledIndices_ReturnsEachIndexOnce();
+#if defined(_WIN32)
+    void Test_SystemErrorText_DescribesAKnownCode();
+    void Test_SystemErrorText_GivesTheNumberForAnUnknownCode();
+    void Test_UTF8ToWide_ConvertsEveryPlane();
+    void Test_UTF8ToWide_ReplacesInvalidUTF8();
+#endif
     void Test_WideToUTF8_EncodesEachSequenceLength();
     void Test_WideToUTF8_KeepsASCIIUnchanged();
 #if WCHAR_MAX > 0xFFFF
