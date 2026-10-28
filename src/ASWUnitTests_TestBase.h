@@ -343,6 +343,40 @@ private:
     {
     };
 
+    // The kind of text a string check's argument is (see TextKindOf()), which decides how it's compared with another.
+    enum class ETextKind
+    {
+        None,          // Not text.
+        NarrowString,  // std::string, as UTF-8.
+        NarrowCString, // char const*, char* or a char array, as UTF-8.
+        WideString,    // std::wstring.
+        WideCString,   // wchar_t const*, wchar_t* or a wchar_t array.
+        RTL            // System::String, or an AnsiStringT such as AnsiString or UTF8String, in RTL builds.
+    };
+
+    // True for an AnsiStringT, such as AnsiString or UTF8String, in RTL builds.
+    template <typename TText>
+    struct TIsAnsiStringT : std::false_type
+    {
+    };
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    template <unsigned short CodePage>
+    struct TIsAnsiStringT<System::AnsiStringT<CodePage> > : std::true_type
+    {
+    };
+#endif
+
+    // A string check's std::string, char const*, std::wstring and wchar_t const* overloads, which ForwardAsUTF8()
+    // and ForwardAsWide() forward to.
+    using TUTF8TextCheck = void (TTestGroupBase::*)(std::string const&, std::string const&, std::string const&, int,
+        std::string const&);
+    using TUTF8CStringCheck = void (TTestGroupBase::*)(char const*, char const*, std::string const&, int,
+        std::string const&);
+    using TWideTextCheck = void (TTestGroupBase::*)(std::wstring const&, std::wstring const&, std::string const&, int,
+        std::string const&);
+    using TWideCStringCheck = void (TTestGroupBase::*)(wchar_t const*, wchar_t const*, std::string const&, int,
+        std::string const&);
+
     // A lock on a group's m_RecordingMutex, like a std::unique_lock, that also counts its holds in m_RecordingHolds,
     // so ReleaseRecordingHolds() can release the ones a crash left behind.
     class TRecordingLock
@@ -562,6 +596,46 @@ private:
         }
     }
 
+    // Forwards a string check's two texts, of any text types (see TextKindOf()), to its std::string overload 'check'
+    // as UTF-8, or, when either is a null C string, to its char const* overload 'cStringCheck' with that one null,
+    // which applies the null C string rules. Used by the templates for mixed string types. The texts are taken by
+    // value, so an array arrives as a pointer, and one instantiation serves every length of literal.
+    template <typename TFirst, typename TSecond>
+    void ForwardAsUTF8(TFirst first, TSecond second, TUTF8TextCheck check, TUTF8CStringCheck cStringCheck,
+        std::string const& method, int line, std::string const& msg)
+    {
+        std::string const firstText = TextToUTF8(first);
+        std::string const secondText = TextToUTF8(second);
+
+        if (IsNullText(first) || IsNullText(second))
+        {
+            (this->*cStringCheck)(IsNullText(first) ? nullptr : firstText.c_str(),
+                IsNullText(second) ? nullptr : secondText.c_str(), method, line, msg);
+        }
+        else
+        {
+            (this->*check)(firstText, secondText, method, line, msg);
+        }
+    }
+    // The same, as wide text, for two wide texts, and for the Matches methods unless both texts are narrow.
+    template <typename TFirst, typename TSecond>
+    void ForwardAsWide(TFirst first, TSecond second, TWideTextCheck check, TWideCStringCheck cStringCheck,
+        std::string const& method, int line, std::string const& msg)
+    {
+        std::wstring const firstText = TextToWide(first);
+        std::wstring const secondText = TextToWide(second);
+
+        if (IsNullText(first) || IsNullText(second))
+        {
+            (this->*cStringCheck)(IsNullText(first) ? nullptr : firstText.c_str(),
+                IsNullText(second) ? nullptr : secondText.c_str(), method, line, msg);
+        }
+        else
+        {
+            (this->*check)(firstText, secondText, method, line, msg);
+        }
+    }
+
     // Calls 'compare' with 'expected' and 'actual' as two int64_t when both fit, otherwise as two uint64_t when
     // neither is negative, otherwise (one negative, the other above INT64_MAX) as two decimal strings, so neither
     // value wraps around. Used by the integer template overloads of the Equals/NotEquals methods.
@@ -583,6 +657,18 @@ private:
             return value >= 0;
         else
             return true;
+    }
+
+    // True when 'text' is a null C string. A char or wchar_t array never is.
+    template <typename TText>
+    static bool IsNullText(TText const& text)
+    {
+        static_cast<void>(text);
+
+        if constexpr (std::is_pointer<TText>::value)
+            return text == nullptr;
+        else
+            return false;
     }
 
     // Runs 'callable' for the NoThrow methods (e.g. CheckNoThrow()) and returns why it failed, or an empty string when
@@ -607,16 +693,6 @@ private:
     // TRecordingLocks' destructors.
     void ReleaseRecordingHolds();
 
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-    // Returns 'text' as UTF-8 for the System::String overloads, which forward to the std::string ones. A null C string
-    // is empty text, as it is for System::String.
-    static std::string RTLTextToUTF8(std::string const& text);
-    static std::string RTLTextToUTF8(std::wstring const& text);
-    static std::string RTLTextToUTF8(char const* text);
-    static std::string RTLTextToUTF8(wchar_t const* text);
-    static std::string RTLTextToUTF8(System::String const& text);
-#endif
-
     // The address the Same methods (e.g. CheckSame()) compare: a smart pointer's get(), or a raw pointer (or an
     // array, or a function) as it is.
     template <typename TValue, typename std::enable_if<
@@ -631,6 +707,34 @@ private:
     {
         return value;
     }
+
+    // Returns 'text' as UTF-8, for the templates for mixed string types (see ForwardAsUTF8()). A null C string is
+    // empty text; see IsNullText().
+    static std::string TextToUTF8(std::string const& text);
+    static std::string TextToUTF8(std::wstring const& text);
+    static std::string TextToUTF8(char const* text);
+    static std::string TextToUTF8(wchar_t const* text);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::string TextToUTF8(System::String const& text);
+    template <unsigned short CodePage>
+    static std::string TextToUTF8(System::AnsiStringT<CodePage> const& text)
+    {
+        return TextToUTF8(System::String(text));
+    }
+#endif
+    // The same, as wide text (see ForwardAsWide()).
+    static std::wstring TextToWide(std::string const& text);
+    static std::wstring TextToWide(std::wstring const& text);
+    static std::wstring TextToWide(char const* text);
+    static std::wstring TextToWide(wchar_t const* text);
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    static std::wstring TextToWide(System::String const& text);
+    template <unsigned short CodePage>
+    static std::wstring TextToWide(System::AnsiStringT<CodePage> const& text)
+    {
+        return TextToWide(System::String(text));
+    }
+#endif
 
     template <typename T>
     static int ThreeWayCompare(T a, T b)
@@ -728,7 +832,7 @@ private:
     {
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
         if constexpr (std::is_base_of<System::TObject, TType>::value)
-            return RTLTextToUTF8(__classid(TType)->ClassName());
+            return TextToUTF8(__classid(TType)->ClassName());
         else
 #endif
         return TypeName(typeid(TType));
@@ -740,7 +844,7 @@ private:
     {
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
         if constexpr (std::is_base_of<System::TObject, TPointee>::value)
-            return RTLTextToUTF8(const_cast<TPointee*>(pointer)->ClassName());
+            return TextToUTF8(const_cast<TPointee*>(pointer)->ClassName());
         else
 #endif
         return TypeName(typeid(*pointer));
@@ -938,16 +1042,19 @@ protected: // Assertion/Check methods - Equals
                 AssertEquals(expectedValue, actualValue, method, line, msg);
             });
     }
-    // Any two pointers, compared by address, except two C strings of the same character type, which the overloads
-    // above compare by content. Without these, two pointers would convert to bool and match the bool overload. Two
-    // pointers that can't be compared with each other (e.g. int* and long*) are a compile error.
+    // Any two pointers, compared by address, except two C strings, narrow or wide, which the overloads above and the
+    // templates for mixed string types (see TEnableIfMixedText) compare by content. Without these, two pointers would
+    // convert to bool and match the bool overload. Two pointers that can't be compared with each other (e.g. int*
+    // and long*) are a compile error.
     template <typename TPointer, typename TChar>
     using TPointsTo = std::is_same<typename std::remove_cv<typename std::remove_pointer<TPointer>::type>::type, TChar>;
+    template <typename TPointer>
+    using TIsCStringPointer = std::integral_constant<bool, TPointsTo<TPointer, char>::value ||
+        TPointsTo<TPointer, wchar_t>::value>;
     template <typename TExpected, typename TActual>
     using TEnableIfPointers = typename std::enable_if<std::is_pointer<TExpected>::value &&
         std::is_pointer<TActual>::value &&
-        !(TPointsTo<TExpected, char>::value && TPointsTo<TActual, char>::value) &&
-        !(TPointsTo<TExpected, wchar_t>::value && TPointsTo<TActual, wchar_t>::value), int>::type;
+        !(TIsCStringPointer<TExpected>::value && TIsCStringPointer<TActual>::value), int>::type;
     template <typename TExpected, typename TActual, TEnableIfPointers<TExpected, TActual> = 0>
     void AssertEquals(TExpected expected, TActual actual, std::string const& method, int line,
         std::string const& msg)
@@ -1595,26 +1702,43 @@ protected: // Assertion/Check methods - Starts/Ends With (prefix/suffix)
 protected: // Assertion/Check methods - Matches (regular expression)
     // Each checks whether the whole of 'text' matches the ECMAScript regular expression 'pattern' (std::regex_match;
     // start or end a pattern with ".*" to match part of the text). Wide text is matched with std::wregex. An invalid
-    // pattern fails the check, showing why, rather than throwing std::regex_error.
+    // pattern fails the check, showing why, rather than throwing std::regex_error. A null C string, as the text or
+    // the pattern, matches nothing: the Matches methods fail, showing it as "(null)", and the NotMatches ones pass.
     virtual void AssertMatches(std::string const& text, std::string const& pattern, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
         int line, std::string const& msg);
+    void AssertMatches(char const* text, char const* pattern, std::string const& method, int line,
+        std::string const& msg);
+    void AssertMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void AssertNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
         int line, std::string const& msg);
     virtual void AssertNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
         int line, std::string const& msg);
+    void AssertNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+        std::string const& msg);
+    void AssertNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckMatches(std::string const& text, std::string const& pattern, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
         int line, std::string const& msg);
+    void CheckMatches(char const* text, char const* pattern, std::string const& method, int line,
+        std::string const& msg);
+    void CheckMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+        std::string const& msg);
 
     virtual void CheckNotMatches(std::string const& text, std::string const& pattern, std::string const& method,
         int line, std::string const& msg);
     virtual void CheckNotMatches(std::wstring const& text, std::wstring const& pattern, std::string const& method,
         int line, std::string const& msg);
+    void CheckNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+        std::string const& msg);
+    void CheckNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+        std::string const& msg);
 
 protected: // Assertion/Check methods - Ordering (value compared with a bound)
     // Any two integer or floating-point types except bool.
@@ -1682,239 +1806,505 @@ protected: // Assertion/Check methods - Memory (bytes)
     virtual void CheckNotEqualsMem(void const* expected, void const* actual, std::size_t size,
         std::string const& method, int line, std::string const& msg);
 
+protected: // Assertion/Check methods - Mixed string types
+    // The Equals, Contains, StartsWith/EndsWith and Matches methods, IC and Not forms included, for two texts that
+    // the overloads above don't take as they are: a std::string with a C string, narrow text with wide, or an RTL
+    // string (System::String, AnsiString, UTF8String or another AnsiStringT, in RTL builds) with any text. Both are
+    // converted to UTF-8 and compared as two std::string values, except that two wide texts are compared as two
+    // std::wstring values, and the Matches methods match any texts but two narrow ones as wide text (std::wregex).
+    // A null C string follows the same rules as in the C string overloads, whatever it's compared with.
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-protected: // Assertion/Check methods - System::String (RTL)
-    // Each takes two texts, at least one of them a System::String, and forwards both to the std::string overload as
-    // UTF-8. The other may also be a std::string, std::wstring or C string. The Empty methods take one System::String.
     template <typename TText>
-    using TIsRTLString = std::is_same<typename std::decay<TText>::type, System::String>;
+    using TIsRTLText = std::integral_constant<bool, std::is_same<TText, System::String>::value ||
+        TIsAnsiStringT<TText>::value>;
+#else
     template <typename TText>
-    using TIsRTLText = std::integral_constant<bool, TIsRTLString<TText>::value ||
-        std::is_same<typename std::decay<TText>::type, std::string>::value ||
-        std::is_same<typename std::decay<TText>::type, std::wstring>::value ||
-        std::is_same<typename std::decay<TText>::type, char const*>::value ||
-        std::is_same<typename std::decay<TText>::type, char*>::value ||
-        std::is_same<typename std::decay<TText>::type, wchar_t const*>::value ||
-        std::is_same<typename std::decay<TText>::type, wchar_t*>::value>;
-    template <typename TFirst, typename TSecond>
-    using TEnableIfRTLText = typename std::enable_if<(TIsRTLString<TFirst>::value ||
-        TIsRTLString<TSecond>::value) && TIsRTLText<TFirst>::value && TIsRTLText<TSecond>::value, int>::type;
-    // Exactly a System::String, so nothing else converts to one implicitly (e.g. a C string, only in RTL builds).
+    using TIsRTLText = std::false_type;
+#endif
+    // The kind of text TText is (see ETextKind). An array is a C string.
     template <typename TText>
-    using TEnableIfRTLString = typename std::enable_if<TIsRTLString<TText>::value, int>::type;
+    static constexpr ETextKind TextKindOf()
+    {
+        using TDecayed = typename std::decay<TText>::type;
 
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+        if constexpr (std::is_same<TDecayed, std::string>::value)
+            return ETextKind::NarrowString;
+        else if constexpr (std::is_same<TDecayed, char const*>::value || std::is_same<TDecayed, char*>::value)
+            return ETextKind::NarrowCString;
+        else if constexpr (std::is_same<TDecayed, std::wstring>::value)
+            return ETextKind::WideString;
+        else if constexpr (std::is_same<TDecayed, wchar_t const*>::value || std::is_same<TDecayed, wchar_t*>::value)
+            return ETextKind::WideCString;
+        else if constexpr (TIsRTLText<TDecayed>::value)
+            return ETextKind::RTL;
+        else
+            return ETextKind::None;
+    }
+    template <typename TText>
+    static constexpr bool IsNarrowText()
+    {
+        return TextKindOf<TText>() == ETextKind::NarrowString || TextKindOf<TText>() == ETextKind::NarrowCString;
+    }
+    template <typename TText>
+    static constexpr bool IsWideText()
+    {
+        return TextKindOf<TText>() == ETextKind::WideString || TextKindOf<TText>() == ETextKind::WideCString;
+    }
+    // A character array, such as a literal, with a std::string or std::wstring of its width, which converts to it and
+    // goes to its overload as before: an array is never null, so it needs nothing these templates add, and leaving it
+    // out saves an instantiation for each length of literal.
+    template <typename TArray, typename TString>
+    static constexpr bool IsArrayWithItsString()
+    {
+        constexpr bool isArray = std::is_array<TArray>::value;
+        constexpr ETextKind arrayKind = TextKindOf<TArray>();
+        constexpr ETextKind stringKind = TextKindOf<TString>();
+
+        return isArray && ((arrayKind == ETextKind::NarrowCString && stringKind == ETextKind::NarrowString) ||
+            (arrayKind == ETextKind::WideCString && stringKind == ETextKind::WideString));
+    }
+    // Two texts of different kinds, or an RTL string with any text, but not an array with its string (see
+    // IsArrayWithItsString()).
+    template <typename TFirst, typename TSecond>
+    static constexpr bool IsMixedText()
+    {
+        constexpr ETextKind firstKind = TextKindOf<TFirst>();
+        constexpr ETextKind secondKind = TextKindOf<TSecond>();
+        constexpr bool bothText = firstKind != ETextKind::None && secondKind != ETextKind::None;
+        constexpr bool mixed = firstKind != secondKind || firstKind == ETextKind::RTL;
+
+        return bothText && mixed && !IsArrayWithItsString<TFirst, TSecond>() &&
+            !IsArrayWithItsString<TSecond, TFirst>();
+    }
+    template <typename TFirst, typename TSecond>
+    using TEnableIfMixedText = typename std::enable_if<IsMixedText<TFirst, TSecond>(), int>::type;
+
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
     void AssertContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::AssertContains, &TTestGroupBase::AssertContains, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::AssertContains, &TTestGroupBase::AssertContains, method,
+                line, msg);
     }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
     void AssertContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::AssertContainsIC, &TTestGroupBase::AssertContainsIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::AssertContainsIC, &TTestGroupBase::AssertContainsIC, method,
+                line, msg);
     }
-    template <typename TText, TEnableIfRTLString<TText> = 0>
-    void AssertEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
-    {
-        AssertEmpty(RTLTextToUTF8(text), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
     void AssertEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::AssertEndsWith, &TTestGroupBase::AssertEndsWith, method, line,
+                msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::AssertEndsWith, &TTestGroupBase::AssertEndsWith, method, line,
+                msg);
     }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
     void AssertEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::AssertEndsWithIC, &TTestGroupBase::AssertEndsWithIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::AssertEndsWithIC, &TTestGroupBase::AssertEndsWithIC, method,
+                line, msg);
     }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
     void AssertEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::AssertEquals, &TTestGroupBase::AssertEquals, method, line,
+                msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::AssertEquals, &TTestGroupBase::AssertEquals, method, line,
+                msg);
     }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
     void AssertEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::AssertEqualsIC, &TTestGroupBase::AssertEqualsIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::AssertEqualsIC, &TTestGroupBase::AssertEqualsIC, method,
+                line, msg);
     }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    template <typename TText, typename TPattern, TEnableIfMixedText<TText, TPattern> = 0>
+    void AssertMatches(TText const& text, TPattern const& pattern, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsNarrowText<TText>() && IsNarrowText<TPattern>())
+            ForwardAsUTF8(text, pattern, &TTestGroupBase::AssertMatches, &TTestGroupBase::AssertMatches, method, line,
+                msg);
+        else
+            ForwardAsWide(text, pattern, &TTestGroupBase::AssertMatches, &TTestGroupBase::AssertMatches, method, line,
+                msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
     void AssertNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::AssertNotContains, &TTestGroupBase::AssertNotContains,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::AssertNotContains, &TTestGroupBase::AssertNotContains,
+                method, line, msg);
     }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
     void AssertNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
         std::string const& msg)
     {
-        AssertNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::AssertNotContainsIC, &TTestGroupBase::AssertNotContainsIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::AssertNotContainsIC, &TTestGroupBase::AssertNotContainsIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::AssertNotEndsWith, &TTestGroupBase::AssertNotEndsWith, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::AssertNotEndsWith, &TTestGroupBase::AssertNotEndsWith, method,
+                line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void AssertNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::AssertNotEndsWithIC, &TTestGroupBase::AssertNotEndsWithIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::AssertNotEndsWithIC, &TTestGroupBase::AssertNotEndsWithIC,
+                method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void AssertNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::AssertNotEquals, &TTestGroupBase::AssertNotEquals, method,
+                line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::AssertNotEquals, &TTestGroupBase::AssertNotEquals, method,
+                line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void AssertNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::AssertNotEqualsIC, &TTestGroupBase::AssertNotEqualsIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::AssertNotEqualsIC, &TTestGroupBase::AssertNotEqualsIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TPattern, TEnableIfMixedText<TText, TPattern> = 0>
+    void AssertNotMatches(TText const& text, TPattern const& pattern, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsNarrowText<TText>() && IsNarrowText<TPattern>())
+            ForwardAsUTF8(text, pattern, &TTestGroupBase::AssertNotMatches, &TTestGroupBase::AssertNotMatches, method,
+                line, msg);
+        else
+            ForwardAsWide(text, pattern, &TTestGroupBase::AssertNotMatches, &TTestGroupBase::AssertNotMatches, method,
+                line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void AssertNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::AssertNotStartsWith, &TTestGroupBase::AssertNotStartsWith,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::AssertNotStartsWith, &TTestGroupBase::AssertNotStartsWith,
+                method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void AssertNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::AssertNotStartsWithIC, &TTestGroupBase::AssertNotStartsWithIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::AssertNotStartsWithIC, &TTestGroupBase::AssertNotStartsWithIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void AssertStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::AssertStartsWith, &TTestGroupBase::AssertStartsWith, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::AssertStartsWith, &TTestGroupBase::AssertStartsWith, method,
+                line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void AssertStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::AssertStartsWithIC, &TTestGroupBase::AssertStartsWithIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::AssertStartsWithIC, &TTestGroupBase::AssertStartsWithIC,
+                method, line, msg);
+    }
+
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
+    void CheckContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::CheckContains, &TTestGroupBase::CheckContains, method, line,
+                msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::CheckContains, &TTestGroupBase::CheckContains, method, line,
+                msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
+    void CheckContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::CheckContainsIC, &TTestGroupBase::CheckContainsIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::CheckContainsIC, &TTestGroupBase::CheckContainsIC, method,
+                line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::CheckEndsWith, &TTestGroupBase::CheckEndsWith, method, line,
+                msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::CheckEndsWith, &TTestGroupBase::CheckEndsWith, method, line,
+                msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void CheckEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::CheckEndsWithIC, &TTestGroupBase::CheckEndsWithIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::CheckEndsWithIC, &TTestGroupBase::CheckEndsWithIC, method,
+                line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void CheckEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::CheckEquals, &TTestGroupBase::CheckEquals, method, line,
+                msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::CheckEquals, &TTestGroupBase::CheckEquals, method, line,
+                msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void CheckEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::CheckEqualsIC, &TTestGroupBase::CheckEqualsIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::CheckEqualsIC, &TTestGroupBase::CheckEqualsIC, method,
+                line, msg);
+    }
+    template <typename TText, typename TPattern, TEnableIfMixedText<TText, TPattern> = 0>
+    void CheckMatches(TText const& text, TPattern const& pattern, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsNarrowText<TText>() && IsNarrowText<TPattern>())
+            ForwardAsUTF8(text, pattern, &TTestGroupBase::CheckMatches, &TTestGroupBase::CheckMatches, method, line,
+                msg);
+        else
+            ForwardAsWide(text, pattern, &TTestGroupBase::CheckMatches, &TTestGroupBase::CheckMatches, method, line,
+                msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
+    void CheckNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::CheckNotContains, &TTestGroupBase::CheckNotContains, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::CheckNotContains, &TTestGroupBase::CheckNotContains, method,
+                line, msg);
+    }
+    template <typename TText, typename TSubstring, TEnableIfMixedText<TText, TSubstring> = 0>
+    void CheckNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSubstring>())
+            ForwardAsWide(text, substring, &TTestGroupBase::CheckNotContainsIC, &TTestGroupBase::CheckNotContainsIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, substring, &TTestGroupBase::CheckNotContainsIC, &TTestGroupBase::CheckNotContainsIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::CheckNotEndsWith, &TTestGroupBase::CheckNotEndsWith, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::CheckNotEndsWith, &TTestGroupBase::CheckNotEndsWith, method,
+                line, msg);
+    }
+    template <typename TText, typename TSuffix, TEnableIfMixedText<TText, TSuffix> = 0>
+    void CheckNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TSuffix>())
+            ForwardAsWide(text, suffix, &TTestGroupBase::CheckNotEndsWithIC, &TTestGroupBase::CheckNotEndsWithIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, suffix, &TTestGroupBase::CheckNotEndsWithIC, &TTestGroupBase::CheckNotEndsWithIC,
+                method, line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void CheckNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::CheckNotEquals, &TTestGroupBase::CheckNotEquals, method,
+                line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::CheckNotEquals, &TTestGroupBase::CheckNotEquals, method,
+                line, msg);
+    }
+    template <typename TExpected, typename TActual, TEnableIfMixedText<TExpected, TActual> = 0>
+    void CheckNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TExpected>() && IsWideText<TActual>())
+            ForwardAsWide(expected, actual, &TTestGroupBase::CheckNotEqualsIC, &TTestGroupBase::CheckNotEqualsIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(expected, actual, &TTestGroupBase::CheckNotEqualsIC, &TTestGroupBase::CheckNotEqualsIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TPattern, TEnableIfMixedText<TText, TPattern> = 0>
+    void CheckNotMatches(TText const& text, TPattern const& pattern, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsNarrowText<TText>() && IsNarrowText<TPattern>())
+            ForwardAsUTF8(text, pattern, &TTestGroupBase::CheckNotMatches, &TTestGroupBase::CheckNotMatches, method,
+                line, msg);
+        else
+            ForwardAsWide(text, pattern, &TTestGroupBase::CheckNotMatches, &TTestGroupBase::CheckNotMatches, method,
+                line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void CheckNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::CheckNotStartsWith, &TTestGroupBase::CheckNotStartsWith,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::CheckNotStartsWith, &TTestGroupBase::CheckNotStartsWith,
+                method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void CheckNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::CheckNotStartsWithIC, &TTestGroupBase::CheckNotStartsWithIC,
+                method, line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::CheckNotStartsWithIC, &TTestGroupBase::CheckNotStartsWithIC,
+                method, line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void CheckStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::CheckStartsWith, &TTestGroupBase::CheckStartsWith, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::CheckStartsWith, &TTestGroupBase::CheckStartsWith, method,
+                line, msg);
+    }
+    template <typename TText, typename TPrefix, TEnableIfMixedText<TText, TPrefix> = 0>
+    void CheckStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
+        std::string const& msg)
+    {
+        if constexpr (IsWideText<TText>() && IsWideText<TPrefix>())
+            ForwardAsWide(text, prefix, &TTestGroupBase::CheckStartsWithIC, &TTestGroupBase::CheckStartsWithIC, method,
+                line, msg);
+        else
+            ForwardAsUTF8(text, prefix, &TTestGroupBase::CheckStartsWithIC, &TTestGroupBase::CheckStartsWithIC, method,
+                line, msg);
+    }
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+protected: // Assertion/Check methods - System::String (RTL)
+    // The Empty methods for a System::String. Exactly a System::String, so nothing else converts to one implicitly
+    // (e.g. a C string, only in RTL builds).
+    template <typename TText>
+    using TEnableIfRTLString = typename std::enable_if<std::is_same<typename std::decay<TText>::type,
+        System::String>::value, int>::type;
+
+    template <typename TText, TEnableIfRTLString<TText> = 0>
+    void AssertEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
+    {
+        AssertEmpty(TextToUTF8(text), method, line, msg);
     }
     template <typename TText, TEnableIfRTLString<TText> = 0>
     void AssertNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
     {
-        AssertNotEmpty(RTLTextToUTF8(text), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void AssertNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void AssertNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void AssertNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void AssertNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void AssertNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void AssertNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void AssertStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void AssertStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        AssertStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+        AssertNotEmpty(TextToUTF8(text), method, line, msg);
     }
 
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
-    void CheckContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
-    }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
-    void CheckContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
-    }
     template <typename TText, TEnableIfRTLString<TText> = 0>
     void CheckEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
     {
-        CheckEmpty(RTLTextToUTF8(text), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void CheckEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void CheckEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void CheckEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void CheckEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
-    void CheckNotContains(TText const& text, TSubstring const& substring, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotContains(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
-    }
-    template <typename TText, typename TSubstring, TEnableIfRTLText<TText, TSubstring> = 0>
-    void CheckNotContainsIC(TText const& text, TSubstring const& substring, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotContainsIC(RTLTextToUTF8(text), RTLTextToUTF8(substring), method, line, msg);
+        CheckEmpty(TextToUTF8(text), method, line, msg);
     }
     template <typename TText, TEnableIfRTLString<TText> = 0>
     void CheckNotEmpty(TText const& text, std::string const& method, int line, std::string const& msg)
     {
-        CheckNotEmpty(RTLTextToUTF8(text), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void CheckNotEndsWith(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotEndsWith(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TText, typename TSuffix, TEnableIfRTLText<TText, TSuffix> = 0>
-    void CheckNotEndsWithIC(TText const& text, TSuffix const& suffix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotEndsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(suffix), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void CheckNotEquals(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotEquals(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TExpected, typename TActual, TEnableIfRTLText<TExpected, TActual> = 0>
-    void CheckNotEqualsIC(TExpected const& expected, TActual const& actual, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotEqualsIC(RTLTextToUTF8(expected), RTLTextToUTF8(actual), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void CheckNotStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void CheckNotStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckNotStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void CheckStartsWith(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckStartsWith(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
-    }
-    template <typename TText, typename TPrefix, TEnableIfRTLText<TText, TPrefix> = 0>
-    void CheckStartsWithIC(TText const& text, TPrefix const& prefix, std::string const& method, int line,
-        std::string const& msg)
-    {
-        CheckStartsWithIC(RTLTextToUTF8(text), RTLTextToUTF8(prefix), method, line, msg);
+        CheckNotEmpty(TextToUTF8(text), method, line, msg);
     }
 #endif // #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
 

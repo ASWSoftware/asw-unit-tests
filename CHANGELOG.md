@@ -29,11 +29,20 @@ versioned baseline.
   `ASWUNITTESTS_GUI_SOURCES`.
 - A `TCLIParser::ParseArguments()` overload that takes the arguments as a
   `std::vector<std::string>`, the program name first, as in `argv`.
-- On Windows, `CommandLineArguments()`, `SystemErrorText()` and `UTF8ToWide()` in
-  `ASWUnitTests_Utils.h`: a command line split into UTF-8 arguments, a `GetLastError()` code's
-  description, and UTF-8 converted to UTF-16.
+- `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,
+  UTF-32 on Linux), and, on Windows, `CommandLineArguments()` and `SystemErrorText()`: a command
+  line split into UTF-8 arguments, and a `GetLastError()` code's description.
 - `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
   to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
+- The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+  and `IC` forms) take two texts of different types: a `std::string` with a C string, and narrow
+  text with wide text, which didn't compile before. Two narrow or two wide texts are compared as
+  they are; any other pair as UTF-8. The README's "Comparing Strings of Different Types" has the
+  details.
+- `Matches` and `NotMatches` take two C strings, narrow or wide, and in RTL builds a
+  `System::String`.
+- In RTL builds, the string checks also take an `AnsiString`, a `UTF8String` or another
+  `AnsiStringT`, and two RTL strings or an RTL string with any other text.
 
 ### Changed
 
@@ -67,6 +76,10 @@ versioned baseline.
 - `TJUnitReportWriter::Write()` now takes its path as UTF-8 on Windows too, as the console runner
   passes it. Code that calls it with a path in the ANSI code page that has non-ASCII characters must
   convert the path to UTF-8 first.
+- In RTL builds, a null C string compared with a `System::String` follows the same rules as with any
+  other text, instead of being empty text: it equals only another null C string, so it no longer
+  equals an empty `System::String`, and it matches nothing in `Contains`, `StartsWith` and
+  `EndsWith`. A test that relied on it being empty text must compare with an empty string instead.
 
 ### Fixed
 
@@ -78,6 +91,11 @@ versioned baseline.
 - With `--catch-crashes` and `--test-timeout-seconds` together, a crash that came while a test was
   logging or recording a result, such as one in a run observer's `OnLog()`, left the run waiting
   forever at the next test. The run now continues with the next test, as after any other crash.
+- A null C string compared with a `std::string` or `std::wstring` (e.g.
+  `CheckEquals(expectedText, nameOrNull, ...)`), or given to `Matches`, was converted to a string,
+  which is undefined behavior and usually crashed. It now follows the same rules as two C strings:
+  it equals only another null C string, matches nothing in the other checks, and a failure shows it
+  as `(null)`.
 
 ## [1.4.0] - 2026-10-14
 

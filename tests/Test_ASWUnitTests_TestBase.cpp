@@ -31,6 +31,7 @@ limitations under the License.
 #include <cstdint>
 #include <forward_list>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
@@ -55,6 +56,8 @@ limitations under the License.
 #include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
+//---------------------------------------------------------------------------
+#include "UT_Helper_StringChecks.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -6738,6 +6741,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly,
         "StartsWithIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix, "StartsWith_ShowsTextAndPrefix");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules,
+        "StringChecks_CompareMixedTypesAsTextAndKeepNullRules");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues,
         "Throws_ChecksTypeAndMessageAndContinues");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
@@ -8921,6 +8926,186 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
         __LINE__, "CheckNotStartsWith shows the wide text and prefix: " + checkNotStartsWithWide->Message);
     CheckTrue(NameEndsWith(checkNonASCII->Message, nonASCIIDetail), __func__, __LINE__,
         "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
+}
+//---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules
+
+    Every string check with two texts of different types: each ordered pairing of std::string, char const*,
+    std::wstring and wchar_t const*, non-ASCII text, texts that differ in case only, and null C strings. The texts
+    must compare as text, whatever their types, and a null C string must follow the same rules whatever it's
+    compared with.
+*/
+void TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules()
+{
+    // Arrange
+    typedef TStringCheckProbe::ERule ERule;
+    enum class ECase
+    {
+        Matching,    // The same text: matches in every method.
+        CaseDiffers, // "ABC" and "abc": matches only in an IC method.
+        OneNull,
+        BothNull
+    };
+    struct TCase
+    {
+        std::string Name;
+        ECase Kind;
+        std::vector<std::optional<std::string> > CheckFailures;
+        std::vector<std::optional<std::string> > AssertFailures;
+    };
+
+    TStringCheckProbe probe;
+    char const* const nullNarrow = nullptr;
+    wchar_t const* const nullWide = nullptr;
+    std::string const nonASCII = "\xC3\xA9x\xCE\xA9\xE4\xB8\xAD"; // U+00E9, an x, U+03A9 and U+4E2D.
+    std::wstring const wideNonASCII = L"\x00E9x\x03A9\x4E2D";
+
+    // Act
+    std::vector<TCase> const cases =
+    {
+        { "StringAndCString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), "abc"),
+          probe.RunAsserts(std::string("abc"), "abc") },
+        { "StringAndWString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), std::wstring(L"abc")),
+          probe.RunAsserts(std::string("abc"), std::wstring(L"abc")) },
+        { "StringAndWCString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), L"abc"),
+          probe.RunAsserts(std::string("abc"), L"abc") },
+        { "CStringAndString", ECase::Matching,
+          probe.RunChecks("abc", std::string("abc")),
+          probe.RunAsserts("abc", std::string("abc")) },
+        { "CStringAndWString", ECase::Matching,
+          probe.RunChecks("abc", std::wstring(L"abc")),
+          probe.RunAsserts("abc", std::wstring(L"abc")) },
+        { "CStringAndWCString", ECase::Matching, probe.RunChecks("abc", L"abc"), probe.RunAsserts("abc", L"abc") },
+        { "WStringAndString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), std::string("abc")),
+          probe.RunAsserts(std::wstring(L"abc"), std::string("abc")) },
+        { "WStringAndCString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), "abc"),
+          probe.RunAsserts(std::wstring(L"abc"), "abc") },
+        { "WStringAndWCString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), L"abc"),
+          probe.RunAsserts(std::wstring(L"abc"), L"abc") },
+        { "WCStringAndString", ECase::Matching,
+          probe.RunChecks(L"abc", std::string("abc")),
+          probe.RunAsserts(L"abc", std::string("abc")) },
+        { "WCStringAndCString", ECase::Matching, probe.RunChecks(L"abc", "abc"), probe.RunAsserts(L"abc", "abc") },
+        { "WCStringAndWString", ECase::Matching,
+          probe.RunChecks(L"abc", std::wstring(L"abc")),
+          probe.RunAsserts(L"abc", std::wstring(L"abc")) },
+        { "NonASCII_StringAndWString", ECase::Matching,
+          probe.RunChecks(nonASCII, wideNonASCII),
+          probe.RunAsserts(nonASCII, wideNonASCII) },
+        { "NonASCII_WCStringAndCString", ECase::Matching,
+          probe.RunChecks(wideNonASCII.c_str(), nonASCII.c_str()),
+          probe.RunAsserts(wideNonASCII.c_str(), nonASCII.c_str()) },
+        { "CaseDiffers_StringAndWCString", ECase::CaseDiffers,
+          probe.RunChecks(std::string("ABC"), L"abc"),
+          probe.RunAsserts(std::string("ABC"), L"abc") },
+        { "CaseDiffers_WStringAndWCString", ECase::CaseDiffers,
+          probe.RunChecks(std::wstring(L"ABC"), L"abc"),
+          probe.RunAsserts(std::wstring(L"ABC"), L"abc") },
+        { "CaseDiffers_CStringAndWString", ECase::CaseDiffers,
+          probe.RunChecks("ABC", std::wstring(L"abc")),
+          probe.RunAsserts("ABC", std::wstring(L"abc")) },
+        { "CaseDiffers_NonASCII_StringAndWString", ECase::CaseDiffers,
+          probe.RunChecks(std::string("\xC3\xA9X\xCE\xA9\xE4\xB8\xAD"), wideNonASCII),
+          probe.RunAsserts(std::string("\xC3\xA9X\xCE\xA9\xE4\xB8\xAD"), wideNonASCII) },
+        { "NullCStringAndString", ECase::OneNull,
+          probe.RunChecks(nullNarrow, std::string("abc")),
+          probe.RunAsserts(nullNarrow, std::string("abc")) },
+        { "StringAndNullCString", ECase::OneNull,
+          probe.RunChecks(std::string("abc"), nullNarrow),
+          probe.RunAsserts(std::string("abc"), nullNarrow) },
+        { "NullWCStringAndString", ECase::OneNull,
+          probe.RunChecks(nullWide, std::string("abc")),
+          probe.RunAsserts(nullWide, std::string("abc")) },
+        { "WStringAndNullWCString", ECase::OneNull,
+          probe.RunChecks(std::wstring(L"abc"), nullWide),
+          probe.RunAsserts(std::wstring(L"abc"), nullWide) },
+        { "NullCStringAndWString", ECase::OneNull,
+          probe.RunChecks(nullNarrow, std::wstring(L"abc")),
+          probe.RunAsserts(nullNarrow, std::wstring(L"abc")) },
+        { "WCStringAndNullCString", ECase::OneNull,
+          probe.RunChecks(L"abc", nullNarrow),
+          probe.RunAsserts(L"abc", nullNarrow) },
+        { "NullCStringAndNullWCString", ECase::BothNull,
+          probe.RunChecks(nullNarrow, nullWide),
+          probe.RunAsserts(nullNarrow, nullWide) },
+        { "NullWCStringAndNullCString", ECase::BothNull,
+          probe.RunChecks(nullWide, nullNarrow),
+          probe.RunAsserts(nullWide, nullNarrow) }
+    };
+    // '.' matches U+00E9 as wide text, but not in two narrow strings, where U+00E9 is two bytes.
+    std::vector<std::optional<std::string> > const wideDot =
+        probe.RunChecks(std::string("\xC3\xA9"), std::wstring(L"."));
+    std::vector<std::optional<std::string> > const narrowDot = probe.RunChecks(std::string("\xC3\xA9"), ".");
+    // Two wide texts are compared as they are, not as UTF-8, where both unpaired surrogates would be U+FFFD.
+    std::vector<std::optional<std::string> > const surrogates =
+        probe.RunChecks(std::wstring(L"\xD800"), L"\xDC00");
+    std::vector<std::optional<std::string> > const mismatch = probe.RunChecks(std::wstring(L"\x03A9x"), "y");
+
+    // Assert
+    for (TCase const& testCase : cases)
+    {
+        AssertEquals(std::size(TStringCheckProbe::Checks), testCase.CheckFailures.size(), __func__, __LINE__,
+            testCase.Name + ": a result for each Check method");
+        AssertEquals(std::size(TStringCheckProbe::Checks), testCase.AssertFailures.size(), __func__, __LINE__,
+            testCase.Name + ": a result for each Assert method");
+
+        for (std::size_t i = 0; i < std::size(TStringCheckProbe::Checks); ++i)
+        {
+            TStringCheckProbe::TCheck const& check = TStringCheckProbe::Checks[i];
+            bool const negated = check.Rule == ERule::NotEquals || check.Rule == ERule::NotMatches;
+            bool const equalsRule = check.Rule == ERule::Equals || check.Rule == ERule::NotEquals;
+            bool const matches = testCase.Kind == ECase::Matching ||
+                (testCase.Kind == ECase::CaseDiffers && check.IgnoresCase) ||
+                (testCase.Kind == ECase::BothNull && equalsRule);
+            bool const shouldPass = matches != negated;
+            bool const withNull = testCase.Kind == ECase::OneNull || testCase.Kind == ECase::BothNull;
+
+            char const* const kinds[] = { "Check", "Assert" };
+            std::vector<std::optional<std::string> > const* const results[] =
+            {
+                &testCase.CheckFailures, &testCase.AssertFailures
+            };
+
+            for (std::size_t k = 0; k < std::size(kinds); ++k)
+            {
+                std::vector<std::optional<std::string> > const& failures = *results[k];
+                std::string const what = std::string(kinds[k]) + check.Name + " with " + testCase.Name;
+                CheckEquals(shouldPass, !failures[i].has_value(), __func__, __LINE__,
+                    what + (shouldPass ? " passes" : " fails"));
+
+                if (withNull && failures[i].has_value())
+                {
+                    CheckContains(*failures[i], "\"(null)\"", __func__, __LINE__,
+                        what + " shows the null C string as (null)");
+                }
+            }
+        }
+    }
+
+    std::size_t const matchesIndex = TStringCheckProbe::IndexOf("Matches");
+    CheckFalse(wideDot[matchesIndex].has_value(), __func__, __LINE__, "'.' matches U+00E9 as wide text");
+    CheckTrue(narrowDot[matchesIndex].has_value(), __func__, __LINE__, "but not in two narrow strings");
+    CheckFalse(surrogates[TStringCheckProbe::IndexOf("NotEquals")].has_value(), __func__, __LINE__,
+        "two different unpaired surrogates aren't equal as wide text");
+
+    std::optional<std::string> const equalsFailure = mismatch[TStringCheckProbe::IndexOf("Equals")];
+    std::optional<std::string> const containsFailure = mismatch[TStringCheckProbe::IndexOf("Contains")];
+    AssertTrue(equalsFailure.has_value() && containsFailure.has_value(), __func__, __LINE__, "both fail");
+    CheckContains(*equalsFailure, "Expected \"\xCE\xA9x\" but was \"y\". msg", __func__, __LINE__,
+        "both texts shown, the wide one in UTF-8");
+    CheckContains(*containsFailure, "Expected \"\xCE\xA9x\" to contain \"y\"", __func__, __LINE__,
+        "both texts shown, the wide one in UTF-8");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    CheckFalse(probe.CheckEqualsThroughSourceLocation("abc", L"abc").has_value(), __func__, __LINE__,
+        "through the std::source_location overload too");
+#endif
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()

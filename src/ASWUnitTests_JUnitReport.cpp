@@ -26,7 +26,6 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <chrono>
 #include <ctime>
-#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -214,16 +213,7 @@ bool TJUnitReportWriter::Write(std::string const& filePath, std::string const& s
 
     // On Windows, a std::string path is read in the ANSI code page, so 'filePath''s UTF-8 is converted first.
 #if defined(_WIN32)
-    std::filesystem::path path;
-
-    try
-    {
-        path = UTF8ToWide(filePath);
-    }
-    catch (std::exception const&)
-    {
-        return false;
-    }
+    std::filesystem::path const path(UTF8ToWide(filePath));
 #else
     std::filesystem::path const path(filePath);
 #endif

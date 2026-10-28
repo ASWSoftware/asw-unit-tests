@@ -50,11 +50,13 @@ std::vector<std::size_t> ShuffledIndices(std::size_t count, unsigned int seed);
 // Returns Windows' description of a GetLastError() code, e.g. "Access is denied.", or "error <code>" when it has
 // none.
 std::string SystemErrorText(unsigned long error);
-
-// Converts UTF-8 text to UTF-16. Invalid UTF-8 becomes U+FFFD, the Unicode replacement character. WideToUTF8()
-// converts back. Throws std::runtime_error if Windows can't convert it.
-std::wstring UTF8ToWide(std::string const& text);
 #endif
+
+// Converts UTF-8 text to wide text, UTF-16 where wchar_t is 16 bits (Windows) and UTF-32 where it's 32 bits
+// (Linux). Each maximal ill-formed sequence (Unicode's term: a byte that can't start a sequence, or as much of a
+// sequence as is valid before it breaks off) becomes one U+FFFD, the Unicode replacement character, as Unicode
+// recommends. WideToUTF8() converts back.
+std::wstring UTF8ToWide(std::string const& text);
 
 // Converts wide text to UTF-8, reading it as UTF-16 where wchar_t is 16 bits (Windows) and as UTF-32 where it's
 // 32 bits (Linux). Anything that isn't a valid code point, such as an unpaired surrogate, becomes U+FFFD, the

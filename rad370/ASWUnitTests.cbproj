@@ -323,6 +323,10 @@
             <DependentOn>..\tests\Test_ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>23</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\tests\UT_Helper_StringChecks.cpp">
+            <DependentOn>..\tests\UT_Helper_StringChecks.h</DependentOn>
+            <BuildOrder>56</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\toTest\ASWTools_Random.cpp">
             <DependentOn>..\toTest\ASWTools_Random.h</DependentOn>
             <BuildOrder>3</BuildOrder>

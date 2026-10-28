@@ -112,6 +112,9 @@ template <typename TFloat>
 TFloat NearDifference(TFloat expected, TFloat actual);
 
 template <typename TChar>
+std::string NullRegexMatchFailure(TChar const* text, TChar const* pattern);
+
+template <typename TChar>
 std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase);
 
 template <typename TString>
@@ -396,6 +399,18 @@ TFloat NearDifference(TFloat expected, TFloat actual)
     The detail for a text check that fails because 'text' or 'part' is a null C string, worded as the check's other
     failures are, e.g. Expected "(null)" to contain "abc". followed by the caller's message.
 */
+/*
+    NullRegexMatchFailure
+
+    The failure detail for a Matches method given a null C string as 'text' or 'pattern', worded as
+    RegexMatchFailure()'s, e.g. Expected "(null)" to match "a.c".
+*/
+template <typename TChar>
+std::string NullRegexMatchFailure(TChar const* text, TChar const* pattern)
+{
+    return "Expected \"" + CStringDisplayText(text) + "\" to match \"" + CStringDisplayText(pattern) + "\"";
+}
+//---------------------------------------------------------------------------
 template <typename TChar>
 std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase)
 {
@@ -862,6 +877,24 @@ void TTestGroupBase::AssertMatches(std::wstring const& text, std::wstring const&
         throw TExceptMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+        throw TExceptMatches(method, line, NullRegexMatchFailure(text, pattern), msg);
+
+    AssertMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+        throw TExceptMatches(method, line, NullRegexMatchFailure(text, pattern), msg);
+
+    AssertMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -1180,6 +1213,24 @@ void TTestGroupBase::AssertNotMatches(std::wstring const& text, std::wstring con
     std::string const failure = RegexMatchFailure(text, pattern, false);
     if (!failure.empty())
         throw TExceptNotMatches(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    AssertNotMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    AssertNotMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
@@ -1713,6 +1764,30 @@ void TTestGroupBase::CheckMatches(std::wstring const& text, std::wstring const& 
         SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullRegexMatchFailure(text, pattern) + ". " + msg);
+        return;
+    }
+
+    CheckMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullRegexMatchFailure(text, pattern) + ". " + msg);
+        return;
+    }
+
+    CheckMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
@@ -2067,6 +2142,24 @@ void TTestGroupBase::CheckNotMatches(std::wstring const& text, std::wstring cons
     std::string const failure = RegexMatchFailure(text, pattern, false);
     if (!failure.empty())
         SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    CheckNotMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    CheckNotMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(
@@ -2427,39 +2520,6 @@ char const* TTestGroupBase::OrderingSymbol(TOrdering ordering)
     }
 }
 //---------------------------------------------------------------------------
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-std::string TTestGroupBase::RTLTextToUTF8(std::string const& text)
-{
-    return text;
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(std::wstring const& text)
-{
-    return WideToUTF8(text);
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(char const* text)
-{
-    return CStringOrEmpty(text);
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(wchar_t const* text)
-{
-    return WideToUTF8(CStringOrEmpty(text));
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(System::String const& text)
-{
-#if defined(WIDECHAR_IS_WCHAR)
-    // The same conversion as wide text, so both give the same bytes even for an unpaired surrogate.
-    return WideToUTF8(std::wstring(text.c_str(), static_cast<std::size_t>(text.Length())));
-#else
-    System::UTF8String const utf8(text);
-    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
-#endif
-}
-//---------------------------------------------------------------------------
-#endif
 /*
     TTestGroupBase::RegisterTest
 
@@ -3183,6 +3243,70 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 {
     return m_TestFailedCheck;
 }
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(std::string const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(std::wstring const& text)
+{
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(char const* text)
+{
+    return CStringOrEmpty(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(wchar_t const* text)
+{
+    return WideToUTF8(CStringOrEmpty(text));
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::TextToUTF8(System::String const& text)
+{
+#if defined(WIDECHAR_IS_WCHAR)
+    // The same conversion as wide text, so both give the same bytes even for an unpaired surrogate.
+    return WideToUTF8(TextToWide(text));
+#else
+    System::UTF8String const utf8(text);
+    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
+#endif
+}
+#endif
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(std::string const& text)
+{
+    return UTF8ToWide(text);
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(std::wstring const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(char const* text)
+{
+    return UTF8ToWide(CStringOrEmpty(text));
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(wchar_t const* text)
+{
+    return CStringOrEmpty(text);
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::wstring TTestGroupBase::TextToWide(System::String const& text)
+{
+#if defined(WIDECHAR_IS_WCHAR)
+    return std::wstring(text.c_str(), static_cast<std::size_t>(text.Length()));
+#else
+    return UTF8ToWide(TextToUTF8(text));
+#endif
+}
+#endif
 //---------------------------------------------------------------------------
 std::string TTestGroupBase::TypeName(std::type_info const& type)
 {

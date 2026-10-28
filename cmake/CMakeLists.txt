@@ -35,6 +35,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../tests/Test_ASWUnitTests_TestBase.cpp
     ../tests/Test_ASWUnitTests_Utils.cpp
     ../tests/Test_ASWUnitTests_Version.cpp
+    ../tests/UT_Helper_StringChecks.cpp
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp
     ../toTest/ASWTools_String.cpp

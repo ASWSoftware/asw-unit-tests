@@ -26,11 +26,11 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <cstddef>
 #include <cstdint>
+#include <cwchar>
 #include <random>
 #include <utility>
 //---------------------------------------------------------------------------
 #if defined(_WIN32)
-#  include <limits>
 #  include <memory>
 #  include <stdexcept>
 #  if !defined(NOMINMAX)
@@ -56,11 +56,10 @@ using TLocalPtr = std::unique_ptr<T, HLOCAL(WINAPI*)(HLOCAL)>;
 //---------------------------------------------------------------------------
 
 void AppendUTF8(std::string& text, uint32_t codePoint);
+void AppendWide(std::wstring& text, uint32_t codePoint);
+std::size_t DecodeUTF8Sequence(std::string const& text, std::size_t start, uint32_t& codePoint);
 bool IsHighSurrogate(uint32_t codeUnit);
 bool IsLowSurrogate(uint32_t codeUnit);
-#if defined(_WIN32)
-int ToConversionLength(std::size_t length);
-#endif
 
 //---------------------------------------------------------------------------
 /*
@@ -94,6 +93,100 @@ void AppendUTF8(std::string& text, uint32_t codePoint)
     }
 }
 //---------------------------------------------------------------------------
+/*
+    AppendWide
+
+    Appends 'codePoint', which must be a valid code point, to 'text': as is where wchar_t is 32 bits, and as a
+    surrogate pair, above U+FFFF, where it's 16.
+*/
+void AppendWide(std::wstring& text, uint32_t codePoint)
+{
+#if WCHAR_MAX > 0xFFFF
+    text += static_cast<wchar_t>(codePoint);
+#else
+    if (codePoint < 0x10000)
+    {
+        text += static_cast<wchar_t>(codePoint);
+        return;
+    }
+
+    text += static_cast<wchar_t>(0xD800 + ((codePoint - 0x10000) >> 10));
+    text += static_cast<wchar_t>(0xDC00 + ((codePoint - 0x10000) & 0x3FF));
+#endif
+}
+//---------------------------------------------------------------------------
+/*
+    DecodeUTF8Sequence
+
+    Decodes the UTF-8 sequence at 'start' in 'text', which must be within it, into 'codePoint', and returns how many
+    bytes it took. A maximal ill-formed sequence (a byte that can't start a sequence, or a sequence's valid start
+    before it breaks off or 'text' ends) gives U+FFFD and takes just those bytes, so the next sequence starts at the
+    byte that broke it off. The second byte's range depends on the first, which rules out overlong sequences,
+    surrogates and values above U+10FFFF (the Unicode standard's table 3-7, "Well-Formed UTF-8 Byte Sequences").
+*/
+std::size_t DecodeUTF8Sequence(std::string const& text, std::size_t start, uint32_t& codePoint)
+{
+    uint32_t const replacementCharacter = 0xFFFD;
+    unsigned char const lead = static_cast<unsigned char>(text[start]);
+
+    if (lead < 0x80)
+    {
+        codePoint = lead;
+        return 1;
+    }
+
+    std::size_t length = 0;
+    unsigned char secondLow = 0x80;
+    unsigned char secondHigh = 0xBF;
+
+    if (lead >= 0xC2 && lead <= 0xDF)
+    {
+        length = 2;
+    }
+    else if (lead >= 0xE0 && lead <= 0xEF)
+    {
+        length = 3;
+        secondLow = (lead == 0xE0) ? 0xA0 : 0x80;
+        secondHigh = (lead == 0xED) ? 0x9F : 0xBF;
+    }
+    else if (lead >= 0xF0 && lead <= 0xF4)
+    {
+        length = 4;
+        secondLow = (lead == 0xF0) ? 0x90 : 0x80;
+        secondHigh = (lead == 0xF4) ? 0x8F : 0xBF;
+    }
+    else
+    {
+        codePoint = replacementCharacter; // A continuation byte, or one never used in UTF-8.
+        return 1;
+    }
+
+    codePoint = lead & (0xFFu >> (length + 1));
+
+    for (std::size_t i = 1; i < length; ++i)
+    {
+        if (start + i >= text.size())
+        {
+            codePoint = replacementCharacter;
+            return i;
+        }
+
+        unsigned char const next = static_cast<unsigned char>(text[start + i]);
+        unsigned char const low = (i == 1) ? secondLow : 0x80;
+        unsigned char const high = (i == 1) ? secondHigh : 0xBF;
+
+        if (next < low || next > high)
+        {
+            codePoint = replacementCharacter;
+            return i;
+        }
+
+        codePoint = (codePoint << 6) | (next & 0x3Fu);
+    }
+
+    return length;
+}
+//---------------------------------------------------------------------------
 bool IsHighSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
@@ -103,21 +196,6 @@ bool IsLowSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
 }
-//---------------------------------------------------------------------------
-#if defined(_WIN32)
-/*
-    ToConversionLength
-
-    A length for MultiByteToWideChar() or WideCharToMultiByte(), which take an int.
-*/
-int ToConversionLength(std::size_t length)
-{
-    if (length > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
-        throw std::length_error("text too long to convert");
-
-    return static_cast<int>(length);
-}
-#endif
 //---------------------------------------------------------------------------
 
 } // namespace
@@ -215,23 +293,22 @@ std::string SystemErrorText(unsigned long error)
 
     return WideToUTF8(text);
 }
+#endif
 //---------------------------------------------------------------------------
 std::wstring UTF8ToWide(std::string const& text)
 {
-    if (text.empty())
-        return std::wstring();
+    std::wstring wide;
+    wide.reserve(text.size());
 
-    int const length = ToConversionLength(text.size());
-    int const wideLength = MultiByteToWideChar(CP_UTF8, 0, text.data(), length, nullptr, 0);
+    for (std::size_t i = 0; i < text.size(); )
+    {
+        uint32_t codePoint = 0;
+        i += DecodeUTF8Sequence(text, i, codePoint);
+        AppendWide(wide, codePoint);
+    }
 
-    if (wideLength <= 0)
-        throw std::runtime_error("Couldn't convert UTF-8 text: " + SystemErrorText(GetLastError()));
-
-    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), length, &wide[0], wideLength);
     return wide;
 }
-#endif
 //---------------------------------------------------------------------------
 std::string WideToUTF8(std::wstring const& text)
 {

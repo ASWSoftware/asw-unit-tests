@@ -237,6 +237,10 @@ call :CopyFile "tests\Test_ASWUnitTests_Version.cpp" "tests\Test_ASWUnitTests_Ve
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_Version.h" "tests\Test_ASWUnitTests_Version.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_StringChecks.cpp" "tests\UT_Helper_StringChecks.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_StringChecks.h" "tests\UT_Helper_StringChecks.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.cpp" "toTest\ASWTools_Common.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.h" "toTest\ASWTools_Common.h"

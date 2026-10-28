@@ -50,9 +50,10 @@ private: // Test methods
 #if defined(_WIN32)
     void Test_SystemErrorText_DescribesAKnownCode();
     void Test_SystemErrorText_GivesTheNumberForAnUnknownCode();
-    void Test_UTF8ToWide_ConvertsEveryPlane();
-    void Test_UTF8ToWide_ReplacesInvalidUTF8();
 #endif
+    void Test_UTF8ToWide_ConvertsEveryPlane();
+    void Test_UTF8ToWide_ReplacesEachMaximalIllFormedSequence();
+    void Test_UTF8ToWide_ReplacesInvalidUTF8();
     void Test_WideToUTF8_EncodesEachSequenceLength();
     void Test_WideToUTF8_KeepsASCIIUnchanged();
 #if WCHAR_MAX > 0xFFFF

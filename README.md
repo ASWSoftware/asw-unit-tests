@@ -691,10 +691,10 @@ writes its executable to `vcl\console\rad370\<Platform>\<Config>`. The
 ### Comparing System::String (VCL/FMX)
 
 The same `ASWUNITTESTS_RTL_EXCEPTIONS` define (see [above](#rad-studio-rtl-exceptions-vclfmx)) also
-lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`): `Equals`,
-`Contains`, `StartsWith`, `EndsWith`, and their `Not` and `IC` forms. At least one of the two texts
-must be a `System::String`. The other may also be a `std::string`, `std::wstring` or C string,
-including a literal:
+lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`), an `AnsiString`,
+a `UTF8String` or another `AnsiStringT`: `Equals`, `Contains`, `StartsWith`, `EndsWith`, `Matches`,
+and their `Not` and `IC` forms. The other text may be any of those, or a `std::string`,
+`std::wstring` or C string, including a literal:
 
 ```
 CheckEquals("Ready", Label1->Caption, __func__, __LINE__, "status after loading");
@@ -702,11 +702,13 @@ CheckStartsWithIC(Edit1->Text, L"https://", __func__, __LINE__, "a secure URL");
 ```
 
 Both texts are converted to UTF-8 and compared as two `std::string` values, so a failure shows them
-the same way. Narrow text is read as UTF-8, as elsewhere in the framework, and a null C string is
-empty text, as it is for `System::String`. A `System::String` converts implicitly from a number or a
-character, but these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile
-error rather than a comparison with `"5"`. Other RTL string types, such as `AnsiString`, need
-converting to `System::String` first, and the message is still a `std::string`.
+the same way, as for [other strings of different types](#comparing-strings-of-different-types). An
+`AnsiString` is converted from its code page, and narrow text is read as UTF-8, as elsewhere in the
+framework. `CheckMatches` matches with `std::wregex`, so `.` matches one UTF-16 code unit. A null C
+string isn't empty text: it follows the [C string rules](#comparing-c-strings), so it doesn't equal
+an empty `System::String`. A `System::String` converts implicitly from a number or a character, but
+these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile error rather
+than a comparison with `"5"`. The message is still a `std::string`.
 
 ### Omitting the Method and Line (C++20)
 
@@ -762,17 +764,43 @@ A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the val
 strings, `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer
 is shown as `(null)`.
 
-The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring)
-and [prefix and suffix](#checking-the-start-or-end-of-a-string) checks take two C strings too. In
+The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring),
+[prefix and suffix](#checking-the-start-or-end-of-a-string) and
+[regular expression](#matching-a-regular-expression) checks take two C strings too. In
 `CheckEqualsIC` and `CheckNotEqualsIC`, a null pointer only matches another null pointer, as in
-`CheckEquals`. In `CheckContains`, `CheckStartsWith` and `CheckEndsWith`, and their `IC` forms, a
-null pointer, as either the text or the part, matches nothing, so they fail and their `Not` forms
-pass:
+`CheckEquals`. In `CheckContains`, `CheckStartsWith`, `CheckEndsWith` and `CheckMatches`, and their
+`IC` forms, a null pointer, as either the text or the part, matches nothing, so they fail and their
+`Not` forms pass:
 
 ```
 char const* const name = FindName(); // null if not found
 CheckStartsWith(name, "ASW", __func__, __LINE__, "fails, rather than crashing, when not found");
 ```
+
+The same rules apply when a C string is compared with
+[a string of another type](#comparing-strings-of-different-types).
+
+### Comparing Strings of Different Types
+
+The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+and `IC` forms) also take two texts of different types: a `std::string` with a C string, narrow text
+(`std::string`, `char const*`) with wide text (`std::wstring`, `wchar_t const*`), and, in
+[RTL builds](#comparing-systemstring-vclfmx), the RTL string types. Narrow text is read as UTF-8, as
+elsewhere in the framework. Two narrow texts, or two wide ones, are compared as they are. Any other
+pair is converted to UTF-8 and compared as two `std::string` values, so a failure shows both texts
+the same way:
+
+```
+std::wstring const title = window.Title();
+CheckEquals("Settings", title, __func__, __LINE__, "the window's title");
+```
+
+`CheckMatches` and `CheckNotMatches` match two narrow texts with `std::regex`, where `.` matches one
+byte of UTF-8, and any other pair with `std::wregex`, where `.` matches one wide character. On
+Windows, that's one UTF-16 code unit, so a character beyond U+FFFF is two.
+
+A null C string follows the [same rules](#comparing-c-strings) whatever it's compared with: it
+equals only another null C string, narrow or wide, and matches nothing in the other checks.
 
 ### Comparing Pointers
 
@@ -892,7 +920,8 @@ CheckMatches(stamp, R"(\d{4}-\d{2}-\d{2})", __func__, __LINE__, "an ISO 8601 dat
 
 Wide text is matched with `std::wregex`, so `.` matches one wide character, and a failure shows it
 as UTF-8. An invalid pattern fails the check, showing `std::regex_error`'s description, rather than
-throwing.
+throwing. The text and the pattern may also be [C strings](#comparing-c-strings), or
+[of different types](#comparing-strings-of-different-types).
 
 ### Comparing Integers of Different Types
 

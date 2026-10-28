@@ -94,9 +94,11 @@ TTest_ASWUnitTests_Utils::TTest_ASWUnitTests_Utils()
         "SystemErrorText_DescribesAKnownCode");
     RegisterTest(&TTest_ASWUnitTests_Utils::Test_SystemErrorText_GivesTheNumberForAnUnknownCode,
         "SystemErrorText_GivesTheNumberForAnUnknownCode");
-    RegisterTest(&TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ConvertsEveryPlane, "UTF8ToWide_ConvertsEveryPlane");
-    RegisterTest(&TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesInvalidUTF8, "UTF8ToWide_ReplacesInvalidUTF8");
 #endif
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ConvertsEveryPlane, "UTF8ToWide_ConvertsEveryPlane");
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesEachMaximalIllFormedSequence,
+        "UTF8ToWide_ReplacesEachMaximalIllFormedSequence");
+    RegisterTest(&TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesInvalidUTF8, "UTF8ToWide_ReplacesInvalidUTF8");
     RegisterTest(&TTest_ASWUnitTests_Utils::Test_WideToUTF8_EncodesEachSequenceLength,
         "WideToUTF8_EncodesEachSequenceLength");
     RegisterTest(&TTest_ASWUnitTests_Utils::Test_WideToUTF8_KeepsASCIIUnchanged, "WideToUTF8_KeepsASCIIUnchanged");
@@ -237,12 +239,14 @@ void TTest_ASWUnitTests_Utils::Test_SystemErrorText_GivesTheNumberForAnUnknownCo
     // Assert
     CheckEquals(std::string("error 805306367"), text, __func__, __LINE__, "the code, in decimal");
 }
+#endif
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ConvertsEveryPlane()
 {
-    // Arrange: ASCII, U+00E9, U+4E2D and U+1F600 (a surrogate pair in UTF-16), and a NUL, which ends neither.
+    // Arrange: ASCII, U+00E9, U+4E2D and U+1F600 (a surrogate pair where wchar_t is 16 bits), and a NUL, which
+    // ends neither.
     std::string const utf8 = std::string("a\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80") + std::string("\0z", 2);
-    std::wstring const expected = std::wstring(L"a\x00E9\x4E2D\xD83D\xDE00") + std::wstring(L"\0z", 2);
+    std::wstring const expected = std::wstring(L"a\x00E9\x4E2D\U0001F600") + std::wstring(L"\0z", 2);
 
     // Act
     std::wstring const wide = UTF8ToWide(utf8);
@@ -251,6 +255,27 @@ void TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ConvertsEveryPlane()
     CheckEquals(expected, wide, __func__, __LINE__, "every character converted");
     CheckEquals(utf8, WideToUTF8(wide), __func__, __LINE__, "and back again");
     CheckEmpty(UTF8ToWide(std::string()), __func__, __LINE__, "empty stays empty");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesEachMaximalIllFormedSequence()
+{
+    // Act: sequences cut short, at the end and before another character; a lead byte UTF-8 never uses; and an
+    // overlong form, a surrogate and a value above U+10FFFF, whose second byte is out of its lead byte's range.
+    std::wstring const cutShort = UTF8ToWide("\xE4\xB8" "x\xF0\x9F\x98");
+    std::wstring const neverUsed = UTF8ToWide("\xC0\x80");
+    std::wstring const overlong = UTF8ToWide("\xE0\x80\x80");
+    std::wstring const surrogate = UTF8ToWide("\xED\xA0\x80");
+    std::wstring const tooLarge = UTF8ToWide("\xF4\x90\x80\x80");
+
+    // Assert
+    CheckEquals(std::wstring(L"\xFFFD" L"x\xFFFD"), cutShort, __func__, __LINE__,
+        "a sequence cut short is one U+FFFD, and the character after it is kept");
+    CheckEquals(std::wstring(L"\xFFFD\xFFFD"), neverUsed, __func__, __LINE__,
+        "0xC0 can't start a sequence, so it and the continuation byte after it are one each");
+    CheckEquals(std::wstring(L"\xFFFD\xFFFD\xFFFD"), overlong, __func__, __LINE__, "an overlong form, one per byte");
+    CheckEquals(std::wstring(L"\xFFFD\xFFFD\xFFFD"), surrogate, __func__, __LINE__, "a surrogate, one per byte");
+    CheckEquals(std::wstring(L"\xFFFD\xFFFD\xFFFD\xFFFD"), tooLarge, __func__, __LINE__,
+        "above U+10FFFF, one per byte");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesInvalidUTF8()
@@ -263,7 +288,6 @@ void TTest_ASWUnitTests_Utils::Test_UTF8ToWide_ReplacesInvalidUTF8()
     CheckEquals(std::wstring(L"a\xFFFD" L"b"), invalid, __func__, __LINE__, "0xFF becomes U+FFFD");
     CheckEquals(std::wstring(L"\xFFFD" L"c"), continuation, __func__, __LINE__, "a lone 0x80 becomes U+FFFD");
 }
-#endif
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Utils::Test_WideToUTF8_EncodesEachSequenceLength()
 {
