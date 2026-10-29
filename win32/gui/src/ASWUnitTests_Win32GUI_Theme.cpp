@@ -88,6 +88,9 @@ public:
 
     // Mixes 'color' into the pixels 'glyph' covers in the square at 'left', 'top' of side 'size'.
     void Blend(EWin32GUIGlyph glyph, int left, int top, int size, COLORREF color);
+    // Takes the pixels at 'left', 'top' of 'context' as the canvas's own, e.g. a gradient a glyph is then drawn
+    // over. Leaves the canvas as it was if they can't be read.
+    void CopyFrom(HDC context, int left, int top);
     // A bitmap of the canvas, which the caller deletes; nullptr if it can't be created.
     HBITMAP CreateBitmap() const;
     void Draw(HDC context, int left, int top) const;
@@ -298,6 +301,36 @@ void TGlyphCanvas::Blend(EWin32GUIGlyph glyph, int left, int top, int size, COLO
     }
 }
 //---------------------------------------------------------------------------
+void TGlyphCanvas::CopyFrom(HDC context, int left, int top)
+{
+    BITMAPINFO const info = BitmapInfo();
+    void* bits = nullptr;
+    HBITMAP const bitmap = CreateDIBSection(context, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HDC const copy = CreateCompatibleDC(context);
+
+    if (bitmap != nullptr && bits != nullptr && copy != nullptr)
+    {
+        HGDIOBJ const old = SelectObject(copy, bitmap);
+
+        if (BitBlt(copy, 0, 0, m_Width, m_Height, context, left, top, SRCCOPY) != 0)
+        {
+            GdiFlush();
+            std::uint32_t const* const pixels = static_cast<std::uint32_t const*>(bits);
+
+            for (std::size_t i = 0; i < m_Pixels.size(); ++i)
+                m_Pixels[i] = 0xFF000000u | pixels[i];
+        }
+
+        SelectObject(copy, old);
+    }
+
+    if (copy != nullptr)
+        DeleteDC(copy);
+
+    if (bitmap != nullptr)
+        DeleteObject(bitmap);
+}
+//---------------------------------------------------------------------------
 HBITMAP TGlyphCanvas::CreateBitmap() const
 {
     BITMAPINFO const info = BitmapInfo();
@@ -505,6 +538,7 @@ void TWin32GUITheme::ApplyToControl(TAttachedControl const& attached)
         case EWin32GUIThemedControl::Splitter:
         case EWin32GUIThemedControl::StatusBar:
         case EWin32GUIThemedControl::TabControl:
+        case EWin32GUIThemedControl::UpDown:
             break; // Painted by ControlProc() while dark.
     }
 
@@ -678,6 +712,32 @@ void TWin32GUITheme::Attach(HWND control, EWin32GUIThemedControl kind)
     SetWindowSubclass(control, &ControlProc, ControlSubclassBase + static_cast<UINT_PTR>(kind),
         reinterpret_cast<DWORD_PTR>(this));
     ApplyToControl(m_Controls.back());
+
+    if (kind == EWin32GUIThemedControl::TabControl)
+        AttachUpDown(control);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::AttachUpDown
+
+    A tab control creates its scroll arrows, a child up-down control, the first time its tabs don't fit, and
+    keeps them, hidden, once they fit again. It's looked for when the tab control is attached, created
+    (WM_PARENTNOTIFY) and resized, in case it doesn't notify.
+*/
+void TWin32GUITheme::AttachUpDown(HWND tabControl)
+{
+    HWND const upDown = FindWindowExW(tabControl, nullptr, UPDOWN_CLASSW, nullptr);
+
+    if (upDown == nullptr)
+        return;
+
+    bool const attached = std::any_of(m_Controls.begin(), m_Controls.end(), [upDown](TAttachedControl const& entry)
+        {
+            return entry.Control == upDown;
+        });
+
+    if (!attached)
+        Attach(upDown, EWin32GUIThemedControl::UpDown);
 }
 //---------------------------------------------------------------------------
 void TWin32GUITheme::AttachWindow(HWND window, HMENU menuBar)
@@ -1086,7 +1146,21 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
     LPARAM lParam)
 {
     bool const painted = kind == EWin32GUIThemedControl::ProgressBar || kind == EWin32GUIThemedControl::StatusBar ||
-        kind == EWin32GUIThemedControl::TabControl;
+        kind == EWin32GUIThemedControl::TabControl || kind == EWin32GUIThemedControl::UpDown;
+
+    bool const mayCreateArrows = message == WM_SIZE || (message == WM_PARENTNOTIFY && LOWORD(wParam) == WM_CREATE);
+
+    if (kind == EWin32GUIThemedControl::TabControl && mayCreateArrows)
+    {
+        // Its scroll arrows, which it creates when it's too narrow for its tabs.
+        LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
+        AttachUpDown(control);
+
+        if (m_Dark && message == WM_SIZE)
+            InvalidateRect(control, nullptr, FALSE);
+
+        return result;
+    }
 
     if (!m_Dark)
     {
@@ -1172,6 +1246,34 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
                 }
             }
 
+            if (kind == EWin32GUIThemedControl::UpDown)
+            {
+                // The arrow under the mouse is drawn lighter.
+                InvalidateRect(control, nullptr, FALSE);
+
+                if (message == WM_MOUSEMOVE)
+                {
+                    TRACKMOUSEEVENT track = {};
+                    track.cbSize = sizeof(track);
+                    track.dwFlags = TME_LEAVE;
+                    track.hwndTrack = control;
+                    TrackMouseEvent(&track);
+                }
+            }
+
+            break;
+
+        case WM_CAPTURECHANGED:
+        case WM_LBUTTONDOWN:
+        case WM_LBUTTONUP:
+            if (kind == EWin32GUIThemedControl::UpDown)
+            {
+                // Pressed, or not any more.
+                LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
+                InvalidateRect(control, nullptr, FALSE);
+                return result;
+            }
+
             break;
 
         case WM_NCPAINT:
@@ -1214,8 +1316,10 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
                         PaintProgressBar(control, buffer.Get());
                     else if (kind == EWin32GUIThemedControl::StatusBar)
                         PaintStatusBar(control, buffer.Get());
-                    else
+                    else if (kind == EWin32GUIThemedControl::TabControl)
                         PaintTabControl(control, buffer.Get());
+                    else
+                        PaintUpDown(control, buffer.Get());
                 }
 
                 if (message == WM_PAINT)
@@ -1963,6 +2067,71 @@ void TWin32GUITheme::PaintTabControl(HWND tabControl, HDC context) const
     SelectObject(context, oldFont);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::PaintUpDown
+
+    As Carbon draws a pair of horizontal spin buttons, e.g. the results tabs' scroll arrows: each an outline
+    around a face shaded from top to bottom, lighter under the mouse, with a darker edge at its top and left
+    while pressed, and an arrow pointing left (decrease) or right (increase).
+*/
+void TWin32GUITheme::PaintUpDown(HWND upDown, HDC context) const
+{
+    RECT client;
+    GetClientRect(upDown, &client);
+    UINT const dpi = WindowDPI(upDown);
+    int const line = (std::max)(1, ScaleForDPI(1, dpi));
+    bool const disabled = IsWindowEnabled(upDown) == FALSE;
+
+    POINT cursor = {};
+    GetCursorPos(&cursor);
+    bool const underMouse = WindowFromPoint(cursor) == upDown;
+    ScreenToClient(upDown, &cursor);
+    bool const pressing = GetCapture() == upDown && (GetKeyState(VK_LBUTTON) & 0x8000) != 0;
+
+    int const middle = (client.left + client.right) / 2;
+    RECT const halves[] = {
+        { client.left, client.top, middle, client.bottom },
+        { middle, client.top, client.right, client.bottom },
+    };
+
+    for (int i = 0; i < 2; ++i)
+    {
+        RECT const& half = halves[i];
+        bool const hot = !disabled && underMouse && PtInRect(&half, cursor) != FALSE;
+
+        FillSolid(context, half, disabled ? m_Palette.SpinDisabledOutline : m_Palette.SpinOutline);
+        RECT const face = Inset(half, line);
+
+        if (disabled)
+            FillGradient(context, face, m_Palette.SpinDisabledFaceTop, m_Palette.SpinDisabledFaceBottom);
+        else if (hot)
+            FillGradient(context, face, m_Palette.SpinHotFaceTop, m_Palette.SpinHotFaceBottom);
+        else
+            FillGradient(context, face, m_Palette.SpinFaceTop, m_Palette.SpinFaceBottom);
+
+        if (hot && pressing)
+        {
+            RECT const top = { face.left, face.top, face.right, face.top + line };
+            RECT const left = { face.left, face.top, face.left + line, face.bottom };
+            FillSolid(context, top, m_Palette.SpinPressedEdge);
+            FillSolid(context, left, m_Palette.SpinPressedEdge);
+        }
+
+        int const size = (std::min)(face.right - face.left, face.bottom - face.top);
+
+        if (size <= 0)
+            continue;
+
+        int const left = face.left + (face.right - face.left - size) / 2;
+        int const top = face.top + (face.bottom - face.top - size) / 2;
+        TGlyphCanvas canvas(size, size, m_Palette.SpinFaceTop);
+        canvas.CopyFrom(context, left, top);
+        canvas.Blend(i == 0 ? EWin32GUIGlyph::ArrowLeft : EWin32GUIGlyph::ArrowRight, 0, 0, size, disabled ?
+                m_Palette.SpinDisabledArrow : m_Palette.SpinArrow);
+        canvas.Draw(context, left, top);
+    }
+}
+//---------------------------------------------------------------------------
 TWin32GUIPalette const& TWin32GUITheme::Palette() const
 {
     return m_Palette;
@@ -1975,8 +2144,13 @@ void TWin32GUITheme::Refresh()
     for (HWND const window : m_Windows)
         ApplyToTitleBar(window);
 
-    for (TAttachedControl const& attached : m_Controls)
+    // By index, on a copy: applying the look can resize a tab control, which may then create and attach its
+    // scroll arrows.
+    for (std::size_t i = 0; i < m_Controls.size(); ++i)
+    {
+        TAttachedControl const attached = m_Controls[i];
         ApplyToControl(attached);
+    }
 
     for (HWND const window : m_Windows)
         RedrawWindow(window, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);

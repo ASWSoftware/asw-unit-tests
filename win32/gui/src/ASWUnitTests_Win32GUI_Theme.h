@@ -68,6 +68,9 @@ enum class EWin32GUIThemedControl
     Tooltip,
     // A WC_TREEVIEWW control, with or without TVS_CHECKBOXES (and TVS_EX_PARTIALCHECKBOXES).
     TreeView,
+    // An UPDOWN_CLASSW control with UDS_HORZ, such as a tab control's scroll arrows, which attaching the tab
+    // control attaches as it creates them.
+    UpDown,
 };
 
 
@@ -158,6 +161,9 @@ private:
     void ApplyToMenus();
     void ApplyToTitleBar(HWND window) const;
     void ApplyToTree(HWND tree);
+    // Attaches the scroll arrows a tab control creates when its tabs don't fit, if it has created them and they
+    // aren't attached yet.
+    void AttachUpDown(HWND tabControl);
     // The dark tree check boxes for 'dpi', created if needed.
     HIMAGELIST DarkCheckImages(UINT dpi);
     void DrawButton(NMCUSTOMDRAW const& draw) const;
@@ -185,6 +191,7 @@ private:
     void PaintProgressBar(HWND progressBar, HDC context) const;
     void PaintStatusBar(HWND statusBar, HDC context) const;
     void PaintTabControl(HWND tabControl, HDC context) const;
+    void PaintUpDown(HWND upDown, HDC context) const;
     // Forgets a control or window that's being destroyed.
     void Unattach(HWND window);
 

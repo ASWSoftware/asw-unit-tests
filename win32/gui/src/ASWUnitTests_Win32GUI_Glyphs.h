@@ -39,11 +39,15 @@ namespace ASWUnitTests
 // EWin32GUIGlyph
 //
 // A shape RenderWin32GUIGlyph() draws, in a square cell. The check box's
-// and radio button's are Carbon's at 13 pixels; the menus' at 16.
+// and radio button's are Carbon's at 13 pixels; the menus' and the spin
+// buttons' arrows at 16.
 /////////////////////////////////////////////////////////////////////////////
 enum class EWin32GUIGlyph
 {
-    // A menu's submenu arrow: a triangle pointing right, in the cell's middle.
+    // A spin button's arrow pointing left: ArrowRight mirrored.
+    ArrowLeft,
+    // A menu's submenu arrow, and a spin button's pointing right: a triangle pointing right, in the cell's
+    // middle.
     ArrowRight,
     // A radio button's circle, filling the cell; drawn in the border color, with InnerCircle over it in the
     // fill color.

@@ -50,7 +50,7 @@ bool NearSegment(double x, double y, double ax, double ay, double bx, double by,
     Whether the point (x, y) of a cell one unit wide, from its top left, is inside 'glyph'. The shapes'
     proportions come from Carbon's glyphs: its 13-pixel check box's cross spans pixels 3 to 9 in strokes about
     1.7 pixels wide, its partial square pixels 4 to 8, its radio dot about 4.6 pixels across, and its 16-pixel
-    submenu arrow is 4 pixels wide and 7 tall.
+    submenu and spin button arrows are 4 pixels wide and 7 tall.
 */
 bool Covers(EWin32GUIGlyph glyph, double x, double y)
 {
@@ -60,6 +60,9 @@ bool Covers(EWin32GUIGlyph glyph, double x, double y)
 
     switch (glyph)
     {
+        case EWin32GUIGlyph::ArrowLeft:
+            return InTriangle(x, y, 0.625, 0.28, 0.625, 0.72, 0.375, 0.5);
+
         case EWin32GUIGlyph::ArrowRight:
             return InTriangle(x, y, 0.375, 0.28, 0.375, 0.72, 0.625, 0.5);
 

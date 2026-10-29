@@ -143,12 +143,23 @@ void TTest_ASWUnitTests_Win32GUI_Glyphs::Test_RenderWin32GUIGlyph_ArrowPointsRig
     // Act: the menus' 16-pixel cell, the triangle's flat side at pixel 6 and its point at 10.
     std::vector<std::uint8_t> const arrow = RenderWin32GUIGlyph(EWin32GUIGlyph::ArrowRight, 16);
 
+    std::vector<std::uint8_t> const left = RenderWin32GUIGlyph(EWin32GUIGlyph::ArrowLeft, 16);
+
+    bool mirrored = true;
+
+    for (int y = 0; y < 16; ++y)
+    {
+        for (int x = 0; x < 16; ++x)
+            mirrored = mirrored && At(left, 16, x, y) == At(arrow, 16, 15 - x, y);
+    }
+
     // Assert
     CheckTrue(IsMirrored(arrow, 16, false), __func__, __LINE__, "the same above and below its middle");
     CheckEquals(255, At(arrow, 16, 6, 8), __func__, __LINE__, "full at its flat side, in the middle");
     CheckEquals(0, At(arrow, 16, 5, 8), __func__, __LINE__, "nothing left of it");
     CheckEquals(0, At(arrow, 16, 11, 8), __func__, __LINE__, "nothing right of its point");
     CheckTrue(At(arrow, 16, 6, 5) > At(arrow, 16, 9, 5), __func__, __LINE__, "narrowing to the right");
+    CheckTrue(mirrored, __func__, __LINE__, "the left arrow is the right one mirrored");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_Glyphs::Test_RenderWin32GUIGlyph_CirclesAreRoundAndNested()
@@ -177,7 +188,7 @@ void TTest_ASWUnitTests_Win32GUI_Glyphs::Test_RenderWin32GUIGlyph_CoversOnePixel
 {
     // Arrange
     EWin32GUIGlyph const glyphs[] = {
-        EWin32GUIGlyph::ArrowRight, EWin32GUIGlyph::Circle, EWin32GUIGlyph::Cross, EWin32GUIGlyph::Dot,
+        EWin32GUIGlyph::ArrowLeft, EWin32GUIGlyph::ArrowRight, EWin32GUIGlyph::Circle, EWin32GUIGlyph::Cross, EWin32GUIGlyph::Dot,
         EWin32GUIGlyph::InnerCircle, EWin32GUIGlyph::Square, EWin32GUIGlyph::Tick,
     };
 

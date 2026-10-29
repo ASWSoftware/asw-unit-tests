@@ -111,6 +111,20 @@ struct TWin32GUIPalette
     COLORREF Selection;
     COLORREF SelectionFrame;
     COLORREF SkipText;
+    // Spin buttons, such as the results tabs' scroll arrows when the tabs don't fit: the outline around each, its
+    // face's gradient from top to bottom, normal, hot and disabled, the edge a pressed one shows at its top and
+    // left, and its arrow, normal and disabled.
+    COLORREF SpinArrow;
+    COLORREF SpinDisabledArrow;
+    COLORREF SpinDisabledFaceBottom;
+    COLORREF SpinDisabledFaceTop;
+    COLORREF SpinDisabledOutline;
+    COLORREF SpinFaceBottom;
+    COLORREF SpinFaceTop;
+    COLORREF SpinHotFaceBottom;
+    COLORREF SpinHotFaceTop;
+    COLORREF SpinOutline;
+    COLORREF SpinPressedEdge;
     // The line along the status bar's top.
     COLORREF StatusLine;
     // The results tabs: the selected one's gradient from top to bottom, the others' color, one under the
