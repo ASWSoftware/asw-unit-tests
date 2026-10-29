@@ -152,6 +152,9 @@ private:
         DWORD_PTR theme);
 
 private:
+    // Gives a bordered control (an edit box, the tree, the list, the log) its own border while dark, in place
+    // of WS_EX_CLIENTEDGE's, or WS_EX_CLIENTEDGE back while light; see the definition.
+    void ApplyToBorder(HWND control) const;
     // Applies the current look to one attached control.
     void ApplyToControl(TAttachedControl const& attached);
     // Makes 'menu''s items, and its submenus', owner-drawn while dark, adding each to 'items', or standard while

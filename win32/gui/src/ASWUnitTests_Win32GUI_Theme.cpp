@@ -58,6 +58,9 @@ DWORD const DarkTitleBarAttributeBefore20H1 = 19;
 wchar_t const ExplorerTheme[] = L"Explorer";
 // The window property that holds which tab is under the mouse, plus one (0 for none), while dark.
 wchar_t const HotTabProperty[] = L"ASWUnitTests_Win32GUI_HotTab";
+// The window property set on a control that had WS_EX_CLIENTEDGE, which it has in place of it while dark; see
+// TWin32GUITheme::ApplyToBorder().
+wchar_t const OwnBorderProperty[] = L"ASWUnitTests_Win32GUI_OwnBorder";
 // The menu windows' class, documented as a system class.
 wchar_t const MenuClassName[] = L"#32768";
 // The subclass IDs: an attached control's is ControlSubclassBase plus its kind.
@@ -133,6 +136,7 @@ public:
 
 //---------------------------------------------------------------------------
 
+int BorderWidth(HWND control);
 bool ClassNameIs(HWND window, wchar_t const* className);
 void FillGradient(HDC context, RECT const& rect, COLORREF top, COLORREF bottom);
 void FillSolid(HDC context, RECT const& rect, COLORREF color);
@@ -146,6 +150,16 @@ void SplitShortcut(std::wstring const& text, std::wstring& caption, std::wstring
 SIZE TextSize(HDC context, std::wstring const& text, UINT format);
 std::wstring WideWindowText(HWND window);
 
+//---------------------------------------------------------------------------
+/*
+    BorderWidth
+
+    WS_EX_CLIENTEDGE's width at the control's DPI, which the dark look's own border has too.
+*/
+int BorderWidth(HWND control)
+{
+    return (std::max)(1, GetSystemMetricsForDpi(SM_CXEDGE, WindowDPI(control)));
+}
 //---------------------------------------------------------------------------
 bool ClassNameIs(HWND window, wchar_t const* className)
 {
@@ -539,6 +553,40 @@ TWin32GUITheme::~TWin32GUITheme()
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::ApplyToBorder
+
+    A control with WS_EX_CLIENTEDGE paints that border itself, in a light color, whatever its theme, in each
+    WM_NCPAINT; painting a dark one over it afterwards shows the light one for a moment, e.g. while a splitter
+    is dragged. So while dark it has no WS_EX_CLIENTEDGE: WM_NCCALCSIZE keeps the same width for a border of
+    its own, around its scroll bars, which WM_NCPAINT paints (see HandleControlMessage()). Light puts
+    WS_EX_CLIENTEDGE back.
+*/
+void TWin32GUITheme::ApplyToBorder(HWND control) const
+{
+    LONG_PTR const exStyle = GetWindowLongPtrW(control, GWL_EXSTYLE);
+    bool const ownBorder = GetPropW(control, OwnBorderProperty) != nullptr;
+
+    if (m_Dark && (exStyle & WS_EX_CLIENTEDGE) != 0)
+    {
+        SetPropW(control, OwnBorderProperty, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(1)));
+        SetWindowLongPtrW(control, GWL_EXSTYLE, exStyle & ~static_cast<LONG_PTR>(WS_EX_CLIENTEDGE));
+    }
+    else if (!m_Dark && ownBorder)
+    {
+        RemovePropW(control, OwnBorderProperty);
+        SetWindowLongPtrW(control, GWL_EXSTYLE, exStyle | WS_EX_CLIENTEDGE);
+    }
+    else if (!ownBorder)
+    {
+        return;
+    }
+
+    // Its non-client area is measured again, also for a new DPI while dark.
+    SetWindowPos(control, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE |
+        SWP_FRAMECHANGED);
+}
+//---------------------------------------------------------------------------
 void TWin32GUITheme::ApplyToControl(TAttachedControl const& attached)
 {
     HWND const control = attached.Control;
@@ -598,6 +646,12 @@ void TWin32GUITheme::ApplyToControl(TAttachedControl const& attached)
         case EWin32GUIThemedControl::TabControl:
         case EWin32GUIThemedControl::UpDown:
             break; // Painted by ControlProc() while dark.
+    }
+
+    if (attached.Kind == EWin32GUIThemedControl::Edit || attached.Kind == EWin32GUIThemedControl::ListView ||
+        attached.Kind == EWin32GUIThemedControl::RichEdit || attached.Kind == EWin32GUIThemedControl::TreeView)
+    {
+        ApplyToBorder(control);
     }
 
     RedrawWindow(control, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
@@ -833,6 +887,7 @@ LRESULT CALLBACK TWin32GUITheme::ControlProc(HWND control, UINT message, WPARAM 
         {
             reinterpret_cast<TWin32GUITheme*>(theme)->Unattach(control);
             RemovePropW(control, HotTabProperty);
+            RemovePropW(control, OwnBorderProperty);
             RemoveWindowSubclass(control, &ControlProc, id);
             return DefSubclassProc(control, message, wParam, lParam);
         }
@@ -1338,6 +1393,20 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
                 LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
                 InvalidateRect(control, nullptr, FALSE);
                 return result;
+            }
+
+            break;
+
+        case WM_NCCALCSIZE:
+            if (bordered && GetPropW(control, OwnBorderProperty) != nullptr)
+            {
+                // The border's width taken off the window's rectangle first, so the control puts its scroll bars
+                // and client area inside it, as with WS_EX_CLIENTEDGE.
+                RECT* const proposed = wParam != FALSE ? &reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam)->rgrc[0] :
+                        reinterpret_cast<RECT*>(lParam);
+                int const edge = BorderWidth(control);
+                InflateRect(proposed, -edge, -edge);
+                return DefSubclassProc(control, message, wParam, lParam);
             }
 
             break;
@@ -1862,13 +1931,16 @@ LRESULT TWin32GUITheme::OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const
 /*
     TWin32GUITheme::PaintBorder
 
-    WS_EX_CLIENTEDGE's border, which stays light under a dark theme, painted over in Carbon's two edit border
-    colors, the outer one a pixel wide.
+    The border a bordered control has of its own while dark (see ApplyToBorder()), in Carbon's two edit border
+    colors, the outer one a pixel wide; or, on one that still has WS_EX_CLIENTEDGE, that border painted over.
 */
 void TWin32GUITheme::PaintBorder(HWND control) const
 {
-    if ((GetWindowLongPtrW(control, GWL_EXSTYLE) & WS_EX_CLIENTEDGE) == 0)
+    if (GetPropW(control, OwnBorderProperty) == nullptr &&
+        (GetWindowLongPtrW(control, GWL_EXSTYLE) & WS_EX_CLIENTEDGE) == 0)
+    {
         return;
+    }
 
     RECT rect;
     GetWindowRect(control, &rect);
@@ -1879,7 +1951,7 @@ void TWin32GUITheme::PaintBorder(HWND control) const
     if (context == nullptr)
         return;
 
-    int const edge = (std::max)(1, GetSystemMetricsForDpi(SM_CXEDGE, WindowDPI(control)));
+    int const edge = BorderWidth(control);
     FrameSolid(context, rect, m_Palette.EditBorderOuter);
 
     for (int i = 1; i < edge; ++i)
