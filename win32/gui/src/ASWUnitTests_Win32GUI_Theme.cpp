@@ -144,6 +144,7 @@ void FrameSolid(HDC context, RECT const& rect, COLORREF color);
 bool HidesAccelerators(HWND control);
 bool HidesFocus(HWND control);
 RECT Inset(RECT rect, int by);
+bool IsOverDisabledScrollBar(HWND control, WPARAM hitTest);
 bool MayRedrawScrollBars(UINT message);
 void SetImmersiveDarkMode(HWND window, bool dark);
 void SplitShortcut(std::wstring const& text, std::wstring& caption, std::wstring& shortcut);
@@ -213,6 +214,24 @@ RECT Inset(RECT rect, int by)
 {
     InflateRect(&rect, -by, -by);
     return rect;
+}
+//---------------------------------------------------------------------------
+/*
+    IsOverDisabledScrollBar
+
+    Whether 'hitTest', a WM_NCHITTEST result, is the control's vertical or horizontal scroll bar, and that bar is
+    disabled.
+*/
+bool IsOverDisabledScrollBar(HWND control, WPARAM hitTest)
+{
+    if (hitTest != HTVSCROLL && hitTest != HTHSCROLL)
+        return false;
+
+    SCROLLBARINFO info = {};
+    info.cbSize = sizeof(info);
+
+    return GetScrollBarInfo(control, hitTest == HTVSCROLL ? OBJID_VSCROLL : OBJID_HSCROLL, &info) != 0 &&
+        (info.rgstate[0] & STATE_SYSTEM_UNAVAILABLE) != 0;
 }
 //---------------------------------------------------------------------------
 /*
@@ -1309,6 +1328,15 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
 
     bool const bordered = kind == EWin32GUIThemedControl::Edit || kind == EWin32GUIThemedControl::ListView ||
         kind == EWin32GUIThemedControl::RichEdit || kind == EWin32GUIThemedControl::TreeView;
+
+    if (bordered && message == WM_NCMOUSEMOVE && IsOverDisabledScrollBar(control, wParam))
+    {
+        // Not passed on: over a scroll bar, Windows fades its arrows as the mouse comes and goes, painting them
+        // from a timer of its own, after PaintScrollBars() has, so a disabled bar's would end up light. A
+        // disabled bar does nothing with the mouse anyway.
+        return 0;
+    }
+
     if (bordered && MayRedrawScrollBars(message))
     {
         LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
