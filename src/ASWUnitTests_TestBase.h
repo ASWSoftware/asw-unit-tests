@@ -833,6 +833,17 @@ private:
         static_assert(IsExpectableException<TException>(), "TException must be a type that can be thrown and caught "
             "by reference (not an array), and with ASWUNITTESTS_RTL_EXCEPTIONS an RTL class must be an Exception");
 
+        // A type that is neither a std::exception nor an RTL exception is caught by const reference, as Test() does
+        // (see m_ExpectedOtherExceptionTypeChecker): MSVC never matches a pointer to const (e.g. a thrown string
+        // literal, a char const*) with a handler that's a non-const reference to it, even for its exact type.
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        constexpr bool isRTLException = std::is_base_of<System::Sysutils::Exception, TException>::value;
+#else
+        constexpr bool isRTLException = false;
+#endif
+        constexpr bool caughtAsIs = isRTLException || std::is_base_of<std::exception, TException>::value;
+        typedef typename std::conditional<caughtAsIs, TException, TException const>::type TCaught;
+
         bool caught = false;
         std::string failure;
 
@@ -844,7 +855,7 @@ private:
                 {
                     static_cast<void>(std::forward<TCallable>(callable)());
                 }
-                catch (TException& ex)
+                catch (TCaught& ex)
                 {
                     // A TException that is a base of TTestException (e.g. std::exception) also catches the
                     // framework's own signals, which must still pass through.
