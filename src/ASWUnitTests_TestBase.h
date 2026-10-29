@@ -322,6 +322,34 @@ private:
         LessThanOrEqual
     };
 
+    // The Near or NotNear method a failure is reported for (see ReportNearFailure()).
+    enum class ENearMethod
+    {
+        AssertNear,
+        AssertNotNear,
+        CheckNear,
+        CheckNotNear
+    };
+
+    // Why a Near or NotNear method failed (see NearFailure()): an invalid tolerance (negative or NaN), or the
+    // values' texts, as std::to_string() shows them.
+    struct TNearFailure
+    {
+        bool InvalidTolerance = false;
+        std::string Expected;
+        std::string Actual;
+        std::string Difference;
+        std::string Tolerance;
+    };
+
+    // An integer for the Near methods, as its sign and magnitude, so two integers of any types can be subtracted
+    // exactly (see ToNearInteger()).
+    struct TNearInteger
+    {
+        bool Negative = false;
+        uint64_t Magnitude = 0;
+    };
+
     // True when TValue has a get() member returning a pointer, like std::unique_ptr and std::shared_ptr.
     template <typename TValue, typename = void>
     struct THasPointerGet : std::false_type
@@ -671,6 +699,15 @@ private:
             return false;
     }
 
+    // Why a Near method (or with 'expectNear' false, a NotNear method) fails for these values, or nullopt when it
+    // passes. A negative or NaN tolerance fails both. Two values are near when they're equal (so equal infinities
+    // are) or differ by at most 'tolerance'; a NaN is near nothing. The template is defined in the .cpp, for float,
+    // double and long double.
+    template <typename TFloat>
+    static std::optional<TNearFailure> NearFailure(TFloat expected, TFloat actual, TFloat tolerance, bool expectNear);
+    static std::optional<TNearFailure> NearFailure(TNearInteger expected, TNearInteger actual, TNearInteger tolerance,
+        bool expectNear);
+
     // Runs 'callable' for the NoThrow methods (e.g. CheckNoThrow()) and returns why it failed, or an empty string when
     // it threw nothing. A failure signal from this framework (e.g. an Assert* failure inside 'callable') passes
     // straight through, failing the test as usual.
@@ -692,6 +729,10 @@ private:
     // Releases every hold of m_RecordingMutex this thread has left, after a crash caught on it skipped the
     // TRecordingLocks' destructors.
     void ReleaseRecordingHolds();
+
+    // Records 'failure' (from NearFailure()) as 'which' does, or throws it for an Assert method.
+    void ReportNearFailure(TNearFailure const& failure, ENearMethod which, std::string const& method, int line,
+        std::string const& msg);
 
     // The address the Same methods (e.g. CheckSame()) compare: a smart pointer's get(), or a raw pointer (or an
     // array, or a function) as it is.
@@ -798,6 +839,26 @@ private:
         return failure;
     }
 
+    template <typename TInteger>
+    static TNearInteger ToNearInteger(TInteger value)
+    {
+        TNearInteger result;
+
+        if constexpr (std::is_signed<TInteger>::value)
+        {
+            result.Negative = (value < 0);
+            // A negative value's magnitude, computed so the most negative int64_t doesn't overflow.
+            result.Magnitude = result.Negative ? static_cast<uint64_t>(-(static_cast<int64_t>(value) + 1)) + 1 :
+                    static_cast<uint64_t>(value);
+        }
+        else
+        {
+            result.Magnitude = static_cast<uint64_t>(value);
+        }
+
+        return result;
+    }
+
     // Puts the group in suite 'suitePath', for TTestHandler when the group's registration names its suite (see
     // ASW_REGISTER_TEST_GROUP_IN_SUITE).
     void SetSuitePath(std::string const& suitePath);
@@ -864,6 +925,58 @@ private:
 
     // 'type''s name for a failure message, demangled where the compiler's name() is mangled (e.g. GCC and Clang).
     static std::string TypeName(std::type_info const& type);
+
+    // The work of the Near and NotNear templates for mixed types (see 'which'). A float or double common type goes to
+    // the virtual overload, so an override still sees the call; a long double one, or integers (compared exactly, as
+    // their sign and magnitude), to NearFailure().
+    template <typename TExpected, typename TActual, typename TTolerance>
+    void VerifyMixedNear(ENearMethod which, TExpected expected, TActual actual, TTolerance tolerance,
+        std::string const& method, int line, std::string const& msg)
+    {
+        typedef typename std::common_type<TExpected, TActual, TTolerance>::type TCommon;
+
+        if constexpr (std::is_same<TCommon, float>::value || std::is_same<TCommon, double>::value)
+        {
+            TCommon const commonExpected = static_cast<TCommon>(expected);
+            TCommon const commonActual = static_cast<TCommon>(actual);
+            TCommon const commonTolerance = static_cast<TCommon>(tolerance);
+
+            switch (which)
+            {
+                case ENearMethod::AssertNear:
+                    AssertNear(commonExpected, commonActual, commonTolerance, method, line, msg);
+                    break;
+                case ENearMethod::AssertNotNear:
+                    AssertNotNear(commonExpected, commonActual, commonTolerance, method, line, msg);
+                    break;
+                case ENearMethod::CheckNear:
+                    CheckNear(commonExpected, commonActual, commonTolerance, method, line, msg);
+                    break;
+                case ENearMethod::CheckNotNear:
+                    CheckNotNear(commonExpected, commonActual, commonTolerance, method, line, msg);
+                    break;
+            }
+        }
+        else
+        {
+            bool const expectNear = (which == ENearMethod::AssertNear || which == ENearMethod::CheckNear);
+            std::optional<TNearFailure> failure;
+
+            if constexpr (std::is_integral<TCommon>::value)
+            {
+                failure = NearFailure(ToNearInteger(expected), ToNearInteger(actual), ToNearInteger(tolerance),
+                    expectNear);
+            }
+            else
+            {
+                failure = NearFailure(static_cast<TCommon>(expected), static_cast<TCommon>(actual),
+                    static_cast<TCommon>(tolerance), expectNear);
+            }
+
+            if (failure != std::nullopt)
+                ReportNearFailure(*failure, which, method, line, msg);
+        }
+    }
 
 protected:
     bool m_ExceptionExpected;
@@ -1262,26 +1375,76 @@ protected: // Assertion/Check methods - Not Equals
     void CheckNotEqualsIC(wchar_t const* expected, wchar_t const* actual, std::string const& method, int line,
         std::string const& msg);
 
-protected: // Assertion/Check methods - Near (floating point, absolute tolerance)
+protected: // Assertion/Check methods - Near (absolute tolerance)
+    // 'actual' is near 'expected' when they're equal (so equal infinities are) or differ by at most 'tolerance'; a NaN
+    // is near nothing. A negative or NaN tolerance fails both Near and NotNear. The templates take any three integer
+    // or floating-point types except bool (all float or all double use the overloads): integers are compared
+    // exactly, and otherwise all three are converted to their common type, as the built-in operators do.
+    template <typename TValue>
+    static constexpr bool IsNearArithmetic()
+    {
+        return std::is_arithmetic<TValue>::value && !std::is_same<TValue, bool>::value;
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    static constexpr bool IsMixedNear()
+    {
+        constexpr bool allSame = std::is_same<TExpected, TActual>::value && std::is_same<TActual, TTolerance>::value;
+        constexpr bool hasOverload = allSame &&
+            (std::is_same<TExpected, float>::value || std::is_same<TExpected, double>::value);
+
+        return IsNearArithmetic<TExpected>() && IsNearArithmetic<TActual>() && IsNearArithmetic<TTolerance>() &&
+            !hasOverload;
+    }
+    template <typename TExpected, typename TActual, typename TTolerance>
+    using TEnableIfMixedNear = typename std::enable_if<IsMixedNear<TExpected, TActual, TTolerance>(), int>::type;
+
     virtual void AssertNear(float expected, float actual, float tolerance, std::string const& method, int line,
         std::string const& msg);
     virtual void AssertNear(double expected, double actual, double tolerance, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, typename TTolerance,
+        TEnableIfMixedNear<TExpected, TActual, TTolerance> = 0>
+    void AssertNear(TExpected expected, TActual actual, TTolerance tolerance, std::string const& method, int line,
+        std::string const& msg)
+    {
+        VerifyMixedNear(ENearMethod::AssertNear, expected, actual, tolerance, method, line, msg);
+    }
 
     virtual void AssertNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
         std::string const& msg);
     virtual void AssertNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, typename TTolerance,
+        TEnableIfMixedNear<TExpected, TActual, TTolerance> = 0>
+    void AssertNotNear(TExpected expected, TActual actual, TTolerance tolerance, std::string const& method, int line,
+        std::string const& msg)
+    {
+        VerifyMixedNear(ENearMethod::AssertNotNear, expected, actual, tolerance, method, line, msg);
+    }
 
     virtual void CheckNear(float expected, float actual, float tolerance, std::string const& method, int line,
         std::string const& msg);
     virtual void CheckNear(double expected, double actual, double tolerance, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, typename TTolerance,
+        TEnableIfMixedNear<TExpected, TActual, TTolerance> = 0>
+    void CheckNear(TExpected expected, TActual actual, TTolerance tolerance, std::string const& method, int line,
+        std::string const& msg)
+    {
+        VerifyMixedNear(ENearMethod::CheckNear, expected, actual, tolerance, method, line, msg);
+    }
 
     virtual void CheckNotNear(float expected, float actual, float tolerance, std::string const& method, int line,
         std::string const& msg);
     virtual void CheckNotNear(double expected, double actual, double tolerance, std::string const& method, int line,
         std::string const& msg);
+    template <typename TExpected, typename TActual, typename TTolerance,
+        TEnableIfMixedNear<TExpected, TActual, TTolerance> = 0>
+    void CheckNotNear(TExpected expected, TActual actual, TTolerance tolerance, std::string const& method, int line,
+        std::string const& msg)
+    {
+        VerifyMixedNear(ENearMethod::CheckNotNear, expected, actual, tolerance, method, line, msg);
+    }
 
 protected: // Assertion/Check methods - Boolean
     virtual void AssertFalse(bool testVal, std::string const& method, int line, std::string const& msg);

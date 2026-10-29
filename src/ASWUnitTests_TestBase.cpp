@@ -88,6 +88,8 @@ bool CharEqualsIgnoringASCIICase(TChar a, TChar b);
 template <typename TString>
 bool ContainsIgnoringASCIICase(TString const& text, TString const& substring);
 
+std::string DecimalSum(uint64_t a, uint64_t b);
+
 std::string DisplayText(std::string const& text);
 
 template <typename TString>
@@ -232,6 +234,39 @@ bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
     // std::search finds an empty substring at the start, which is the end of an empty text.
     return substring.empty() || (std::search(text.begin(), text.end(), substring.begin(), substring.end(),
         CharEqualsIgnoringASCIICase<typename TString::value_type>) != text.end());
+}
+//---------------------------------------------------------------------------
+/*
+    DecimalSum
+
+    Returns 'a' + 'b' in decimal, exactly, even when the sum doesn't fit in a uint64_t.
+*/
+std::string DecimalSum(uint64_t a, uint64_t b)
+{
+    if (a <= std::numeric_limits<uint64_t>::max() - b)
+        return std::to_string(a + b);
+
+    // Long addition of the two numbers' digits, from the last.
+    std::string const first = std::to_string(a);
+    std::string const second = std::to_string(b);
+    std::string sum;
+    int carry = 0;
+
+    for (std::size_t i = 0; i < first.size() || i < second.size() || carry != 0; ++i)
+    {
+        int digit = carry;
+
+        if (i < first.size())
+            digit += first[first.size() - 1 - i] - '0';
+
+        if (i < second.size())
+            digit += second[second.size() - 1 - i] - '0';
+
+        sum.insert(sum.begin(), static_cast<char>('0' + digit % 10));
+        carry = digit / 10;
+    }
+
+    return sum;
 }
 //---------------------------------------------------------------------------
 /*
@@ -951,27 +986,17 @@ void TTestGroupBase::AssertMatches(wchar_t const* text, wchar_t const* pattern, 
 void TTestGroupBase::AssertNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotContains(std::string const& text, std::string const& substring,
@@ -1303,27 +1328,17 @@ void TTestGroupBase::AssertNotMatches(wchar_t const* text, wchar_t const* patter
 void TTestGroupBase::AssertNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        throw TExceptNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        throw TExceptNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotStartsWith(std::string const& text, std::string const& prefix,
@@ -1872,27 +1887,17 @@ void TTestGroupBase::CheckMatches(wchar_t const* text, wchar_t const* pattern, s
 void TTestGroupBase::CheckNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotContains(std::string const& text, std::string const& substring,
@@ -2260,27 +2265,17 @@ void TTestGroupBase::CheckNotMatches(wchar_t const* text, wchar_t const* pattern
 void TTestGroupBase::CheckNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotStartsWith(std::string const& text, std::string const& prefix,
@@ -2572,6 +2567,67 @@ void TTestGroupBase::LogAppend(std::string const& msg)
     std::cout << msg;
 }
 //---------------------------------------------------------------------------
+template <typename TFloat>
+std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure(TFloat expected, TFloat actual,
+    TFloat tolerance, bool expectNear)
+{
+    TFloat const diff = NearDifference(expected, actual);
+    bool const invalidTolerance = !(tolerance >= 0); // Negative or NaN.
+
+    if (!invalidTolerance && (diff <= tolerance) == expectNear)
+        return std::nullopt;
+
+    TNearFailure failure;
+    failure.InvalidTolerance = invalidTolerance;
+    failure.Expected = std::to_string(expected);
+    failure.Actual = std::to_string(actual);
+    failure.Difference = std::to_string(diff);
+    failure.Tolerance = std::to_string(tolerance);
+    return failure;
+}
+//---------------------------------------------------------------------------
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<float>(float, float, float,
+    bool);
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<double>(double, double, double,
+    bool);
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<long double>(long double,
+    long double, long double, bool);
+//---------------------------------------------------------------------------
+std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure(TNearInteger expected,
+    TNearInteger actual, TNearInteger tolerance, bool expectNear)
+{
+    // With the same sign, the difference is that of the magnitudes; otherwise their sum, which can exceed
+    // UINT64_MAX (one value negative, the other above INT64_MAX) and is then near nothing.
+    bool const sameSign = (expected.Negative == actual.Negative);
+    bool const sumOverflows = !sameSign &&
+        (expected.Magnitude > std::numeric_limits<uint64_t>::max() - actual.Magnitude);
+    uint64_t diff = expected.Magnitude + actual.Magnitude;
+
+    if (sameSign)
+    {
+        diff = (expected.Magnitude >= actual.Magnitude) ? expected.Magnitude - actual.Magnitude :
+                actual.Magnitude - expected.Magnitude;
+    }
+
+    bool const isNear = !sumOverflows && (diff <= tolerance.Magnitude);
+
+    if (!tolerance.Negative && isNear == expectNear)
+        return std::nullopt;
+
+    auto const text = [](TNearInteger value)
+        {
+            return std::string(value.Negative ? "-" : "") + std::to_string(value.Magnitude);
+        };
+
+    TNearFailure failure;
+    failure.InvalidTolerance = tolerance.Negative;
+    failure.Expected = text(expected);
+    failure.Actual = text(actual);
+    failure.Difference = sumOverflows ? DecimalSum(expected.Magnitude, actual.Magnitude) : std::to_string(diff);
+    failure.Tolerance = text(tolerance);
+    return failure;
+}
+//---------------------------------------------------------------------------
 bool TTestGroupBase::OrderingHolds(std::optional<int> order, TOrdering ordering)
 {
     if (!order.has_value())
@@ -2708,6 +2764,46 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     }
 
     Log("!!CRASH!!: \"" + testFullName + "\" crashed (" + description + "); continuing with the next test.");
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::ReportNearFailure(TNearFailure const& failure, ENearMethod which, std::string const& method,
+    int line, std::string const& msg)
+{
+    bool const isAssert = (which == ENearMethod::AssertNear || which == ENearMethod::AssertNotNear);
+    bool const expectNear = (which == ENearMethod::AssertNear || which == ENearMethod::CheckNear);
+
+    if (failure.InvalidTolerance)
+    {
+        std::string const detail = "Invalid tolerance " + failure.Tolerance + ": it must be zero or more. " + msg;
+
+        if (which == ENearMethod::AssertNear)
+            throw TExceptEquals(method, line, detail);
+
+        if (which == ENearMethod::AssertNotNear)
+            throw TExceptNotEquals(method, line, detail);
+
+        SetTestFailedCheck(method, line, detail);
+    }
+    else if (expectNear)
+    {
+        std::string const expectedStr = failure.Expected + " (tolerance " + failure.Tolerance + ")";
+        std::string const actualStr = failure.Actual + " (diff " + failure.Difference + ")";
+
+        if (isAssert)
+            throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+    else
+    {
+        std::string const valueStr = failure.Actual + " (diff " + failure.Difference + " <= tolerance " +
+            failure.Tolerance + ")";
+
+        if (isAssert)
+            throw TExceptNotEquals(method, line, valueStr, msg);
+
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 /*

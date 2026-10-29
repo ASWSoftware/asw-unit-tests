@@ -26,7 +26,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   `std::source_location` report the caller's function and line, without passing
   `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()`
-  compare `float` and `double` values within a tolerance.
+  compare two values within a tolerance: floating point, integers, or a mix.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** -
   `SetExceptionExpected()`, with an optional check of the exception's type and message, and
   [`CheckThrows()`/`CheckNoThrow()`](#checking-that-a-call-throws) for a single call.
@@ -986,6 +986,20 @@ sensible tolerance depends heavily on the magnitude and accumulated error of the
 
 A NaN is near nothing, not even another NaN, so `CheckNear` fails and `CheckNotNear` passes when
 either value is a NaN, whatever the tolerance. Equal infinities are near each other.
+
+A negative or NaN tolerance is a mistake in the test, so both `CheckNear` and `CheckNotNear` fail
+with it, showing the tolerance (e.g. `Invalid tolerance -0.100000: it must be zero or more`).
+
+The three values can be of any integer or floating-point types except `bool`, in any mix, such as
+`CheckNear(2.0, aFloat, 0.01, ...)` or `CheckNear(10, count, 1, ...)`. When any of them is floating
+point, all three are compared as their common type, as the built-in operators do, so an all-`float`
+call keeps `float` arithmetic. Three integers are compared exactly, whatever their types, so
+`-1` and `1u` are 2 apart, and a failure shows them as integers:
+
+```
+CheckNear(10, count, 1, __func__, __LINE__, "about ten");
+// Check failed for: "Test_Count" (42): Expected "10 (tolerance 1)" but was "12 (diff 2)". about ten
+```
 
 ### Comparing Greater Than and Less Than
 

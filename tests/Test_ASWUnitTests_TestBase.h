@@ -64,6 +64,7 @@ private: // Test methods
     void Test_Fail_AbortsTestAsFailed();
     void Test_IsType_UsesDynamicTypeAndShowsNames();
     void Test_Matches_MatchesWholeTextAndShowsPattern();
+    void Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance();
     void Test_Near_HandlesNaNAndInfinity();
     void Test_NullCStrings_MatchNothingInTextChecks();
     void Test_NullNotNull_FailureNamesTheExpectedValue();

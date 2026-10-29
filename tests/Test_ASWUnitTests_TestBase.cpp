@@ -823,6 +823,62 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_NearMixedTypes
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods with mixed
+// types (integers, float, double, long double, mixed signedness) and with invalid tolerances, so
+// Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance below can check each outcome and message. It overrides
+// CheckNear(double, ...) to count its calls: a call whose common type is double must still reach it. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearMixedTypes : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_Integers_Fails();
+    void Test_AssertNear_NegativeTolerance_Fails();
+    void Test_AssertNotNear_FloatNaNTolerance_Fails();
+    void Test_AssertNotNear_MixedSigns_Passes();
+    void Test_CheckNear_DoubleAndFloat_Fails();
+    void Test_CheckNear_DoubleAndFloat_Passes();
+    void Test_CheckNear_FloatsAndDoubleTolerance_Passes();
+    void Test_CheckNear_IntegerBoundary_Passes();
+    void Test_CheckNear_IntegerExtremes_Passes();
+    void Test_CheckNear_IntegerSumOverflows_Fails();
+    void Test_CheckNear_Integers_Fails();
+    void Test_CheckNear_LongDouble_Fails();
+    void Test_CheckNear_LongDouble_Passes();
+    void Test_CheckNear_MixedSigns_Passes();
+    void Test_CheckNear_NaNAndFloat_Fails();
+    void Test_CheckNear_NaNTolerance_Fails();
+    void Test_CheckNear_NegativeIntegerTolerance_Fails();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_CheckNear_SourceLocation_Passes();
+#endif
+    void Test_CheckNotNear_DoubleAndFloat_Fails();
+    void Test_CheckNotNear_Integers_Fails();
+    void Test_CheckNotNear_LongDoublePrecision_Passes();
+    void Test_CheckNotNear_NegativeTolerance_Fails();
+
+protected:
+    using inherited::CheckNear;
+
+    void CheckNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg) override;
+
+public:
+    int DoubleCheckNearCalls = 0; // Calls of CheckNear(double, ...), the override above.
+
+    TFixture_NearMixedTypes();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_NearNonFiniteValues
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods, float and
@@ -4062,6 +4118,181 @@ void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_NearMixedTypes
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_NearMixedTypes::TFixture_NearMixedTypes()
+    : inherited("Fixture_NearMixedTypes")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNear_Integers_Fails, "AssertNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNear_NegativeTolerance_Fails,
+        "AssertNear_NegativeTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNotNear_FloatNaNTolerance_Fails,
+        "AssertNotNear_FloatNaNTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNotNear_MixedSigns_Passes, "AssertNotNear_MixedSigns_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Fails, "CheckNear_DoubleAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Passes, "CheckNear_DoubleAndFloat_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_FloatsAndDoubleTolerance_Passes,
+        "CheckNear_FloatsAndDoubleTolerance_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerBoundary_Passes, "CheckNear_IntegerBoundary_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerExtremes_Passes, "CheckNear_IntegerExtremes_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerSumOverflows_Fails,
+        "CheckNear_IntegerSumOverflows_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_Integers_Fails, "CheckNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Fails, "CheckNear_LongDouble_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Passes, "CheckNear_LongDouble_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_MixedSigns_Passes, "CheckNear_MixedSigns_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NaNAndFloat_Fails, "CheckNear_NaNAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NaNTolerance_Fails, "CheckNear_NaNTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NegativeIntegerTolerance_Fails,
+        "CheckNear_NegativeIntegerTolerance_Fails");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_SourceLocation_Passes, "CheckNear_SourceLocation_Passes");
+#endif
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_DoubleAndFloat_Fails, "CheckNotNear_DoubleAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_Integers_Fails, "CheckNotNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_LongDoublePrecision_Passes,
+        "CheckNotNear_LongDoublePrecision_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_NegativeTolerance_Fails,
+        "CheckNotNear_NegativeTolerance_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::CheckNear(double expected, double actual, double tolerance, std::string const& method,
+    int line, std::string const& msg)
+{
+    ++DoubleCheckNearCalls;
+    inherited::CheckNear(expected, actual, tolerance, method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNear_Integers_Fails()
+{
+    AssertNear(10, 13, 2, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNear_NegativeTolerance_Fails()
+{
+    AssertNear(1.0, 1.0, -0.5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNotNear_FloatNaNTolerance_Fails()
+{
+    AssertNotNear(1.0f, 5.0f, std::numeric_limits<float>::quiet_NaN(), __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNotNear_MixedSigns_Passes()
+{
+    // -1 and 1u differ by 2: as their common type (unsigned int), -1 would wrap to UINT_MAX.
+    AssertNotNear(-1, 1u, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Fails()
+{
+    CheckNear(2.0, 2.5f, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Passes()
+{
+    float const actual = 2.005f;
+    CheckNear(2.0, actual, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_FloatsAndDoubleTolerance_Passes()
+{
+    CheckNear(1.0f, 1.5f, 0.5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerBoundary_Passes()
+{
+    std::size_t const count = 11;
+    CheckNear(10, count, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerExtremes_Passes()
+{
+    CheckNear(std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max(),
+        std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "a difference of exactly UINT64_MAX");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerSumOverflows_Fails()
+{
+    CheckNear(static_cast<int64_t>(-1), std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint64_t>::max(),
+        __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_Integers_Fails()
+{
+    CheckNear(10, static_cast<std::size_t>(12), 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Fails()
+{
+    CheckNear(1.0L, 1.5L, 0.25L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Passes()
+{
+    CheckNear(1.0L, 1.25L, 0.25L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_MixedSigns_Passes()
+{
+    CheckNear(-1, 1u, 2, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NaNAndFloat_Fails()
+{
+    CheckNear(std::numeric_limits<double>::quiet_NaN(), 1.0f, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NaNTolerance_Fails()
+{
+    CheckNear(1.0, 1.0, std::numeric_limits<double>::quiet_NaN(), __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NegativeIntegerTolerance_Fails()
+{
+    CheckNear(5, 5, -1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TFixture_NearMixedTypes::Test_CheckNear_SourceLocation_Passes()
+{
+    int const count = 11;
+    CheckNear(10, count, 1, "integers through the std::source_location form");
+}
+//---------------------------------------------------------------------------
+#endif
+void TFixture_NearMixedTypes::Test_CheckNotNear_DoubleAndFloat_Fails()
+{
+    CheckNotNear(2.0, 2.005f, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_Integers_Fails()
+{
+    CheckNotNear(10, 12, 5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_LongDoublePrecision_Passes()
+{
+    // Computed as long double: where it's wider than double, these differ, though as doubles they'd be equal. The
+    // sum is a constant, since one computed at run time can be rounded to double precision: a llvm-mingw std::thread
+    // (where --test-timeout-seconds runs a test) starts with the x87 FPU at 53-bit precision.
+    constexpr long double actual = 1.0L + std::numeric_limits<long double>::epsilon();
+    CheckNotNear(1.0L, actual, 0.0L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_NegativeTolerance_Fails()
+{
+    // Passed before 1.5: no difference is at most a negative tolerance.
+    CheckNotNear(1.0, 5.0, -1.0, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_NearNonFiniteValues
 /////////////////////////////////////////////////////////////////////////////
 
@@ -6804,6 +7035,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "IsType_UsesDynamicTypeAndShowsNames");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance,
+        "Near_ComparesMixedTypesAndRejectsInvalidTolerance");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity, "Near_HandlesNaNAndInfinity");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks,
         "NullCStrings_MatchNothingInTextChecks");
@@ -7858,6 +8091,94 @@ void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
         CheckContains(record->Message, "): Invalid regular expression \"" + invalid.second + "\": ", __func__,
             __LINE__, invalid.first + " says the pattern is invalid");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance()
+{
+    // Arrange
+    TFixture_NearMixedTypes fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    size_t const expectedCount = 22;
+#else
+    size_t const expectedCount = 21;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__,
+                record.TestName + " should pass: " + record.Message);
+        }
+        else if (NameEndsWith(record.TestName, "_Fails"))
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        }
+        else
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
+    }
+
+    // Every call whose common type is double reaches the CheckNear(double, ...) override: DoubleAndFloat (2),
+    // FloatsAndDoubleTolerance, NaNAndFloat and NaNTolerance. Integer and long double calls don't.
+    CheckEquals(5, fixture.DoubleCheckNearCalls, __func__, __LINE__, "mixed calls still reach the virtual overload");
+
+    // Each failure's start (up to the varying line number) and end. A NaN's text varies by compiler.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::string Detail;
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertNear_Integers_Fails", "Values not equal: Test_AssertNear_Integers_Fails (",
+          "): Expected: \"10 (tolerance 2)\" but was \"13 (diff 3)\". msg" },
+        { "AssertNear_NegativeTolerance_Fails", "Values not equal: Test_AssertNear_NegativeTolerance_Fails (",
+          "): Invalid tolerance -0.500000: it must be zero or more. msg" },
+        { "AssertNotNear_FloatNaNTolerance_Fails", "Values are equal: Test_AssertNotNear_FloatNaNTolerance_Fails (",
+          ": it must be zero or more. msg" },
+        { "CheckNear_DoubleAndFloat_Fails", "Check failed for: \"Test_CheckNear_DoubleAndFloat_Fails\" (",
+          "): Expected \"2.000000 (tolerance 0.010000)\" but was \"2.500000 (diff 0.500000)\". msg" },
+        { "CheckNear_IntegerSumOverflows_Fails", "Check failed for: \"Test_CheckNear_IntegerSumOverflows_Fails\" (",
+          "): Expected \"-1 (tolerance 18446744073709551615)\" but was \"18446744073709551615 "
+          "(diff 18446744073709551616)\". msg" },
+        { "CheckNear_Integers_Fails", "Check failed for: \"Test_CheckNear_Integers_Fails\" (",
+          "): Expected \"10 (tolerance 1)\" but was \"12 (diff 2)\". msg" },
+        { "CheckNear_LongDouble_Fails", "Check failed for: \"Test_CheckNear_LongDouble_Fails\" (",
+          "): Expected \"1.000000 (tolerance 0.250000)\" but was \"1.500000 (diff 0.500000)\". msg" },
+        { "CheckNear_NaNTolerance_Fails", "Check failed for: \"Test_CheckNear_NaNTolerance_Fails\" (",
+          ": it must be zero or more. msg" },
+        { "CheckNear_NegativeIntegerTolerance_Fails",
+          "Check failed for: \"Test_CheckNear_NegativeIntegerTolerance_Fails\" (",
+          "): Invalid tolerance -1: it must be zero or more. msg" },
+        { "CheckNotNear_DoubleAndFloat_Fails", "Check failed for: \"Test_CheckNotNear_DoubleAndFloat_Fails\" (",
+          "): Both values equal: \"2.005000 (diff 0.005000 <= tolerance 0.010000)\". msg" },
+        { "CheckNotNear_Integers_Fails", "Check failed for: \"Test_CheckNotNear_Integers_Fails\" (",
+          "): Both values equal: \"12 (diff 2 <= tolerance 5)\". msg" },
+        { "CheckNotNear_NegativeTolerance_Fails", "Check failed for: \"Test_CheckNotNear_NegativeTolerance_Fails\" (",
+          "): Invalid tolerance -1.000000: it must be zero or more. msg" },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+        CheckEndsWith(record->Message, expected.Detail, __func__, __LINE__, expected.TestName + " shows the values");
+    }
+
+    TTestCaseRecord const* const nanTolerance = FindRecord(results, "CheckNear_NaNTolerance_Fails");
+    AssertNotNull(nanTolerance, __func__, __LINE__, "the NaN tolerance test has a record");
+    CheckContains(nanTolerance->Message, "): Invalid tolerance ", __func__, __LINE__, "a NaN tolerance is invalid");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity()

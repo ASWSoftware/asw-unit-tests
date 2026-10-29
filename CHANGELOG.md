@@ -49,6 +49,11 @@ versioned baseline.
   `UTF8String` or another `AnsiStringT`.
 - A `TExceptNotEmpty` constructor that takes a detail, which `AssertNotEmpty` uses for a null C
   string.
+- `CheckNear`/`AssertNear` and `CheckNotNear`/`AssertNotNear` take any three integer or
+  floating-point types except `bool`, in any mix, e.g. `CheckNear(2.0, aFloat, 0.01, ...)` or
+  `CheckNear(10, count, 1, ...)`, which were ambiguous before, and `long double`. With any
+  floating-point value, all three are compared as their common type; three integers are compared
+  exactly and shown as integers.
 
 ### Changed
 
@@ -86,6 +91,10 @@ versioned baseline.
   other text, instead of being empty text: it equals only another null C string, so it no longer
   equals an empty `System::String`, and it matches nothing in `Contains`, `StartsWith` and
   `EndsWith`. A test that relied on it being empty text must compare with an empty string instead.
+- A negative or NaN tolerance now fails `CheckNotNear`/`AssertNotNear` as well as
+  `CheckNear`/`AssertNear`, with "Invalid tolerance ...: it must be zero or more". Before, the
+  NotNear methods passed with one, whatever the values. A test that passes a negative tolerance must
+  pass its absolute value instead.
 
 ### Fixed
 
