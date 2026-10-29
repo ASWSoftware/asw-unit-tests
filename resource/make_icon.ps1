@@ -1,11 +1,11 @@
 # Draws the ASWUnitTests icon (a blue rounded badge with a green check mark and, from 32 px up, a green and red
-# progress bar) at each icon size, writes the PNGs and a preview sheet to %TEMP%\asw-check\icon, and with -Ico
-# packs them into an .ico (BMP entries below 256 px, PNG at 256, via ImageMagick).
-# Usage: & plans\tools\make_icon.ps1 [-Ico <path to .ico>]
-param([string]$Ico = '')
+# progress bar) at each icon size, and writes icon_<size>.png and ASWUnitTests.ico (BMP entries below 256 px, PNG
+# at 256) beside this script, replacing them; the same drawing gives the same files. ImageMagick's magick packs
+# the .ico, so it must be on the PATH. Also writes a preview sheet of every size on light and dark backgrounds to
+# %TEMP%\ASWUnitTests_icon_preview.png.
+# Usage (Windows PowerShell): & resource\make_icon.ps1
 Add-Type -AssemblyName System.Drawing
-$out = "$env:TEMP\asw-check\icon"
-New-Item -ItemType Directory -Force $out | Out-Null
+$out = $PSScriptRoot
 
 $sizes = 16, 20, 24, 32, 40, 48, 64, 256
 
@@ -130,12 +130,9 @@ $g.DrawImage($images[48], 300, 420, 288, 288)
 $g.FillRectangle((New-Object System.Drawing.SolidBrush((C '#202020'))), 700, 400, 700, 300)
 $g.DrawImage($images[256], 720, 420, 256, 256)
 $g.Dispose()
-$sheet.Save("$out\preview.png", [System.Drawing.Imaging.ImageFormat]::Png)
-"wrote $out"
+$sheet.Save("$env:TEMP\ASWUnitTests_icon_preview.png", [System.Drawing.Imaging.ImageFormat]::Png)
 
-if ($Ico -ne '')
-{
-    $pngs = $sizes | ForEach-Object { "$out\icon_$_.png" }
-    & magick @pngs $Ico
-    & magick identify $Ico
-}
+$pngs = $sizes | ForEach-Object { "$out\icon_$_.png" }
+& magick @pngs "$out\ASWUnitTests.ico"
+& magick identify "$out\ASWUnitTests.ico"
+"wrote the PNGs and ASWUnitTests.ico to $out, and the preview to $env:TEMP\ASWUnitTests_icon_preview.png"

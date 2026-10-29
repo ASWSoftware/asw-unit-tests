@@ -61,6 +61,7 @@ private: // Test methods
     void Test_FileExists_IsTrueOnlyForAFile();
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
+    void Test_MainIcon_IsThisExecutablesSharedIcon();
     void Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote();
     void Test_ReadFileBytes_ThrowsForAMissingFile();
     void Test_RemoveFile_DeletesOnlyAnExistingFile();

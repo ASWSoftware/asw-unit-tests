@@ -34,6 +34,13 @@ versioned baseline.
   VCL style, so a project of your own that runs its tests in the VCL GUI runner needs Carbon among
   its custom styles (Project > Options > Application > Appearance) for it, and a `WinMain()` that
   applies the saved theme as `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` does.
+- An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
+  runners now have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which
+  draws them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32
+  GUI runner of your own built with CMake gets the icon too, in Explorer, its title bar and the
+  taskbar; to use your own, remove that script from the list (the README's "Win32 GUI Runner" shows
+  how) and name your icon `MAINICON`. `ASWUNITTESTS_RESOURCE_DIR` is the `resource` folder, which
+  `ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS` now includes.
 - A `TCLIParser::ParseArguments()` overload that takes the arguments as a
   `std::vector<std::string>`, the program name first, as in `argv`.
 - `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,

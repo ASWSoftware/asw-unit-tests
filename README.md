@@ -466,7 +466,9 @@ files in `gui\src` (shared by the GUI runners) and `vcl\gui\src`, including
 a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line,
 applies the saved theme and starts the main form. For the dark theme, also add RAD Studio's Carbon
 style to the application (Project > Options > Application > Appearance, which this repository's
-project has as `Custom_Styles`); without it, Dark shows the light look.
+project has as `Custom_Styles`); without it, Dark shows the light look. For the ASWUnitTests icon,
+set the application's icon to `resource\ASWUnitTests.ico` there too, as this repository's project
+does.
 
 ### Win32 GUI Runner
 
@@ -485,8 +487,9 @@ and its `Build_*.bat` scripts write the executable to `win32\gui\rad370\<Platfor
 To run your own tests in it with CMake, include `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`
 after `project()`. Its `ASWUNITTESTS_WIN32_GUI_SOURCES` lists the framework's `src` files except
 `main.cpp`, the files in `gui\src` (shared by the GUI runners) and `win32\gui\src`, including the
-runner's own `WinMain()`, and its manifest, and it exports the include path, libraries and linker
-options they need:
+runner's own `WinMain()`, its manifest, and `resource\ASWUnitTests_Icon.rc`, which gives the
+executable the ASWUnitTests icon. It also exports the include path (which has the `resource` folder,
+for the icon), libraries and linker options they need:
 
 ```cmake
 include(third_party/asw-unit-tests/win32/gui/src/ASWUnitTests_Win32GUI_Sources.cmake)
@@ -511,13 +514,21 @@ Integration). With MinGW, also link its runtime statically
 put its DLLs next to the executable, or the GUI may load another program's older `libstdc++-6.dll`
 from `PATH` and fail to start.
 
+For an icon of your own, remove the ASWUnitTests one from the list before `add_executable()`, and
+add a resource script of your own whose icon is named `MAINICON`, which the window then shows:
+
+```cmake
+list(REMOVE_ITEM ASWUNITTESTS_WIN32_GUI_SOURCES "${ASWUNITTESTS_RESOURCE_DIR}/ASWUnitTests_Icon.rc")
+```
+
 With RAD Studio, the simplest start is a copy of `win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj`,
 with its paths and test files changed. It's a C++ application with no framework
 (`FrameworkType None`), with `TCHAR` mapped to `char`, since the runner's entry point is
 `WinMain()`. It compiles the framework's `src` files except `main.cpp`, the files in `gui\src` and
 `win32\gui\src`, with all three folders on the include path, and the test modules. Its manifest is
 `win32\gui\src\ASWUnitTests_Win32GUI.manifest`, with DPI awareness set to None, so RAD Studio uses
-the manifest as it is (the manifest declares per-monitor DPI awareness itself).
+the manifest as it is (the manifest declares per-monitor DPI awareness itself). Its icon is
+`resource\ASWUnitTests.ico`, which RAD Studio embeds as `MAINICON`.
 
 ## Registering Tests
 
@@ -1290,6 +1301,7 @@ my-project/
 |   +-- gui/src/                  <- shared by the GUI runners, if you use one (never touched)
 |   +-- vcl/gui/src/              <- VCL GUI runner, if you use it (never touched)
 |   +-- win32/gui/src/            <- Win32 GUI runner, if you use it (never touched)
+|   +-- resource/                 <- the ASWUnitTests icon, for a runner's executable (never touched)
 |   `-- cmake/, rad370/, tests/, toTest/, other vcl/ and win32/ folders   <- this framework's own example build, unused by you
 +-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
 `-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo

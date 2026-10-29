@@ -16,4 +16,5 @@
 *.jpg     -text
 *.png     -text
 *.gif     -text
+*.ico     -text
 *.pdf     -text

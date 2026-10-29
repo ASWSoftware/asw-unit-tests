@@ -804,6 +804,8 @@ void TWin32GUIMainWindow::Create()
         windowClass.cbSize = sizeof(windowClass);
         windowClass.lpfnWndProc = &WindowProc;
         windowClass.hInstance = instance;
+        // With no small icon given, Windows takes the title bar's from the same resource, at the size it needs.
+        windowClass.hIcon = MainIcon();
         windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512)); // IDC_ARROW
         windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
         windowClass.lpszClassName = MainWindowClassName;

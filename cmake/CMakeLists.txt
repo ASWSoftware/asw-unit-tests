@@ -92,6 +92,10 @@ if(WIN32)
         ../win32/gui/src
         ../win32/tests
     )
+
+    # The ASWUnitTests icon, which the resource compiler finds through the include path.
+    target_sources(ASWUnitTests PRIVATE ../resource/ASWUnitTests_Icon.rc)
+    target_include_directories(ASWUnitTests PRIVATE ../resource)
     # CommandLineToArgvW(), used by src/ASWUnitTests_Utils.cpp and the Win32 GUI's units. MSVC and MinGW link
     # shell32 by default; naming it doesn't depend on that.
     target_link_libraries(ASWUnitTests PRIVATE shell32)
