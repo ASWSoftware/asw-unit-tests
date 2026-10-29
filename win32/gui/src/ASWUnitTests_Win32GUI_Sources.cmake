@@ -7,13 +7,21 @@
 #     ASWUNITTESTS_WIN32_GUI_SOURCES       The framework's core sources (all
 #                                          but main.cpp), the GUI runners'
 #                                          shared core, this folder's units
-#                                          including WinMain, and the
-#                                          manifest: the .manifest file
+#                                          including WinMain, the
+#                                          manifest (the .manifest file
 #                                          itself for MSVC, or the resource
 #                                          script that embeds it for other
-#                                          compilers.
+#                                          compilers), and
+#                                          ASWUnitTests_Icon.rc, which
+#                                          embeds the ASWUnitTests icon. A
+#                                          project with an icon of its own
+#                                          removes that script from the list
+#                                          (see the usage below); the window
+#                                          shows its icon if it's named
+#                                          MAINICON.
 #     ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS  Their directories, for the include
-#                                          path.
+#                                          path (the resource compiler finds
+#                                          the icon through it).
 #     ASWUNITTESTS_WIN32_GUI_LIBRARIES     The Windows libraries it links.
 #     ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS  Linker options it needs: with MSVC,
 #                                          leaving the execution level to the
@@ -22,6 +30,8 @@
 #                                          or later, which gives its windows
 #                                          the same frame as other programs.
 #     ASWUNITTESTS_WIN32_GUI_SOURCE_DIR    This folder.
+#     ASWUNITTESTS_RESOURCE_DIR            The repository's resource folder,
+#                                          which has the icon.
 #
 # It includes src/ASWUnitTests_Sources.cmake and
 # gui/src/ASWUnitTests_GUI_Sources.cmake, so their variables are also set.
@@ -38,11 +48,16 @@
 #     target_include_directories(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS} tests)
 #     target_link_libraries(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LIBRARIES})
 #     target_link_options(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS})
+#
+# To use an icon of your own instead, before add_executable():
+#
+#     list(REMOVE_ITEM ASWUNITTESTS_WIN32_GUI_SOURCES "${ASWUNITTESTS_RESOURCE_DIR}/ASWUnitTests_Icon.rc")
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../../src/ASWUnitTests_Sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/../../../gui/src/ASWUnitTests_GUI_Sources.cmake")
 
 set(ASWUNITTESTS_WIN32_GUI_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+get_filename_component(ASWUNITTESTS_RESOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../resource" ABSOLUTE)
 
 set(ASWUNITTESTS_WIN32_GUI_SOURCES
     ${ASWUNITTESTS_CORE_SOURCES}
@@ -56,12 +71,14 @@ set(ASWUNITTESTS_WIN32_GUI_SOURCES
     "${ASWUNITTESTS_WIN32_GUI_SOURCE_DIR}/ASWUnitTests_Win32GUI_System.cpp"
     "${ASWUNITTESTS_WIN32_GUI_SOURCE_DIR}/ASWUnitTests_Win32GUI_TextDialog.cpp"
     "${ASWUNITTESTS_WIN32_GUI_SOURCE_DIR}/ASWUnitTests_Win32GUI_WinMain.cpp"
+    "${ASWUNITTESTS_RESOURCE_DIR}/ASWUnitTests_Icon.rc"
 )
 
 set(ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS
     "${ASWUNITTESTS_SOURCE_DIR}"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}"
     "${ASWUNITTESTS_WIN32_GUI_SOURCE_DIR}"
+    "${ASWUNITTESTS_RESOURCE_DIR}"
 )
 
 set(ASWUNITTESTS_WIN32_GUI_LIBRARIES

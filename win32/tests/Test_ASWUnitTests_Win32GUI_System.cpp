@@ -120,6 +120,8 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_MainIcon_IsThisExecutablesSharedIcon,
+        "MainIcon_IsThisExecutablesSharedIcon");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote,
         "ReadFileBytes_ReadsWhatWriteFileBytesWrote");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ReadFileBytes_ThrowsForAMissingFile,
@@ -311,6 +313,17 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLa
     // Assert
     CheckEquals(layoutPath.substr(0, layoutPath.size() - 4) + ".selection", selectionPath, __func__, __LINE__,
         "the layout file's path with a .selection extension");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_MainIcon_IsThisExecutablesSharedIcon()
+{
+    // Act: every runner that compiles this test embeds the ASWUnitTests icon.
+    HICON const icon = MainIcon();
+    HICON const again = MainIcon();
+
+    // Assert
+    CheckTrue(icon != nullptr, __func__, __LINE__, "this executable has a MAINICON resource");
+    CheckTrue(again == icon, __func__, __LINE__, "the same, shared, icon each time");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote()

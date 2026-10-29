@@ -64,6 +64,9 @@ std::string GUISelectionFilePath();
 // The folder that holds the GUI runners' layout and selection files, %APPDATA%\ASWUnitTests. It may not exist
 // yet (see CreateFolderPath()).
 std::string GUISettingsFolderPath();
+// This executable's icon, its MAINICON resource (resource/ASWUnitTests_Icon.rc, or Icon_MainIcon in a RAD Studio
+// project), at the standard icon size; nullptr if it has none. Shared, so it's never destroyed.
+HICON MainIcon();
 // This process's command-line arguments, without the program name, converted to UTF-8, for
 // TGUICommandLine::Parse().
 std::vector<std::string> ProcessArguments();

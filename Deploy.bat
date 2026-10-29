@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake gui\src gui\tests rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src win32\tests) do (
+for %%D in (build cmake gui\src gui\tests rad370 resource src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src win32\tests) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -144,6 +144,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win32_Debug.bat" "rad370\Build_Win32_Debug.bat"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win32_Release.bat" "rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "resource\ASWUnitTests.ico" "resource\ASWUnitTests.ico"
+if errorlevel 1 exit /b 1
+call :CopyFile "resource\ASWUnitTests_Icon.rc" "resource\ASWUnitTests_Icon.rc"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.cpp" "src\ASWUnitTests_CLI.cpp"
 if errorlevel 1 exit /b 1

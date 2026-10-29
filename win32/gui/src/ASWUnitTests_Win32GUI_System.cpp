@@ -260,6 +260,11 @@ std::string GUISettingsFolderPath()
     return WideToUTF8(appData) + "\\ASWUnitTests";
 }
 //---------------------------------------------------------------------------
+HICON MainIcon()
+{
+    return LoadIconW(GetModuleHandleW(nullptr), L"MAINICON");
+}
+//---------------------------------------------------------------------------
 std::vector<std::string> ProcessArguments()
 {
     return CommandLineArguments(GetCommandLineW());
