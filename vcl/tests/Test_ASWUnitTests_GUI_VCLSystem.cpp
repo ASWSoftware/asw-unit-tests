@@ -24,16 +24,20 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
+#include <memory>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
 #include <System.hpp>
 #include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
+#include <System.Win.Registry.hpp>
+#include <windows.h>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Strings.h"
+#include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 
@@ -52,9 +56,13 @@ TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
         "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote,
+        "LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote,
         "ReadFileBytes_ReadsWhatWriteFileBytesWrote");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_WindowsAppsUseDarkTheme_MatchesTheRegistry,
+        "WindowsAppsUseDarkTheme_MatchesTheRegistry");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_GUI_VCLSystem::~TTest_ASWUnitTests_GUI_VCLSystem()
@@ -112,6 +120,56 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayo
         __LINE__, "the layout file's path with a .selection extension");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
+{
+    // Arrange: this runner's own layout file, which only a GUI would otherwise use, put back however the test
+    // ends.
+    System::UnicodeString const path = GUILayoutFilePath();
+
+    struct TRestoreFile
+    {
+        System::UnicodeString const Path;
+        bool const Existed;
+        std::string const Bytes;
+
+        ~TRestoreFile()
+        {
+            try
+            {
+                if (Existed)
+                    WriteFileBytes(Path, Bytes);
+                else
+                    System::Sysutils::DeleteFile(Path);
+            }
+            catch (...)
+            {
+            }
+        }
+    };
+
+    bool const existed = System::Sysutils::FileExists(path);
+    TRestoreFile const restoreFile{ path, existed, existed ? ReadFileBytes(path) : std::string() };
+
+    System::Sysutils::DeleteFile(path);
+    EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
+
+    // Act
+    SaveGUIThemeToLayoutFile(EGUITheme::Dark);
+    EGUITheme const dark = LoadGUIThemeFromLayoutFile();
+
+    WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
+    SaveGUIThemeToLayoutFile(EGUITheme::Light);
+    EGUITheme const light = LoadGUIThemeFromLayoutFile();
+    std::string const text = ReadFileBytes(path);
+
+    // Assert
+    CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
+    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
+    CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
+    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\n\r\n"), text, __func__,
+        __LINE__, "the layout stays");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount()
 {
     // Arrange
@@ -159,6 +217,27 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_ReadFileBytes_ReadsWhatWriteFileByte
     CheckEquals(bytes, read, __func__, __LINE__, "every byte is read back unchanged");
     CheckEquals(std::string("xy"), shorter, __func__, __LINE__, "writing again replaces the whole file");
     CheckEmpty(empty, __func__, __LINE__, "an empty file reads as empty");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_WindowsAppsUseDarkTheme_MatchesTheRegistry()
+{
+    // Arrange: the setting read another way, through the RTL. This machine's setting can't be changed here,
+    // so only agreement with it can be checked.
+    bool expected = false;
+    std::unique_ptr<System::Win::Registry::TRegistry> const registry(new System::Win::Registry::TRegistry(KEY_READ));
+    registry->RootKey = HKEY_CURRENT_USER;
+
+    if (registry->OpenKeyReadOnly("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize") &&
+        registry->ValueExists("AppsUseLightTheme"))
+    {
+        expected = (registry->ReadInteger("AppsUseLightTheme") == 0);
+    }
+
+    // Act
+    bool const dark = WindowsAppsUseDarkTheme();
+
+    // Assert
+    CheckEquals(expected, dark, __func__, __LINE__, "dark when AppsUseLightTheme is 0");
 }
 //---------------------------------------------------------------------------
 

@@ -381,6 +381,15 @@ Reset Layout** restores the default layout right away; `--layout-ignore` and `--
 (below) control this from the command line. Since the file is named after the executable, the two
 GUI runners, and each project's own build of them, keep separate layouts.
 
+In the VCL GUI runner, **View > Theme** chooses a light or dark look. **Use Windows Setting**, the
+default, follows Windows' app mode setting (Settings > Personalization > Colors), and switches as
+soon as it changes, but stays light while high contrast is on, so the window shows high contrast's
+own colors. **Light** and **Dark** keep that look whatever Windows is set to. Dark is RAD Studio's
+Carbon VCL style, and light the standard Windows look. A choice applies right away and is saved in
+the layout file at once, so the next session starts with it; **View > Reset Layout** leaves it as
+it is. The Theme commands are disabled during a run, and a change of the Windows setting during one
+applies when it ends. The Win32 GUI runner always has the standard Windows look, for now.
+
 The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
 as long as the command line doesn't choose them itself (no `--run`, `--filter`, or partition
 options). What it saves is what Run Selected would run, the checked tests that are shown; the filter
@@ -421,11 +430,12 @@ these differences:
 - `--exit` (GUI-only, requires `--run`) closes the window when that run finishes, and exits with the
   same code the console runner would; a run ended with Stop exits with `1`. Without `--exit`, the
   GUI always exits with `0`.
-- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, so the window opens with
-  the defaults and the saved layout is left as it is.
-- `--layout-reset` (GUI-only) deletes the saved window layout and opens with the defaults, which is
-  a way to recover if a saved layout ever causes a problem. The layout is saved again when the
-  window closes.
+- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, or the VCL GUI runner's
+  theme, so the window opens with the defaults and the saved ones are left as they are. A theme
+  chosen in the View menu then lasts only until the window closes.
+- `--layout-reset` (GUI-only) deletes the saved window layout, and with it the VCL GUI runner's
+  theme, and opens with the defaults, which is a way to recover if a saved layout ever causes a
+  problem. The layout is saved again when the window closes.
 
 A GUI process doesn't make a Windows command prompt wait for it, so a script that needs `--exit`'s
 exit code should start it with `start /wait` (or its own language's equivalent; Bash, including Git
@@ -453,8 +463,10 @@ To run your own tests in it, create a RAD Studio VCL application that defines
 `ASWUNITTESTS_RTL_EXCEPTIONS`, and add to it: the framework's `src` files except `main.cpp`; the
 files in `gui\src` (shared by the GUI runners) and `vcl\gui\src`, including
 `ASWUnitTests_GUI_MainForm.dfm`, with both folders on the include path; your own test modules; and
-a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line
-and starts the main form.
+a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line,
+applies the saved theme and starts the main form. For the dark theme, also add RAD Studio's Carbon
+style to the application (Project > Options > Application > Appearance, which this repository's
+project has as `Custom_Styles`); without it, Dark shows the light look.
 
 ### Win32 GUI Runner
 

@@ -75,6 +75,7 @@ std::string EnabledCommands(TGUICommandStates const& states)
     add(states.ShuffleOrder, "ShuffleOrder");
     add(states.ShuffleSeed, "ShuffleSeed");
     add(states.Stop, "Stop");
+    add(states.Theme, "Theme");
 
     return text;
 }
@@ -141,7 +142,7 @@ void TTest_ASWUnitTests_GUI_Commands::Test_GUICommandStates_AbortedRunCannotRunA
 
     // Act and Assert
     CheckEquals(std::string("About CommandLineOptions Exit ExportJUnitReport FilterBox FocusFilter ResetLayout "
-        "SelectAll SelectFailed SelectNone ShuffleOrder ShuffleSeed"), EnabledCommands(GUICommandStates(context)),
+        "SelectAll SelectFailed SelectNone ShuffleOrder ShuffleSeed Theme"), EnabledCommands(GUICommandStates(context)),
         __func__, __LINE__, "neither Run Selected nor Run Failed, but everything else that doesn't run tests");
 }
 //---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ void TTest_ASWUnitTests_GUI_Commands::Test_GUICommandStates_FailuresEnableRunAnd
 
     // Act and Assert
     CheckEquals(std::string("About CommandLineOptions Exit FilterBox FocusFilter ResetLayout RunFailed RunSelected "
-        "SelectAll SelectFailed SelectNone ShuffleOrder ShuffleSeed"), EnabledCommands(GUICommandStates(context)),
+        "SelectAll SelectFailed SelectNone ShuffleOrder ShuffleSeed Theme"), EnabledCommands(GUICommandStates(context)),
         __func__, __LINE__, "Run Failed and Select Failed, once a test has failed");
 }
 //---------------------------------------------------------------------------
@@ -161,7 +162,7 @@ void TTest_ASWUnitTests_GUI_Commands::Test_GUICommandStates_IdleWithNothingRunYe
 {
     // Act and Assert: as the window opens, before its tree is built.
     CheckEquals(std::string("About CommandLineOptions Exit FilterBox FocusFilter ResetLayout RunSelected SelectAll "
-        "SelectNone ShuffleOrder ShuffleSeed"), EnabledCommands(GUICommandStates(TGUICommandContext())), __func__,
+        "SelectNone ShuffleOrder ShuffleSeed Theme"), EnabledCommands(GUICommandStates(TGUICommandContext())), __func__,
         __LINE__, "nothing that needs a failure, a report, a selection, or tree nodes, and not Stop");
 }
 //---------------------------------------------------------------------------

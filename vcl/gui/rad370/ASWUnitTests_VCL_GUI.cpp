@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
 USEFORM("..\src\ASWUnitTests_GUI_MainForm.cpp", FormASWUnitTestsGUIMain);
@@ -52,6 +53,12 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
         ASWUnitTests::TGUICommandLineResult const commandLine =
             ASWUnitTests::TGUICommandLine::Parse(ASWUnitTests::ProcessArguments(), options);
 
+        // Before any form exists, so each one, the --help text's included, is created in its style rather than
+        // restyled. --layout-reset's deletion of the layout file, which also holds the theme, comes later.
+        ASWUnitTests::EGUITheme const theme = (options.LayoutIgnore || options.LayoutReset) ?
+                ASWUnitTests::EGUITheme::Windows : ASWUnitTests::LoadGUIThemeFromLayoutFile();
+        ASWUnitTests::ApplyGUITheme(theme);
+
         if (commandLine.EarlyExitCode.has_value())
         {
             ASWUnitTests::ShowTextDialog(Application->Title, commandLine.Message);
@@ -59,7 +66,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
         }
 
         Application->CreateForm(__classid(TFormASWUnitTestsGUIMain), &FormASWUnitTestsGUIMain);
-        FormASWUnitTestsGUIMain->Start(options);
+        FormASWUnitTestsGUIMain->Start(options, theme);
         Application->Run();
 
         // The form outlives Run(); Application frees it later, during shutdown.

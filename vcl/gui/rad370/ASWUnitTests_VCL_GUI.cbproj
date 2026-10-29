@@ -101,6 +101,7 @@
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <BCC_UseClassicCompiler>false</BCC_UseClassicCompiler>
+        <Custom_Styles>Carbon|VCLSTYLE|$(BDSCOMMONDIR)\Styles\Carbon.vsf</Custom_Styles>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <PackageImports>adortl;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXInterBaseDriver;DBXMySQLDriver;DBXSqliteDriver;dsnap;dsnapcon;dsnapxml;FireDAC;FireDACADSDriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACIBDriver;FireDACMSAccDriver;FireDACMySQLDriver;FireDACPgDriver;FireDACSqliteDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;FMXTee;FmxTeeUI;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;inetstn;RESTBackendComponents;RESTComponents;rtl;Skia;soapmidas;soaprtl;soapserver;Tee;TeeDB;TeeUI;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
@@ -352,6 +353,10 @@
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>5</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Theme.cpp">
+            <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Theme.h</DependentOn>
+            <BuildOrder>58</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\gui\src\ASWUnitTests_GUI_Tree.cpp">
             <DependentOn>..\..\..\gui\src\ASWUnitTests_GUI_Tree.h</DependentOn>
             <BuildOrder>50</BuildOrder>
@@ -403,6 +408,10 @@
         <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.cpp">
             <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>31</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Theme.cpp">
+            <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Theme.h</DependentOn>
+            <BuildOrder>59</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.cpp">
             <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_Tree.h</DependentOn>

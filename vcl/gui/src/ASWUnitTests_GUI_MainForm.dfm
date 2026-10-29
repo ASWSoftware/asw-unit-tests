@@ -363,6 +363,25 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Hint = 'Collapse the test tree to its top-level suites and groups'
       OnExecute = Act_CollapseAllExecute
     end
+    object Act_ThemeWindows: TAction
+      Caption = 'Use &Windows Setting'
+      Checked = True
+      GroupIndex = 1
+      Hint = 'Use the light or dark theme, as Windows'#39' app mode is set'
+      OnExecute = Act_ThemeWindowsExecute
+    end
+    object Act_ThemeLight: TAction
+      Caption = '&Light'
+      GroupIndex = 1
+      Hint = 'Use the light theme, whatever Windows is set to'
+      OnExecute = Act_ThemeLightExecute
+    end
+    object Act_ThemeDark: TAction
+      Caption = '&Dark'
+      GroupIndex = 1
+      Hint = 'Use the dark theme, whatever Windows is set to'
+      OnExecute = Act_ThemeDarkExecute
+    end
   end
   object IL_Status: TImageList
     Left = 120
@@ -429,6 +448,24 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       end
       object MI_ViewResetLayout: TMenuItem
         Action = Act_ResetLayout
+      end
+      object MI_ViewSeparator2: TMenuItem
+        Caption = '-'
+      end
+      object MI_ViewTheme: TMenuItem
+        Caption = '&Theme'
+        object MI_ViewThemeWindows: TMenuItem
+          Action = Act_ThemeWindows
+          RadioItem = True
+        end
+        object MI_ViewThemeLight: TMenuItem
+          Action = Act_ThemeLight
+          RadioItem = True
+        end
+        object MI_ViewThemeDark: TMenuItem
+          Action = Act_ThemeDark
+          RadioItem = True
+        end
       end
     end
     object MI_Options: TMenuItem

@@ -58,7 +58,9 @@ struct TGUICommandContext
 //
 // Whether each of a GUI runner's commands is enabled, one member per
 // command, named as in the VCL GUI runner's actions (e.g. RunSelected for
-// Act_RunSelected), plus the filter box.
+// Act_RunSelected), plus the filter box. Theme is the VCL GUI runner's
+// View > Theme menu, its three actions together; the Win32 GUI runner has no
+// themes yet, so it has no command that uses it.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUICommandStates
 {
@@ -80,6 +82,7 @@ struct TGUICommandStates
     bool ShuffleOrder = false;
     bool ShuffleSeed = false;
     bool Stop = false;
+    bool Theme = false;
 };
 
 //---------------------------------------------------------------------------
@@ -90,7 +93,8 @@ struct TGUICommandStates
 //   Details, Expand All, Collapse All, and Reset Layout) are enabled. Tests run on the GUI's main thread, so a
 //   modal dialog (About, Command Line Options, Shuffle Seed, Export JUnit Report) would hold up the run until
 //   it closed; the run's tests and order are already decided, so checking tests and changing the shuffle
-//   would only mislead; and changing the filter would rebuild the tree the run is updating.
+//   would only mislead; changing the filter would rebuild the tree the run is updating; and changing the theme
+//   would recreate the windows the run is updating.
 // - Run Selected and Run Failed stay disabled once a run has been aborted.
 // - Run Failed and Select Failed need a failed test, Export JUnit Report a finished run's report, Copy Details a
 //   selected node, and Expand All and Collapse All a tree with nodes.

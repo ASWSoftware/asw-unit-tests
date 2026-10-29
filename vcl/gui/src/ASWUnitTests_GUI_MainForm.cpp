@@ -30,6 +30,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <cstdint>
+#include <cwchar>
 #include <exception>
 #include <functional>
 #include <memory>
@@ -40,6 +41,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <System.IOUtils.hpp>
 #include <Vcl.Clipbrd.hpp>
+#include <Vcl.Themes.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Exception.h"
@@ -60,18 +62,20 @@ namespace
 
 using namespace ASWUnitTests;
 
-TColor const FailureColor = static_cast<TColor>(RGB(200, 0, 0));
-TColor const SkipColor = static_cast<TColor>(RGB(190, 120, 0));
-
 //---------------------------------------------------------------------------
 
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
 size_t DataToIndex(void* data);
+TColor FailureColor();
 void* IndexToData(size_t index);
+bool IsDarkBackground();
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam);
 TColor LogLineColor(std::string const& line);
+TColor LogTextColor();
 std::vector<TGUIRect> MonitorWorkAreas();
 void* NodeData(TGUINodeRef const& ref);
 TGUINodeRef NodeRef(void* data);
+TColor SkipColor();
 TGUIRect ToGUIRect(TRect const& rect);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
@@ -101,9 +105,49 @@ size_t DataToIndex(void* data)
     return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
+/*
+    FailureColor
+
+    The text color of a failure in the log and the Failures & Skips list, lighter on a dark background.
+*/
+TColor FailureColor()
+{
+    return IsDarkBackground() ? static_cast<TColor>(RGB(255, 100, 100)) : static_cast<TColor>(RGB(200, 0, 0));
+}
+//---------------------------------------------------------------------------
 void* IndexToData(size_t index)
 {
     return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index));
+}
+//---------------------------------------------------------------------------
+/*
+    IsDarkBackground
+
+    Whether the active style's window color is dark, by its luma, so text colors that read well on white need
+    lighter variants. Also true for a dark high contrast theme, whose window color the unstyled look uses.
+*/
+bool IsDarkBackground()
+{
+    int const rgb = ColorToRGB(Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindow));
+    int const luma = (GetRValue(rgb) * 299 + GetGValue(rgb) * 587 + GetBValue(rgb) * 114) / 1000;
+
+    return luma < 128;
+}
+//---------------------------------------------------------------------------
+/*
+    IsThemeSettingChange
+
+    Whether a WM_SETTINGCHANGE message's parameters are about a setting that Use Windows Setting follows:
+    the app mode, whose change Windows names "ImmersiveColorSet", or high contrast.
+*/
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == SPI_SETHIGHCONTRAST)
+        return true;
+
+    wchar_t const* const area = reinterpret_cast<wchar_t const*>(lParam);
+
+    return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
 }
 //---------------------------------------------------------------------------
 /*
@@ -116,16 +160,27 @@ TColor LogLineColor(std::string const& line)
     switch (ClassifyGUILogLine(line))
     {
         case TGUILogLineKind::Failure:
-            return FailureColor;
+            return FailureColor();
 
         case TGUILogLineKind::Skip:
-            return SkipColor;
+            return SkipColor();
 
         case TGUILogLineKind::Normal:
             break;
     }
 
-    return clWindowText;
+    return LogTextColor();
+}
+//---------------------------------------------------------------------------
+/*
+    LogTextColor
+
+    The Log tab's color for a line that isn't a failure or a skip: the active style's text color. Unstyled,
+    that's clWindowText, which the rich edit shows in its automatic color (see TTextAttributes::SetColor()).
+*/
+TColor LogTextColor()
+{
+    return Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindowText);
 }
 //---------------------------------------------------------------------------
 /*
@@ -156,6 +211,16 @@ void* NodeData(TGUINodeRef const& ref)
 TGUINodeRef NodeRef(void* data)
 {
     return DecodeGUINodeRef(reinterpret_cast<std::uintptr_t>(data));
+}
+//---------------------------------------------------------------------------
+/*
+    SkipColor
+
+    The text color of a skip in the log and the Failures & Skips list, lighter on a dark background.
+*/
+TColor SkipColor()
+{
+    return IsDarkBackground() ? static_cast<TColor>(RGB(255, 190, 70)) : static_cast<TColor>(RGB(190, 120, 0));
 }
 //---------------------------------------------------------------------------
 TGUIRect ToGUIRect(TRect const& rect)
@@ -263,8 +328,18 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_SettingFilterText(false),
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
+      m_Theme(EGUITheme::Windows),
+      m_ThemeChangePending(false),
       m_TreeNodesStale(false)
 {
+    m_FormWindowProc = WindowProc;
+    WindowProc = FormWindowProc;
+
+    // A VCL style's rich edit hook gives every color set in the log's text the style's text color instead, so
+    // failures and skips would lose theirs. Without seFont it leaves them, and LogLineColor() chooses colors
+    // that suit the style.
+    RE_Log->StyleElements = RE_Log->StyleElements >> seFont;
+
     m_TreeViewWindowProc = TV_Tests->WindowProc;
     TV_Tests->WindowProc = TV_TestsWindowProc;
 }
@@ -275,10 +350,11 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
     This form's own members (m_TestList, m_TestNodes, and so on) are destroyed before the VCL base class
     destroys its controls, and destroying a control can fire its events. So every event that reads those
     members is detached first, along with anything still queued for this form, so none can run against
-    members that no longer exist. The tree's own WindowProc is restored for the same reason.
+    members that no longer exist. The form's and the tree's own WindowProc are restored for the same reason.
 */
 __fastcall TFormASWUnitTestsGUIMain::~TFormASWUnitTestsGUIMain()
 {
+    WindowProc = m_FormWindowProc;
     TV_Tests->WindowProc = m_TreeViewWindowProc;
 
     Edt_Filter->OnChange = nullptr;
@@ -507,6 +583,30 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_StopExecute(TObject* /*Sender*/)
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeDarkExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Dark", [this]()
+    {
+        SetTheme(EGUITheme::Dark);
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeLightExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Light", [this]()
+    {
+        SetTheme(EGUITheme::Light);
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeWindowsExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Use Windows Setting", [this]()
+    {
+        SetTheme(EGUITheme::Windows);
+    });
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::AddFailureItem(size_t testIndex)
 {
     TTestId const& test = m_TestList.Test(testIndex);
@@ -573,6 +673,25 @@ void TFormASWUnitTestsGUIMain::ApplyPanelSizes(TGUILayout const& layout)
         Mem_Detail->Height = std::max(Spl_Detail->MinSize,
             std::min(ScaleFrom96(*layout.DetailHeight, CurrentPPI), maximum));
     }
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::ApplyTheme
+
+    Not during a run, since restyling recreates the windows the run is updating; SetRunning() calls it again
+    once the run has ended. The window is restyled once it handles the message the style change posts; see
+    FormWindowProc().
+*/
+void TFormASWUnitTestsGUIMain::ApplyTheme()
+{
+    if (m_Running)
+    {
+        m_ThemeChangePending = true;
+        return;
+    }
+
+    m_ThemeChangePending = false;
+    ApplyGUITheme(m_Theme);
 }
 //---------------------------------------------------------------------------
 /*
@@ -771,6 +890,45 @@ void __fastcall TFormASWUnitTestsGUIMain::FormCloseQuery(TObject* /*Sender*/, bo
 }
 //---------------------------------------------------------------------------
 /*
+    TFormASWUnitTestsGUIMain::FormWindowProc
+
+    Follows the theme as it changes:
+    - TStyleManager posts CM_CUSTOMSTYLECHANGED to each visible form when the style changes, and the form
+      handles it by recreating its windows in the new style. Its log text and tree nodes are kept, but the
+      log's lines keep the colors chosen for the old style, so they're colored again, and the tree's check
+      boxes and status images are set again. VCL changes the message to CM_STYLECHANGED as it handles it, so
+      it's noted first.
+    - With Use Windows Setting, a WM_SETTINGCHANGE about the app mode or high contrast applies the theme
+      again.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::FormWindowProc(TMessage& message)
+{
+    bool const styleChanged = (message.Msg == CM_CUSTOMSTYLECHANGED);
+    bool const settingChanged = (message.Msg == WM_SETTINGCHANGE) &&
+        IsThemeSettingChange(message.WParam, message.LParam);
+
+    m_FormWindowProc(message);
+
+    if (styleChanged)
+    {
+        RunGuarded("changing the theme", [this]()
+        {
+            RecolorLog();
+            SyncTreeChecks();
+            RefreshAllNodeImages();
+            LV_Failures->Invalidate();
+        });
+    }
+    else if (settingChanged && m_Theme == EGUITheme::Windows)
+    {
+        RunGuarded("following Windows' theme setting", [this]()
+        {
+            ApplyTheme();
+        });
+    }
+}
+//---------------------------------------------------------------------------
+/*
     TFormASWUnitTestsGUIMain::LoadLayout
 
     Called from Start(), before the window is first shown. The panel sizes are applied once it's showing,
@@ -852,7 +1010,7 @@ void TFormASWUnitTestsGUIMain::LoadSelection()
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresCustomDrawItem(TCustomListView* Sender, TListItem* Item,
-    TCustomDrawState /*State*/, bool& /*DefaultDraw*/)
+    TCustomDrawState State, bool& /*DefaultDraw*/)
 {
     // Not RunGuarded(): this runs while painting, where showing an error would only cause more painting.
     // An item it can't match to a test is simply drawn in the default color.
@@ -861,7 +1019,12 @@ void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresCustomDrawItem(TCustomListV
         return;
 
     bool const failed = m_TestList.Status(index) == TGUITestStatus::Failed;
-    Sender->Canvas->Font->Color = failed ? FailureColor : SkipColor;
+    Sender->Canvas->Font->Color = failed ? FailureColor() : SkipColor();
+
+    // Otherwise a styled list view paints an item that's neither selected nor hot in the canvas's default,
+    // light, color.
+    if (!State.Contains(cdsSelected) && !State.Contains(cdsHot))
+        Sender->Canvas->Brush->Color = Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindow);
 }
 //---------------------------------------------------------------------------
 /*
@@ -952,6 +1115,51 @@ void TFormASWUnitTestsGUIMain::RebuildNodeCache()
     }
 
     m_TreeNodesStale = false;
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::RecolorLog
+
+    AppendLog() colored each line for the style active then. Every line is given the text color first, in one
+    step, then each failure and skip line its own color. Lines are found by their index, which counts a line
+    break as one character, as SelStart does.
+*/
+void TFormASWUnitTestsGUIMain::RecolorLog()
+{
+    struct TEndUpdate
+    {
+        TStrings* const Lines;
+
+        ~TEndUpdate()
+        {
+            Lines->EndUpdate();
+        }
+    };
+
+    int const selStart = RE_Log->SelStart;
+    int const selLength = RE_Log->SelLength;
+
+    RE_Log->Lines->BeginUpdate();
+    TEndUpdate const endUpdate{ RE_Log->Lines };
+
+    RE_Log->SelectAll();
+    RE_Log->SelAttributes->Color = LogTextColor();
+
+    for (int i = 0; i < RE_Log->Lines->Count; ++i)
+    {
+        System::UnicodeString const text = RE_Log->Lines->Strings[i];
+        std::string const line = ToUTF8(text);
+
+        if (ClassifyGUILogLine(line) == TGUILogLineKind::Normal)
+            continue;
+
+        RE_Log->SelStart = static_cast<int>(::SendMessage(RE_Log->Handle, EM_LINEINDEX, static_cast<WPARAM>(i), 0));
+        RE_Log->SelLength = text.Length();
+        RE_Log->SelAttributes->Color = LogLineColor(line);
+    }
+
+    RE_Log->SelStart = selStart;
+    RE_Log->SelLength = selLength;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::RefreshAllNodeImages()
@@ -1189,12 +1397,40 @@ void TFormASWUnitTestsGUIMain::SetRunning(bool running)
     m_Running = running;
     UpdateCommands();
     UpdateStatusBar();
+
+    // Windows' setting changed during the run; see ApplyTheme().
+    if (!running && m_ThemeChangePending)
+        ApplyTheme();
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetTheme
+
+    Saved at once, rather than with the layout as the window closes, so the choice is kept even if the window
+    doesn't get to close normally.
+*/
+void TFormASWUnitTestsGUIMain::SetTheme(EGUITheme theme)
+{
+    m_Theme = theme;
+    ShowThemeState();
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIThemeToLayoutFile(theme);
+
+    ApplyTheme();
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::ShowShuffleState()
 {
     Act_ShuffleOrder->Checked = m_Shuffle.Enabled();
     UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::ShowThemeState()
+{
+    Act_ThemeDark->Checked = (m_Theme == EGUITheme::Dark);
+    Act_ThemeLight->Checked = (m_Theme == EGUITheme::Light);
+    Act_ThemeWindows->Checked = (m_Theme == EGUITheme::Windows);
 }
 //---------------------------------------------------------------------------
 /*
@@ -1205,9 +1441,11 @@ void TFormASWUnitTestsGUIMain::ShowShuffleState()
     and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout saved when it
     last closed.
 */
-void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
+void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options, EGUITheme theme)
 {
     m_Options = options;
+    m_Theme = theme;
+    ShowThemeState();
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {
@@ -1419,6 +1657,9 @@ void TFormASWUnitTestsGUIMain::UpdateCommands()
     Act_ShuffleOrder->Enabled = states.ShuffleOrder;
     Act_ShuffleSeed->Enabled = states.ShuffleSeed;
     Act_Stop->Enabled = states.Stop;
+    Act_ThemeDark->Enabled = states.Theme;
+    Act_ThemeLight->Enabled = states.Theme;
+    Act_ThemeWindows->Enabled = states.Theme;
     Edt_Filter->Enabled = states.FilterBox;
 }
 //---------------------------------------------------------------------------
