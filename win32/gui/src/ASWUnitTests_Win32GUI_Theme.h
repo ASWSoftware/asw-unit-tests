@@ -188,12 +188,14 @@ private:
     bool OnCtlColor(UINT message, HDC context, HWND control, LRESULT& result) const;
     LRESULT OnHeaderCustomDraw(NMCUSTOMDRAW const& draw) const;
     LRESULT OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const;
-    void PaintBorder(HWND control) const;
+    void PaintBorder(HWND control, HDC context) const;
     void PaintMenuBarLine(HWND window) const;
     void PaintMenuFrame(HWND menu, HDC given) const;
+    // A bordered control's WM_NCPAINT while dark, of 'update', its region: its scroll bars and border.
+    void PaintNonClient(HWND control, HRGN update) const;
     void PaintProgressBar(HWND progressBar, HDC context) const;
     // What the dark scroll bar theme leaves light on 'control''s scroll bars (see the definition).
-    void PaintScrollBars(HWND control) const;
+    void PaintScrollBars(HWND control, HDC given) const;
     void PaintStatusBar(HWND statusBar, HDC context) const;
     void PaintTabControl(HWND tabControl, HDC context) const;
     void PaintUpDown(HWND upDown, HDC context) const;

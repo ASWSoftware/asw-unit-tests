@@ -61,6 +61,9 @@ wchar_t const HotTabProperty[] = L"ASWUnitTests_Win32GUI_HotTab";
 // The window property set on a control that had WS_EX_CLIENTEDGE, which it has in place of it while dark; see
 // TWin32GUITheme::ApplyToBorder().
 wchar_t const OwnBorderProperty[] = L"ASWUnitTests_Win32GUI_OwnBorder";
+// The window property set on the tree or the list while its size changes, between WM_WINDOWPOSCHANGING and
+// WM_WINDOWPOSCHANGED; see TWin32GUITheme::HandleControlMessage().
+wchar_t const ResizingProperty[] = L"ASWUnitTests_Win32GUI_Resizing";
 // The menu windows' class, documented as a system class.
 wchar_t const MenuClassName[] = L"#32768";
 // The subclass IDs: an attached control's is ControlSubclassBase plus its kind.
@@ -136,11 +139,14 @@ public:
 
 //---------------------------------------------------------------------------
 
+COLORREF BackgroundColor(HWND control, EWin32GUIThemedControl kind);
 int BorderWidth(HWND control);
 bool ClassNameIs(HWND window, wchar_t const* className);
+void ExcludeRect(HRGN region, RECT const& rect);
 void FillGradient(HDC context, RECT const& rect, COLORREF top, COLORREF bottom);
 void FillSolid(HDC context, RECT const& rect, COLORREF color);
 void FrameSolid(HDC context, RECT const& rect, COLORREF color);
+bool HasThemedBorder(HWND control);
 bool HidesAccelerators(HWND control);
 bool HidesFocus(HWND control);
 RECT Inset(RECT rect, int by);
@@ -151,6 +157,21 @@ void SplitShortcut(std::wstring const& text, std::wstring& caption, std::wstring
 SIZE TextSize(HDC context, std::wstring const& text, UINT format);
 std::wstring WideWindowText(HWND window);
 
+//---------------------------------------------------------------------------
+/*
+    BackgroundColor
+
+    The background the tree or the list paints, by asking it: the system's window color if it has none of its
+    own.
+*/
+COLORREF BackgroundColor(HWND control, EWin32GUIThemedControl kind)
+{
+    // The tree's -1 for none is CLR_NONE too, as a COLORREF.
+    COLORREF const color = static_cast<COLORREF>(kind == EWin32GUIThemedControl::TreeView ?
+            SendMessageW(control, TVM_GETBKCOLOR, 0, 0) : SendMessageW(control, LVM_GETBKCOLOR, 0, 0));
+
+    return color == CLR_NONE ? GetSysColor(COLOR_WINDOW) : color;
+}
 //---------------------------------------------------------------------------
 /*
     BorderWidth
@@ -168,6 +189,17 @@ bool ClassNameIs(HWND window, wchar_t const* className)
     GetClassNameW(window, name, 64);
 
     return lstrcmpiW(name, className) == 0;
+}
+//---------------------------------------------------------------------------
+void ExcludeRect(HRGN region, RECT const& rect)
+{
+    HRGN const excluded = CreateRectRgnIndirect(&rect);
+
+    if (excluded == nullptr)
+        return;
+
+    CombineRgn(region, region, excluded, RGN_DIFF);
+    DeleteObject(excluded);
 }
 //---------------------------------------------------------------------------
 /*
@@ -198,6 +230,18 @@ void FrameSolid(HDC context, RECT const& rect, COLORREF color)
     COLORREF const old = SetDCBrushColor(context, color);
     FrameRect(context, &rect, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
     SetDCBrushColor(context, old);
+}
+//---------------------------------------------------------------------------
+/*
+    HasThemedBorder
+
+    Whether the dark look paints the control's border (see TWin32GUITheme::PaintBorder()): it has one of its own
+    in place of WS_EX_CLIENTEDGE, or still has WS_EX_CLIENTEDGE.
+*/
+bool HasThemedBorder(HWND control)
+{
+    return GetPropW(control, OwnBorderProperty) != nullptr ||
+        (GetWindowLongPtrW(control, GWL_EXSTYLE) & WS_EX_CLIENTEDGE) != 0;
 }
 //---------------------------------------------------------------------------
 bool HidesAccelerators(HWND control)
@@ -911,6 +955,7 @@ LRESULT CALLBACK TWin32GUITheme::ControlProc(HWND control, UINT message, WPARAM 
             reinterpret_cast<TWin32GUITheme*>(theme)->Unattach(control);
             RemovePropW(control, HotTabProperty);
             RemovePropW(control, OwnBorderProperty);
+            RemovePropW(control, ResizingProperty);
             RemoveWindowSubclass(control, &ControlProc, id);
             return DefSubclassProc(control, message, wParam, lParam);
         }
@@ -1298,6 +1343,29 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
         return result;
     }
 
+    bool const doubleBuffered = kind == EWin32GUIThemedControl::ListView || kind == EWin32GUIThemedControl::TreeView;
+
+    if (doubleBuffered && message == WM_WINDOWPOSCHANGING &&
+        (reinterpret_cast<WINDOWPOS const*>(lParam)->flags & SWP_NOSIZE) == 0)
+    {
+        SetPropW(control, ResizingProperty, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(1)));
+    }
+    else if (doubleBuffered && (message == WM_WINDOWPOSCHANGED || message == WM_PAINT))
+    {
+        RemovePropW(control, ResizingProperty);
+    }
+    else if (doubleBuffered && message == WM_ERASEBKGND && GetPropW(control, ResizingProperty) != nullptr)
+    {
+        // As the control grows, e.g. by a splitter, Windows erases the part it newly shows straight away, and the
+        // control paints it later. Being double-buffered, the tree and the list skip the erase, so that part
+        // showed what the screen had there before, e.g. the scroll bar at its old place, until they painted it.
+        // Filled with their background here, and only while resizing, so their other repaints don't flicker.
+        RECT client;
+        GetClientRect(control, &client);
+        FillSolid(reinterpret_cast<HDC>(wParam), client, BackgroundColor(control, kind));
+        return 1;
+    }
+
     if (!m_Dark)
     {
         // The control paints itself, through a buffer too, so it doesn't flicker while the window is resized:
@@ -1340,7 +1408,7 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
     if (bordered && MayRedrawScrollBars(message))
     {
         LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
-        PaintScrollBars(control);
+        PaintScrollBars(control, nullptr);
         return result;
     }
 
@@ -1444,10 +1512,8 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
         case WM_NCPAINT:
             if (bordered)
             {
-                LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
-                PaintScrollBars(control);
-                PaintBorder(control);
-                return result;
+                PaintNonClient(control, reinterpret_cast<HRGN>(wParam));
+                return 0;
             }
 
             break;
@@ -1963,31 +2029,22 @@ LRESULT TWin32GUITheme::OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const
 
     The border a bordered control has of its own while dark (see ApplyToBorder()), in Carbon's two edit border
     colors, the outer one a pixel wide; or, on one that still has WS_EX_CLIENTEDGE, that border painted over.
+    Into 'context', in the window's coordinates.
 */
-void TWin32GUITheme::PaintBorder(HWND control) const
+void TWin32GUITheme::PaintBorder(HWND control, HDC context) const
 {
-    if (GetPropW(control, OwnBorderProperty) == nullptr &&
-        (GetWindowLongPtrW(control, GWL_EXSTYLE) & WS_EX_CLIENTEDGE) == 0)
-    {
+    if (!HasThemedBorder(control))
         return;
-    }
 
     RECT rect;
     GetWindowRect(control, &rect);
     OffsetRect(&rect, -rect.left, -rect.top);
-
-    HDC const context = GetWindowDC(control);
-
-    if (context == nullptr)
-        return;
 
     int const edge = BorderWidth(control);
     FrameSolid(context, rect, m_Palette.EditBorderOuter);
 
     for (int i = 1; i < edge; ++i)
         FrameSolid(context, Inset(rect, i), m_Palette.EditBorderInner);
-
-    ReleaseDC(control, context);
 }
 //---------------------------------------------------------------------------
 /*
@@ -2053,6 +2110,64 @@ void TWin32GUITheme::PaintMenuFrame(HWND menu, HDC given) const
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUITheme::PaintNonClient
+
+    Each part painted once: the control (and Windows) paint 'update', WM_NCPAINT's region, less what
+    PaintBorder() and PaintScrollBars() paint, which they then paint. Letting the control paint it all first,
+    as before, showed its light parts in between, e.g. a disabled scroll bar's arrows and a light border without
+    the scroll bars, which flickered while the control was resized, e.g. by a splitter.
+*/
+void TWin32GUITheme::PaintNonClient(HWND control, HRGN update) const
+{
+    RECT window;
+    GetWindowRect(control, &window);
+
+    // In screen coordinates, as WM_NCPAINT's region is: inside the border.
+    RECT const inside = HasThemedBorder(control) ? Inset(window, BorderWidth(control)) : window;
+    HRGN const rest = CreateRectRgnIndirect(&inside);
+
+    if (rest != nullptr)
+    {
+        // 1 is the whole window.
+        if (update != reinterpret_cast<HRGN>(1))
+            CombineRgn(rest, rest, update, RGN_AND);
+
+        SCROLLBARINFO bars[2] = {};
+        LONG const ids[2] = { OBJID_VSCROLL, OBJID_HSCROLL };
+        bool visible[2] = { false, false };
+
+        for (int i = 0; i < 2; ++i)
+        {
+            bars[i].cbSize = sizeof(bars[i]);
+            visible[i] = GetScrollBarInfo(control, ids[i], &bars[i]) != 0 &&
+                (bars[i].rgstate[0] & (STATE_SYSTEM_INVISIBLE | STATE_SYSTEM_OFFSCREEN)) == 0;
+
+            if (visible[i] && (bars[i].rgstate[0] & STATE_SYSTEM_UNAVAILABLE) != 0)
+                ExcludeRect(rest, bars[i].rcScrollBar);
+        }
+
+        if (visible[0] && visible[1])
+        {
+            RECT const corner = { bars[0].rcScrollBar.left, bars[1].rcScrollBar.top, bars[0].rcScrollBar.right,
+                                  bars[1].rcScrollBar.bottom };
+            ExcludeRect(rest, corner);
+        }
+
+        DefSubclassProc(control, WM_NCPAINT, reinterpret_cast<WPARAM>(rest), 0);
+        DeleteObject(rest);
+    }
+
+    HDC const context = GetWindowDC(control);
+
+    if (context == nullptr)
+        return;
+
+    PaintScrollBars(control, context);
+    PaintBorder(control, context);
+    ReleaseDC(control, context);
+}
+//---------------------------------------------------------------------------
+/*
     TWin32GUITheme::PaintProgressBar
 
     As Carbon draws it: a border around a dark track, and the bar shaded from top to bottom, red once a test
@@ -2099,9 +2214,10 @@ void TWin32GUITheme::PaintProgressBar(HWND progressBar, HDC context) const
       state, which has no thumb when there's nothing to scroll, with its arrows faded halfway toward the track,
       so they read as disabled.
     An enabled bar is left as it is. Called after each message that may draw the bars (see
-    MayRedrawScrollBars()), so it's quick when there's nothing to paint.
+    MayRedrawScrollBars()), so it's quick when there's nothing to paint. Into 'given' if it isn't nullptr
+    (PaintNonClient()'s), in the window's coordinates, or else the window's own context.
 */
-void TWin32GUITheme::PaintScrollBars(HWND control) const
+void TWin32GUITheme::PaintScrollBars(HWND control, HDC given) const
 {
     SCROLLBARINFO bars[2] = {};
     LONG const ids[2] = { OBJID_VSCROLL, OBJID_HSCROLL };
@@ -2123,7 +2239,7 @@ void TWin32GUITheme::PaintScrollBars(HWND control) const
     if (!corner && !disabled[0] && !disabled[1])
         return;
 
-    HDC const context = GetWindowDC(control);
+    HDC const context = given != nullptr ? given : GetWindowDC(control);
     HTHEME const theme = OpenThemeData(control, L"ScrollBar");
     RECT window;
     GetWindowRect(control, &window);
@@ -2186,7 +2302,7 @@ void TWin32GUITheme::PaintScrollBars(HWND control) const
     if (theme != nullptr)
         CloseThemeData(theme);
 
-    if (context != nullptr)
+    if (context != nullptr && given == nullptr)
         ReleaseDC(control, context);
 }
 //---------------------------------------------------------------------------
