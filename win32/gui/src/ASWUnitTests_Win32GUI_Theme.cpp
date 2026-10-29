@@ -29,6 +29,8 @@ limitations under the License.
 #include <cstdint>
 #include <cstring>
 //---------------------------------------------------------------------------
+#include <vsstyle.h>
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_Glyphs.h"
 //---------------------------------------------------------------------------
 
@@ -94,7 +96,11 @@ public:
     // A bitmap of the canvas, which the caller deletes; nullptr if it can't be created.
     HBITMAP CreateBitmap() const;
     void Draw(HDC context, int left, int top) const;
+    // Mixes every pixel toward 'toward' in the proportion 'numerator' / 'denominator' (see BlendColors()).
+    void Fade(COLORREF toward, int numerator, int denominator);
     void FillRect(RECT const& rect, COLORREF color);
+    // The pixel at 'x', 'y', or black outside the canvas.
+    COLORREF PixelAt(int x, int y) const;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -134,6 +140,7 @@ void FrameSolid(HDC context, RECT const& rect, COLORREF color);
 bool HidesAccelerators(HWND control);
 bool HidesFocus(HWND control);
 RECT Inset(RECT rect, int by);
+bool MayRedrawScrollBars(UINT message);
 void SetImmersiveDarkMode(HWND window, bool dark);
 void SplitShortcut(std::wstring const& text, std::wstring& caption, std::wstring& shortcut);
 SIZE TextSize(HDC context, std::wstring const& text, UINT format);
@@ -192,6 +199,38 @@ RECT Inset(RECT rect, int by)
 {
     InflateRect(&rect, -by, -by);
     return rect;
+}
+//---------------------------------------------------------------------------
+/*
+    MayRedrawScrollBars
+
+    Whether an edit box may draw its scroll bars straight away, rather than in WM_NCPAINT, while it handles
+    'message': as its text changes (it enables or disables them), as it's resized, and as the mouse enters or
+    leaves it or its scroll bars (a themed scroll bar's arrows show whether the mouse is over the window).
+*/
+bool MayRedrawScrollBars(UINT message)
+{
+    switch (message)
+    {
+        case EM_REPLACESEL:
+        case WM_CAPTURECHANGED:
+        case WM_ENABLE:
+        case WM_KILLFOCUS:
+        case WM_MOUSELEAVE:
+        case WM_MOUSEMOVE:
+        case WM_NCLBUTTONDOWN:
+        case WM_NCLBUTTONUP:
+        case WM_NCMOUSELEAVE:
+        case WM_NCMOUSEMOVE:
+        case WM_SETFOCUS:
+        case WM_SETTEXT:
+        case WM_SIZE:
+        case WM_WINDOWPOSCHANGED:
+            return true;
+
+        default:
+            return false;
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -350,6 +389,15 @@ void TGlyphCanvas::Draw(HDC context, int left, int top) const
         static_cast<UINT>(m_Height), m_Pixels.data(), &info, DIB_RGB_COLORS);
 }
 //---------------------------------------------------------------------------
+void TGlyphCanvas::Fade(COLORREF toward, int numerator, int denominator)
+{
+    for (std::uint32_t& pixel : m_Pixels)
+    {
+        COLORREF const color = RGB((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF);
+        pixel = ToPixel(BlendColors(color, toward, numerator, denominator));
+    }
+}
+//---------------------------------------------------------------------------
 void TGlyphCanvas::FillRect(RECT const& rect, COLORREF color)
 {
     std::uint32_t const pixel = ToPixel(color);
@@ -364,6 +412,16 @@ void TGlyphCanvas::FillRect(RECT const& rect, COLORREF color)
                 pixel;
         }
     }
+}
+//---------------------------------------------------------------------------
+COLORREF TGlyphCanvas::PixelAt(int x, int y) const
+{
+    if (x < 0 || y < 0 || x >= m_Width || y >= m_Height)
+        return RGB(0, 0, 0);
+
+    std::size_t const row = static_cast<std::size_t>(y) * static_cast<std::size_t>(m_Width);
+    std::uint32_t const pixel = m_Pixels[row + static_cast<std::size_t>(x)];
+    return RGB((pixel >> 16) & 0xFF, (pixel >> 8) & 0xFF, pixel & 0xFF);
 }
 //---------------------------------------------------------------------------
 std::uint32_t TGlyphCanvas::ToPixel(COLORREF color)
@@ -1192,6 +1250,14 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
 
     bool const bordered = kind == EWin32GUIThemedControl::Edit || kind == EWin32GUIThemedControl::ListView ||
         kind == EWin32GUIThemedControl::RichEdit || kind == EWin32GUIThemedControl::TreeView;
+    bool const edit = kind == EWin32GUIThemedControl::Edit || kind == EWin32GUIThemedControl::RichEdit;
+
+    if (edit && MayRedrawScrollBars(message))
+    {
+        LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
+        PaintDisabledScrollBars(control);
+        return result;
+    }
 
     switch (message)
     {
@@ -1280,6 +1346,7 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
             if (bordered)
             {
                 LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
+                PaintDisabledScrollBars(control);
                 PaintBorder(control);
                 return result;
             }
@@ -1819,6 +1886,88 @@ void TWin32GUITheme::PaintBorder(HWND control) const
         FrameSolid(context, Inset(rect, i), m_Palette.EditBorderInner);
 
     ReleaseDC(control, context);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::PaintDisabledScrollBars
+
+    The dark scroll bar theme ("DarkMode_Explorer") draws a disabled scroll bar's arrows nearly white, e.g. the
+    empty detail pane's, which keeps its scroll bar while there's nothing to scroll. Such a bar is drawn again
+    in the theme's normal state, which has no thumb when there's nothing to scroll, with its arrows faded
+    halfway toward the track, so they read as disabled. A bar that's enabled, or hidden, is left as it is.
+    Called after each message that may draw the bars (see MayRedrawScrollBars()), so it's quick when there's
+    no disabled bar.
+*/
+void TWin32GUITheme::PaintDisabledScrollBars(HWND control) const
+{
+    RECT window;
+    GetWindowRect(control, &window);
+    HDC context = nullptr;
+    HTHEME theme = nullptr;
+
+    for (LONG const id : { OBJID_VSCROLL, OBJID_HSCROLL })
+    {
+        SCROLLBARINFO info = {};
+        info.cbSize = sizeof(info);
+
+        if (GetScrollBarInfo(control, id, &info) == 0 ||
+            (info.rgstate[0] & (STATE_SYSTEM_INVISIBLE | STATE_SYSTEM_OFFSCREEN)) != 0 ||
+            (info.rgstate[0] & STATE_SYSTEM_UNAVAILABLE) == 0)
+        {
+            continue;
+        }
+
+        if (context == nullptr)
+        {
+            context = GetWindowDC(control);
+            theme = OpenThemeData(control, L"ScrollBar");
+        }
+
+        if (context == nullptr || theme == nullptr)
+            break;
+
+        bool const vertical = id == OBJID_VSCROLL;
+        RECT bar = info.rcScrollBar;
+        OffsetRect(&bar, -window.left, -window.top);
+
+        // The arrow buttons at its two ends, each as long as a line button.
+        RECT first = bar;
+        RECT second = bar;
+
+        if (vertical)
+        {
+            first.bottom = first.top + info.dxyLineButton;
+            second.top = second.bottom - info.dxyLineButton;
+        }
+        else
+        {
+            first.right = first.left + info.dxyLineButton;
+            second.left = second.right - info.dxyLineButton;
+        }
+
+        TPaintBuffer const buffer(context, bar);
+        HDC const target = buffer.Get();
+        DrawThemeBackground(theme, target, vertical ? SBP_UPPERTRACKVERT : SBP_UPPERTRACKHORZ, SCRBS_NORMAL, &bar,
+            nullptr);
+        DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_UPNORMAL : ABS_LEFTNORMAL, &first, nullptr);
+        DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_DOWNNORMAL : ABS_RIGHTNORMAL, &second,
+            nullptr);
+
+        for (RECT const& button : { first, second })
+        {
+            TGlyphCanvas canvas(button.right - button.left, button.bottom - button.top, m_Palette.Window);
+            canvas.CopyFrom(target, button.left, button.top);
+            // Toward its corner's pixel, the button's background.
+            canvas.Fade(canvas.PixelAt(0, 0), 1, 2);
+            canvas.Draw(target, button.left, button.top);
+        }
+    }
+
+    if (theme != nullptr)
+        CloseThemeData(theme);
+
+    if (context != nullptr)
+        ReleaseDC(control, context);
 }
 //---------------------------------------------------------------------------
 /*

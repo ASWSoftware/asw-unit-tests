@@ -186,6 +186,8 @@ private:
     LRESULT OnHeaderCustomDraw(NMCUSTOMDRAW const& draw) const;
     LRESULT OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const;
     void PaintBorder(HWND control) const;
+    // A disabled scroll bar of 'control' (see the definition).
+    void PaintDisabledScrollBars(HWND control) const;
     void PaintMenuBarLine(HWND window) const;
     void PaintMenuFrame(HWND menu, HDC given) const;
     void PaintProgressBar(HWND progressBar, HDC context) const;
