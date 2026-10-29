@@ -25,6 +25,7 @@ limitations under the License.
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cfenv>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -2978,7 +2979,10 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
     data race with the waiting thread here. Once the test has been abandoned (below), the worker
     records nothing more and logs nothing more, should it end after all (see BeginRecording()); a
     test that had begun recording its outcome when the timeout came counts as finished in time
-    instead. If it finishes in time, whatever it threw (if anything)
+    instead. The worker starts with the calling thread's floating-point environment (std::fesetenv()),
+    as the test would have on that thread: on Windows a new thread otherwise starts with the defaults,
+    such as rounding to nearest and, with llvm-mingw, x87 long double arithmetic at double precision.
+    If it finishes in time, whatever it threw (if anything)
     is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
     directly. The one exception, with ASWUNITTESTS_RTL_EXCEPTIONS enabled: an RTL exception arrives
     as a TExceptRTLException carrying its description and class (see the worker's catch). If it
@@ -3002,9 +3006,12 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     // Held by shared_ptr for the same reason: the worker reads it, through t_WorkerState, for as long as it runs.
     std::shared_ptr<TWorkerState> const state = std::make_shared<TWorkerState>();
     state->Group = this;
+    std::fenv_t environment = {};
+    std::fegetenv(&environment);
 
-    std::thread worker([this, &testCase, done, state, catchCrashes]()
+    std::thread worker([this, &testCase, done, state, catchCrashes, environment]()
             {
+        std::fesetenv(&environment);
         t_WorkerState = state.get();
 
         try

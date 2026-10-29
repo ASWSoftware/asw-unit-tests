@@ -26,6 +26,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <atomic>
+#include <cfenv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -46,6 +47,9 @@ limitations under the License.
 // The test header's ASWUnitTests_TestBase.h includes <version>, where available, for this feature-test macro.
 #if defined(__cpp_lib_string_view)
 #  include <string_view>
+#endif
+#if defined(__BORLANDC__) && !defined(_WIN64)
+#  include <float.h> // _control87(), for RoundingMode()
 #endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
@@ -608,6 +612,32 @@ public:
     bool ReachedAfterFail = false;
 
     TFixture_FailCalls();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_FloatingPointEnvironment
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that records the floating-point
+// environment it runs in: the rounding mode, and whether long double arithmetic keeps its precision. Used by
+// Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment below, which compares them with the calling thread's.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_FloatingPointEnvironment : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_RecordsEnvironment();
+
+public:
+    bool LongDoublePrecisionInTest = false; // LongDoubleKeepsPrecision() in the test.
+    int RoundingModeInTest = -1;
+
+    TFixture_FloatingPointEnvironment();
 
     void SetUp_Group() override {}
     void TearDown_Group() override {}
@@ -1888,8 +1918,12 @@ public:
 //---------------------------------------------------------------------------
 
 size_t CountOccurrences(std::string const& text, std::string const& needle);
+int DownwardRoundingMode();
 TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
+bool LongDoubleKeepsPrecision();
 bool NameEndsWith(std::string const& name, std::string const& suffix);
+int RoundingMode();
+void SetRoundingMode(int mode);
 
 //---------------------------------------------------------------------------
 /*
@@ -1905,6 +1939,20 @@ size_t CountOccurrences(std::string const& text, std::string const& needle)
         ++count;
 
     return count;
+}
+//---------------------------------------------------------------------------
+/*
+    DownwardRoundingMode
+
+    The rounding mode that rounds toward negative infinity, as RoundingMode() returns it.
+*/
+int DownwardRoundingMode()
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return RC_DOWN;
+#else
+    return FE_DOWNWARD;
+#endif
 }
 //---------------------------------------------------------------------------
 /*
@@ -1924,6 +1972,20 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 }
 //---------------------------------------------------------------------------
 /*
+    LongDoubleKeepsPrecision
+
+    True if long double arithmetic on this thread keeps all of long double's digits: 1 plus its epsilon isn't 1.
+    Where long double is wider than double, x87 arithmetic set to double precision rounds that sum to 1, as on a
+    new llvm-mingw thread. The volatile load keeps the sum from being computed at compile time.
+*/
+bool LongDoubleKeepsPrecision()
+{
+    long double volatile one = 1.0L;
+    long double const sum = one + std::numeric_limits<long double>::epsilon();
+    return sum != one;
+}
+//---------------------------------------------------------------------------
+/*
     NameEndsWith
 
     True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
@@ -1934,6 +1996,36 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+//---------------------------------------------------------------------------
+/*
+    RoundingMode
+
+    This thread's floating-point rounding mode, as std::fegetround() returns it. RAD Studio's 32-bit runtime
+    declares std::fegetround() and std::fesetround() but doesn't define them, so there it's the x87 control
+    word's rounding bits instead (see SetRoundingMode() and DownwardRoundingMode()).
+*/
+int RoundingMode()
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return static_cast<int>(_control87(0, 0) & MCW_RC);
+#else
+    return std::fegetround();
+#endif
+}
+//---------------------------------------------------------------------------
+/*
+    SetRoundingMode
+
+    Sets this thread's rounding mode to 'mode' (from RoundingMode() or DownwardRoundingMode()).
+*/
+void SetRoundingMode(int mode)
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    _control87(static_cast<unsigned int>(mode), MCW_RC);
+#else
+    std::fesetround(mode);
+#endif
 }
 //---------------------------------------------------------------------------
 
@@ -3607,6 +3699,27 @@ void TFixture_FailCalls::Test_Fail_WhileExceptionExpected_Fails()
 {
     SetExceptionExpected(true, __func__, __LINE__, "any exception");
     Fail(__func__, __LINE__, "not the exception the test expects");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_FloatingPointEnvironment
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_FloatingPointEnvironment::TFixture_FloatingPointEnvironment()
+    : inherited("Fixture_FloatingPointEnvironment")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_FloatingPointEnvironment::Test_RecordsEnvironment, "RecordsEnvironment");
+}
+//---------------------------------------------------------------------------
+void TFixture_FloatingPointEnvironment::Test_RecordsEnvironment()
+{
+    LongDoublePrecisionInTest = LongDoubleKeepsPrecision();
+    RoundingModeInTest = RoundingMode();
 }
 //---------------------------------------------------------------------------
 
@@ -7058,6 +7171,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
         "Run_EndsRunOnSetUpOrTearDownTestException");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment,
+        "Run_GivesTimedTestTheCallersFloatingPointEnvironment");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout,
         "Run_IgnoresTestThatEndsAfterItsTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
@@ -8583,6 +8698,35 @@ void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException
         CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__,
             scenario.ExpectedMessage + ": the test counts as failed");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment()
+{
+    // Arrange: this thread rounds downward for the run, and as before afterwards, whatever happens. On Windows
+    // a new thread starts rounding to nearest, so a test run on one without this thread's environment would too.
+    struct TRoundingModeRestorer
+    {
+        int Mode = RoundingMode();
+
+        ~TRoundingModeRestorer()
+        {
+            SetRoundingMode(Mode);
+        }
+    };
+
+    TFixture_FloatingPointEnvironment fixture;
+    TRoundingModeRestorer const restorer;
+    SetRoundingMode(DownwardRoundingMode());
+    AssertEquals(DownwardRoundingMode(), RoundingMode(), __func__, __LINE__, "this thread now rounds downward");
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, false); // Only long enough never to fire.
+
+    // Assert
+    CheckEquals(DownwardRoundingMode(), fixture.RoundingModeInTest, __func__, __LINE__,
+        "the test, on a worker thread, rounds as the calling thread does");
+    CheckEquals(LongDoubleKeepsPrecision(), fixture.LongDoublePrecisionInTest, __func__, __LINE__,
+        "and computes long double with the calling thread's precision");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout()

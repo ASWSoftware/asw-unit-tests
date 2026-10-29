@@ -111,6 +111,10 @@ versioned baseline.
   which is undefined behavior and usually crashed. It now follows the same rules as two C strings:
   it equals only another null C string, matches nothing in the other checks, and a failure shows it
   as `(null)`.
+- With `--test-timeout-seconds`, on Windows, a test ran with the default floating-point environment
+  instead of the one the run started with: rounding to nearest, whatever rounding mode was set, and
+  with llvm-mingw, `long double` arithmetic at `double` precision. Each test now starts with the
+  floating-point environment of the thread that runs the tests, as it does without a timeout.
 
 ## [1.4.0] - 2026-10-14
 

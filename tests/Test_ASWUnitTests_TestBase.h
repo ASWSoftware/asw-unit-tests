@@ -76,6 +76,7 @@ private: // Test methods
     void Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished();
     void Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread();
     void Test_Run_EndsRunOnSetUpOrTearDownTestException();
+    void Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment();
     void Test_Run_IgnoresTestThatEndsAfterItsTimeout();
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();

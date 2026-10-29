@@ -241,9 +241,10 @@ partition, the same way `--list` can preview `--filter`.
 `--test-timeout-seconds` guards against a single test hanging (e.g. an infinite loop) forever. There
 is no default; without it, a hung test blocks the run indefinitely. When given, each test runs on
 its own worker thread while the main thread waits with that timeout; a test that finishes normally
-(whether it passes, fails, or throws) is completely unaffected. A test that doesn't finish in time
-is recorded as failed, with a message naming it and the timeout that was exceeded, and the run stops
-there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
+(whether it passes, fails, or throws) is completely unaffected. The worker thread starts with the
+main thread's floating-point environment, such as its rounding mode. A test that doesn't finish in
+time is recorded as failed, with a message naming it and the timeout that was exceeded, and the run
+stops there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
 distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the report still
 gets written, covering every test that completed before the timeout, plus the timed-out test's own
 synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped,
