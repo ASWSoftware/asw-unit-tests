@@ -189,11 +189,11 @@ private:
     LRESULT OnHeaderCustomDraw(NMCUSTOMDRAW const& draw) const;
     LRESULT OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const;
     void PaintBorder(HWND control) const;
-    // A disabled scroll bar of 'control' (see the definition).
-    void PaintDisabledScrollBars(HWND control) const;
     void PaintMenuBarLine(HWND window) const;
     void PaintMenuFrame(HWND menu, HDC given) const;
     void PaintProgressBar(HWND progressBar, HDC context) const;
+    // What the dark scroll bar theme leaves light on 'control''s scroll bars (see the definition).
+    void PaintScrollBars(HWND control) const;
     void PaintStatusBar(HWND statusBar, HDC context) const;
     void PaintTabControl(HWND tabControl, HDC context) const;
     void PaintUpDown(HWND upDown, HDC context) const;

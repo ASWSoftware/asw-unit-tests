@@ -218,9 +218,11 @@ RECT Inset(RECT rect, int by)
 /*
     MayRedrawScrollBars
 
-    Whether an edit box may draw its scroll bars straight away, rather than in WM_NCPAINT, while it handles
-    'message': as its text changes (it enables or disables them), as it's resized, and as the mouse enters or
-    leaves it or its scroll bars (a themed scroll bar's arrows show whether the mouse is over the window).
+    Whether a control with scroll bars (an edit box, the tree, the list, the log) may draw them straight away,
+    rather than in WM_NCPAINT, while it handles 'message': as its text changes (an edit box enables or disables
+    them), as it's resized (they may appear or go, and with them the corner between them), and as the mouse
+    enters or leaves it or its scroll bars (a themed scroll bar's arrows show whether the mouse is over the
+    window).
 */
 bool MayRedrawScrollBars(UINT message)
 {
@@ -605,7 +607,9 @@ void TWin32GUITheme::ApplyToControl(TAttachedControl const& attached)
             HWND const header = reinterpret_cast<HWND>(SendMessageW(control, LVM_GETHEADER, 0, 0));
 
             if (header != nullptr)
+            {
                 SetWindowTheme(header, m_Dark ? L"DarkMode_ItemsView" : nullptr, nullptr);
+            }
 
             COLORREF const background = WindowColor();
             SendMessageW(control, LVM_SETBKCOLOR, 0, static_cast<LPARAM>(background));
@@ -1305,12 +1309,10 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
 
     bool const bordered = kind == EWin32GUIThemedControl::Edit || kind == EWin32GUIThemedControl::ListView ||
         kind == EWin32GUIThemedControl::RichEdit || kind == EWin32GUIThemedControl::TreeView;
-    bool const edit = kind == EWin32GUIThemedControl::Edit || kind == EWin32GUIThemedControl::RichEdit;
-
-    if (edit && MayRedrawScrollBars(message))
+    if (bordered && MayRedrawScrollBars(message))
     {
         LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
-        PaintDisabledScrollBars(control);
+        PaintScrollBars(control);
         return result;
     }
 
@@ -1415,7 +1417,7 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
             if (bordered)
             {
                 LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
-                PaintDisabledScrollBars(control);
+                PaintScrollBars(control);
                 PaintBorder(control);
                 return result;
             }
@@ -1961,88 +1963,6 @@ void TWin32GUITheme::PaintBorder(HWND control) const
 }
 //---------------------------------------------------------------------------
 /*
-    TWin32GUITheme::PaintDisabledScrollBars
-
-    The dark scroll bar theme ("DarkMode_Explorer") draws a disabled scroll bar's arrows nearly white, e.g. the
-    empty detail pane's, which keeps its scroll bar while there's nothing to scroll. Such a bar is drawn again
-    in the theme's normal state, which has no thumb when there's nothing to scroll, with its arrows faded
-    halfway toward the track, so they read as disabled. A bar that's enabled, or hidden, is left as it is.
-    Called after each message that may draw the bars (see MayRedrawScrollBars()), so it's quick when there's
-    no disabled bar.
-*/
-void TWin32GUITheme::PaintDisabledScrollBars(HWND control) const
-{
-    RECT window;
-    GetWindowRect(control, &window);
-    HDC context = nullptr;
-    HTHEME theme = nullptr;
-
-    for (LONG const id : { OBJID_VSCROLL, OBJID_HSCROLL })
-    {
-        SCROLLBARINFO info = {};
-        info.cbSize = sizeof(info);
-
-        if (GetScrollBarInfo(control, id, &info) == 0 ||
-            (info.rgstate[0] & (STATE_SYSTEM_INVISIBLE | STATE_SYSTEM_OFFSCREEN)) != 0 ||
-            (info.rgstate[0] & STATE_SYSTEM_UNAVAILABLE) == 0)
-        {
-            continue;
-        }
-
-        if (context == nullptr)
-        {
-            context = GetWindowDC(control);
-            theme = OpenThemeData(control, L"ScrollBar");
-        }
-
-        if (context == nullptr || theme == nullptr)
-            break;
-
-        bool const vertical = id == OBJID_VSCROLL;
-        RECT bar = info.rcScrollBar;
-        OffsetRect(&bar, -window.left, -window.top);
-
-        // The arrow buttons at its two ends, each as long as a line button.
-        RECT first = bar;
-        RECT second = bar;
-
-        if (vertical)
-        {
-            first.bottom = first.top + info.dxyLineButton;
-            second.top = second.bottom - info.dxyLineButton;
-        }
-        else
-        {
-            first.right = first.left + info.dxyLineButton;
-            second.left = second.right - info.dxyLineButton;
-        }
-
-        TPaintBuffer const buffer(context, bar);
-        HDC const target = buffer.Get();
-        DrawThemeBackground(theme, target, vertical ? SBP_UPPERTRACKVERT : SBP_UPPERTRACKHORZ, SCRBS_NORMAL, &bar,
-            nullptr);
-        DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_UPNORMAL : ABS_LEFTNORMAL, &first, nullptr);
-        DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_DOWNNORMAL : ABS_RIGHTNORMAL, &second,
-            nullptr);
-
-        for (RECT const& button : { first, second })
-        {
-            TGlyphCanvas canvas(button.right - button.left, button.bottom - button.top, m_Palette.Window);
-            canvas.CopyFrom(target, button.left, button.top);
-            // Toward its corner's pixel, the button's background.
-            canvas.Fade(canvas.PixelAt(0, 0), 1, 2);
-            canvas.Draw(target, button.left, button.top);
-        }
-    }
-
-    if (theme != nullptr)
-        CloseThemeData(theme);
-
-    if (context != nullptr)
-        ReleaseDC(control, context);
-}
-//---------------------------------------------------------------------------
-/*
     TWin32GUITheme::PaintMenuBarLine
 
     The line DefWindowProc() draws under the menu bar, in a light system color, painted over in the
@@ -2138,6 +2058,108 @@ void TWin32GUITheme::PaintProgressBar(HWND progressBar, HDC context) const
     bool const failed = SendMessageW(progressBar, PBM_GETSTATE, 0, 0) == PBST_ERROR;
     FillGradient(context, bar, failed ? m_Palette.ProgressFailedTop : m_Palette.ProgressChunkTop,
         failed ? m_Palette.ProgressFailedBottom : m_Palette.ProgressChunkBottom);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::PaintScrollBars
+
+    What the dark scroll bar theme ("DarkMode_Explorer") leaves light, painted over:
+    - the corner between a vertical and a horizontal scroll bar, which Windows paints in the system colors
+      whatever the theme (a light edge around a gray square), painted as the theme's track;
+    - a disabled scroll bar's arrows, which the theme draws nearly white, e.g. the empty detail pane's, which
+      keeps its scroll bar while there's nothing to scroll. Such a bar is drawn again in the theme's normal
+      state, which has no thumb when there's nothing to scroll, with its arrows faded halfway toward the track,
+      so they read as disabled.
+    An enabled bar is left as it is. Called after each message that may draw the bars (see
+    MayRedrawScrollBars()), so it's quick when there's nothing to paint.
+*/
+void TWin32GUITheme::PaintScrollBars(HWND control) const
+{
+    SCROLLBARINFO bars[2] = {};
+    LONG const ids[2] = { OBJID_VSCROLL, OBJID_HSCROLL };
+    bool visible[2] = { false, false };
+
+    for (int i = 0; i < 2; ++i)
+    {
+        bars[i].cbSize = sizeof(bars[i]);
+        visible[i] = GetScrollBarInfo(control, ids[i], &bars[i]) != 0 &&
+            (bars[i].rgstate[0] & (STATE_SYSTEM_INVISIBLE | STATE_SYSTEM_OFFSCREEN)) == 0;
+    }
+
+    bool const corner = visible[0] && visible[1];
+    bool const disabled[2] = {
+        visible[0] && (bars[0].rgstate[0] & STATE_SYSTEM_UNAVAILABLE) != 0,
+        visible[1] && (bars[1].rgstate[0] & STATE_SYSTEM_UNAVAILABLE) != 0,
+    };
+
+    if (!corner && !disabled[0] && !disabled[1])
+        return;
+
+    HDC const context = GetWindowDC(control);
+    HTHEME const theme = OpenThemeData(control, L"ScrollBar");
+    RECT window;
+    GetWindowRect(control, &window);
+
+    if (context != nullptr && theme != nullptr)
+    {
+        if (corner)
+        {
+            // Below the vertical bar and right of the horizontal one.
+            RECT box = { bars[0].rcScrollBar.left, bars[1].rcScrollBar.top, bars[0].rcScrollBar.right,
+                         bars[1].rcScrollBar.bottom };
+            OffsetRect(&box, -window.left, -window.top);
+            DrawThemeBackground(theme, context, SBP_LOWERTRACKVERT, SCRBS_NORMAL, &box, nullptr);
+        }
+
+        for (int i = 0; i < 2; ++i)
+        {
+            if (!disabled[i])
+                continue;
+
+            bool const vertical = ids[i] == OBJID_VSCROLL;
+            RECT bar = bars[i].rcScrollBar;
+            OffsetRect(&bar, -window.left, -window.top);
+
+            // The arrow buttons at its two ends, each as long as a line button.
+            RECT first = bar;
+            RECT second = bar;
+
+            if (vertical)
+            {
+                first.bottom = first.top + bars[i].dxyLineButton;
+                second.top = second.bottom - bars[i].dxyLineButton;
+            }
+            else
+            {
+                first.right = first.left + bars[i].dxyLineButton;
+                second.left = second.right - bars[i].dxyLineButton;
+            }
+
+            TPaintBuffer const buffer(context, bar);
+            HDC const target = buffer.Get();
+            DrawThemeBackground(theme, target, vertical ? SBP_UPPERTRACKVERT : SBP_UPPERTRACKHORZ, SCRBS_NORMAL, &bar,
+                nullptr);
+            DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_UPNORMAL : ABS_LEFTNORMAL, &first,
+                nullptr);
+            DrawThemeBackground(theme, target, SBP_ARROWBTN, vertical ? ABS_DOWNNORMAL : ABS_RIGHTNORMAL, &second,
+                nullptr);
+
+            for (RECT const& button : { first, second })
+            {
+                TGlyphCanvas canvas(button.right - button.left, button.bottom - button.top, m_Palette.Window);
+                canvas.CopyFrom(target, button.left, button.top);
+                // Toward its corner's pixel, the button's background.
+                canvas.Fade(canvas.PixelAt(0, 0), 1, 2);
+                canvas.Draw(target, button.left, button.top);
+            }
+        }
+    }
+
+    if (theme != nullptr)
+        CloseThemeData(theme);
+
+    if (context != nullptr)
+        ReleaseDC(control, context);
 }
 //---------------------------------------------------------------------------
 /*
