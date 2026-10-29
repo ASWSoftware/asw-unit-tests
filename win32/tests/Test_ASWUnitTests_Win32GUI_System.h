@@ -53,9 +53,6 @@ private:
 
 private: // Test methods
     void Test_AdjustLineBreaks_MakesEveryLineBreakCRLF();
-    void Test_CommandLineArguments_ConvertsNonASCIIToUTF8();
-    void Test_CommandLineArguments_FollowsTheCRuntimeQuotingRules();
-    void Test_CommandLineArguments_SkipsTheProgramName();
     void Test_CreateFolderPath_CreatesEveryMissingFolder();
     void Test_CreateFolderPath_ThrowsWhenAFileIsInTheWay();
     void Test_ExeFileName_IsThisExecutablesNameWithoutItsFolder();
@@ -67,8 +64,6 @@ private: // Test methods
     void Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote();
     void Test_ReadFileBytes_ThrowsForAMissingFile();
     void Test_RemoveFile_DeletesOnlyAnExistingFile();
-    void Test_UTF8ToWide_ConvertsEveryPlane();
-    void Test_UTF8ToWide_ReplacesInvalidUTF8();
     void Test_WindowText_ConvertsNonASCIIToUTF8();
     void Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing();
 

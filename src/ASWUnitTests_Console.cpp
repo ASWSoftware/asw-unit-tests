@@ -298,4 +298,43 @@ std::string TConsole::StripColor(std::string const& text)
 }
 //---------------------------------------------------------------------------
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TConsoleUTF8Output
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+/*
+    TConsoleUTF8Output::TConsoleUTF8Output
+
+    SetConsoleOutputCP() fails without a console, and then nothing is changed or restored. The console is the one
+    the process shares with whatever started it (cmd.exe, say), so its code page must be put back afterwards.
+*/
+TConsoleUTF8Output::TConsoleUTF8Output()
+    : m_OriginalCodePage(0)
+{
+#if defined(_WIN32)
+    UINT const original = GetConsoleOutputCP();
+
+    if (original != 0 && original != CP_UTF8 && SetConsoleOutputCP(CP_UTF8))
+        m_OriginalCodePage = original;
+#endif
+}
+//---------------------------------------------------------------------------
+TConsoleUTF8Output::~TConsoleUTF8Output()
+{
+    Restore();
+}
+//---------------------------------------------------------------------------
+void TConsoleUTF8Output::Restore()
+{
+#if defined(_WIN32)
+    if (m_OriginalCodePage != 0)
+        SetConsoleOutputCP(m_OriginalCodePage);
+#endif
+
+    m_OriginalCodePage = 0;
+}
+//---------------------------------------------------------------------------
+
 } // namespace ASWUnitTests

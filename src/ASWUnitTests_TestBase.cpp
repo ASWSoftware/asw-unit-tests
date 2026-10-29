@@ -25,6 +25,7 @@ limitations under the License.
 #include "ASWUnitTests_TestBase.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cfenv>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -51,6 +52,11 @@ limitations under the License.
 #    define ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED 1
 #  endif
 #endif
+// _rtl_unmangle(), for TypeName() with bcc32c, whose std::type_info::name() is Borland-mangled (see
+// BorlandTypeName()).
+#if defined(__BORLANDC__) && !defined(_WIN64)
+#  include <unmangle.h>
+#endif
 //---------------------------------------------------------------------------
 
 namespace
@@ -70,8 +76,18 @@ thread_local TWorkerState* t_WorkerState = nullptr;
 
 //---------------------------------------------------------------------------
 
+#if defined(__BORLANDC__) && !defined(_WIN64)
+std::string BorlandTypeName(char const* name);
+#endif
+
 std::string CStringDisplayText(char const* str);
 std::string CStringDisplayText(wchar_t const* str);
+
+template <typename TChar>
+std::string CStringEmptyFailure(TChar const* text);
+
+template <typename TChar>
+std::string CStringNotEmptyFailure(TChar const* text);
 
 std::string CStringOrEmpty(char const* str);
 std::wstring CStringOrEmpty(wchar_t const* str);
@@ -81,6 +97,8 @@ bool CharEqualsIgnoringASCIICase(TChar a, TChar b);
 
 template <typename TString>
 bool ContainsIgnoringASCIICase(TString const& text, TString const& substring);
+
+std::string DecimalSum(uint64_t a, uint64_t b);
 
 std::string DisplayText(std::string const& text);
 
@@ -112,6 +130,9 @@ template <typename TFloat>
 TFloat NearDifference(TFloat expected, TFloat actual);
 
 template <typename TChar>
+std::string NullRegexMatchFailure(TChar const* text, TChar const* pattern);
+
+template <typename TChar>
 std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase);
 
 template <typename TString>
@@ -124,6 +145,67 @@ template <typename TString>
 bool StartsWithIgnoringASCIICase(TString const& text, TString const& prefix);
 
 //---------------------------------------------------------------------------
+#if defined(__BORLANDC__) && !defined(_WIN64)
+/*
+    BorlandTypeName
+
+    Returns 'name', a std::type_info::name() from bcc32c, readably (e.g. "int" for "$i", "N::TNamed" for
+    "$N@TNamed"), or as it is when it can't be read. It's a Borland-mangled type, which _rtl_unmangle() reads as the
+    argument of a function f(): as it is for a built-in type ("@f$qi", "@f$qpxc"), or for a class, or a pointer to
+    one, with the class's length in front ("@f$q8N@TNamed", "@f$qp8N@TNamed"). An anonymous namespace, which
+    _rtl_unmangle() can't read, is given a name of its own first, then shown as "(anonymous namespace)".
+*/
+std::string BorlandTypeName(char const* name)
+{
+    if ((name == nullptr) || (name[0] != '$'))
+        return (name == nullptr) ? std::string() : std::string(name);
+
+    std::string const anonymous = "12_GLOBAL__N_1@";
+    std::string const anonymousStandIn = "ASWUnitTestsAnonymousNamespace@";
+    std::string code(name + 1);
+
+    for (std::size_t at = code.find(anonymous); at != std::string::npos;
+         at = code.find(anonymous, at + anonymousStandIn.size()))
+        code.replace(at, anonymous.size(), anonymousStandIn);
+
+    std::size_t const pointers = std::min(code.find_first_not_of('p'), code.size());
+    std::string const symbols[2] =
+    {
+        "@f$q" + code,
+        "@f$q" + code.substr(0, pointers) + std::to_string(code.size() - pointers) + code.substr(pointers)
+    };
+    // After a pointer, an 'x' or 'w' is const or volatile, which the second form would read as part of a class's
+    // name (e.g. "xN::TNamed *" for "$pxN@TNamed"), so only the first is tried.
+    bool const qualifiedPointee = (pointers > 0) && (pointers < code.size()) &&
+        ((code[pointers] == 'x') || (code[pointers] == 'w'));
+
+    for (std::string symbol : symbols)
+    {
+        if (qualifiedPointee && (symbol != symbols[0]))
+            break;
+
+        char unmangled[1024] = {};
+        _umKind const kind = _rtl_unmangle(&symbol[0], unmangled, sizeof(unmangled) - 1, nullptr, nullptr, 1);
+        std::string const text(unmangled);
+        std::size_t const arguments = text.find("f(");
+
+        if (((kind & (UM_ERRMASK | UM_NOT_MANGLED)) != 0) || (arguments == std::string::npos) ||
+            (text.back() != ')'))
+            continue;
+
+        std::string type = text.substr(arguments + 2, text.size() - arguments - 3);
+        std::string const standInQualifier = anonymousStandIn.substr(0, anonymousStandIn.size() - 1) + "::";
+        for (std::size_t at = type.find(standInQualifier); at != std::string::npos;
+             at = type.find(standInQualifier, at + 1))
+            type.replace(at, standInQualifier.size(), "(anonymous namespace)::");
+
+        return type;
+    }
+
+    return name;
+}
+//---------------------------------------------------------------------------
+#endif
 /*
     CStringDisplayText
 
@@ -142,6 +224,39 @@ std::string CStringDisplayText(char const* str)
 std::string CStringDisplayText(wchar_t const* str)
 {
     return (str != nullptr) ? ASWUnitTests::WideToUTF8(str) : std::string("(null)");
+}
+//---------------------------------------------------------------------------
+/*
+    CStringEmptyFailure
+
+    Why 'text' fails an Empty method, e.g. Expected empty but was "abc" (or "(null)" for a null C string), or an
+    empty string when it's empty.
+*/
+template <typename TChar>
+std::string CStringEmptyFailure(TChar const* text)
+{
+    if (text != nullptr && *text == TChar())
+        return std::string();
+
+    return "Expected empty but was \"" + CStringDisplayText(text) + "\"";
+}
+//---------------------------------------------------------------------------
+/*
+    CStringNotEmptyFailure
+
+    Why 'text' fails a NotEmpty method, Expected not empty but was empty (or was "(null)" for a null C string), or
+    an empty string when it isn't empty.
+*/
+template <typename TChar>
+std::string CStringNotEmptyFailure(TChar const* text)
+{
+    if (text == nullptr)
+        return "Expected not empty but was \"(null)\"";
+
+    if (*text == TChar())
+        return "Expected not empty but was empty";
+
+    return std::string();
 }
 //---------------------------------------------------------------------------
 /*
@@ -190,6 +305,39 @@ bool ContainsIgnoringASCIICase(TString const& text, TString const& substring)
     // std::search finds an empty substring at the start, which is the end of an empty text.
     return substring.empty() || (std::search(text.begin(), text.end(), substring.begin(), substring.end(),
         CharEqualsIgnoringASCIICase<typename TString::value_type>) != text.end());
+}
+//---------------------------------------------------------------------------
+/*
+    DecimalSum
+
+    Returns 'a' + 'b' in decimal, exactly, even when the sum doesn't fit in a uint64_t.
+*/
+std::string DecimalSum(uint64_t a, uint64_t b)
+{
+    if (a <= std::numeric_limits<uint64_t>::max() - b)
+        return std::to_string(a + b);
+
+    // Long addition of the two numbers' digits, from the last.
+    std::string const first = std::to_string(a);
+    std::string const second = std::to_string(b);
+    std::string sum;
+    int carry = 0;
+
+    for (std::size_t i = 0; i < first.size() || i < second.size() || carry != 0; ++i)
+    {
+        int digit = carry;
+
+        if (i < first.size())
+            digit += first[first.size() - 1 - i] - '0';
+
+        if (i < second.size())
+            digit += second[second.size() - 1 - i] - '0';
+
+        sum.insert(sum.begin(), static_cast<char>('0' + digit % 10));
+        carry = digit / 10;
+    }
+
+    return sum;
 }
 //---------------------------------------------------------------------------
 /*
@@ -396,6 +544,18 @@ TFloat NearDifference(TFloat expected, TFloat actual)
     The detail for a text check that fails because 'text' or 'part' is a null C string, worded as the check's other
     failures are, e.g. Expected "(null)" to contain "abc". followed by the caller's message.
 */
+/*
+    NullRegexMatchFailure
+
+    The failure detail for a Matches method given a null C string as 'text' or 'pattern', worded as
+    RegexMatchFailure()'s, e.g. Expected "(null)" to match "a.c".
+*/
+template <typename TChar>
+std::string NullRegexMatchFailure(TChar const* text, TChar const* pattern)
+{
+    return "Expected \"" + CStringDisplayText(text) + "\" to match \"" + CStringDisplayText(pattern) + "\"";
+}
+//---------------------------------------------------------------------------
 template <typename TChar>
 std::string NullTextFailure(TChar const* text, TChar const* part, char const* relation, bool ignoreCase)
 {
@@ -562,7 +722,8 @@ TTestGroupBase::TTestGroupBase(std::string const& name)
 }
 //---------------------------------------------------------------------------
 TTestGroupBase::TTestGroupBase(TSuitePath const& suitePath, std::string const& name)
-    : m_ExceptionExpected(false),
+    : m_RecordingHolds(0),
+      m_ExceptionExpected(false),
       m_LogSuppressed(false),
       m_TestFailedCheck(false),
       m_Name(name),
@@ -634,6 +795,20 @@ void TTestGroupBase::AssertContainsIC(wchar_t const* text, wchar_t const* substr
         throw TExceptContains(method, line, CStringDisplayText(text), CStringDisplayText(substring), msg, true);
 
     AssertContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptEmpty(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptEmpty(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertEndsWith(std::string const& text, std::string const& suffix,
@@ -861,30 +1036,38 @@ void TTestGroupBase::AssertMatches(std::wstring const& text, std::wstring const&
         throw TExceptMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+        throw TExceptMatches(method, line, NullRegexMatchFailure(text, pattern), msg);
+
+    AssertMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+        throw TExceptMatches(method, line, NullRegexMatchFailure(text, pattern), msg);
+
+    AssertMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        throw TExceptEquals(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotContains(std::string const& text, std::string const& substring,
@@ -949,6 +1132,20 @@ void TTestGroupBase::AssertNotContainsIC(wchar_t const* text, wchar_t const* sub
         return;
 
     AssertNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptNotEmpty(method, line, failure, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        throw TExceptNotEmpty(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotEndsWith(std::string const& text, std::string const& suffix,
@@ -1181,30 +1378,38 @@ void TTestGroupBase::AssertNotMatches(std::wstring const& text, std::wstring con
         throw TExceptNotMatches(method, line, failure, msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    AssertNotMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::AssertNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    AssertNotMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        throw TExceptNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        throw TExceptNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::AssertNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::AssertNotStartsWith(std::string const& text, std::string const& prefix,
@@ -1341,15 +1546,15 @@ void TTestGroupBase::AssertTrue(bool testVal, std::string const& method, int lin
         throw TExceptTrue(method, line, msg);
 }
 //---------------------------------------------------------------------------
-bool TTestGroupBase::BeginRecording(std::unique_lock<std::recursive_mutex>& lock)
+bool TTestGroupBase::BeginRecording(TRecordingLock& lock)
 {
-    if (!lock.owns_lock())
-        lock = std::unique_lock<std::recursive_mutex>(m_RecordingMutex);
+    if (!lock.OwnsLock())
+        lock.Lock();
 
     return t_WorkerState == nullptr || t_WorkerState->Group != this || !t_WorkerState->Abandoned;
 }
 //---------------------------------------------------------------------------
-bool TTestGroupBase::BeginRecordingOutcome(std::unique_lock<std::recursive_mutex>& lock)
+bool TTestGroupBase::BeginRecordingOutcome(TRecordingLock& lock)
 {
     if (!BeginRecording(lock))
         return false;
@@ -1443,6 +1648,20 @@ void TTestGroupBase::CheckContainsIC(wchar_t const* text, wchar_t const* substri
     }
 
     CheckContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckEndsWith(std::string const& text, std::string const& suffix,
@@ -1712,30 +1931,44 @@ void TTestGroupBase::CheckMatches(std::wstring const& text, std::wstring const& 
         SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullRegexMatchFailure(text, pattern) + ". " + msg);
+        return;
+    }
+
+    CheckMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr)
+    {
+        SetTestFailedCheck(method, line, NullRegexMatchFailure(text, pattern) + ". " + msg);
+        return;
+    }
+
+    CheckMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (!(diff <= tolerance))
-    {
-        std::string expectedStr = std::to_string(expected) + " (tolerance " + std::to_string(tolerance) + ")";
-        std::string actualStr = std::to_string(actual) + " (diff " + std::to_string(diff) + ")";
-        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, true);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotContains(std::string const& text, std::string const& substring,
@@ -1809,6 +2042,20 @@ void TTestGroupBase::CheckNotContainsIC(wchar_t const* text, wchar_t const* subs
         return;
 
     CheckNotContainsIC(std::wstring(text), std::wstring(substring), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEmpty(char const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotEmpty(wchar_t const* text, std::string const& method, int line, std::string const& msg)
+{
+    std::string const failure = CStringNotEmptyFailure(text);
+    if (!failure.empty())
+        SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotEndsWith(std::string const& text, std::string const& suffix,
@@ -2068,30 +2315,38 @@ void TTestGroupBase::CheckNotMatches(std::wstring const& text, std::wstring cons
         SetTestFailedCheck(method, line, failure + ". " + msg);
 }
 //---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(char const* text, char const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    CheckNotMatches(std::string(text), std::string(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::CheckNotMatches(wchar_t const* text, wchar_t const* pattern, std::string const& method, int line,
+    std::string const& msg)
+{
+    if (text == nullptr || pattern == nullptr) // A null C string never matches, so it never fails.
+        return;
+
+    CheckNotMatches(std::wstring(text), std::wstring(pattern), method, line, msg);
+}
+//---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(
     float expected, float actual, float tolerance, std::string const& method, int line, std::string const& msg)
 {
-    float const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotNear(
     double expected, double actual, double tolerance, std::string const& method, int line, std::string const& msg)
 {
-    double const diff = NearDifference(expected, actual);
-
-    if (diff <= tolerance)
-    {
-        std::string valueStr = std::to_string(actual) + " (diff " + std::to_string(diff) + " <= tolerance " +
-            std::to_string(tolerance) + ")";
-        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
-    }
+    std::optional<TNearFailure> const failure = NearFailure(expected, actual, tolerance, false);
+    if (failure != std::nullopt)
+        ReportNearFailure(*failure, ENearMethod::CheckNotNear, method, line, msg);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::CheckNotStartsWith(std::string const& text, std::string const& prefix,
@@ -2283,6 +2538,15 @@ std::string TTestGroupBase::DescribeException(System::Sysutils::Exception& ex)
 }
 //---------------------------------------------------------------------------
 #endif
+std::string TTestGroupBase::DescribeUnknownException()
+{
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    return "an object that is neither a std::exception nor an RTL Exception";
+#else
+    return "a non-std::exception object";
+#endif
+}
+//---------------------------------------------------------------------------
 std::string TTestGroupBase::ExceptionMessage(std::exception const& ex)
 {
     return ex.what();
@@ -2302,7 +2566,7 @@ bool TTestGroupBase::ExceptionTypeExpected() const
         return true;
 #endif
 
-    return m_ExpectedExceptionTypeChecker != nullptr;
+    return (m_ExpectedExceptionTypeChecker != nullptr) || (m_ExpectedOtherExceptionTypeChecker != nullptr);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::Fail(std::string const& method, int line, std::string const& msg)
@@ -2352,7 +2616,7 @@ void TTestGroupBase::Log(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2370,7 +2634,7 @@ void TTestGroupBase::LogAppend(std::string const& msg)
     if (m_LogSuppressed)
         return;
 
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2381,6 +2645,67 @@ void TTestGroupBase::LogAppend(std::string const& msg)
     }
 
     std::cout << msg;
+}
+//---------------------------------------------------------------------------
+template <typename TFloat>
+std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure(TFloat expected, TFloat actual,
+    TFloat tolerance, bool expectNear)
+{
+    TFloat const diff = NearDifference(expected, actual);
+    bool const invalidTolerance = !(tolerance >= 0); // Negative or NaN.
+
+    if (!invalidTolerance && (diff <= tolerance) == expectNear)
+        return std::nullopt;
+
+    TNearFailure failure;
+    failure.InvalidTolerance = invalidTolerance;
+    failure.Expected = std::to_string(expected);
+    failure.Actual = std::to_string(actual);
+    failure.Difference = std::to_string(diff);
+    failure.Tolerance = std::to_string(tolerance);
+    return failure;
+}
+//---------------------------------------------------------------------------
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<float>(float, float, float,
+    bool);
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<double>(double, double, double,
+    bool);
+template std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure<long double>(long double,
+    long double, long double, bool);
+//---------------------------------------------------------------------------
+std::optional<TTestGroupBase::TNearFailure> TTestGroupBase::NearFailure(TNearInteger expected,
+    TNearInteger actual, TNearInteger tolerance, bool expectNear)
+{
+    // With the same sign, the difference is that of the magnitudes; otherwise their sum, which can exceed
+    // UINT64_MAX (one value negative, the other above INT64_MAX) and is then near nothing.
+    bool const sameSign = (expected.Negative == actual.Negative);
+    bool const sumOverflows = !sameSign &&
+        (expected.Magnitude > std::numeric_limits<uint64_t>::max() - actual.Magnitude);
+    uint64_t diff = expected.Magnitude + actual.Magnitude;
+
+    if (sameSign)
+    {
+        diff = (expected.Magnitude >= actual.Magnitude) ? expected.Magnitude - actual.Magnitude :
+                actual.Magnitude - expected.Magnitude;
+    }
+
+    bool const isNear = !sumOverflows && (diff <= tolerance.Magnitude);
+
+    if (!tolerance.Negative && isNear == expectNear)
+        return std::nullopt;
+
+    auto const text = [](TNearInteger value)
+        {
+            return std::string(value.Negative ? "-" : "") + std::to_string(value.Magnitude);
+        };
+
+    TNearFailure failure;
+    failure.InvalidTolerance = tolerance.Negative;
+    failure.Expected = text(expected);
+    failure.Actual = text(actual);
+    failure.Difference = sumOverflows ? DecimalSum(expected.Magnitude, actual.Magnitude) : std::to_string(diff);
+    failure.Tolerance = text(tolerance);
+    return failure;
 }
 //---------------------------------------------------------------------------
 bool TTestGroupBase::OrderingHolds(std::optional<int> order, TOrdering ordering)
@@ -2426,39 +2751,6 @@ char const* TTestGroupBase::OrderingSymbol(TOrdering ordering)
     }
 }
 //---------------------------------------------------------------------------
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-std::string TTestGroupBase::RTLTextToUTF8(std::string const& text)
-{
-    return text;
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(std::wstring const& text)
-{
-    return WideToUTF8(text);
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(char const* text)
-{
-    return CStringOrEmpty(text);
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(wchar_t const* text)
-{
-    return WideToUTF8(CStringOrEmpty(text));
-}
-//---------------------------------------------------------------------------
-std::string TTestGroupBase::RTLTextToUTF8(System::String const& text)
-{
-#if defined(WIDECHAR_IS_WCHAR)
-    // The same conversion as wide text, so both give the same bytes even for an unpaired surrogate.
-    return WideToUTF8(std::wstring(text.c_str(), static_cast<std::size_t>(text.Length())));
-#else
-    System::UTF8String const utf8(text);
-    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
-#endif
-}
-//---------------------------------------------------------------------------
-#endif
 /*
     TTestGroupBase::RegisterTest
 
@@ -2487,6 +2779,33 @@ void TTestGroupBase::RegisterTest(ITestCase::TestCallback callback, std::string 
 }
 //---------------------------------------------------------------------------
 /*
+    TTestGroupBase::ReleaseRecordingHolds
+
+    Called by RunCatchingCrashes() when TCrashGuard::Run() has caught a crash on this thread. The
+    jump out of a crash skips the destructors of the TRecordingLocks it leaves, so a crash in code
+    run while m_RecordingMutex is held (a run observer's OnLog(), say) leaves this thread holding it.
+    That's harmless while one thread runs every test, as the mutex is recursive, but a test's worker
+    thread (see RunWithTimeout()) would end still holding it, and the next thread to record would
+    wait for it forever.
+
+    Locks it once more, so that every hold m_RecordingHolds counts is this thread's, then releases
+    them all. No thread calls RunCatchingCrashes() while holding it, so every hold left is one the
+    crash skipped.
+*/
+void TTestGroupBase::ReleaseRecordingHolds()
+{
+    m_RecordingMutex.lock();
+
+    unsigned int const holds = m_RecordingHolds;
+    m_RecordingHolds = 0;
+
+    for (unsigned int i = 0; i < holds; ++i)
+        m_RecordingMutex.unlock();
+
+    m_RecordingMutex.unlock();
+}
+//---------------------------------------------------------------------------
+/*
     TTestGroupBase::ReportCrashedTest
 
     Called by RunCatchingCrashes() when TCrashGuard::Run() catches a native crash while running
@@ -2506,7 +2825,7 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     std::string const plainMsg = tag + ": \"" + testFullName + "\": " + detail;
 
     // On a worker thread, a crash that comes after its test timed out is ignored, like the rest of what it does then.
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecordingOutcome(lock))
         return;
 
@@ -2525,6 +2844,46 @@ void TTestGroupBase::ReportCrashedTest(ITestCase& testCase, std::string const& d
     }
 
     Log("!!CRASH!!: \"" + testFullName + "\" crashed (" + description + "); continuing with the next test.");
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::ReportNearFailure(TNearFailure const& failure, ENearMethod which, std::string const& method,
+    int line, std::string const& msg)
+{
+    bool const isAssert = (which == ENearMethod::AssertNear || which == ENearMethod::AssertNotNear);
+    bool const expectNear = (which == ENearMethod::AssertNear || which == ENearMethod::CheckNear);
+
+    if (failure.InvalidTolerance)
+    {
+        std::string const detail = "Invalid tolerance " + failure.Tolerance + ": it must be zero or more. " + msg;
+
+        if (which == ENearMethod::AssertNear)
+            throw TExceptEquals(method, line, detail);
+
+        if (which == ENearMethod::AssertNotNear)
+            throw TExceptNotEquals(method, line, detail);
+
+        SetTestFailedCheck(method, line, detail);
+    }
+    else if (expectNear)
+    {
+        std::string const expectedStr = failure.Expected + " (tolerance " + failure.Tolerance + ")";
+        std::string const actualStr = failure.Actual + " (diff " + failure.Difference + ")";
+
+        if (isAssert)
+            throw TExceptEquals(method, line, expectedStr, actualStr, msg);
+
+        SetTestFailedCheck(method, line, expectedStr, actualStr, msg);
+    }
+    else
+    {
+        std::string const valueStr = failure.Actual + " (diff " + failure.Difference + " <= tolerance " +
+            failure.Tolerance + ")";
+
+        if (isAssert)
+            throw TExceptNotEquals(method, line, valueStr, msg);
+
+        SetTestFailedCheckNotEquals(method, line, valueStr, msg);
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -2665,7 +3024,8 @@ void TTestGroupBase::Run(TestFilter const& filter, std::optional<unsigned int> s
     normal completion, including via an ordinary C++ exception, passes through unaffected. A caught
     crash is handed to ReportCrashedTest(), which either records it as a failure and returns (the
     common case: the next test still runs) or additionally throws to abort the rest of the run, for
-    the specific crash types TCrashGuard::Run() considers too severe to continue past.
+    the specific crash types TCrashGuard::Run() considers too severe to continue past. First, though,
+    ReleaseRecordingHolds() releases m_RecordingMutex, in case the crash came while it was held.
 */
 void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
 {
@@ -2681,7 +3041,10 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
         });
 
     if (result.Crashed)
+    {
+        ReleaseRecordingHolds();
         ReportCrashedTest(testCase, result.Description, result.ShouldAbortRun);
+    }
 }
 //---------------------------------------------------------------------------
 /*
@@ -2695,7 +3058,10 @@ void TTestGroupBase::RunCatchingCrashes(ITestCase& testCase, bool catchCrashes)
     data race with the waiting thread here. Once the test has been abandoned (below), the worker
     records nothing more and logs nothing more, should it end after all (see BeginRecording()); a
     test that had begun recording its outcome when the timeout came counts as finished in time
-    instead. If it finishes in time, whatever it threw (if anything)
+    instead. The worker starts with the calling thread's floating-point environment (std::fesetenv()),
+    as the test would have on that thread: on Windows a new thread otherwise starts with the defaults,
+    such as rounding to nearest and, with llvm-mingw, x87 long double arithmetic at double precision.
+    If it finishes in time, whatever it threw (if anything)
     is rethrown by future.get(), preserving normal exception propagation exactly as if it had run
     directly. The one exception, with ASWUNITTESTS_RTL_EXCEPTIONS enabled: an RTL exception arrives
     as a TExceptRTLException carrying its description and class (see the worker's catch). If it
@@ -2719,9 +3085,12 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     // Held by shared_ptr for the same reason: the worker reads it, through t_WorkerState, for as long as it runs.
     std::shared_ptr<TWorkerState> const state = std::make_shared<TWorkerState>();
     state->Group = this;
+    std::fenv_t environment = {};
+    std::fegetenv(&environment);
 
-    std::thread worker([this, &testCase, done, state, catchCrashes]()
+    std::thread worker([this, &testCase, done, state, catchCrashes, environment]()
             {
+        std::fesetenv(&environment);
         t_WorkerState = state.get();
 
         try
@@ -2748,11 +3117,12 @@ void TTestGroupBase::RunWithTimeout(ITestCase& testCase, std::optional<unsigned 
     {
         // Waits for a Check failure or a log line the worker is recording, then abandons the test, unless it has
         // begun recording its outcome, in which case it counts as finished in time and is waited for below.
-        std::unique_lock<std::recursive_mutex> lock(m_RecordingMutex);
+        TRecordingLock lock(*this);
+        lock.Lock();
         if (!state->RecordingOutcome)
         {
             state->Abandoned = true;
-            lock.unlock();
+            lock.Unlock();
 
             worker.detach();
             ReportTimedOutTest(testCase, *testTimeoutSeconds);
@@ -2774,6 +3144,7 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
     m_ExpectedExceptionMessage.clear();
     m_ExpectedExceptionTypeChecker = nullptr;
+    m_ExpectedOtherExceptionTypeChecker = nullptr;
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     m_ExpectedRTLExceptionTypeChecker = nullptr;
 #endif
@@ -2797,7 +3168,7 @@ void TTestGroupBase::SetSuitePath(std::string const& suitePath)
 //---------------------------------------------------------------------------
 void TTestGroupBase::SetTestFailedCheck(std::string const& method, int line, std::string const& msg)
 {
-    std::unique_lock<std::recursive_mutex> lock;
+    TRecordingLock lock(*this);
     if (!BeginRecording(lock))
         return;
 
@@ -2921,8 +3292,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
         };
 
     // Scores an exception caught while one was expected. 'typeMatches' is whether it satisfies the requested
-    // type (true when no specific type was requested), 'message' is the text checked for the expected substring,
-    // and 'description' is how the exception is shown in a failure detail.
+    // type (true when no specific type was requested), 'message' is the text checked for the expected substring
+    // (nullopt for an exception that has none, which fails a message check), and 'description' is how the
+    // exception is shown in a failure detail.
     // Records a pass, unless a Check* failure earlier in the test means it failed after all, even if everything
     // after that (including an expected exception arriving) went as intended. Every path that would otherwise
     // pass the test goes through here, so none of them can overlook an earlier Check* failure.
@@ -2940,10 +3312,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
             finish(TTestOutcome::Pass, "passed", std::string());
         };
 
-    auto finishExpectedException = [&](bool typeMatches, std::string const& message, std::string const& description)
+    auto finishExpectedException = [&](bool typeMatches, std::optional<std::string> const& message,
+                                       std::string const& description)
         {
             bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
-                (message.find(m_ExpectedExceptionMessage) != std::string::npos);
+                ((message != std::nullopt) && (message->find(m_ExpectedExceptionMessage) != std::string::npos));
 
             if (typeMatches && messageMatches)
             {
@@ -2956,6 +3329,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
             std::string detail;
             if (!typeMatches)
                 detail = "expected exception type was not thrown (caught a different exception): " + description;
+            else if (message == std::nullopt)
+                detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
+                    "\" but caught an exception without a message: " + description;
             else
                 detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage + "\" but caught: " +
                     description;
@@ -2971,7 +3347,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
     // Held from when the test, its SetUp_Test() and its TearDown_Test() are over until Test() returns or throws, while
     // the outcome is recorded. On a worker thread whose test has timed out (see RunWithTimeout()), nothing is recorded:
     // Test() just returns, even for a fatal exception.
-    std::unique_lock<std::recursive_mutex> outcomeLock;
+    TRecordingLock outcomeLock(*this);
 
     auto tearDown = [&]()
         {
@@ -3064,7 +3440,8 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             // A type/message check is only requested via the templated SetExceptionExpected<TException>()
             // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
-            // A requested RTL exception type (see ExceptionTypeExpected()) never matches a std::exception.
+            // A requested RTL exception type or non-class type (see ExceptionTypeExpected()) never matches a
+            // std::exception.
             bool const typeMatches = (m_ExpectedExceptionTypeChecker != nullptr) ?
                     m_ExpectedExceptionTypeChecker(ex) : !ExceptionTypeExpected();
             finishExpectedException(typeMatches, ex.what(), ex.what());
@@ -3112,16 +3489,16 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             if (ExceptionTypeExpected())
             {
-                // A specific type was requested, but what was thrown isn't an exception class this framework
-                // can inspect to confirm the type (or message) matched. Treat that as a failure, not a pass.
-                m_Results.FailedCount++;
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-                finish(TTestOutcome::Fail, "failed", "expected a specific exception type, but an object that is "
-                    "neither a std::exception nor an RTL Exception was thrown instead.");
-#else
-                finish(TTestOutcome::Fail, "failed",
-                    "expected a specific exception type, but a non-std::exception object was thrown instead.");
-#endif
+                // Only a requested type not derived from std::exception can match here, and it has no message. A
+                // requested std::exception or RTL type never matches.
+                std::optional<std::string> caught;
+                if (m_ExpectedOtherExceptionTypeChecker != nullptr)
+                    caught = m_ExpectedOtherExceptionTypeChecker();
+
+                if (caught != std::nullopt)
+                    finishExpectedException(true, std::nullopt, *caught);
+                else
+                    finishExpectedException(false, std::nullopt, DescribeUnknownException());
             }
             else
             {
@@ -3136,12 +3513,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 throw; // Fatal
 
             // The same description CallAndDescribeException() gives it.
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-            finish(TTestOutcome::Fail, "failed",
-                "Unexpected exception: an object that is neither a std::exception nor an RTL Exception");
-#else
-            finish(TTestOutcome::Fail, "failed", "Unexpected exception: a non-std::exception object");
-#endif
+            finish(TTestOutcome::Fail, "failed", "Unexpected exception: " + DescribeUnknownException());
         }
     }
 }
@@ -3150,6 +3522,70 @@ bool TTestGroupBase::TestFailedOneOrMoreChecks()
 {
     return m_TestFailedCheck;
 }
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(std::string const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(std::wstring const& text)
+{
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(char const* text)
+{
+    return CStringOrEmpty(text);
+}
+//---------------------------------------------------------------------------
+std::string TTestGroupBase::TextToUTF8(wchar_t const* text)
+{
+    return WideToUTF8(CStringOrEmpty(text));
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::string TTestGroupBase::TextToUTF8(System::String const& text)
+{
+#if defined(WIDECHAR_IS_WCHAR)
+    // The same conversion as wide text, so both give the same bytes even for an unpaired surrogate.
+    return WideToUTF8(TextToWide(text));
+#else
+    System::UTF8String const utf8(text);
+    return std::string(utf8.c_str(), static_cast<std::size_t>(utf8.Length()));
+#endif
+}
+#endif
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(std::string const& text)
+{
+    return UTF8ToWide(text);
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(std::wstring const& text)
+{
+    return text;
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(char const* text)
+{
+    return UTF8ToWide(CStringOrEmpty(text));
+}
+//---------------------------------------------------------------------------
+std::wstring TTestGroupBase::TextToWide(wchar_t const* text)
+{
+    return CStringOrEmpty(text);
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+std::wstring TTestGroupBase::TextToWide(System::String const& text)
+{
+#if defined(WIDECHAR_IS_WCHAR)
+    return std::wstring(text.c_str(), static_cast<std::size_t>(text.Length()));
+#else
+    return UTF8ToWide(TextToUTF8(text));
+#endif
+}
+#endif
 //---------------------------------------------------------------------------
 std::string TTestGroupBase::TypeName(std::type_info const& type)
 {
@@ -3164,7 +3600,49 @@ std::string TTestGroupBase::TypeName(std::type_info const& type)
     }
 #endif
 
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return BorlandTypeName(type.name());
+#else
     return type.name();
+#endif
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TTestGroupBase::TRecordingLock
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TTestGroupBase::TRecordingLock::TRecordingLock(TTestGroupBase& group)
+    : m_Group(group),
+      m_Locked(false)
+{
+}
+//---------------------------------------------------------------------------
+TTestGroupBase::TRecordingLock::~TRecordingLock()
+{
+    if (m_Locked)
+        Unlock();
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::TRecordingLock::Lock()
+{
+    m_Group.m_RecordingMutex.lock();
+    ++m_Group.m_RecordingHolds;
+    m_Locked = true;
+}
+//---------------------------------------------------------------------------
+bool TTestGroupBase::TRecordingLock::OwnsLock() const
+{
+    return m_Locked;
+}
+//---------------------------------------------------------------------------
+void TTestGroupBase::TRecordingLock::Unlock()
+{
+    m_Locked = false;
+    --m_Group.m_RecordingHolds;
+    m_Group.m_RecordingMutex.unlock();
 }
 //---------------------------------------------------------------------------
 

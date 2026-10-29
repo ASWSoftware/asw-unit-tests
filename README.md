@@ -26,7 +26,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   `std::source_location` report the caller's function and line, without passing
   `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()`
-  compare `float` and `double` values within a tolerance.
+  compare two values within a tolerance: floating point, integers, or a mix.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** -
   `SetExceptionExpected()`, with an optional check of the exception's type and message, and
   [`CheckThrows()`/`CheckNoThrow()`](#checking-that-a-call-throws) for a single call.
@@ -209,6 +209,12 @@ listing tests, and `--list` reports how many tests/groups matched out of the tot
 when output is redirected to a file, there's a record of why fewer tests ran or were listed than
 expected. Likewise, it always states whether shuffle is enabled and, if so, the seed in use.
 
+On Windows, the console runner reads its arguments from the UTF-16 command line rather than the C
+runtime's `argv`, which holds them in the ANSI code page, so a `--filter` pattern, a
+`--project-name` or a `--report-junit` path can hold any character. While it runs, it also sets the
+console's output code page to UTF-8, and restores it afterwards, so non-ASCII test names and
+messages show correctly. Output redirected to a file or a pipe is UTF-8 either way.
+
 `--shuffle` is a sanity check against hidden inter-test/inter-group coupling. The deterministic
 alphabetical default (see [Registering Tests](#registering-tests)) is for readable, reproducible
 output day-to-day, while `--shuffle` deliberately breaks that to surface tests that secretly depend
@@ -235,9 +241,10 @@ partition, the same way `--list` can preview `--filter`.
 `--test-timeout-seconds` guards against a single test hanging (e.g. an infinite loop) forever. There
 is no default; without it, a hung test blocks the run indefinitely. When given, each test runs on
 its own worker thread while the main thread waits with that timeout; a test that finishes normally
-(whether it passes, fails, or throws) is completely unaffected. A test that doesn't finish in time
-is recorded as failed, with a message naming it and the timeout that was exceeded, and the run stops
-there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
+(whether it passes, fails, or throws) is completely unaffected. The worker thread starts with the
+main thread's floating-point environment, such as its rounding mode. A test that doesn't finish in
+time is recorded as failed, with a message naming it and the timeout that was exceeded, and the run
+stops there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
 distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the report still
 gets written, covering every test that completed before the timeout, plus the timed-out test's own
 synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped,
@@ -601,11 +608,21 @@ int32_t i = TStrTool::StrToInt32(invalid);
 ```
 
 If the wrong exception type is thrown, or its message doesn't contain the given substring, the test
-fails with a message showing what was actually caught. This only works for exceptions deriving from
-`std::exception`, or from RAD Studio's RTL `Exception` class when
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled. A thrown object that doesn't
-can't be inspected, so a type/message expectation against it fails with an explanatory message
-rather than silently passing.
+fails with a message showing what was actually caught. The type can be any type that can be thrown:
+a `std::exception` class, RAD Studio's RTL `Exception` class or a subclass when
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled, a class of your own, or even
+`int` or `char const*` (the type a string literal is thrown as):
+
+```
+SetExceptionExpected<int>(__func__, __LINE__, "the legacy parser throws its error code");
+LegacyParse("x");
+```
+
+Only a `std::exception` (its `what()`) and an RTL exception (its `Message`) have a message, so
+expecting a substring from any other type fails, naming the type that was caught (e.g.
+`caught an exception without a message: an object of type "int"`). A class that doesn't derive from
+`std::exception` also matches a `std::exception` subclass derived from it, whose `what()` is then
+checked.
 
 An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails
 the test rather than counting as the expected exception, and so does a failed `Check*` earlier in
@@ -625,11 +642,11 @@ CheckEquals(3u, list.Count(), __func__, __LINE__, "a failed call leaves the list
 CheckNoThrow([&] { list.At(2); }, __func__, __LINE__, "last index");
 ```
 
-The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, and with
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL exception types too. A failed
-`Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the thrown exception; it ends the
-test as usual, unless the requested type is that framework exception (e.g.
-`CheckThrows<TExceptTrue>`).
+The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, of any type (e.g.
+`CheckThrows<int>`), and with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL
+exception types too. A failed `Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the
+thrown exception; it ends the test as usual, unless the requested type is that framework exception
+(e.g. `CheckThrows<TExceptTrue>`).
 
 ### RAD Studio RTL Exceptions (VCL/FMX)
 
@@ -685,10 +702,10 @@ writes its executable to `vcl\console\rad370\<Platform>\<Config>`. The
 ### Comparing System::String (VCL/FMX)
 
 The same `ASWUNITTESTS_RTL_EXCEPTIONS` define (see [above](#rad-studio-rtl-exceptions-vclfmx)) also
-lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`): `Equals`,
-`Contains`, `StartsWith`, `EndsWith`, and their `Not` and `IC` forms. At least one of the two texts
-must be a `System::String`. The other may also be a `std::string`, `std::wstring` or C string,
-including a literal:
+lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`), an `AnsiString`,
+a `UTF8String` or another `AnsiStringT`: `Equals`, `Contains`, `StartsWith`, `EndsWith`, `Matches`,
+and their `Not` and `IC` forms. The other text may be any of those, or a `std::string`,
+`std::wstring` or C string, including a literal:
 
 ```
 CheckEquals("Ready", Label1->Caption, __func__, __LINE__, "status after loading");
@@ -696,11 +713,13 @@ CheckStartsWithIC(Edit1->Text, L"https://", __func__, __LINE__, "a secure URL");
 ```
 
 Both texts are converted to UTF-8 and compared as two `std::string` values, so a failure shows them
-the same way. Narrow text is read as UTF-8, as elsewhere in the framework, and a null C string is
-empty text, as it is for `System::String`. A `System::String` converts implicitly from a number or a
-character, but these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile
-error rather than a comparison with `"5"`. Other RTL string types, such as `AnsiString`, need
-converting to `System::String` first, and the message is still a `std::string`.
+the same way, as for [other strings of different types](#comparing-strings-of-different-types). An
+`AnsiString` is converted from its code page, and narrow text is read as UTF-8, as elsewhere in the
+framework. `CheckMatches` matches with `std::wregex`, so `.` matches one UTF-16 code unit. A null C
+string isn't empty text: it follows the [C string rules](#comparing-c-strings), so it doesn't equal
+an empty `System::String`. A `System::String` converts implicitly from a number or a character, but
+these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile error rather
+than a comparison with `"5"`. The message is still a `std::string`.
 
 ### Omitting the Method and Line (C++20)
 
@@ -756,17 +775,43 @@ A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the val
 strings, `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer
 is shown as `(null)`.
 
-The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring)
-and [prefix and suffix](#checking-the-start-or-end-of-a-string) checks take two C strings too. In
+The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring),
+[prefix and suffix](#checking-the-start-or-end-of-a-string) and
+[regular expression](#matching-a-regular-expression) checks take two C strings too. In
 `CheckEqualsIC` and `CheckNotEqualsIC`, a null pointer only matches another null pointer, as in
-`CheckEquals`. In `CheckContains`, `CheckStartsWith` and `CheckEndsWith`, and their `IC` forms, a
-null pointer, as either the text or the part, matches nothing, so they fail and their `Not` forms
-pass:
+`CheckEquals`. In `CheckContains`, `CheckStartsWith`, `CheckEndsWith` and `CheckMatches`, and their
+`IC` forms, a null pointer, as either the text or the part, matches nothing, so they fail and their
+`Not` forms pass:
 
 ```
 char const* const name = FindName(); // null if not found
 CheckStartsWith(name, "ASW", __func__, __LINE__, "fails, rather than crashing, when not found");
 ```
+
+The same rules apply when a C string is compared with
+[a string of another type](#comparing-strings-of-different-types).
+
+### Comparing Strings of Different Types
+
+The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+and `IC` forms) also take two texts of different types: a `std::string` with a C string, narrow text
+(`std::string`, `char const*`) with wide text (`std::wstring`, `wchar_t const*`), and, in
+[RTL builds](#comparing-systemstring-vclfmx), the RTL string types. Narrow text is read as UTF-8, as
+elsewhere in the framework. Two narrow texts, or two wide ones, are compared as they are. Any other
+pair is converted to UTF-8 and compared as two `std::string` values, so a failure shows both texts
+the same way:
+
+```
+std::wstring const title = window.Title();
+CheckEquals("Settings", title, __func__, __LINE__, "the window's title");
+```
+
+`CheckMatches` and `CheckNotMatches` match two narrow texts with `std::regex`, where `.` matches one
+byte of UTF-8, and any other pair with `std::wregex`, where `.` matches one wide character. On
+Windows, that's one UTF-16 code unit, so a character beyond U+FFFF is two.
+
+A null C string follows the [same rules](#comparing-c-strings) whatever it's compared with: it
+equals only another null C string, narrow or wide, and matches nothing in the other checks.
 
 ### Comparing Pointers
 
@@ -803,8 +848,8 @@ CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
 // Check failed for: "Test_Create" (42): Expected type "TCircle" but was "TSquare". the factory makes a circle
 ```
 
-Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form
-(e.g. a namespace or `class ` prefix) depends on the compiler. With
+Type names come from `std::type_info::name()`, demangled with GCC, Clang and RAD Studio's
+compilers, so their exact form (e.g. a namespace or `class ` prefix) depends on the compiler. With
 [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, a `TObject` descendant is named
 by its `ClassName()` instead (e.g. `TStringList`), the same with every compiler.
 
@@ -886,7 +931,8 @@ CheckMatches(stamp, R"(\d{4}-\d{2}-\d{2})", __func__, __LINE__, "an ISO 8601 dat
 
 Wide text is matched with `std::wregex`, so `.` matches one wide character, and a failure shows it
 as UTF-8. An invalid pattern fails the check, showing `std::regex_error`'s description, rather than
-throwing.
+throwing. The text and the pattern may also be [C strings](#comparing-c-strings), or
+[of different types](#comparing-strings-of-different-types).
 
 ### Comparing Integers of Different Types
 
@@ -952,6 +998,20 @@ sensible tolerance depends heavily on the magnitude and accumulated error of the
 A NaN is near nothing, not even another NaN, so `CheckNear` fails and `CheckNotNear` passes when
 either value is a NaN, whatever the tolerance. Equal infinities are near each other.
 
+A negative or NaN tolerance is a mistake in the test, so both `CheckNear` and `CheckNotNear` fail
+with it, showing the tolerance (e.g. `Invalid tolerance -0.100000: it must be zero or more`).
+
+The three values can be of any integer or floating-point types except `bool`, in any mix, such as
+`CheckNear(2.0, aFloat, 0.01, ...)` or `CheckNear(10, count, 1, ...)`. When any of them is floating
+point, all three are compared as their common type, as the built-in operators do, so an all-`float`
+call keeps `float` arithmetic. Three integers are compared exactly, whatever their types, so
+`-1` and `1u` are 2 apart, and a failure shows them as integers:
+
+```
+CheckNear(10, count, 1, __func__, __LINE__, "about ten");
+// Check failed for: "Test_Count" (42): Expected "10 (tolerance 1)" but was "12 (diff 2)". about ten
+```
+
 ### Comparing Greater Than and Less Than
 
 `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and `CheckLessThanOrEqual`, and their
@@ -972,16 +1032,26 @@ built-in operators do, and a NaN fails every check.
 ### Checking for Empty
 
 `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take anything with an `empty()`
-member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, and with
-[RTL support](#comparing-systemstring-vclfmx), a `System::String`. Unlike
-`CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element count of a
-container with a `size()`:
+member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, a C string
+(`char const*` or `wchar_t const*`, including character arrays), and with
+[RTL support](#comparing-systemstring-vclfmx), a `System::String`, `AnsiString` or `UTF8String`.
+Unlike `CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element
+count of a container with a `size()`:
 
 ```
 CheckEmpty(errors, __func__, __LINE__, "no errors reported");
 // Check failed for: "Test_Load" (42): Expected empty but had 2 elements. no errors reported
 CheckEmpty(GetWarning(), __func__, __LINE__, "no warning");
 // Check failed for: "Test_Load" (43): Expected empty but was "low disk space". no warning
+```
+
+A character array is checked as the text it holds, whatever its size, so `char name[32] = ""` is
+empty. A null C string is neither empty nor not empty: both checks fail, showing it as `(null)`:
+
+```
+char const* name = nullptr;
+CheckNotEmpty(name, __func__, __LINE__, "has a name");
+// Check failed for: "Test_Load" (44): Expected not empty but was "(null)". has a name
 ```
 
 ### Checking for Null
@@ -1254,6 +1324,11 @@ For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the s
 Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own
 project, plus your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after
 updating the submodule.
+
+On Windows, `main.cpp` defines `_tmain` (`main` elsewhere), so a project that maps `TCHAR` to
+`wchar_t`, such as a RAD Studio project with "TCHAR maps to" set to `wchar_t`, links as well as one
+that maps it to `char`. On Windows, the framework also uses `CommandLineToArgvW()`, from `shell32`,
+which MSVC, MinGW and RAD Studio link by default.
 
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to
 enable [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and

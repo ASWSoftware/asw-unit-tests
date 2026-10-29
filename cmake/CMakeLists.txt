@@ -35,6 +35,8 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../tests/Test_ASWUnitTests_TestBase.cpp
     ../tests/Test_ASWUnitTests_Utils.cpp
     ../tests/Test_ASWUnitTests_Version.cpp
+    ../tests/UT_Helper_ExceptionTypes.cpp
+    ../tests/UT_Helper_StringChecks.cpp
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp
     ../toTest/ASWTools_String.cpp
@@ -89,6 +91,8 @@ if(WIN32)
         ../win32/gui/src
         ../win32/tests
     )
+    # CommandLineToArgvW(), used by src/ASWUnitTests_Utils.cpp and the Win32 GUI's units. MSVC and MinGW link
+    # shell32 by default; naming it doesn't depend on that.
     target_link_libraries(ASWUnitTests PRIVATE shell32)
 endif()
 

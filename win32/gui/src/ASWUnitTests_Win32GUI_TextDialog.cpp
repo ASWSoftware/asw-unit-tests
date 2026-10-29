@@ -27,6 +27,8 @@ limitations under the License.
 #include <algorithm>
 #include <stdexcept>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_DialogTemplate.h"
 #include "ASWUnitTests_Win32GUI_DPI.h"
 #include "ASWUnitTests_Win32GUI_System.h"

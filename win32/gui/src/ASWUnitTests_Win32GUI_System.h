@@ -44,10 +44,6 @@ namespace ASWUnitTests
 // The text with every line break made CRLF, which an EDIT control needs: a lone LF or CR becomes CRLF, much as
 // the VCL's AdjustLineBreaks() does for the VCL GUI runner.
 std::string AdjustLineBreaks(std::string const& text);
-// The arguments in a Windows command line such as GetCommandLineW()'s, without the program name, converted to
-// UTF-8. Split by CommandLineToArgvW(), whose quoting rules are those of the C runtime's argv in the console
-// runner.
-std::vector<std::string> CommandLineArguments(std::wstring const& commandLine);
 // Creates the folder, and any of its parent folders that don't exist yet; succeeds if it already exists. Throws
 // std::runtime_error if it can't be created. 'folderPath' must be absolute.
 void CreateFolderPath(std::string const& folderPath);
@@ -79,9 +75,6 @@ bool RemoveFile(std::string const& path);
 // Replaces the clipboard's content with the text, for 'owner' (a window of this process). Throws
 // std::runtime_error if it can't, e.g. while another program has the clipboard open.
 void SetClipboardText(HWND owner, std::string const& text);
-// Converts UTF-8 text to UTF-16 for Windows. Invalid UTF-8 becomes U+FFFD. The framework's WideToUTF8()
-// (ASWUnitTests_Utils.h) converts back.
-std::wstring UTF8ToWide(std::string const& text);
 // The window's text, e.g. a control's, converted to UTF-8.
 std::string WindowText(HWND window);
 // Replaces the file's content with 'bytes', unchanged, creating the file if needed (but not its folder).

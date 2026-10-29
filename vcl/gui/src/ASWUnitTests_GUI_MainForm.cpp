@@ -1473,8 +1473,8 @@ bool TFormASWUnitTestsGUIMain::WasRunAborted() const
 /*
     TFormASWUnitTestsGUIMain::WriteJUnitReport
 
-    Writes the file itself, rather than with TJUnitReportWriter::Write(), whose std::ofstream can't open a
-    path with characters outside the system code page (e.g. a user folder's name) from a std::string.
+    Writes the file itself, rather than with TJUnitReportWriter::Write(), so a failure can say why: Write() only
+    returns false.
 */
 bool TFormASWUnitTestsGUIMain::WriteJUnitReport(System::UnicodeString const& path, std::string& error)
 {

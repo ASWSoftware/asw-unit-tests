@@ -32,7 +32,6 @@ limitations under the License.
 #include <algorithm>
 #include <cstddef>
 #include <limits>
-#include <memory>
 #include <stdexcept>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Utils.h"
@@ -46,10 +45,6 @@ namespace
 
 // The most bytes one ReadFile() or WriteFile() call is asked to transfer.
 DWORD const MaxFileChunk = 1u << 30;
-
-// A buffer from CommandLineToArgvW() or FormatMessageW(), freed with LocalFree().
-template <typename T>
-using TLocalPtr = std::unique_ptr<T, HLOCAL(WINAPI*)(HLOCAL)>;
 
 //---------------------------------------------------------------------------
 
@@ -77,8 +72,6 @@ public:
 //---------------------------------------------------------------------------
 
 std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error);
-std::string SystemErrorText(DWORD error);
-int ToConversionLength(std::size_t length);
 std::string WithExtension(std::string const& path, std::string const& extension);
 
 //---------------------------------------------------------------------------
@@ -90,43 +83,6 @@ std::string WithExtension(std::string const& path, std::string const& extension)
 std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error)
 {
     return std::runtime_error("Couldn't " + action + " " + path + ": " + SystemErrorText(error));
-}
-//---------------------------------------------------------------------------
-/*
-    SystemErrorText
-
-    Windows' description of a GetLastError() code, e.g. "Access is denied.".
-*/
-std::string SystemErrorText(DWORD error)
-{
-    wchar_t* buffer = nullptr;
-    DWORD const length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, error, 0, reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
-
-    if (length == 0 || buffer == nullptr)
-        return "error " + std::to_string(error);
-
-    TLocalPtr<wchar_t> const owner(buffer, &LocalFree);
-    std::wstring text(buffer, length);
-
-    // FormatMessageW() ends the text with a line break.
-    while (!text.empty() && (text.back() == L'\r' || text.back() == L'\n' || text.back() == L' '))
-        text.pop_back();
-
-    return WideToUTF8(text);
-}
-//---------------------------------------------------------------------------
-/*
-    ToConversionLength
-
-    A length for MultiByteToWideChar() or WideCharToMultiByte(), which take an int.
-*/
-int ToConversionLength(std::size_t length)
-{
-    if (length > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
-        throw std::length_error("text too long to convert");
-
-    return static_cast<int>(length);
 }
 //---------------------------------------------------------------------------
 /*
@@ -202,27 +158,6 @@ std::string AdjustLineBreaks(std::string const& text)
     }
 
     return adjusted;
-}
-//---------------------------------------------------------------------------
-std::vector<std::string> CommandLineArguments(std::wstring const& commandLine)
-{
-    // CommandLineToArgvW() splits an empty command line as if it were this executable's path, unquoted, so a path
-    // with a space in it would become a program name and an argument.
-    if (commandLine.empty())
-        return std::vector<std::string>();
-
-    int count = 0;
-    TLocalPtr<wchar_t*> const argv(CommandLineToArgvW(commandLine.c_str(), &count), &LocalFree);
-
-    if (argv == nullptr)
-        throw std::runtime_error("Couldn't split the command line: " + SystemErrorText(GetLastError()));
-
-    std::vector<std::string> args;
-
-    for (int i = 1; i < count; ++i)
-        args.push_back(WideToUTF8(argv.get()[i]));
-
-    return args;
 }
 //---------------------------------------------------------------------------
 void CreateFolderPath(std::string const& folderPath)
@@ -416,22 +351,6 @@ void SetClipboardText(HWND owner, std::string const& text)
         GlobalFree(memory);
         throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(error));
     }
-}
-//---------------------------------------------------------------------------
-std::wstring UTF8ToWide(std::string const& text)
-{
-    if (text.empty())
-        return std::wstring();
-
-    int const length = ToConversionLength(text.size());
-    int const wideLength = MultiByteToWideChar(CP_UTF8, 0, text.data(), length, nullptr, 0);
-
-    if (wideLength <= 0)
-        throw std::runtime_error("Couldn't convert UTF-8 text: " + SystemErrorText(GetLastError()));
-
-    std::wstring wide(static_cast<std::size_t>(wideLength), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, text.data(), length, &wide[0], wideLength);
-    return wide;
 }
 //---------------------------------------------------------------------------
 std::string WindowText(HWND window)

@@ -62,6 +62,7 @@ private: // Test methods
     void Test_ParseArguments_Pause();
     void Test_ParseArguments_ReportAndProjectName();
     void Test_ParseArguments_Shuffle();
+    void Test_ParseArguments_Strings_SkipProgramNameAndKeepUTF8();
     void Test_ParseArguments_TestTimeout();
     void Test_ParseColorMode();
     void Test_ParseUnsignedInt_Invalid();

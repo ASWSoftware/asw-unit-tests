@@ -30,6 +30,8 @@ limitations under the License.
 #include <stdexcept>
 #include <string>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_DialogTemplate.h"
 #include "ASWUnitTests_Win32GUI_DPI.h"
 #include "ASWUnitTests_Win32GUI_System.h"

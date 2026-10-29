@@ -80,13 +80,9 @@ TGUICommandLineResult TGUICommandLine::Parse(std::vector<std::string> const& arg
             cliArgs.push_back(arg);
     }
 
-    std::vector<char*> argv;
-    for (std::string& arg : cliArgs)
-        argv.push_back(&arg[0]);
-
     {
         TStdOutRedirect const capture;
-        result.EarlyExitCode = TCLIParser::ParseArguments(static_cast<int>(argv.size()), argv.data(), options.CLI);
+        result.EarlyExitCode = TCLIParser::ParseArguments(cliArgs, options.CLI);
         result.Message = capture.Str();
     }
 

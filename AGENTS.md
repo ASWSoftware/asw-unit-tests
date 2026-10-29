@@ -53,9 +53,21 @@ Keep all source files (`.cpp`/`.h`) plain ASCII, including comments. MSVC reads 
 
 - Insert new class methods in alphabetical order within their existing section. If the class has named or visibly separated sections, preserve those sections and alphabetize only within the relevant section.
 - Insert new free functions in alphabetical order within their existing section. Apply the same section rule when functions are grouped.
+- Lay out a new class's members by kind, each kind in a section of its own with its own access label, even when the label repeats: nested types first, then static data, then data members, then the methods, grouped by access (private, then protected, then public), with each group's static methods in a section before its other methods. See `TWin32GUIMainWindow` (`win32/gui/src/ASWUnitTests_Win32GUI_MainWindow.h`) and `TStringCheckProbe` (`tests/UT_Helper_StringChecks.h`).
 - Follow the surrounding naming, indentation, brace, include, and comment style. Avoid unrelated formatting changes.
 - Keep declarations and definitions consistent, and update all relevant project or build files when adding, removing or renaming source files, including `Deploy.bat`, which copies an explicit list of files, and the `*_Sources.cmake` files (`src/`, `gui/src/`, `win32/gui/src/`), which list each folder's sources for projects that use this repository as a submodule.
 - Add or update focused tests for behavior changes, including error and platform-specific cases where applicable.
+- Each unit under test has exactly one test module: `ASWUnitTests_X` is tested by `Test_ASWUnitTests_X.cpp`/`.h` (class `TTest_ASWUnitTests_X`, group name `"ASWUnitTests_X_Tests"`), in the matching tests folder, and its tests go there, however large it grows. Supporting code that isn't a test itself, such as a fixture group or a probe whose templates are instantiated for the tests, may go in a helper module named `UT_Helper_<what>.cpp`/`.h` in the same folder (e.g. `tests/UT_Helper_StringChecks`), listed in the projects and build files like any other source file.
+- RAD Studio's Win32 linker (ilink32) limits the line-number debug information of each module (its "Line number cache"), and `tests/Test_ASWUnitTests_TestBase.cpp` is close to that limit. A Win32 Debug build then fails with "Fatal: Exceeded memory limit for block Line number cache in module ...". Every distinct lambda registered as a test costs a `std::function` instantiation, so prefer a few tests that each check many cases (or parameterized tests, which share one callback) to hundreds of registered lambdas, and move heavy template instantiations into a `UT_Helper_` module, defined and explicitly instantiated in its `.cpp`. Check with the VCL console's Win32 Debug build, which links the most modules.
+
+## Naming and Style
+
+- New enums take an `E` prefix (`EWin32GUICommand`); classes and structs take `T`. Existing enums that use `T` (e.g. `TLogKind`, `TTestOutcome`) keep it.
+- Write acronyms in identifiers and file names in uppercase: `GUI`, `CLI`, `RTL`, `UTF8`, `XML` (e.g. `TCLIParser`, `ToUTF8`, `ASWUnitTests_GUI_TestList`). `JUnit` is a name, not an acronym. Check an existing name against this rule before copying its casing.
+- Compare a pointer, `std::function` or other nullable value with `nullptr` explicitly (`if (filter != nullptr)`), rather than relying on its conversion to `bool` (`if (filter)`).
+- In a `.cpp` file, describe a function in a block comment between its `//----` separator line and its definition (`/*`, the function's name, a blank line, the description, `*/`), not in `//` lines above it; a function that needs no explanation gets no comment. Declarations in a header keep `//` comments. See `win32/gui/src/ASWUnitTests_Win32GUI_System.cpp`.
+- Suppress an intentional MSVC warning with `#pragma warning(push)`, `#pragma warning(disable: N)` and `#pragma warning(pop)` around the whole function or block, guarded by `#if defined(_MSC_VER)`, never with `#pragma warning(suppress: N)`: MSVC checks some warnings (e.g. C4702) against the state at the end of the function, after a `suppress` has lapsed.
+- Don't name an identifier `assert`, even a parameter: `assert()` is a macro wherever `<cassert>` is included, and the VCL headers include it.
 
 ## Building and Testing
 
@@ -89,5 +101,7 @@ git config --local core.hooksPath .githooks/
 ```
 
 Wrap Markdown prose at 100 columns in `README.md`, `CONTRIBUTING.md` and `CHANGELOG.md`, re-wrapping the edited paragraph when a change makes a line too long. Don't split inline code or a link's text across lines. Code blocks and tables are exempt, and so is a line that only overflows because a single link or URL can't be split.
+
+Don't use em dashes in anything written for this repository (documentation, comments, messages): use a hyphen with a space on each side (" - "), or restructure the sentence.
 
 Review the final diff for accidental file changes, ordering regressions, missing includes, platform assumptions, and tests that do not actually exercise the changed behavior. Do not commit changes unless the user explicitly requests a commit.

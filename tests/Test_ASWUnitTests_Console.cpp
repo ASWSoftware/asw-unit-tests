@@ -24,7 +24,14 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Console.h"
 //---------------------------------------------------------------------------
+#include <cstdint>
 #include <string>
+#if defined(_WIN32)
+#  if !defined(WIN32_LEAN_AND_MEAN)
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -42,6 +49,10 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_Console::TTest_ASWUnitTests_Console()
     : inherited("ASWUnitTests_Console_Tests")
 {
+#if defined(_WIN32)
+    RegisterTest(&TTest_ASWUnitTests_Console::Test_ConsoleUTF8Output_SetsUTF8UntilRestored,
+        "ConsoleUTF8Output_SetsUTF8UntilRestored");
+#endif
     RegisterTest(&TTest_ASWUnitTests_Console::Test_ParseColorName_RejectsInvalid, "ParseColorName_RejectsInvalid");
     RegisterTest(&TTest_ASWUnitTests_Console::Test_ParseColorName_Recognizes, "ParseColorName_Recognizes");
     RegisterTest(&TTest_ASWUnitTests_Console::Test_StripColor_RemovesColorCodesOnly, "StripColor_RemovesColorCodesOnly");
@@ -72,6 +83,49 @@ void TTest_ASWUnitTests_Console::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+void TTest_ASWUnitTests_Console::Test_ConsoleUTF8Output_SetsUTF8UntilRestored()
+{
+    // Arrange: the console runner has already set UTF-8 (see main()), so another code page is set first, and the
+    // original is put back at the end.
+    UINT const outerCodePage = GetConsoleOutputCP();
+    if (outerCodePage == 0 || !SetConsoleOutputCP(437))
+        Skip(__func__, __LINE__, "needs a console, which a GUI runner doesn't have");
+
+    // Act
+    UINT duringFirst = 0;
+    UINT afterRestore = 0;
+    UINT duringSecond = 0;
+    UINT afterDestructor = 0;
+    {
+        TConsoleUTF8Output first;
+        duringFirst = GetConsoleOutputCP();
+        first.Restore();
+        afterRestore = GetConsoleOutputCP();
+        SetConsoleOutputCP(850); // Which the destructor, restoring again, mustn't undo.
+    }
+    UINT const afterFirstDestructor = GetConsoleOutputCP();
+    {
+        TConsoleUTF8Output const second;
+        duringSecond = GetConsoleOutputCP();
+    }
+    afterDestructor = GetConsoleOutputCP();
+
+    SetConsoleOutputCP(outerCodePage);
+
+    // Assert
+    CheckEquals(static_cast<uint32_t>(CP_UTF8), static_cast<uint32_t>(duringFirst), __func__, __LINE__,
+        "UTF-8 while it exists");
+    CheckEquals(437u, static_cast<uint32_t>(afterRestore), __func__, __LINE__, "Restore() puts the original back");
+    CheckEquals(850u, static_cast<uint32_t>(afterFirstDestructor), __func__, __LINE__,
+        "and the destructor then leaves the console alone");
+    CheckEquals(static_cast<uint32_t>(CP_UTF8), static_cast<uint32_t>(duringSecond), __func__, __LINE__,
+        "UTF-8 again for a second one");
+    CheckEquals(850u, static_cast<uint32_t>(afterDestructor), __func__, __LINE__,
+        "whose destructor puts the original back");
+}
+#endif
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Console::Test_ParseColorName_RejectsInvalid()
 {

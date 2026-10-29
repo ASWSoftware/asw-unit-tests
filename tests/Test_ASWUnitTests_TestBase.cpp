@@ -26,11 +26,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <atomic>
+#include <cfenv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <forward_list>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
@@ -46,6 +48,9 @@ limitations under the License.
 #if defined(__cpp_lib_string_view)
 #  include <string_view>
 #endif
+#if defined(__BORLANDC__) && !defined(_WIN64)
+#  include <float.h> // _control87(), for RoundingMode()
+#endif
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
@@ -55,6 +60,9 @@ limitations under the License.
 #include "ASWUnitTests_JUnitReport.h"
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
+//---------------------------------------------------------------------------
+#include "UT_Helper_ExceptionTypes.h"
+#include "UT_Helper_StringChecks.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -238,9 +246,10 @@ public:
 // TFixture_EmptyChecks
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing AssertEmpty()/CheckEmpty()/
-// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), and (where the
-// library has it) std::string_view, so Test_Empty_ShowsContentsOnFailure below can check what each failure shows.
-// Test names self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
+// AssertNotEmpty()/CheckNotEmpty() with strings, wide strings, containers with and without size(), C strings and
+// character arrays (narrow and wide, null included), and (where the library has it) std::string_view, so
+// Test_Empty_ShowsContentsOnFailure below can check what each failure shows. Test names self-document expected
+// outcome via NameEndsWith(), same as TFixture_ExceptionExpectations below.
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_EmptyChecks : public TTestGroupBase
 {
@@ -249,19 +258,36 @@ private:
 
 private:
     void Test_AssertEmpty_EmptyString_Passes();
+    void Test_AssertEmpty_NullCString_Fails();
     void Test_AssertEmpty_String_Fails();
+    void Test_AssertEmpty_WideArray_Passes();
     void Test_AssertNotEmpty_EmptyVector_Fails();
+    void Test_AssertNotEmpty_EmptyWideCString_Fails();
+    void Test_AssertNotEmpty_NullCString_Fails();
     void Test_AssertNotEmpty_Vector_Passes();
+    void Test_AssertNotEmpty_WideCString_Passes();
+    void Test_CheckEmpty_CharArray_Fails();
+    void Test_CheckEmpty_EmptyCharArray_Passes();
     void Test_CheckEmpty_EmptyMap_Passes();
     void Test_CheckEmpty_ForwardList_Fails();
+    void Test_CheckEmpty_NullWideCString_Fails();
     void Test_CheckEmpty_OneElement_Fails();
 #if defined(__cpp_lib_string_view)
     void Test_CheckEmpty_StringView_Fails();
 #endif
     void Test_CheckEmpty_Vector_Fails();
+    void Test_CheckEmpty_WideCString_Fails();
     void Test_CheckEmpty_WideString_Fails();
+    void Test_CheckNotEmpty_CString_Passes();
+    void Test_CheckNotEmpty_EmptyCharPointer_Fails();
     void Test_CheckNotEmpty_EmptyString_Fails();
+    void Test_CheckNotEmpty_NullCString_Fails();
+    void Test_CheckNotEmpty_NullWideCString_Fails();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_CheckNotEmpty_SourceLocation_Passes();
+#endif
     void Test_CheckNotEmpty_String_Passes();
+    void Test_CheckNotEmpty_WideArray_Passes();
 
 public:
     TFixture_EmptyChecks();
@@ -594,6 +620,32 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_FloatingPointEnvironment
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group with one test that records the floating-point
+// environment it runs in: the rounding mode, and whether long double arithmetic keeps its precision. Used by
+// Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment below, which compares them with the calling thread's.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_FloatingPointEnvironment : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_RecordsEnvironment();
+
+public:
+    bool LongDoublePrecisionInTest = false; // LongDoubleKeepsPrecision() in the test.
+    int RoundingModeInTest = -1;
+
+    TFixture_FloatingPointEnvironment();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_IntegerComparisons
 //
 // A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing the integer template overloads
@@ -795,6 +847,62 @@ private:
 
 public:
     TFixture_NearComparisons();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearMixedTypes
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group calling the Near and NotNear methods with mixed
+// types (integers, float, double, long double, mixed signedness) and with invalid tolerances, so
+// Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance below can check each outcome and message. It overrides
+// CheckNear(double, ...) to count its calls: a call whose common type is double must still reach it. Test names
+// self-document expected outcome via NameEndsWith(), same as TFixture_ExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_NearMixedTypes : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertNear_Integers_Fails();
+    void Test_AssertNear_NegativeTolerance_Fails();
+    void Test_AssertNotNear_FloatNaNTolerance_Fails();
+    void Test_AssertNotNear_MixedSigns_Passes();
+    void Test_CheckNear_DoubleAndFloat_Fails();
+    void Test_CheckNear_DoubleAndFloat_Passes();
+    void Test_CheckNear_FloatsAndDoubleTolerance_Passes();
+    void Test_CheckNear_IntegerBoundary_Passes();
+    void Test_CheckNear_IntegerExtremes_Passes();
+    void Test_CheckNear_IntegerSumOverflows_Fails();
+    void Test_CheckNear_Integers_Fails();
+    void Test_CheckNear_LongDouble_Fails();
+    void Test_CheckNear_LongDouble_Passes();
+    void Test_CheckNear_MixedSigns_Passes();
+    void Test_CheckNear_NaNAndFloat_Fails();
+    void Test_CheckNear_NaNTolerance_Fails();
+    void Test_CheckNear_NegativeIntegerTolerance_Fails();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    void Test_CheckNear_SourceLocation_Passes();
+#endif
+    void Test_CheckNotNear_DoubleAndFloat_Fails();
+    void Test_CheckNotNear_Integers_Fails();
+    void Test_CheckNotNear_LongDoublePrecision_Passes();
+    void Test_CheckNotNear_NegativeTolerance_Fails();
+
+protected:
+    using inherited::CheckNear;
+
+    void CheckNear(double expected, double actual, double tolerance, std::string const& method, int line,
+        std::string const& msg) override;
+
+public:
+    int DoubleCheckNearCalls = 0; // Calls of CheckNear(double, ...), the override above.
+
+    TFixture_NearMixedTypes();
 
     void SetUp_Group() override {}
     void TearDown_Group() override {}
@@ -1756,6 +1864,40 @@ public:
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TCrashOnLogObserver
+//
+// A TRecordingObserver whose first OnLog() crashes, for the Run_*CrashInRunObserver* tests below: the crash
+// comes while the group holds the lock it records and logs under. An integer divide by zero, like
+// TFixture_CrashingTest's, so the run continues on POSIX too. It crashes before TRecordingObserver::OnLog()
+// takes its own lock, which the crash would leave locked.
+/////////////////////////////////////////////////////////////////////////////
+class TCrashOnLogObserver : public TRecordingObserver
+{
+private:
+    std::atomic<bool> m_Crashed;
+
+public:
+    TCrashOnLogObserver()
+        : m_Crashed(false)
+    {
+    }
+
+    void OnLog(std::string const& text) override
+    {
+        if (!m_Crashed.exchange(true))
+        {
+            volatile int numerator = 42;
+            volatile int denominator = 0;
+            volatile int const quotient = numerator / denominator;
+            (void)quotient;
+        }
+
+        TRecordingObserver::OnLog(text);
+    }
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TSlowFinishObserver
 //
 // A TRecordingObserver that takes 1.5 seconds over a test's "Finished test" log line, which a test logs while
@@ -1777,8 +1919,12 @@ public:
 //---------------------------------------------------------------------------
 
 size_t CountOccurrences(std::string const& text, std::string const& needle);
+int DownwardRoundingMode();
 TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const& testName);
+bool LongDoubleKeepsPrecision();
 bool NameEndsWith(std::string const& name, std::string const& suffix);
+int RoundingMode();
+void SetRoundingMode(int mode);
 
 //---------------------------------------------------------------------------
 /*
@@ -1794,6 +1940,20 @@ size_t CountOccurrences(std::string const& text, std::string const& needle)
         ++count;
 
     return count;
+}
+//---------------------------------------------------------------------------
+/*
+    DownwardRoundingMode
+
+    The rounding mode that rounds toward negative infinity, as RoundingMode() returns it.
+*/
+int DownwardRoundingMode()
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return RC_DOWN;
+#else
+    return FE_DOWNWARD;
+#endif
 }
 //---------------------------------------------------------------------------
 /*
@@ -1813,6 +1973,20 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 }
 //---------------------------------------------------------------------------
 /*
+    LongDoubleKeepsPrecision
+
+    True if long double arithmetic on this thread keeps all of long double's digits: 1 plus its epsilon isn't 1.
+    Where long double is wider than double, x87 arithmetic set to double precision rounds that sum to 1, as on a
+    new llvm-mingw thread. The volatile load keeps the sum from being computed at compile time.
+*/
+bool LongDoubleKeepsPrecision()
+{
+    long double volatile one = 1.0L;
+    long double const sum = one + std::numeric_limits<long double>::epsilon();
+    return sum != one;
+}
+//---------------------------------------------------------------------------
+/*
     NameEndsWith
 
     True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
@@ -1823,6 +1997,36 @@ TTestCaseRecord const* FindRecord(TTestResults const& results, std::string const
 bool NameEndsWith(std::string const& name, std::string const& suffix)
 {
     return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+//---------------------------------------------------------------------------
+/*
+    RoundingMode
+
+    This thread's floating-point rounding mode, as std::fegetround() returns it. RAD Studio's 32-bit runtime
+    declares std::fegetround() and std::fesetround() but doesn't define them, so there it's the x87 control
+    word's rounding bits instead (see SetRoundingMode() and DownwardRoundingMode()).
+*/
+int RoundingMode()
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return static_cast<int>(_control87(0, 0) & MCW_RC);
+#else
+    return std::fegetround();
+#endif
+}
+//---------------------------------------------------------------------------
+/*
+    SetRoundingMode
+
+    Sets this thread's rounding mode to 'mode' (from RoundingMode() or DownwardRoundingMode()).
+*/
+void SetRoundingMode(int mode)
+{
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    _control87(static_cast<unsigned int>(mode), MCW_RC);
+#else
+    std::fesetround(mode);
+#endif
 }
 //---------------------------------------------------------------------------
 
@@ -2435,19 +2639,39 @@ TFixture_EmptyChecks::TFixture_EmptyChecks()
     SetLogSuppressed(true);
 
     RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes, "AssertEmpty_EmptyString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_NullCString_Fails, "AssertEmpty_NullCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_String_Fails, "AssertEmpty_String_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertEmpty_WideArray_Passes, "AssertEmpty_WideArray_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails, "AssertNotEmpty_EmptyVector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyWideCString_Fails,
+        "AssertNotEmpty_EmptyWideCString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_NullCString_Fails, "AssertNotEmpty_NullCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes, "AssertNotEmpty_Vector_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_AssertNotEmpty_WideCString_Passes, "AssertNotEmpty_WideCString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_CharArray_Fails, "CheckEmpty_CharArray_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_EmptyCharArray_Passes, "CheckEmpty_EmptyCharArray_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes, "CheckEmpty_EmptyMap_Passes");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails, "CheckEmpty_ForwardList_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_NullWideCString_Fails, "CheckEmpty_NullWideCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails, "CheckEmpty_OneElement_Fails");
 #if defined(__cpp_lib_string_view)
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_StringView_Fails, "CheckEmpty_StringView_Fails");
 #endif
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails, "CheckEmpty_Vector_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_WideCString_Fails, "CheckEmpty_WideCString_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails, "CheckEmpty_WideString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_CString_Passes, "CheckNotEmpty_CString_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyCharPointer_Fails,
+        "CheckNotEmpty_EmptyCharPointer_Fails");
     RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails, "CheckNotEmpty_EmptyString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_NullCString_Fails, "CheckNotEmpty_NullCString_Fails");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_NullWideCString_Fails,
+        "CheckNotEmpty_NullWideCString_Fails");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_SourceLocation_Passes, "CheckNotEmpty_SourceLocation_Passes");
+#endif
     RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes, "CheckNotEmpty_String_Passes");
+    RegisterTest(&TFixture_EmptyChecks::Test_CheckNotEmpty_WideArray_Passes, "CheckNotEmpty_WideArray_Passes");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes()
@@ -2455,9 +2679,20 @@ void TFixture_EmptyChecks::Test_AssertEmpty_EmptyString_Passes()
     AssertEmpty(std::string(), __func__, __LINE__, "empty string");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_NullCString_Fails()
+{
+    AssertEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertEmpty_String_Fails()
 {
     AssertEmpty(std::string("abc"), __func__, __LINE__, "has text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertEmpty_WideArray_Passes()
+{
+    wchar_t const buffer[16] = L"";
+    AssertEmpty(buffer, __func__, __LINE__, "an array holding empty text");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails()
@@ -2465,9 +2700,38 @@ void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyVector_Fails()
     AssertNotEmpty(std::vector<int>(), __func__, __LINE__, "no elements");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_EmptyWideCString_Fails()
+{
+    wchar_t const* const text = L"";
+    AssertNotEmpty(text, __func__, __LINE__, "empty wide C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_NullCString_Fails()
+{
+    AssertNotEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_AssertNotEmpty_Vector_Passes()
 {
     AssertNotEmpty(std::vector<int>{ 1 }, __func__, __LINE__, "one element");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_AssertNotEmpty_WideCString_Passes()
+{
+    wchar_t const* const text = L"x";
+    AssertNotEmpty(text, __func__, __LINE__, "wide C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_CharArray_Fails()
+{
+    char const buffer[32] = "abc";
+    CheckEmpty(buffer, __func__, __LINE__, "an array shows its text, not its size");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_EmptyCharArray_Passes()
+{
+    char const buffer[32] = "";
+    CheckEmpty(buffer, __func__, __LINE__, "an array holding empty text, whatever its size");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_EmptyMap_Passes()
@@ -2479,6 +2743,11 @@ void TFixture_EmptyChecks::Test_CheckEmpty_ForwardList_Fails()
 {
     // std::forward_list has empty() but no size().
     CheckEmpty(std::forward_list<int>{ 1, 2 }, __func__, __LINE__, "no size to show");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_NullWideCString_Fails()
+{
+    CheckEmpty(static_cast<wchar_t const*>(nullptr), __func__, __LINE__, "null wide C string");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_OneElement_Fails()
@@ -2498,10 +2767,30 @@ void TFixture_EmptyChecks::Test_CheckEmpty_Vector_Fails()
     CheckEmpty(std::vector<int>{ 1, 2, 3 }, __func__, __LINE__, "three elements");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckEmpty_WideCString_Fails()
+{
+    // U+00E9 (e with acute accent) is shown as its UTF-8 bytes.
+    wchar_t const* const text = L"caf\x00E9";
+    CheckEmpty(text, __func__, __LINE__, "wide C string");
+}
+//---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckEmpty_WideString_Fails()
 {
     // U+00E9 (e with acute accent) is shown as its UTF-8 bytes.
     CheckEmpty(std::wstring(L"caf\x00E9"), __func__, __LINE__, "wide text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_CString_Passes()
+{
+    char const* const text = "abc";
+    CheckNotEmpty(text, __func__, __LINE__, "C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyCharPointer_Fails()
+{
+    char buffer[8] = "";
+    char* const text = buffer;
+    CheckNotEmpty(text, __func__, __LINE__, "a char* to empty text");
 }
 //---------------------------------------------------------------------------
 void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails()
@@ -2509,9 +2798,33 @@ void TFixture_EmptyChecks::Test_CheckNotEmpty_EmptyString_Fails()
     CheckNotEmpty(std::string(), __func__, __LINE__, "empty string");
 }
 //---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_NullCString_Fails()
+{
+    CheckNotEmpty(static_cast<char const*>(nullptr), __func__, __LINE__, "null C string");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_NullWideCString_Fails()
+{
+    CheckNotEmpty(static_cast<wchar_t const*>(nullptr), __func__, __LINE__, "null wide C string");
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TFixture_EmptyChecks::Test_CheckNotEmpty_SourceLocation_Passes()
+{
+    wchar_t buffer[8] = L"x";
+    CheckNotEmpty(buffer, "a wchar_t array through the std::source_location form");
+}
+//---------------------------------------------------------------------------
+#endif
 void TFixture_EmptyChecks::Test_CheckNotEmpty_String_Passes()
 {
     CheckNotEmpty(std::string("abc"), __func__, __LINE__, "has text");
+}
+//---------------------------------------------------------------------------
+void TFixture_EmptyChecks::Test_CheckNotEmpty_WideArray_Passes()
+{
+    wchar_t const buffer[16] = L"abc";
+    CheckNotEmpty(buffer, __func__, __LINE__, "an array holding text");
 }
 //---------------------------------------------------------------------------
 
@@ -3392,6 +3705,27 @@ void TFixture_FailCalls::Test_Fail_WhileExceptionExpected_Fails()
 
 
 /////////////////////////////////////////////////////////////////////////////
+// TFixture_FloatingPointEnvironment
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_FloatingPointEnvironment::TFixture_FloatingPointEnvironment()
+    : inherited("Fixture_FloatingPointEnvironment")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_FloatingPointEnvironment::Test_RecordsEnvironment, "RecordsEnvironment");
+}
+//---------------------------------------------------------------------------
+void TFixture_FloatingPointEnvironment::Test_RecordsEnvironment()
+{
+    LongDoublePrecisionInTest = LongDoubleKeepsPrecision();
+    RoundingModeInTest = RoundingMode();
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TFixture_IntegerComparisons
 /////////////////////////////////////////////////////////////////////////////
 
@@ -3893,6 +4227,181 @@ void TFixture_NearComparisons::Test_CheckNotNear_AtToleranceBoundary_Fails()
 void TFixture_NearComparisons::Test_CheckNotNear_JustOutsideTolerance_Passes()
 {
     CheckNotNear(1.0f, 1.51f, 0.5f, __func__, __LINE__, "diff (0.51) exceeds tolerance: correctly 'not near'");
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_NearMixedTypes
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_NearMixedTypes::TFixture_NearMixedTypes()
+    : inherited("Fixture_NearMixedTypes")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNear_Integers_Fails, "AssertNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNear_NegativeTolerance_Fails,
+        "AssertNear_NegativeTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNotNear_FloatNaNTolerance_Fails,
+        "AssertNotNear_FloatNaNTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_AssertNotNear_MixedSigns_Passes, "AssertNotNear_MixedSigns_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Fails, "CheckNear_DoubleAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Passes, "CheckNear_DoubleAndFloat_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_FloatsAndDoubleTolerance_Passes,
+        "CheckNear_FloatsAndDoubleTolerance_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerBoundary_Passes, "CheckNear_IntegerBoundary_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerExtremes_Passes, "CheckNear_IntegerExtremes_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_IntegerSumOverflows_Fails,
+        "CheckNear_IntegerSumOverflows_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_Integers_Fails, "CheckNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Fails, "CheckNear_LongDouble_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Passes, "CheckNear_LongDouble_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_MixedSigns_Passes, "CheckNear_MixedSigns_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NaNAndFloat_Fails, "CheckNear_NaNAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NaNTolerance_Fails, "CheckNear_NaNTolerance_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_NegativeIntegerTolerance_Fails,
+        "CheckNear_NegativeIntegerTolerance_Fails");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNear_SourceLocation_Passes, "CheckNear_SourceLocation_Passes");
+#endif
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_DoubleAndFloat_Fails, "CheckNotNear_DoubleAndFloat_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_Integers_Fails, "CheckNotNear_Integers_Fails");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_LongDoublePrecision_Passes,
+        "CheckNotNear_LongDoublePrecision_Passes");
+    RegisterTest(&TFixture_NearMixedTypes::Test_CheckNotNear_NegativeTolerance_Fails,
+        "CheckNotNear_NegativeTolerance_Fails");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::CheckNear(double expected, double actual, double tolerance, std::string const& method,
+    int line, std::string const& msg)
+{
+    ++DoubleCheckNearCalls;
+    inherited::CheckNear(expected, actual, tolerance, method, line, msg);
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNear_Integers_Fails()
+{
+    AssertNear(10, 13, 2, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNear_NegativeTolerance_Fails()
+{
+    AssertNear(1.0, 1.0, -0.5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNotNear_FloatNaNTolerance_Fails()
+{
+    AssertNotNear(1.0f, 5.0f, std::numeric_limits<float>::quiet_NaN(), __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_AssertNotNear_MixedSigns_Passes()
+{
+    // -1 and 1u differ by 2: as their common type (unsigned int), -1 would wrap to UINT_MAX.
+    AssertNotNear(-1, 1u, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Fails()
+{
+    CheckNear(2.0, 2.5f, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_DoubleAndFloat_Passes()
+{
+    float const actual = 2.005f;
+    CheckNear(2.0, actual, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_FloatsAndDoubleTolerance_Passes()
+{
+    CheckNear(1.0f, 1.5f, 0.5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerBoundary_Passes()
+{
+    std::size_t const count = 11;
+    CheckNear(10, count, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerExtremes_Passes()
+{
+    CheckNear(std::numeric_limits<int64_t>::min(), std::numeric_limits<int64_t>::max(),
+        std::numeric_limits<uint64_t>::max(), __func__, __LINE__, "a difference of exactly UINT64_MAX");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_IntegerSumOverflows_Fails()
+{
+    CheckNear(static_cast<int64_t>(-1), std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint64_t>::max(),
+        __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_Integers_Fails()
+{
+    CheckNear(10, static_cast<std::size_t>(12), 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Fails()
+{
+    CheckNear(1.0L, 1.5L, 0.25L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_LongDouble_Passes()
+{
+    CheckNear(1.0L, 1.25L, 0.25L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_MixedSigns_Passes()
+{
+    CheckNear(-1, 1u, 2, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NaNAndFloat_Fails()
+{
+    CheckNear(std::numeric_limits<double>::quiet_NaN(), 1.0f, 1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NaNTolerance_Fails()
+{
+    CheckNear(1.0, 1.0, std::numeric_limits<double>::quiet_NaN(), __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNear_NegativeIntegerTolerance_Fails()
+{
+    CheckNear(5, 5, -1, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+void TFixture_NearMixedTypes::Test_CheckNear_SourceLocation_Passes()
+{
+    int const count = 11;
+    CheckNear(10, count, 1, "integers through the std::source_location form");
+}
+//---------------------------------------------------------------------------
+#endif
+void TFixture_NearMixedTypes::Test_CheckNotNear_DoubleAndFloat_Fails()
+{
+    CheckNotNear(2.0, 2.005f, 0.01, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_Integers_Fails()
+{
+    CheckNotNear(10, 12, 5, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_LongDoublePrecision_Passes()
+{
+    // Computed as long double: where it's wider than double, these differ, though as doubles they'd be equal. The
+    // sum is a constant, since one computed at run time can be rounded to double precision: a llvm-mingw std::thread
+    // (where --test-timeout-seconds runs a test) starts with the x87 FPU at 53-bit precision.
+    constexpr long double actual = 1.0L + std::numeric_limits<long double>::epsilon();
+    CheckNotNear(1.0L, actual, 0.0L, __func__, __LINE__, "msg");
+}
+//---------------------------------------------------------------------------
+void TFixture_NearMixedTypes::Test_CheckNotNear_NegativeTolerance_Fails()
+{
+    // Passed before 1.5: no difference is at most a negative tolerance.
+    CheckNotNear(1.0, 5.0, -1.0, __func__, __LINE__, "msg");
 }
 //---------------------------------------------------------------------------
 
@@ -6640,6 +7149,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "IsType_UsesDynamicTypeAndShowsNames");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern,
         "Matches_MatchesWholeTextAndShowsPattern");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance,
+        "Near_ComparesMixedTypesAndRejectsInvalidTolerance");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity, "Near_HandlesNaNAndInfinity");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_NullCStrings_MatchNothingInTextChecks,
         "NullCStrings_MatchNothingInTextChecks");
@@ -6651,12 +7162,18 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "Run_AbandonsHungTestAndAbortsGroupOnTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests,
         "Run_AppliesFilterToSkipNonMatchingTests");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout,
+        "Run_ContinuesAfterCrashInRunObserverUnderTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet,
         "Run_ContinuesAfterCrashWhenCatchCrashesIsSet");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished,
         "Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread,
+        "Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException,
         "Run_EndsRunOnSetUpOrTearDownTestException");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment,
+        "Run_GivesTimedTestTheCallersFloatingPointEnvironment");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout,
         "Run_IgnoresTestThatEndsAfterItsTimeout");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Run_LogsEachCheckFailureOnce, "Run_LogsEachCheckFailureOnce");
@@ -6689,6 +7206,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "SetExceptionExpected_AssertFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
         "SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesAnyType,
+        "SetExceptionExpected_MatchesAnyType");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage,
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
@@ -6700,8 +7219,11 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWithIC_IgnoresASCIICaseOnly,
         "StartsWithIC_IgnoresASCIICaseOnly");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix, "StartsWith_ShowsTextAndPrefix");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules,
+        "StringChecks_CompareMixedTypesAsTextAndKeepNullRules");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues,
         "Throws_ChecksTypeAndMessageAndContinues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_MatchesAnyType, "Throws_MatchesAnyType");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
         "TrueFalse_FailureNamesTheExpectedValue");
 }
@@ -6943,10 +7465,12 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
 
     // Assert
     TTestResults const& results = fixture.Results();
+    size_t expectedCount = 25;
 #if defined(__cpp_lib_string_view)
-    size_t const expectedCount = 12;
-#else
-    size_t const expectedCount = 11;
+    ++expectedCount;
+#endif
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    ++expectedCount;
 #endif
     CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
 
@@ -6969,12 +7493,22 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
     };
 
     std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertEmpty_NullCString_Fails", "Not empty: Test_AssertEmpty_NullCString_Fails (",
+          "): Expected empty but was \"(null)\". null C string" },
         { "AssertEmpty_String_Fails", "Not empty: Test_AssertEmpty_String_Fails (",
           "): Expected empty but was \"abc\". has text" },
         { "AssertNotEmpty_EmptyVector_Fails", "Empty: Test_AssertNotEmpty_EmptyVector_Fails (",
           "): Expected not empty but was empty. no elements" },
+        { "AssertNotEmpty_EmptyWideCString_Fails", "Empty: Test_AssertNotEmpty_EmptyWideCString_Fails (",
+          "): Expected not empty but was empty. empty wide C string" },
+        { "AssertNotEmpty_NullCString_Fails", "Empty: Test_AssertNotEmpty_NullCString_Fails (",
+          "): Expected not empty but was \"(null)\". null C string" },
+        { "CheckEmpty_CharArray_Fails", "Check failed for: \"Test_CheckEmpty_CharArray_Fails\" (",
+          "): Expected empty but was \"abc\". an array shows its text, not its size" },
         { "CheckEmpty_ForwardList_Fails", "Check failed for: \"Test_CheckEmpty_ForwardList_Fails\" (",
           "): Expected empty but was not empty. no size to show" },
+        { "CheckEmpty_NullWideCString_Fails", "Check failed for: \"Test_CheckEmpty_NullWideCString_Fails\" (",
+          "): Expected empty but was \"(null)\". null wide C string" },
         { "CheckEmpty_OneElement_Fails", "Check failed for: \"Test_CheckEmpty_OneElement_Fails\" (",
           "): Expected empty but had 1 element. one element" },
 #if defined(__cpp_lib_string_view)
@@ -6987,10 +7521,18 @@ void TTest_ASWUnitTests_TestBase::Test_Empty_ShowsContentsOnFailure()
             "CheckEmpty_Vector_Fails", "Check failed for: \"Test_CheckEmpty_Vector_Fails\" (",
             "): Expected empty but had 3 elements. three elements"
         },
+        { "CheckEmpty_WideCString_Fails", "Check failed for: \"Test_CheckEmpty_WideCString_Fails\" (",
+          "): Expected empty but was \"caf\xC3\xA9\". wide C string" },
         { "CheckEmpty_WideString_Fails", "Check failed for: \"Test_CheckEmpty_WideString_Fails\" (",
           "): Expected empty but was \"caf\xC3\xA9\". wide text" },
+        { "CheckNotEmpty_EmptyCharPointer_Fails", "Check failed for: \"Test_CheckNotEmpty_EmptyCharPointer_Fails\" (",
+          "): Expected not empty but was empty. a char* to empty text" },
         { "CheckNotEmpty_EmptyString_Fails", "Check failed for: \"Test_CheckNotEmpty_EmptyString_Fails\" (",
           "): Expected not empty but was empty. empty string" },
+        { "CheckNotEmpty_NullCString_Fails", "Check failed for: \"Test_CheckNotEmpty_NullCString_Fails\" (",
+          "): Expected not empty but was \"(null)\". null C string" },
+        { "CheckNotEmpty_NullWideCString_Fails", "Check failed for: \"Test_CheckNotEmpty_NullWideCString_Fails\" (",
+          "): Expected not empty but was \"(null)\". null wide C string" },
     };
 
     for (TExpectedFailure const& expected : expectedFailures)
@@ -7670,6 +8212,94 @@ void TTest_ASWUnitTests_TestBase::Test_Matches_MatchesWholeTextAndShowsPattern()
     }
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance()
+{
+    // Arrange
+    TFixture_NearMixedTypes fixture;
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    size_t const expectedCount = 22;
+#else
+    size_t const expectedCount = 21;
+#endif
+    CheckEquals(expectedCount, results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+        {
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__,
+                record.TestName + " should pass: " + record.Message);
+        }
+        else if (NameEndsWith(record.TestName, "_Fails"))
+        {
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        }
+        else
+        {
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+        }
+    }
+
+    // Every call whose common type is double reaches the CheckNear(double, ...) override: DoubleAndFloat (2),
+    // FloatsAndDoubleTolerance, NaNAndFloat and NaNTolerance. Integer and long double calls don't.
+    CheckEquals(5, fixture.DoubleCheckNearCalls, __func__, __LINE__, "mixed calls still reach the virtual overload");
+
+    // Each failure's start (up to the varying line number) and end. A NaN's text varies by compiler.
+    struct TExpectedFailure
+    {
+        std::string TestName;
+        std::string Prefix;
+        std::string Detail;
+    };
+
+    std::vector<TExpectedFailure> const expectedFailures = {
+        { "AssertNear_Integers_Fails", "Values not equal: Test_AssertNear_Integers_Fails (",
+          "): Expected: \"10 (tolerance 2)\" but was \"13 (diff 3)\". msg" },
+        { "AssertNear_NegativeTolerance_Fails", "Values not equal: Test_AssertNear_NegativeTolerance_Fails (",
+          "): Invalid tolerance -0.500000: it must be zero or more. msg" },
+        { "AssertNotNear_FloatNaNTolerance_Fails", "Values are equal: Test_AssertNotNear_FloatNaNTolerance_Fails (",
+          ": it must be zero or more. msg" },
+        { "CheckNear_DoubleAndFloat_Fails", "Check failed for: \"Test_CheckNear_DoubleAndFloat_Fails\" (",
+          "): Expected \"2.000000 (tolerance 0.010000)\" but was \"2.500000 (diff 0.500000)\". msg" },
+        { "CheckNear_IntegerSumOverflows_Fails", "Check failed for: \"Test_CheckNear_IntegerSumOverflows_Fails\" (",
+          "): Expected \"-1 (tolerance 18446744073709551615)\" but was \"18446744073709551615 "
+          "(diff 18446744073709551616)\". msg" },
+        { "CheckNear_Integers_Fails", "Check failed for: \"Test_CheckNear_Integers_Fails\" (",
+          "): Expected \"10 (tolerance 1)\" but was \"12 (diff 2)\". msg" },
+        { "CheckNear_LongDouble_Fails", "Check failed for: \"Test_CheckNear_LongDouble_Fails\" (",
+          "): Expected \"1.000000 (tolerance 0.250000)\" but was \"1.500000 (diff 0.500000)\". msg" },
+        { "CheckNear_NaNTolerance_Fails", "Check failed for: \"Test_CheckNear_NaNTolerance_Fails\" (",
+          ": it must be zero or more. msg" },
+        { "CheckNear_NegativeIntegerTolerance_Fails",
+          "Check failed for: \"Test_CheckNear_NegativeIntegerTolerance_Fails\" (",
+          "): Invalid tolerance -1: it must be zero or more. msg" },
+        { "CheckNotNear_DoubleAndFloat_Fails", "Check failed for: \"Test_CheckNotNear_DoubleAndFloat_Fails\" (",
+          "): Both values equal: \"2.005000 (diff 0.005000 <= tolerance 0.010000)\". msg" },
+        { "CheckNotNear_Integers_Fails", "Check failed for: \"Test_CheckNotNear_Integers_Fails\" (",
+          "): Both values equal: \"12 (diff 2 <= tolerance 5)\". msg" },
+        { "CheckNotNear_NegativeTolerance_Fails", "Check failed for: \"Test_CheckNotNear_NegativeTolerance_Fails\" (",
+          "): Invalid tolerance -1.000000: it must be zero or more. msg" },
+    };
+
+    for (TExpectedFailure const& expected : expectedFailures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, expected.TestName);
+        AssertNotNull(record, __func__, __LINE__, expected.TestName + " has a record");
+        CheckStartsWith(record->Message, expected.Prefix, __func__, __LINE__, expected.TestName + " names the test");
+        CheckEndsWith(record->Message, expected.Detail, __func__, __LINE__, expected.TestName + " shows the values");
+    }
+
+    TTestCaseRecord const* const nanTolerance = FindRecord(results, "CheckNear_NaNTolerance_Fails");
+    AssertNotNull(nanTolerance, __func__, __LINE__, "the NaN tolerance test has a record");
+    CheckContains(nanTolerance->Message, "): Invalid tolerance ", __func__, __LINE__, "a NaN tolerance is invalid");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Near_HandlesNaNAndInfinity()
 {
     // Arrange
@@ -7909,6 +8539,39 @@ void TTest_ASWUnitTests_TestBase::Test_Run_AppliesFilterToSkipNonMatchingTests()
         "CaseRecords has an entry only for the tests that ran, not the full registered set");
 }
 //---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout
+
+    The first test crashes in its "Running test" log line, on its worker thread, while that thread
+    holds the group's recording lock. The jump out of the crash skips the lock's destructor, so
+    unless the framework releases it, the worker thread ends still holding it: the next test then
+    waits for it forever at its first log line, and so does Run() once that test times out, so
+    Run() never returns (under --test-timeout-seconds, this test times out instead).
+*/
+void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logs, so the observer's OnLog() is called.
+    TCrashOnLogObserver observer;
+    fixture.SetRunObserver(&observer);
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, true); // Only long enough never to fire; catchCrashes = true.
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__, "every test recorded");
+    CheckEquals(static_cast<size_t>(6), observer.FinishedRecords.size(), __func__, __LINE__, "every test reported");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "the one passing test, after the crash, passed");
+
+    TTestCaseRecord const& crashedRecord = results.CaseRecords.front();
+    CheckEquals(std::string("ContinuesAfterCheckFailure"), crashedRecord.TestName, __func__, __LINE__,
+        "the first test is the one that crashed");
+    CheckContains(crashedRecord.Message, "crashed", __func__, __LINE__, "and its record says so");
+    CheckContains(observer.LogText(), "Running test: Fixture_MixedOutcomes.Skip", __func__, __LINE__,
+        "the last test still logged");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet()
 {
     // Arrange
@@ -7965,6 +8628,40 @@ void TTest_ASWUnitTests_TestBase::Test_Run_CountsTestRecordingItsOutcomeAtTimeou
     CheckEquals(0u, results.FailedCount, __func__, __LINE__, "and nothing failed");
 }
 //---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread
+
+    Without a timeout, the crash in the first test's "Running test" log line comes on this thread,
+    while it holds the group's recording lock. Unless the framework releases the lock, this thread
+    keeps holding it (harmless to this thread, as it's recursive), and a later run on another thread
+    waits for it forever at its first log line, so the join below never returns.
+*/
+void TTest_ASWUnitTests_TestBase::Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread()
+{
+    // Arrange
+    TFixture_MixedOutcomes fixture(false); // Logs, so the observer's OnLog() is called.
+    TCrashOnLogObserver observer;
+    fixture.SetRunObserver(&observer);
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, true); // catchCrashes = true; the first test crashes.
+
+    auto runAgain = [&fixture]()
+        {
+            fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+        };
+
+    // Act
+    std::thread other(runAgain);
+    other.join();
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(6), results.CaseRecords.size(), __func__, __LINE__,
+        "the run on the other thread recorded every test");
+    CheckEquals(1u, results.SuccessCount, __func__, __LINE__, "the passing test passed");
+    CheckNotContains(results.CaseRecords.front().Message, "crashed", __func__, __LINE__,
+        "the first test didn't crash this time");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException()
 {
     // Unlike an unexpected exception from a test itself, one from SetUp_Test() or TearDown_Test() still escapes
@@ -8005,6 +8702,35 @@ void TTest_ASWUnitTests_TestBase::Test_Run_EndsRunOnSetUpOrTearDownTestException
         CheckEquals(1u, fixture.Results().FailedCount, __func__, __LINE__,
             scenario.ExpectedMessage + ": the test counts as failed");
     }
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment()
+{
+    // Arrange: this thread rounds downward for the run, and as before afterwards, whatever happens. On Windows
+    // a new thread starts rounding to nearest, so a test run on one without this thread's environment would too.
+    struct TRoundingModeRestorer
+    {
+        int Mode = RoundingMode();
+
+        ~TRoundingModeRestorer()
+        {
+            SetRoundingMode(Mode);
+        }
+    };
+
+    TFixture_FloatingPointEnvironment fixture;
+    TRoundingModeRestorer const restorer;
+    SetRoundingMode(DownwardRoundingMode());
+    AssertEquals(DownwardRoundingMode(), RoundingMode(), __func__, __LINE__, "this thread now rounds downward");
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, 30u, false); // Only long enough never to fire.
+
+    // Assert
+    CheckEquals(DownwardRoundingMode(), fixture.RoundingModeInTest, __func__, __LINE__,
+        "the test, on a worker thread, rounds as the calling thread does");
+    CheckEquals(LongDoubleKeepsPrecision(), fixture.LongDoublePrecisionInTest, __func__, __LINE__,
+        "and computes long double with the calling thread's precision");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Run_IgnoresTestThatEndsAfterItsTimeout()
@@ -8569,6 +9295,71 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureS
         "all four Check-then-expected-exception tests ran");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesAnyType()
+{
+    // Arrange
+    TFixture_AnyTypeExceptionExpectations fixture;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::string const unknown = "an object that is neither a std::exception nor an RTL Exception";
+#else
+    std::string const unknown = "a non-std::exception object";
+#endif
+    std::string const wrongType = "expected exception type was not thrown (caught a different exception): ";
+    std::string const noMessage = "expected exception message to contain \"needle\" but caught an exception without a "
+        "message: an object of type \"";
+    // A part of each failed test's record (a class name's full form differs by compiler).
+    std::vector<std::pair<char const*, std::string> > const failures =
+    {
+        { "CheckFailedThenIntThrown_Fails", "deliberate Check failure before the expected exception" },
+        { "ClassExpected_MessageExpected_Fails", noMessage },
+        { "ClassExpected_MessageExpected_Fails", "TFixturePlainError\"" },
+        { "ClassExpected_SubclassThrownMessageExpected_Fails", noMessage },
+        { "ClassExpected_SubclassThrownMessageExpected_Fails", "TFixtureNonStdSubError\"" },
+        { "IntExpected_AssertFails_Fails", "deliberate Assert failure while an int is expected" },
+        { "IntExpected_DoubleThrown_Fails", wrongType + unknown },
+        { "IntExpected_MessageExpected_Fails", noMessage + "int\"" },
+        { "IntExpected_NoneThrown_Fails", "expected an int that never comes" },
+        { "IntExpected_StdExceptionThrown_Fails", wrongType + "boom" },
+        { "IntThenStdTypeExpected_IntThrown_Fails", wrongType + unknown },
+        { "MixinExpected_StdExceptionWithoutMixinThrown_Fails", wrongType + "boom" },
+        { "MixinExpected_TaggedErrorMessageAbsent_Fails", "expected exception message to contain \"needle\" but caught: boom" },
+        { "StdTypeExpected_IntThrown_Fails", wrongType + unknown },
+    };
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(17), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass: " + record.Message);
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    for (std::pair<char const*, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, std::string(failure.first) + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, std::string(failure.first) + "'s message");
+    }
+
+    // A type name still mangled, as bcc32c's type_info::name() is (e.g. "$i"), would start with '$'.
+    for (char const* const testName : { "ClassExpected_MessageExpected_Fails", "IntExpected_MessageExpected_Fails" })
+        CheckNotContains(FindRecord(results, testName)->Message, "$", __func__, __LINE__, testName);
+#if !defined(_MSC_VER)
+    // MSVC writes it "`anonymous namespace'".
+    CheckContains(FindRecord(results, "ClassExpected_MessageExpected_Fails")->Message,
+        "(anonymous namespace)::TFixturePlainError\"", __func__, __LINE__, "a class in an anonymous namespace");
+#endif
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage()
 {
     // Arrange
@@ -8818,6 +9609,186 @@ void TTest_ASWUnitTests_TestBase::Test_StartsWith_ShowsTextAndPrefix()
         "a wide failure shows its text as UTF-8: " + checkNonASCII->Message);
 }
 //---------------------------------------------------------------------------
+/*
+    TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules
+
+    Every string check with two texts of different types: each ordered pairing of std::string, char const*,
+    std::wstring and wchar_t const*, non-ASCII text, texts that differ in case only, and null C strings. The texts
+    must compare as text, whatever their types, and a null C string must follow the same rules whatever it's
+    compared with.
+*/
+void TTest_ASWUnitTests_TestBase::Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules()
+{
+    // Arrange
+    typedef TStringCheckProbe::ERule ERule;
+    enum class ECase
+    {
+        Matching,    // The same text: matches in every method.
+        CaseDiffers, // "ABC" and "abc": matches only in an IC method.
+        OneNull,
+        BothNull
+    };
+    struct TCase
+    {
+        std::string Name;
+        ECase Kind;
+        std::vector<std::optional<std::string> > CheckFailures;
+        std::vector<std::optional<std::string> > AssertFailures;
+    };
+
+    TStringCheckProbe probe;
+    char const* const nullNarrow = nullptr;
+    wchar_t const* const nullWide = nullptr;
+    std::string const nonASCII = "\xC3\xA9x\xCE\xA9\xE4\xB8\xAD"; // U+00E9, an x, U+03A9 and U+4E2D.
+    std::wstring const wideNonASCII = L"\x00E9x\x03A9\x4E2D";
+
+    // Act
+    std::vector<TCase> const cases =
+    {
+        { "StringAndCString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), "abc"),
+          probe.RunAsserts(std::string("abc"), "abc") },
+        { "StringAndWString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), std::wstring(L"abc")),
+          probe.RunAsserts(std::string("abc"), std::wstring(L"abc")) },
+        { "StringAndWCString", ECase::Matching,
+          probe.RunChecks(std::string("abc"), L"abc"),
+          probe.RunAsserts(std::string("abc"), L"abc") },
+        { "CStringAndString", ECase::Matching,
+          probe.RunChecks("abc", std::string("abc")),
+          probe.RunAsserts("abc", std::string("abc")) },
+        { "CStringAndWString", ECase::Matching,
+          probe.RunChecks("abc", std::wstring(L"abc")),
+          probe.RunAsserts("abc", std::wstring(L"abc")) },
+        { "CStringAndWCString", ECase::Matching, probe.RunChecks("abc", L"abc"), probe.RunAsserts("abc", L"abc") },
+        { "WStringAndString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), std::string("abc")),
+          probe.RunAsserts(std::wstring(L"abc"), std::string("abc")) },
+        { "WStringAndCString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), "abc"),
+          probe.RunAsserts(std::wstring(L"abc"), "abc") },
+        { "WStringAndWCString", ECase::Matching,
+          probe.RunChecks(std::wstring(L"abc"), L"abc"),
+          probe.RunAsserts(std::wstring(L"abc"), L"abc") },
+        { "WCStringAndString", ECase::Matching,
+          probe.RunChecks(L"abc", std::string("abc")),
+          probe.RunAsserts(L"abc", std::string("abc")) },
+        { "WCStringAndCString", ECase::Matching, probe.RunChecks(L"abc", "abc"), probe.RunAsserts(L"abc", "abc") },
+        { "WCStringAndWString", ECase::Matching,
+          probe.RunChecks(L"abc", std::wstring(L"abc")),
+          probe.RunAsserts(L"abc", std::wstring(L"abc")) },
+        { "NonASCII_StringAndWString", ECase::Matching,
+          probe.RunChecks(nonASCII, wideNonASCII),
+          probe.RunAsserts(nonASCII, wideNonASCII) },
+        { "NonASCII_WCStringAndCString", ECase::Matching,
+          probe.RunChecks(wideNonASCII.c_str(), nonASCII.c_str()),
+          probe.RunAsserts(wideNonASCII.c_str(), nonASCII.c_str()) },
+        { "CaseDiffers_StringAndWCString", ECase::CaseDiffers,
+          probe.RunChecks(std::string("ABC"), L"abc"),
+          probe.RunAsserts(std::string("ABC"), L"abc") },
+        { "CaseDiffers_WStringAndWCString", ECase::CaseDiffers,
+          probe.RunChecks(std::wstring(L"ABC"), L"abc"),
+          probe.RunAsserts(std::wstring(L"ABC"), L"abc") },
+        { "CaseDiffers_CStringAndWString", ECase::CaseDiffers,
+          probe.RunChecks("ABC", std::wstring(L"abc")),
+          probe.RunAsserts("ABC", std::wstring(L"abc")) },
+        { "CaseDiffers_NonASCII_StringAndWString", ECase::CaseDiffers,
+          probe.RunChecks(std::string("\xC3\xA9X\xCE\xA9\xE4\xB8\xAD"), wideNonASCII),
+          probe.RunAsserts(std::string("\xC3\xA9X\xCE\xA9\xE4\xB8\xAD"), wideNonASCII) },
+        { "NullCStringAndString", ECase::OneNull,
+          probe.RunChecks(nullNarrow, std::string("abc")),
+          probe.RunAsserts(nullNarrow, std::string("abc")) },
+        { "StringAndNullCString", ECase::OneNull,
+          probe.RunChecks(std::string("abc"), nullNarrow),
+          probe.RunAsserts(std::string("abc"), nullNarrow) },
+        { "NullWCStringAndString", ECase::OneNull,
+          probe.RunChecks(nullWide, std::string("abc")),
+          probe.RunAsserts(nullWide, std::string("abc")) },
+        { "WStringAndNullWCString", ECase::OneNull,
+          probe.RunChecks(std::wstring(L"abc"), nullWide),
+          probe.RunAsserts(std::wstring(L"abc"), nullWide) },
+        { "NullCStringAndWString", ECase::OneNull,
+          probe.RunChecks(nullNarrow, std::wstring(L"abc")),
+          probe.RunAsserts(nullNarrow, std::wstring(L"abc")) },
+        { "WCStringAndNullCString", ECase::OneNull,
+          probe.RunChecks(L"abc", nullNarrow),
+          probe.RunAsserts(L"abc", nullNarrow) },
+        { "NullCStringAndNullWCString", ECase::BothNull,
+          probe.RunChecks(nullNarrow, nullWide),
+          probe.RunAsserts(nullNarrow, nullWide) },
+        { "NullWCStringAndNullCString", ECase::BothNull,
+          probe.RunChecks(nullWide, nullNarrow),
+          probe.RunAsserts(nullWide, nullNarrow) }
+    };
+    // '.' matches U+00E9 as wide text, but not in two narrow strings, where U+00E9 is two bytes.
+    std::vector<std::optional<std::string> > const wideDot =
+        probe.RunChecks(std::string("\xC3\xA9"), std::wstring(L"."));
+    std::vector<std::optional<std::string> > const narrowDot = probe.RunChecks(std::string("\xC3\xA9"), ".");
+    // Two wide texts are compared as they are, not as UTF-8, where both unpaired surrogates would be U+FFFD.
+    std::vector<std::optional<std::string> > const surrogates =
+        probe.RunChecks(std::wstring(L"\xD800"), L"\xDC00");
+    std::vector<std::optional<std::string> > const mismatch = probe.RunChecks(std::wstring(L"\x03A9x"), "y");
+
+    // Assert
+    for (TCase const& testCase : cases)
+    {
+        AssertEquals(std::size(TStringCheckProbe::Checks), testCase.CheckFailures.size(), __func__, __LINE__,
+            testCase.Name + ": a result for each Check method");
+        AssertEquals(std::size(TStringCheckProbe::Checks), testCase.AssertFailures.size(), __func__, __LINE__,
+            testCase.Name + ": a result for each Assert method");
+
+        for (std::size_t i = 0; i < std::size(TStringCheckProbe::Checks); ++i)
+        {
+            TStringCheckProbe::TCheck const& check = TStringCheckProbe::Checks[i];
+            bool const negated = check.Rule == ERule::NotEquals || check.Rule == ERule::NotMatches;
+            bool const equalsRule = check.Rule == ERule::Equals || check.Rule == ERule::NotEquals;
+            bool const matches = testCase.Kind == ECase::Matching ||
+                (testCase.Kind == ECase::CaseDiffers && check.IgnoresCase) ||
+                (testCase.Kind == ECase::BothNull && equalsRule);
+            bool const shouldPass = matches != negated;
+            bool const withNull = testCase.Kind == ECase::OneNull || testCase.Kind == ECase::BothNull;
+
+            char const* const kinds[] = { "Check", "Assert" };
+            std::vector<std::optional<std::string> > const* const results[] =
+            {
+                &testCase.CheckFailures, &testCase.AssertFailures
+            };
+
+            for (std::size_t k = 0; k < std::size(kinds); ++k)
+            {
+                std::vector<std::optional<std::string> > const& failures = *results[k];
+                std::string const what = std::string(kinds[k]) + check.Name + " with " + testCase.Name;
+                CheckEquals(shouldPass, !failures[i].has_value(), __func__, __LINE__,
+                    what + (shouldPass ? " passes" : " fails"));
+
+                if (withNull && failures[i].has_value())
+                {
+                    CheckContains(*failures[i], "\"(null)\"", __func__, __LINE__,
+                        what + " shows the null C string as (null)");
+                }
+            }
+        }
+    }
+
+    std::size_t const matchesIndex = TStringCheckProbe::IndexOf("Matches");
+    CheckFalse(wideDot[matchesIndex].has_value(), __func__, __LINE__, "'.' matches U+00E9 as wide text");
+    CheckTrue(narrowDot[matchesIndex].has_value(), __func__, __LINE__, "but not in two narrow strings");
+    CheckFalse(surrogates[TStringCheckProbe::IndexOf("NotEquals")].has_value(), __func__, __LINE__,
+        "two different unpaired surrogates aren't equal as wide text");
+
+    std::optional<std::string> const equalsFailure = mismatch[TStringCheckProbe::IndexOf("Equals")];
+    std::optional<std::string> const containsFailure = mismatch[TStringCheckProbe::IndexOf("Contains")];
+    AssertTrue(equalsFailure.has_value() && containsFailure.has_value(), __func__, __LINE__, "both fail");
+    CheckContains(*equalsFailure, "Expected \"\xCE\xA9x\" but was \"y\". msg", __func__, __LINE__,
+        "both texts shown, the wide one in UTF-8");
+    CheckContains(*containsFailure, "Expected \"\xCE\xA9x\" to contain \"y\"", __func__, __LINE__,
+        "both texts shown, the wide one in UTF-8");
+#if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
+    CheckFalse(probe.CheckEqualsThroughSourceLocation("abc", L"abc").has_value(), __func__, __LINE__,
+        "through the std::source_location overload too");
+#endif
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()
 {
     // Arrange
@@ -8875,6 +9846,61 @@ void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()
         "a non-std::exception object is a wrong type");
     CheckEndsWith(wrongType->Message, "): Expected a different exception type but caught: boom. wrong type",
         __func__, __LINE__, "a wrong type shows what was caught");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Throws_MatchesAnyType()
+{
+    // Arrange
+    TFixture_AnyTypeThrowsChecks fixture;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::string const unknown = "an object that is neither a std::exception nor an RTL Exception";
+#else
+    std::string const unknown = "a non-std::exception object";
+#endif
+    std::string const noMessage = "): Expected the exception message to contain \"needle\" but caught an exception "
+        "without a message: an object of type \"";
+    // A part of each failed test's record (a class name's full form differs by compiler).
+    std::vector<std::pair<char const*, std::string> > const failures =
+    {
+        { "AssertThrows_IntMessageExpected_Fails", noMessage + "int\". an int has no message" },
+        { "CheckThrows_ClassSubclassMessageExpected_Fails", noMessage },
+        { "CheckThrows_ClassSubclassMessageExpected_Fails", "TFixtureNonStdSubError\". a subclass with no message" },
+        { "CheckThrows_IntExpectedAssertFailsInside_Fails", "inner assert" },
+        { "CheckThrows_IntExpectedDoubleThrown_Fails", "): Expected a different exception type but caught: " + unknown +
+          ". int expected, double thrown" },
+        { "CheckThrows_IntExpectedStdExceptionThrown_Fails",
+          "): Expected a different exception type but caught: boom. int expected, std::exception thrown" },
+        { "CheckThrows_MixinMessageAbsent_Fails",
+          "): Expected the exception message to contain \"needle\" but caught: boom. the subclass's what() is checked" },
+        { "CheckThrows_PlainClassMessageExpected_Fails", noMessage },
+        { "CheckThrows_PlainClassMessageExpected_Fails", "TFixturePlainError\". a class with no message" },
+        { "CheckThrows_StdStringMessageExpected_Fails", noMessage },
+        { "CheckThrows_StdStringMessageExpected_Fails", "basic_string<char" },
+    };
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(12), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass: " + record.Message);
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    for (std::pair<char const*, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, std::string(failure.first) + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, std::string(failure.first) + "'s message");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()

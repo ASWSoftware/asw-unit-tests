@@ -2630,8 +2630,8 @@ LRESULT CALLBACK TWin32GUIMainWindow::WindowProc(HWND window, UINT message, WPAR
 /*
     TWin32GUIMainWindow::WriteJUnitReport
 
-    Writes the file itself, rather than with TJUnitReportWriter::Write(), whose std::ofstream can't open a
-    path with characters outside the system code page (e.g. a user folder's name) from a std::string.
+    Writes the file itself, rather than with TJUnitReportWriter::Write(), so a failure can say why: Write() only
+    returns false.
 */
 bool TWin32GUIMainWindow::WriteJUnitReport(std::string const& path, std::string& error)
 {

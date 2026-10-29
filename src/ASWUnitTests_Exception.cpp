@@ -325,6 +325,12 @@ TExceptNotEmpty::TExceptNotEmpty(std::string const& method, int line, std::strin
     m_Message = "Empty: " + method + " (" + std::to_string(line) + "): Expected not empty but was empty. " + msg;
 }
 //---------------------------------------------------------------------------
+TExceptNotEmpty::TExceptNotEmpty(std::string const& method, int line, std::string const& detail,
+    std::string const& msg)
+{
+    m_Message = "Empty: " + method + " (" + std::to_string(line) + "): " + detail + ". " + msg;
+}
+//---------------------------------------------------------------------------
 
 
 /////////////////////////////////////////////////////////////////////////////

@@ -741,10 +741,32 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_AcceptEveryTextKind()
     CheckStartsWith(text, narrowBuffer, __func__, __LINE__, "System::String and a char buffer");
     CheckEndsWith(text, wideBuffer, __func__, __LINE__, "System::String and a wchar_t buffer");
 
-    CheckEquals(System::String(), static_cast<char const*>(nullptr), __func__, __LINE__,
-        "a null C string is empty text");
-    CheckEquals(static_cast<wchar_t const*>(nullptr), System::String(), __func__, __LINE__,
-        "a null wide C string is empty text");
+    CheckNotEquals(System::String(), static_cast<char const*>(nullptr), __func__, __LINE__,
+        "a null C string isn't empty text: it equals only another null C string");
+    CheckNotEquals(static_cast<wchar_t const*>(nullptr), System::String(), __func__, __LINE__,
+        "nor is a null wide C string");
+    CheckNotContains(text, static_cast<char const*>(nullptr), __func__, __LINE__,
+        "a null C string matches nothing, so the Not form passes");
+
+    // AnsiString with ASCII text only, which every ANSI code page has; UTF8String with any.
+    CheckEquals(System::AnsiString("Hello World hello"), text, __func__, __LINE__, "AnsiString and System::String");
+    CheckEquals(narrow, System::AnsiString("Hello World hello"), __func__, __LINE__, "std::string and AnsiString");
+    CheckContains(System::AnsiString("Hello World hello"), L"World", __func__, __LINE__,
+        "AnsiString and a wide literal");
+    CheckEquals(System::UTF8String(nonASCII), nonASCII, __func__, __LINE__, "UTF8String and System::String");
+    CheckEquals(System::UTF8String(nonASCII), "caf\xC3\xA9 \xF0\x9F\x98\x80", __func__, __LINE__,
+        "UTF8String and its UTF-8 bytes");
+    CheckEndsWith(L"caf" L"\x00E9", System::UTF8String(L"\x00E9"), __func__, __LINE__, "a wide literal and UTF8String");
+    CheckEmpty(System::AnsiString(), __func__, __LINE__, "an empty AnsiString");
+    CheckNotEmpty(System::AnsiString("Hello"), __func__, __LINE__, "an AnsiString with text");
+    AssertEmpty(System::UTF8String(), __func__, __LINE__, "an empty UTF8String");
+    AssertNotEmpty(System::UTF8String(nonASCII), __func__, __LINE__, "a UTF8String with text");
+
+    // Matched as wide text, where '.' is one UTF-16 code unit.
+    CheckMatches(System::String(L"caf" L"\x00E9"), "caf.", __func__, __LINE__, "'.' matches the e-acute");
+    CheckMatches(System::String(L"\x00E9"), System::UTF8String("."), __func__, __LINE__,
+        "'.' in a UTF8String pattern matches one character too");
+    CheckNotMatches(System::String(L"abc"), "a.", __func__, __LINE__, "the whole text must match");
 
     CheckEquals(nonASCII, "caf\xC3\xA9 \xF0\x9F\x98\x80", __func__, __LINE__, "non-ASCII text and its UTF-8 bytes");
     CheckEquals(nonASCII, L"caf" L"\x00E9" L" \U0001F600", __func__, __LINE__, "non-ASCII text and its wide form");
@@ -903,15 +925,23 @@ void TTest_ASWUnitTests_RTLStrings::Test_Overloads_RejectNonText()
     static_assert(TCanCheckEquals<wchar_t const*, System::String>::value, "a wide C string and System::String");
     static_assert(TCanCheckEquals<std::string, System::String>::value, "std::string and System::String");
     static_assert(TCanCheckContains<System::String, std::wstring>::value, "System::String and std::wstring");
+    static_assert(TCanCheckContains<std::string, std::wstring>::value, "narrow and wide text without System::String");
+    static_assert(TCanCheckEquals<System::AnsiString, System::UTF8String>::value, "AnsiString and UTF8String");
+    static_assert(TCanCheckEquals<char const*, System::AnsiString>::value, "a C string and AnsiString");
     static_assert(TCanCheckEmpty<System::String>::value, "a System::String");
+    static_assert(TCanCheckEmpty<System::AnsiString>::value, "an AnsiString");
+    static_assert(TCanCheckEmpty<System::UTF8String>::value, "a UTF8String");
+    static_assert(TCanCheckEmpty<char const*>::value,
+        "a C string, through its own overload rather than as a System::String (a null one isn't empty)");
 
     static_assert(!TCanCheckEquals<System::String, int>::value, "System::String and a number");
     static_assert(!TCanCheckEquals<double, System::String>::value, "a number and System::String");
     static_assert(!TCanCheckEquals<System::String, wchar_t>::value, "System::String and a character");
     static_assert(!TCanCheckEquals<double, double>::value, "two floating-point values, as without System::String");
     static_assert(!TCanCheckContains<System::String, int>::value, "System::String and a number");
-    static_assert(!TCanCheckContains<std::string, std::wstring>::value, "narrow and wide text without System::String");
-    static_assert(!TCanCheckEmpty<char const*>::value, "a C string, which mustn't convert to System::String");
+    static_assert(!TCanCheckEquals<System::AnsiString, int>::value, "AnsiString and a number");
+    static_assert(!TCanCheckContains<std::string, int>::value, "std::string and a number");
+    static_assert(!TCanCheckEmpty<wchar_t>::value, "a character, which mustn't convert to System::String");
     static_assert(!TCanCheckEmpty<int>::value, "a number");
 }
 //---------------------------------------------------------------------------

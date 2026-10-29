@@ -27,6 +27,40 @@ versioned baseline.
   before.
 - `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
   `ASWUNITTESTS_GUI_SOURCES`.
+- A `TCLIParser::ParseArguments()` overload that takes the arguments as a
+  `std::vector<std::string>`, the program name first, as in `argv`.
+- `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,
+  UTF-32 on Linux), and, on Windows, `CommandLineArguments()` and `SystemErrorText()`: a command
+  line split into UTF-8 arguments, and a `GetLastError()` code's description.
+- `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
+  to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
+- The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+  and `IC` forms) take two texts of different types: a `std::string` with a C string, and narrow
+  text with wide text, which didn't compile before. Two narrow or two wide texts are compared as
+  they are; any other pair as UTF-8. The README's "Comparing Strings of Different Types" has the
+  details.
+- `Matches` and `NotMatches` take two C strings, narrow or wide, and in RTL builds a
+  `System::String`.
+- In RTL builds, the string checks also take an `AnsiString`, a `UTF8String` or another
+  `AnsiStringT`, and two RTL strings or an RTL string with any other text.
+- `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take a C string, narrow or wide,
+  including a character array, which is checked as the text it holds rather than by its size. A
+  null C string fails both, shown as `(null)`. In RTL builds they also take an `AnsiString`, a
+  `UTF8String` or another `AnsiStringT`.
+- A `TExceptNotEmpty` constructor that takes a detail, which `AssertNotEmpty` uses for a null C
+  string.
+- `CheckNear`/`AssertNear` and `CheckNotNear`/`AssertNotNear` take any three integer or
+  floating-point types except `bool`, in any mix, e.g. `CheckNear(2.0, aFloat, 0.01, ...)` or
+  `CheckNear(10, count, 1, ...)`, which were ambiguous before, and `long double`. With any
+  floating-point value, all three are compared as their common type; three integers are compared
+  exactly and shown as integers.
+- `SetExceptionExpected<TException>()`, `CheckThrows<TException>` and `AssertThrows<TException>`
+  take any type that can be thrown, e.g. `int`, `char const*` or a class that doesn't derive from
+  `std::exception`. Before, the Throws methods didn't compile with one, and
+  `SetExceptionExpected<TException>()` didn't compile with `int` and never matched a class.
+  Expecting a message substring from a type with no message (neither a `std::exception` nor an RTL
+  exception) fails, naming the type that was caught, e.g. `an object of type "int"`. A class also
+  matches a `std::exception` subclass derived from it, whose `what()` is then checked.
 
 ### Changed
 
@@ -50,6 +84,32 @@ versioned baseline.
   written the same way. A size or position written in hexadecimal by hand is now ignored, as an
   invalid value. The selection file's first line, a comment, now reads "ASWUnitTests GUI test
   selection" instead of "ASWUnitTests VCL GUI test selection"; files saved before still load.
+- On Windows, the console runner reads its arguments from the UTF-16 command line instead of
+  `argv`, which holds them in the ANSI code page, so a `--filter` pattern, `--project-name` or
+  `--report-junit` path can hold characters outside that code page; before, those became `?` or a
+  lookalike. While it runs, it also sets the console's output code page to UTF-8, so non-ASCII test
+  names and messages show correctly, and restores it afterwards.
+- On Windows, `main.cpp` defines `_tmain` instead of `main`, so a project whose `TCHAR` maps to
+  `wchar_t` (in RAD Studio, "TCHAR maps to" set to `wchar_t`) links too. It stays `main` elsewhere.
+- `TJUnitReportWriter::Write()` now takes its path as UTF-8 on Windows too, as the console runner
+  passes it. Code that calls it with a path in the ANSI code page that has non-ASCII characters must
+  convert the path to UTF-8 first.
+- In RTL builds, a null C string compared with a `System::String` follows the same rules as with any
+  other text, instead of being empty text: it equals only another null C string, so it no longer
+  equals an empty `System::String`, and it matches nothing in `Contains`, `StartsWith` and
+  `EndsWith`. A test that relied on it being empty text must compare with an empty string instead.
+- A negative or NaN tolerance now fails `CheckNotNear`/`AssertNotNear` as well as
+  `CheckNear`/`AssertNear`, with "Invalid tolerance ...: it must be zero or more". Before, the
+  NotNear methods passed with one, whatever the values. A test that passes a negative tolerance must
+  pass its absolute value instead.
+- When a test expects a specific type with `SetExceptionExpected<TException>()` and throws an object
+  of another type that is neither a `std::exception` nor an RTL exception, the failure now reads
+  "expected exception type was not thrown (caught a different exception): a non-std::exception
+  object", as for any other wrong type, instead of "expected a specific exception type, but a
+  non-std::exception object was thrown instead."
+- In RTL builds, `SetExceptionExpected<TException>()` no longer compiles with an RTL class that
+  isn't an `Exception` or a subclass (e.g. `TStringList`), which could never match, as the Throws
+  methods already didn't. Expect `Exception` or the class that's actually raised instead.
 
 ### Fixed
 
@@ -58,6 +118,23 @@ versioned baseline.
   full. It now shows every finished test, and starts each run empty.
 - The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
   twice, e.g. "(F9) (F9)".
+- With `--catch-crashes` and `--test-timeout-seconds` together, a crash that came while a test was
+  logging or recording a result, such as one in a run observer's `OnLog()`, left the run waiting
+  forever at the next test. The run now continues with the next test, as after any other crash.
+- A null C string compared with a `std::string` or `std::wstring` (e.g.
+  `CheckEquals(expectedText, nameOrNull, ...)`), or given to `Matches`, was converted to a string,
+  which is undefined behavior and usually crashed. It now follows the same rules as two C strings:
+  it equals only another null C string, matches nothing in the other checks, and a failure shows it
+  as `(null)`.
+- With `--test-timeout-seconds`, on Windows, a test ran with the default floating-point environment
+  instead of the one the run started with: rounding to nearest, whatever rounding mode was set, and
+  with llvm-mingw, `long double` arithmetic at `double` precision. Each test now starts with the
+  floating-point environment of the thread that runs the tests, as it does without a timeout.
+- With RAD Studio's 32-bit compiler (`bcc32c`), type names in failure messages, such as
+  `CheckIsType`'s, were shown as the compiler mangles them, e.g. `$N@TShape` or `$i`. They're now
+  shown as written, e.g. `N::TShape` or `int`, as with the other compilers. A pointer to a `const`
+  or `volatile` class, and a template whose argument is in an anonymous namespace, are still shown
+  as mangled.
 
 ## [1.4.0] - 2026-10-14
 
