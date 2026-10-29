@@ -184,7 +184,7 @@ std::vector<std::string> GUIStatusPanels(TGUITestList const& testList, size_t ru
 //---------------------------------------------------------------------------
 std::vector<int> GUIStatusPanelWidths()
 {
-    return { 120, 100, 90, 90, 90, 70, 190, 300 };
+    return { 170, 100, 90, 90, 90, 70, 190, 300 };
 }
 //---------------------------------------------------------------------------
 TTestCaseRecord GUIUnhandledExceptionRecord(TTestId const& test, std::string const& description)

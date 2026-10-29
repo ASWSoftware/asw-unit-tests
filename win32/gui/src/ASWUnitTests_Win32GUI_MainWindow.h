@@ -49,9 +49,11 @@ limitations under the License.
 #include "ASWUnitTests_GUI_RunObserver.h"
 #include "ASWUnitTests_GUI_Shuffle.h"
 #include "ASWUnitTests_GUI_TestList.h"
+#include "ASWUnitTests_GUI_Theme.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_DPI.h"
 #include "ASWUnitTests_Win32GUI_Splitter.h"
+#include "ASWUnitTests_Win32GUI_Theme.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -61,8 +63,10 @@ namespace ASWUnitTests
 // EWin32GUICommand
 //
 // The main window's commands, one per VCL GUI runner action, named as in
-// TGUICommandStates (e.g. RunSelected for Act_RunSelected). Each is also the
-// control ID of its menu item and toolbar button.
+// TGUICommandStates (e.g. RunSelected for Act_RunSelected), the theme ones
+// each a View > Theme item (TGUICommandStates::Theme). Each is also the
+// control ID of its menu item and toolbar button; the Theme ones are
+// consecutive, for CheckMenuRadioItem().
 /////////////////////////////////////////////////////////////////////////////
 enum class EWin32GUICommand : WORD
 {
@@ -83,6 +87,9 @@ enum class EWin32GUICommand : WORD
     ShuffleOrder,
     ShuffleSeed,
     Stop,
+    ThemeDark,
+    ThemeLight,
+    ThemeWindows,
 };
 
 
@@ -194,6 +201,12 @@ private:
     // BuildTestTree(); a Win32 tree's nodes stay valid until they're deleted.
     std::vector<HTREEITEM> m_TestNodes;
     int m_TestTreeWidth;
+    // The look of the window, its controls and dialogs, light or dark; see ApplyTheme().
+    TWin32GUITheme& m_Theme;
+    // Set when the theme should change during a run, which then changes it once the run has ended.
+    bool m_ThemeChangePending;
+    // The View > Theme choice.
+    EGUITheme m_ThemeChoice;
     TWin32GUIFont m_UIFont;
     HWND m_Window;
 
@@ -213,6 +226,8 @@ private:
     // Sets the test tree's width and the detail pane's height that 'layout' has, within what the splitters
     // allow.
     void ApplyPanelSizes(TGUILayout const& layout);
+    // Makes the window light or dark as m_ThemeChoice and Windows' settings say; see the definition.
+    void ApplyTheme();
     // Rebuilds the test tree from m_TestList's visible tests, fully expanded; see the definition.
     void BuildTestTree();
     void CenterOnMonitor();
@@ -261,6 +276,8 @@ private:
     // Handles the messages waiting in the queue, so the window stays responsive while tests run; see the
     // definition.
     void ProcessMessages();
+    // Colors the log's text again for the current theme; see the definition.
+    void RecolorLog();
     // Sets every test tree node's status image from m_TestList.
     void RefreshAllNodeImages();
     // Reports an error that escaped from 'where' in a message box.
@@ -292,12 +309,16 @@ private:
     void SetProgressPosition(int position);
     // Enables or disables the commands for a run starting or ending; see the definition.
     void SetRunning(bool running);
+    // Chooses View > Theme's 'theme', saving it, and applies it; see the definition.
+    void SetTheme(EGUITheme theme);
     // Expands or collapses every node of the test tree.
     void SetTreeExpanded(bool expanded);
     // Shows the results page whose tab is selected; see the definition.
     void ShowResultsPage();
     // Shows whether shuffling is on, in the Options menu's check mark and the status bar.
     void ShowShuffleState();
+    // Shows m_ThemeChoice in View > Theme's radio check.
+    void ShowThemeState();
     // Sets every test tree node's check box from m_TestList; see the definition.
     void SyncTreeChecks();
     // A test's tree node, or nullptr while the filter box hides it.
@@ -315,7 +336,8 @@ private:
     bool WriteJUnitReport(std::string const& path, std::string& error);
 
 public:
-    TWin32GUIMainWindow();
+    // A window in 'theme''s look, which must outlive it.
+    explicit TWin32GUIMainWindow(TWin32GUITheme& theme);
     ~TWin32GUIMainWindow();
 
     TWin32GUIMainWindow(TWin32GUIMainWindow const&) = delete;
@@ -337,8 +359,9 @@ public:
     // else was asked for.
     void Show(int showCommand);
     // Loads the registered tests, applies the command line's options, and restores the saved layout and selection;
-    // see the definition. Call after Create(), before Show().
-    void Start(TGUIOptions const& options);
+    // see the definition. 'theme' is the View > Theme choice the window's theme was set up for. Call after
+    // Create(), before Show().
+    void Start(TGUIOptions const& options, EGUITheme theme);
     // Whether a run ended with a test that timed out or crashed. A timed-out test's abandoned thread may still be
     // running, using one of the test groups, and after a crash their state may be corrupted, so the caller should
     // then end the process, as the console runner does, without destroying this window and its tests.

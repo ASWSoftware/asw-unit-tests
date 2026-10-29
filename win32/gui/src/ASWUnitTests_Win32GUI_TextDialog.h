@@ -29,6 +29,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <string>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_Theme.h"
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -36,8 +38,8 @@ namespace ASWUnitTests
 // Shows 'text' (UTF-8) in a modal, resizable dialog with a read-only, scrollable, monospace text box, for
 // console-style output such as --help, whose aligned columns a regular message box's proportional font would
 // scramble. 'caption' (UTF-8) is the dialog's title. 'owner' may be nullptr, e.g. before the main window
-// exists. Throws std::runtime_error if the dialog can't be shown.
-void ShowTextDialog(HWND owner, std::string const& caption, std::string const& text);
+// exists. The dialog has 'theme''s look. Throws std::runtime_error if the dialog can't be shown.
+void ShowTextDialog(HWND owner, TWin32GUITheme& theme, std::string const& caption, std::string const& text);
 
 } // namespace ASWUnitTests
 

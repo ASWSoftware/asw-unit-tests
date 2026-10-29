@@ -31,10 +31,9 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // EGUITheme
 //
-// A GUI runner's theme, as chosen in the VCL GUI runner's View > Theme menu
-// and saved in its layout file. Contains no UI code, so it's unit tested
-// from the console runners (see gui/tests/Test_ASWUnitTests_GUI_Theme.cpp).
-// The Win32 GUI runner has no themes yet.
+// A GUI runner's theme, as chosen in its View > Theme menu and saved in its
+// layout file. Contains no UI code, so it's unit tested from the console
+// runners (see gui/tests/Test_ASWUnitTests_GUI_Theme.cpp).
 /////////////////////////////////////////////////////////////////////////////
 enum class EGUITheme
 {

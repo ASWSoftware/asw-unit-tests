@@ -34,6 +34,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_DialogTemplate.h"
 #include "ASWUnitTests_Win32GUI_DPI.h"
+#include "ASWUnitTests_Win32GUI_MessageDialog.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 //---------------------------------------------------------------------------
 
@@ -56,6 +57,17 @@ WORD const LastSeedLabelID = 104;
 WORD const NewSeedID = 101;
 WORD const SeedBoxID = 103;
 
+/////////////////////////////////////////////////////////////////////////////
+// TShuffleSeedDialogState
+//
+// The choice the dialog edits, and the theme it's shown in.
+/////////////////////////////////////////////////////////////////////////////
+struct TShuffleSeedDialogState
+{
+    TGUIShuffle* Shuffle = nullptr;
+    TWin32GUITheme* Theme = nullptr;
+};
+
 //---------------------------------------------------------------------------
 
 void ApplyChoice(HWND dialog);
@@ -76,13 +88,15 @@ int TextHeight(HWND control, int width);
 */
 void ApplyChoice(HWND dialog)
 {
-    TGUIShuffle* const shuffle = reinterpret_cast<TGUIShuffle*>(GetWindowLongPtrW(dialog, DWLP_USER));
+    TShuffleSeedDialogState const* const state = reinterpret_cast<TShuffleSeedDialogState const*>(
+        GetWindowLongPtrW(dialog, DWLP_USER));
     HWND const seedBox = GetDlgItem(dialog, SeedBoxID);
     std::string error;
 
-    if (!shuffle->ApplySeedChoice(IsDlgButtonChecked(dialog, NewSeedID) == BST_CHECKED, WindowText(seedBox), error))
+    if (!state->Shuffle->ApplySeedChoice(IsDlgButtonChecked(dialog, NewSeedID) == BST_CHECKED, WindowText(seedBox),
+        error))
     {
-        MessageBoxW(dialog, UTF8ToWide(error).c_str(), DialogCaption, MB_OK | MB_ICONWARNING);
+        ShowMessageDialog(dialog, *state->Theme, WideToUTF8(DialogCaption), error, EWin32GUIMessageIcon::Warning);
         // Focuses the seed box as tabbing to it does, which also selects its text.
         SendMessageW(dialog, WM_NEXTDLGCTL, reinterpret_cast<WPARAM>(seedBox), TRUE);
         return;
@@ -189,12 +203,14 @@ INT_PTR HandleDialogMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lPa
         case WM_INITDIALOG:
         {
             SetWindowLongPtrW(dialog, DWLP_USER, lParam);
-            TGUIShuffle const* const shuffle = reinterpret_cast<TGUIShuffle const*>(lParam);
+            TShuffleSeedDialogState const* const state = reinterpret_cast<TShuffleSeedDialogState const*>(lParam);
 
             HWND const seedBox = GetDlgItem(dialog, SeedBoxID);
             SendMessageW(seedBox, EM_SETLIMITTEXT, 10, 0); // 4294967295, the largest seed.
+            state->Theme->AttachWindow(dialog);
+            state->Theme->Attach(seedBox, EWin32GUIThemedControl::Edit);
 
-            bool const fixedSeed = shuffle->FixedSeed().has_value();
+            bool const fixedSeed = state->Shuffle->FixedSeed().has_value();
             SelectSeedChoice(dialog, fixedSeed ? FixedSeedID : NewSeedID);
 
             LayOutDialog(dialog);
@@ -350,12 +366,16 @@ int TextHeight(HWND control, int width)
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-bool ShowShuffleSeedDialog(HWND owner, TGUIShuffle& shuffle)
+bool ShowShuffleSeedDialog(HWND owner, TWin32GUITheme& theme, TGUIShuffle& shuffle)
 {
     TWin32GUIDialogTemplate const dialogTemplate = BuildDialogTemplate(shuffle);
 
+    TShuffleSeedDialogState state;
+    state.Shuffle = &shuffle;
+    state.Theme = &theme;
+
     INT_PTR const result = DialogBoxIndirectParamW(GetModuleHandleW(nullptr), dialogTemplate.Get(), owner,
-        &DialogProc, reinterpret_cast<LPARAM>(&shuffle));
+        &DialogProc, reinterpret_cast<LPARAM>(&state));
 
     if (result == -1)
         throw std::runtime_error("Couldn't show the \"Shuffle Seed\" dialog");

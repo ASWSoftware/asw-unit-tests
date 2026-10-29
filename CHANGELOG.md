@@ -27,13 +27,16 @@ versioned baseline.
   before.
 - `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
   `ASWUNITTESTS_GUI_SOURCES`.
-- A dark theme in the VCL GUI runner, with **View > Theme** to choose it: **Use Windows Setting**
+- A dark theme in both GUI runners, with **View > Theme** to choose it: **Use Windows Setting**
   (the default) follows Windows' app mode setting, switching as soon as it changes, and **Light**
   and **Dark** override it. The choice applies without a restart and is saved in the layout file;
-  `--layout-ignore` and `--layout-reset` cover it as they do the layout. Dark is RAD Studio's Carbon
-  VCL style, so a project of your own that runs its tests in the VCL GUI runner needs Carbon among
-  its custom styles (Project > Options > Application > Appearance) for it, and a `WinMain()` that
-  applies the saved theme as `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` does.
+  `--layout-ignore` and `--layout-reset` cover it as they do the layout. In the VCL GUI runner, dark
+  is RAD Studio's Carbon VCL style, so a project of your own that runs its tests in it needs Carbon
+  among its custom styles (Project > Options > Application > Appearance) for it, and a `WinMain()`
+  that applies the saved theme as `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` does. The Win32 GUI
+  runner paints Carbon's colors itself, so it needs nothing more; its message boxes are its own
+  dialogs, in its theme, and its tree, results tabs and progress bar are drawn without flicker as
+  the window is resized.
 - An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
   runners now have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which
   draws them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32
@@ -132,6 +135,8 @@ versioned baseline.
   full. It now shows every finished test, and starts each run empty.
 - The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
   twice, e.g. "(F9) (F9)".
+- The VCL GUI runner's status bar cut off its first panel's text, e.g. "Checked: 44 / 44 show", and
+  now has room for up to "Checked: 9999 / 9999 shown".
 - With `--catch-crashes` and `--test-timeout-seconds` together, a crash that came while a test was
   logging or recording a result, such as one in a run observer's `OnLog()`, left the run waiting
   forever at the next test. The run now continues with the next test, as after any other crash.

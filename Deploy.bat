@@ -357,6 +357,10 @@ call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp" "win32\gui\src\ASWU
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.h" "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h"
@@ -366,6 +370,14 @@ if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Palette.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Palette.h" "win32\gui\src\ASWUnitTests_Win32GUI_Palette.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp"
 if errorlevel 1 exit /b 1
@@ -385,6 +397,10 @@ call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.cpp" "win32\gui\s
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Theme.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Theme.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Theme.h" "win32\gui\src\ASWUnitTests_Win32GUI_Theme.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
@@ -397,9 +413,17 @@ call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp" "win32\tests\Tes
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.h" "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.h" "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp"
 if errorlevel 1 exit /b 1

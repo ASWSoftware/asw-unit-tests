@@ -28,6 +28,7 @@ limitations under the License.
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -42,17 +43,10 @@ limitations under the License.
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_MainLayout.h"
+#include "ASWUnitTests_Win32GUI_MessageDialog.h"
 #include "ASWUnitTests_Win32GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
-//---------------------------------------------------------------------------
-
-// RAD Studio's Win32 (bcc32c) links its own Windows import libraries, which don't include SetWindowTheme()'s.
-// CMake links uxtheme for the other compilers, and RAD Studio's Win64x links it already.
-#if defined(__BORLANDC__) && !defined(_WIN64)
-#  pragma comment(lib, "uxtheme.lib")
-#endif
-
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -61,13 +55,9 @@ namespace ASWUnitTests
 namespace
 {
 
-// The log's color for failure lines, as the VCL GUI runner's.
-COLORREF const FailureColor = RGB(200, 0, 0);
 wchar_t const MainWindowClassName[] = L"ASWUnitTests_Win32GUI_Main";
 // Posted by PostToUI(), so the message loop runs the queued actions.
 UINT const RunQueuedMessage = WM_APP + 1;
-// The log's color for skip lines, as the VCL GUI runner's.
-COLORREF const SkipColor = RGB(190, 120, 0);
 // The title of the GUI's windows, as the VCL GUI runner's Application->Title.
 char const Title[] = "ASWUnitTests";
 
@@ -90,6 +80,9 @@ EWin32GUICommand const AllCommands[] = {
     EWin32GUICommand::ShuffleOrder,
     EWin32GUICommand::ShuffleSeed,
     EWin32GUICommand::Stop,
+    EWin32GUICommand::ThemeDark,
+    EWin32GUICommand::ThemeLight,
+    EWin32GUICommand::ThemeWindows,
 };
 
 //---------------------------------------------------------------------------
@@ -141,7 +134,7 @@ void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption)
 HMENU AppendSubmenu(HMENU menuBar, wchar_t const* caption);
 char const* CommandName(EWin32GUICommand command);
 bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command);
-COLORREF LogLineColor(std::string const& line);
+COLORREF LogLineColor(std::string const& line, TWin32GUITheme const& theme);
 std::vector<TGUIRect> MonitorWorkAreas();
 HTREEITEM NextTreeItem(HWND tree, HTREEITEM item);
 MONITORINFO PrimaryMonitorInfo();
@@ -250,6 +243,15 @@ char const* CommandName(EWin32GUICommand command)
 
         case EWin32GUICommand::Stop:
             return "Stop";
+
+        case EWin32GUICommand::ThemeDark:
+            return "Theme > Dark";
+
+        case EWin32GUICommand::ThemeLight:
+            return "Theme > Light";
+
+        case EWin32GUICommand::ThemeWindows:
+            return "Theme > Use Windows Setting";
     }
 
     return "a command";
@@ -309,6 +311,11 @@ bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command)
 
         case EWin32GUICommand::Stop:
             return states.Stop;
+
+        case EWin32GUICommand::ThemeDark:
+        case EWin32GUICommand::ThemeLight:
+        case EWin32GUICommand::ThemeWindows:
+            return states.Theme;
     }
 
     return false;
@@ -317,23 +324,24 @@ bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command)
 /*
     LogLineColor
 
-    The log's color for one line of the framework's log output; see ClassifyGUILogLine().
+    The log's color for one line of the framework's log output (see ClassifyGUILogLine()) in 'theme', as the
+    VCL GUI runner's: normal lines in the text color, explicitly, so a dark log's aren't black.
 */
-COLORREF LogLineColor(std::string const& line)
+COLORREF LogLineColor(std::string const& line, TWin32GUITheme const& theme)
 {
     switch (ClassifyGUILogLine(line))
     {
         case TGUILogLineKind::Failure:
-            return FailureColor;
+            return theme.FailureTextColor();
 
         case TGUILogLineKind::Skip:
-            return SkipColor;
+            return theme.SkipTextColor();
 
         case TGUILogLineKind::Normal:
             break;
     }
 
-    return GetSysColor(COLOR_WINDOWTEXT);
+    return theme.WindowTextColor();
 }
 //---------------------------------------------------------------------------
 /*
@@ -508,7 +516,7 @@ TWin32GUIMainWindow::TToolbarButton const TWin32GUIMainWindow::ToolbarButtons[7]
 };
 
 //---------------------------------------------------------------------------
-TWin32GUIMainWindow::TWin32GUIMainWindow()
+TWin32GUIMainWindow::TWin32GUIMainWindow(TWin32GUITheme& theme)
     : m_Btn_CopyDetails(nullptr),
       m_Btn_RunFailed(nullptr),
       m_Btn_RunSelected(nullptr),
@@ -547,6 +555,9 @@ TWin32GUIMainWindow::TWin32GUIMainWindow()
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
       m_TestTreeWidth(TWin32GUIMainSizes::DefaultTestTreeWidth),
+      m_Theme(theme),
+      m_ThemeChangePending(false),
+      m_ThemeChoice(EGUITheme::Windows),
       m_Window(nullptr)
 {
 }
@@ -628,7 +639,7 @@ void TWin32GUIMainWindow::AppendLog(std::string const& text)
         CHARFORMAT2W format = {};
         format.cbSize = sizeof(format);
         format.dwMask = CFM_COLOR;
-        format.crTextColor = LogLineColor(line);
+        format.crTextColor = LogLineColor(line, m_Theme);
         SendMessageW(m_RE_Log, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
 
         SendMessageW(m_RE_Log, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(UTF8ToWide(line +
@@ -653,6 +664,8 @@ void TWin32GUIMainWindow::ApplyDPI()
 
     CreateStatusImages();
     SendMessageW(m_TV_Tests, TVM_SETINDENT, static_cast<WPARAM>(ScaleForDPI(19, m_DPI)), 0);
+    // e.g. the dark tree's check boxes and the menus' sizes, for the new DPI.
+    m_Theme.Refresh();
 
     // The status bar's parts' widths, from the .dfm's panels.
     std::vector<int> rightEdges;
@@ -704,6 +717,31 @@ void TWin32GUIMainWindow::ApplyPanelSizes(TGUILayout const& layout)
         m_DetailHeight = ClampDetailHeight(ScaleFrom96(*layout.DetailHeight, pixelsPerInch), client.bottom, m_DPI);
 
     LayOut();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::ApplyTheme
+
+    Dark or light as View > Theme says, or with Use Windows Setting, as Windows' app mode does, but light while
+    a high contrast theme is on (see GUIThemeIsDark()). Not during a run, as in the VCL GUI runner; SetRunning()
+    calls it again once the run has ended.
+*/
+void TWin32GUIMainWindow::ApplyTheme()
+{
+    if (m_Running)
+    {
+        m_ThemeChangePending = true;
+        return;
+    }
+
+    m_ThemeChangePending = false;
+    bool const dark = GUIThemeIsDark(m_ThemeChoice, WindowsAppsUseDarkTheme(), WindowsHighContrast());
+
+    if (dark == m_Theme.IsDark())
+        return;
+
+    m_Theme.SetDark(dark);
+    RecolorLog();
 }
 //---------------------------------------------------------------------------
 /*
@@ -829,6 +867,7 @@ void TWin32GUIMainWindow::Create()
         throw std::runtime_error("Couldn't create the main window");
     }
 
+    m_Theme.AttachWindow(m_Window, m_MM_Main);
     m_DPI = WindowDPI(m_Window);
     m_TestTreeWidth = ScaleForDPI(TWin32GUIMainSizes::DefaultTestTreeWidth, m_DPI);
     m_DetailHeight = ScaleForDPI(TWin32GUIMainSizes::DefaultDetailHeight, m_DPI);
@@ -887,35 +926,40 @@ void TWin32GUIMainWindow::CreateControls()
     m_Lbl_Filter = CreateChild(0, L"STATIC", L"F&ilter:", SS_LEFT);
     m_Edt_Filter = CreateChild(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_TABSTOP | ES_AUTOHSCROLL);
     SendMessageW(m_Edt_Filter, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"e.g. String or *Handler*.Run_*"));
+    m_Theme.Attach(m_Edt_Filter, EWin32GUIThemedControl::Edit);
 
     m_TV_Tests = CreateChild(WS_EX_CLIENTEDGE, WC_TREEVIEWW, L"", WS_TABSTOP | TVS_HASBUTTONS | TVS_HASLINES |
         TVS_LINESATROOT | TVS_SHOWSELALWAYS);
     // The partial state, for a group or suite with only some of its tests checked, has to be asked for before
     // the check boxes, which create the check box images. The check boxes only once the tree exists, as
-    // TVS_CHECKBOXES' documentation says, or they may not show their state.
-    SendMessageW(m_TV_Tests, TVM_SETEXTENDEDSTYLE, TVS_EX_PARTIALCHECKBOXES, TVS_EX_PARTIALCHECKBOXES);
+    // TVS_CHECKBOXES' documentation says, or they may not show their state. Painted through a buffer, so it
+    // doesn't flicker.
+    SendMessageW(m_TV_Tests, TVM_SETEXTENDEDSTYLE, TVS_EX_PARTIALCHECKBOXES | TVS_EX_DOUBLEBUFFER,
+        TVS_EX_PARTIALCHECKBOXES | TVS_EX_DOUBLEBUFFER);
     SetWindowLongPtrW(m_TV_Tests, GWL_STYLE, GetWindowLongPtrW(m_TV_Tests, GWL_STYLE) | TVS_CHECKBOXES);
-    // Drawn like File Explorer's tree (arrows to expand, a light selection), as the VCL draws its trees.
-    SetWindowTheme(m_TV_Tests, L"Explorer", nullptr);
+    // Drawn like File Explorer's tree (arrows to expand, a light selection) while light, as the VCL draws its
+    // trees; see TWin32GUITheme.
+    m_Theme.Attach(m_TV_Tests, EWin32GUIThemedControl::TreeView);
     m_Spl_Tests.Create(m_Window, TWin32GUISplitter::EOrientation::Vertical, [this](int position)
         {
             OnTestsSplitterDrag(position);
         });
+    m_Theme.Attach(m_Spl_Tests.Handle(), EWin32GUIThemedControl::Splitter);
 
     m_Mem_Detail = CreateChild(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_READONLY |
         ES_AUTOVSCROLL);
     SendMessageW(m_Mem_Detail, EM_SETLIMITTEXT, 0, 0); // Otherwise 32K characters at most.
+    m_Theme.Attach(m_Mem_Detail, EWin32GUIThemedControl::Edit);
     m_Spl_Detail.Create(m_Window, TWin32GUISplitter::EOrientation::Horizontal, [this](int position)
         {
             OnDetailSplitterDrag(position);
         });
+    m_Theme.Attach(m_Spl_Detail.Handle(), EWin32GUIThemedControl::Splitter);
 
     m_LV_Failures = CreateChild(WS_EX_CLIENTEDGE, WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_SINGLESEL |
         LVS_SHOWSELALWAYS);
     SendMessageW(m_LV_Failures, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER,
         LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
-    // As the VCL draws its list views; it also keeps a selected row's text in its result's color.
-    SetWindowTheme(m_LV_Failures, L"Explorer", nullptr);
 
     wchar_t const* const columns[] = { L"Result", L"Test", L"Detail" };
 
@@ -927,11 +971,15 @@ void TWin32GUIMainWindow::CreateControls()
         SendMessageW(m_LV_Failures, LVM_INSERTCOLUMNW, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&column));
     }
 
+    // As the VCL draws its list views while light; it also keeps a selected row's text in its result's color.
+    m_Theme.Attach(m_LV_Failures, EWin32GUIThemedControl::ListView);
+
     m_RE_Log = CreateChild(WS_EX_CLIENTEDGE, MSFTEDIT_CLASS, L"", WS_TABSTOP | WS_VSCROLL | WS_HSCROLL |
         ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL);
     SendMessageW(m_RE_Log, EM_EXLIMITTEXT, 0, 0x7FFFFFFE); // Otherwise 32K characters at most.
     SendMessageW(m_RE_Log, EM_SETTARGETDEVICE, 0, 1); // No word wrap.
     ShowWindow(m_RE_Log, SW_HIDE);
+    m_Theme.Attach(m_RE_Log, EWin32GUIThemedControl::RichEdit);
 
     m_PC_Results = CreateChild(0, WC_TABCONTROLW, L"", WS_TABSTOP | WS_CLIPSIBLINGS);
     // "&&" for a literal '&', as in the .dfm: a tab control takes '&' as a hot key's prefix.
@@ -945,9 +993,13 @@ void TWin32GUIMainWindow::CreateControls()
         SendMessageW(m_PC_Results, TCM_INSERTITEMW, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&item));
     }
 
+    m_Theme.Attach(m_PC_Results, EWin32GUIThemedControl::TabControl);
+
     m_PB_Progress = CreateChild(0, PROGRESS_CLASSW, L"", 0);
+    m_Theme.Attach(m_PB_Progress, EWin32GUIThemedControl::ProgressBar);
     // Placed and sized by LayOut(), at the .dfm's height, rather than by itself at its font's.
     m_SB_Status = CreateChild(0, STATUSCLASSNAMEW, L"", SBARS_SIZEGRIP | CCS_NORESIZE | CCS_NOPARENTALIGN);
+    m_Theme.Attach(m_SB_Status, EWin32GUIThemedControl::StatusBar);
 }
 //---------------------------------------------------------------------------
 /*
@@ -985,6 +1037,11 @@ void TWin32GUIMainWindow::CreateMenuBar()
     AppendCommand(view, EWin32GUICommand::CollapseAll, L"&Collapse All");
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendCommand(view, EWin32GUICommand::ResetLayout, L"&Reset Layout");
+    AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
+    HMENU const theme = AppendSubmenu(view, L"&Theme");
+    AppendCommand(theme, EWin32GUICommand::ThemeWindows, L"Use &Windows Setting");
+    AppendCommand(theme, EWin32GUICommand::ThemeLight, L"&Light");
+    AppendCommand(theme, EWin32GUICommand::ThemeDark, L"&Dark");
 
     HMENU const options = AppendSubmenu(m_MM_Main, L"&Options");
     AppendCommand(options, EWin32GUICommand::ShuffleOrder, L"Run in &Shuffled Order");
@@ -1090,6 +1147,8 @@ void TWin32GUIMainWindow::CreateTooltips()
     if (m_TT_Hints == nullptr)
         throw std::runtime_error("Couldn't create the tooltips");
 
+    m_Theme.Attach(m_TT_Hints, EWin32GUIThemedControl::Tooltip);
+
     auto const addTool = [this](HWND control, wchar_t const* text)
         {
             TTTOOLINFOW tool = {};
@@ -1160,7 +1219,7 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
             switch (command)
             {
                 case EWin32GUICommand::About:
-                    ShowTextDialog(m_Window, std::string("About ") + Title, GUIAboutText("Win32 GUI runner"));
+                    ShowTextDialog(m_Window, m_Theme, std::string("About ") + Title, GUIAboutText("Win32 GUI runner"));
                     break;
 
                 case EWin32GUICommand::CollapseAll:
@@ -1170,7 +1229,8 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     break;
 
                 case EWin32GUICommand::CommandLineOptions:
-                    ShowTextDialog(m_Window, std::string(Title) + " - Command Line Options", TGUICommandLine::HelpText());
+                    ShowTextDialog(m_Window, m_Theme, std::string(Title) + " - Command Line Options",
+                        TGUICommandLine::HelpText());
                     break;
 
                 case EWin32GUICommand::CopyDetails:
@@ -1247,7 +1307,7 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     break;
 
                 case EWin32GUICommand::ShuffleSeed:
-                    if (ShowShuffleSeedDialog(m_Window, m_Shuffle))
+                    if (ShowShuffleSeedDialog(m_Window, m_Theme, m_Shuffle))
                         ShowShuffleState();
 
                     break;
@@ -1256,6 +1316,18 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     m_Observer.RequestStop();
                     m_StatusMessage = "Stopping after the current test...";
                     UpdateStatusBar();
+                    break;
+
+                case EWin32GUICommand::ThemeDark:
+                    SetTheme(EGUITheme::Dark);
+                    break;
+
+                case EWin32GUICommand::ThemeLight:
+                    SetTheme(EGUITheme::Light);
+                    break;
+
+                case EWin32GUICommand::ThemeWindows:
+                    SetTheme(EGUITheme::Windows);
                     break;
 
                 default:
@@ -1336,7 +1408,7 @@ void TWin32GUIMainWindow::ExportJUnitReport()
     {
         std::string const message = "The JUnit report couldn't be written to:\n" + m_ExportJUnitReportPath + "\n\n" +
             error;
-        MessageBoxW(m_Window, UTF8ToWide(message).c_str(), UTF8ToWide(Title).c_str(), MB_OK | MB_ICONERROR);
+        ShowMessageDialog(m_Window, m_Theme, Title, message, EWin32GUIMessageIcon::Error);
         return;
     }
 
@@ -1405,7 +1477,8 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
         {
             WORD const id = LOWORD(wParam);
 
-            if (id >= static_cast<WORD>(EWin32GUICommand::About) && id <= static_cast<WORD>(EWin32GUICommand::Stop))
+            if (id >= static_cast<WORD>(EWin32GUICommand::About) &&
+                id <= static_cast<WORD>(EWin32GUICommand::ThemeWindows))
             {
                 DoCommand(static_cast<EWin32GUICommand>(id));
                 return 0;
@@ -1425,18 +1498,6 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
 
             break;
         }
-
-        case WM_CTLCOLORSTATIC:
-            // The read-only detail pane is drawn like an editable one, as the VCL GUI runner's is, rather than gray.
-            if (reinterpret_cast<HWND>(lParam) == m_Mem_Detail)
-            {
-                HDC const context = reinterpret_cast<HDC>(wParam);
-                SetTextColor(context, GetSysColor(COLOR_WINDOWTEXT));
-                SetBkColor(context, GetSysColor(COLOR_WINDOW));
-                return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
-            }
-
-            break;
 
         case WM_DESTROY:
             if (m_Closing)
@@ -1497,10 +1558,34 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
             break;
         }
 
+        case WM_SETTINGCHANGE:
+            // With Use Windows Setting, Windows' app mode or high contrast changing changes the theme.
+            if (IsThemeSettingChange(wParam, lParam))
+            {
+                RunGuarded("following Windows' theme", [this]()
+                {
+                    ApplyTheme();
+                });
+            }
+
+            break;
+
         case WM_SIZE:
             if (wParam != SIZE_MINIMIZED)
                 LayOut();
 
+            return 0;
+
+        case WM_SYSCOLORCHANGE:
+            // The common controls need it passed on, and the light theme's colors are the system's.
+            for (HWND child = GetWindow(m_Window, GW_CHILD); child != nullptr; child = GetWindow(child, GW_HWNDNEXT))
+                SendMessageW(child, WM_SYSCOLORCHANGE, wParam, lParam);
+
+            RunGuarded("the system colors' change", [this]()
+            {
+                m_Theme.Refresh();
+                RecolorLog();
+            });
             return 0;
 
         default:
@@ -1791,22 +1876,25 @@ void TWin32GUIMainWindow::OnDPIChanged(UINT dpi, RECT const& suggested)
 /*
     TWin32GUIMainWindow::OnFailuresCustomDraw
 
-    A row it can't match to a test is simply drawn in the default color.
+    A row it can't match to a test is simply drawn in the text color. The theme draws the row; see
+    TWin32GUITheme::OnListCustomDraw().
 */
 LRESULT TWin32GUIMainWindow::OnFailuresCustomDraw(NMLVCUSTOMDRAW& draw) const
 {
-    if (draw.nmcd.dwDrawStage == CDDS_PREPAINT)
-        return CDRF_NOTIFYITEMDRAW;
+    COLORREF color = m_Theme.WindowTextColor();
 
     if (draw.nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
     {
         std::size_t const index = static_cast<std::size_t>(draw.nmcd.lItemlParam);
 
         if (index < m_TestList.Count())
-            draw.clrText = m_TestList.Status(index) == TGUITestStatus::Failed ? FailureColor : SkipColor;
+        {
+            color = m_TestList.Status(index) == TGUITestStatus::Failed ? m_Theme.FailureTextColor() :
+                    m_Theme.SkipTextColor();
+        }
     }
 
-    return CDRF_DODEFAULT;
+    return m_Theme.OnListCustomDraw(draw, color);
 }
 //---------------------------------------------------------------------------
 /*
@@ -2026,6 +2114,62 @@ void TWin32GUIMainWindow::ProcessMessages()
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::RecolorLog
+
+    AppendLog() colored each line for the theme then. Every line is given the text color first, in one step,
+    then each failure and skip line its own color, as the VCL GUI runner's does. The selection and the scroll
+    position are kept.
+*/
+void TWin32GUIMainWindow::RecolorLog()
+{
+    CHARRANGE selection = {};
+    SendMessageW(m_RE_Log, EM_EXGETSEL, 0, reinterpret_cast<LPARAM>(&selection));
+    int const firstVisible = static_cast<int>(SendMessageW(m_RE_Log, EM_GETFIRSTVISIBLELINE, 0, 0));
+
+    // Only while it's showing: WM_SETREDRAW's TRUE shows a hidden window, e.g. the log behind the Failures &
+    // Skips page. (bcc32c's std::optional can't hold a TRedrawScope, which has no default constructor.)
+    std::unique_ptr<TRedrawScope> const updating = IsWindowVisible(m_RE_Log) != FALSE ?
+            std::make_unique<TRedrawScope>(m_RE_Log) : nullptr;
+
+    CHARFORMAT2W format = {};
+    format.cbSize = sizeof(format);
+    format.dwMask = CFM_COLOR;
+    format.crTextColor = m_Theme.WindowTextColor();
+    SendMessageW(m_RE_Log, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&format));
+
+    int const lineCount = static_cast<int>(SendMessageW(m_RE_Log, EM_GETLINECOUNT, 0, 0));
+
+    for (int i = 0; i < lineCount; ++i)
+    {
+        int const start = static_cast<int>(SendMessageW(m_RE_Log, EM_LINEINDEX, static_cast<WPARAM>(i), 0));
+        int const length = static_cast<int>(SendMessageW(m_RE_Log, EM_LINELENGTH, static_cast<WPARAM>(start), 0));
+
+        if (start < 0 || length <= 0)
+            continue;
+
+        // EM_GETLINE's buffer starts with its size, in characters.
+        std::wstring text(static_cast<std::size_t>(length) + 1, L' ');
+        text[0] = static_cast<wchar_t>((std::min)(length + 1, 0xFFFF));
+        text.resize(static_cast<std::size_t>(SendMessageW(m_RE_Log, EM_GETLINE, static_cast<WPARAM>(i),
+            reinterpret_cast<LPARAM>(&text[0]))));
+
+        std::string const line = WideToUTF8(text);
+
+        if (ClassifyGUILogLine(line) == TGUILogLineKind::Normal)
+            continue;
+
+        CHARRANGE range = { start, start + length };
+        SendMessageW(m_RE_Log, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&range));
+        format.crTextColor = LogLineColor(line, m_Theme);
+        SendMessageW(m_RE_Log, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
+    }
+
+    SendMessageW(m_RE_Log, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&selection));
+    int const nowVisible = static_cast<int>(SendMessageW(m_RE_Log, EM_GETFIRSTVISIBLELINE, 0, 0));
+    SendMessageW(m_RE_Log, EM_LINESCROLL, 0, firstVisible - nowVisible);
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::RefreshAllNodeImages()
 {
     TRedrawScope const updating(m_TV_Tests);
@@ -2040,7 +2184,7 @@ void TWin32GUIMainWindow::RefreshAllNodeImages()
 void TWin32GUIMainWindow::ReportUnexpectedError(std::string const& where, std::string const& description)
 {
     std::string const message = "An unexpected error occurred in " + where + ": " + description;
-    MessageBoxW(m_Window, UTF8ToWide(message).c_str(), UTF8ToWide(Title).c_str(), MB_OK | MB_ICONERROR);
+    ShowMessageDialog(m_Window, m_Theme, Title, message, EWin32GUIMessageIcon::Error);
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::ResetLayout()
@@ -2309,6 +2453,28 @@ void TWin32GUIMainWindow::SetRunning(bool running)
     {
         SetFocus(m_FocusBeforeRun);
     }
+
+    // Windows' setting changed during the run; see ApplyTheme().
+    if (!running && m_ThemeChangePending)
+        ApplyTheme();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SetTheme
+
+    Saved at once, rather than with the layout as the window closes, so the choice is kept even if the window
+    doesn't get to close normally; but not with --layout-ignore, which saves nothing. Reset Layout leaves it
+    alone.
+*/
+void TWin32GUIMainWindow::SetTheme(EGUITheme theme)
+{
+    m_ThemeChoice = theme;
+    ShowThemeState();
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIThemeToLayoutFile(theme);
+
+    ApplyTheme();
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::SetTreeExpanded(bool expanded)
@@ -2364,17 +2530,33 @@ void TWin32GUIMainWindow::ShowShuffleState()
     UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
+void TWin32GUIMainWindow::ShowThemeState()
+{
+    EWin32GUICommand checked = EWin32GUICommand::ThemeWindows;
+
+    if (m_ThemeChoice == EGUITheme::Dark)
+        checked = EWin32GUICommand::ThemeDark;
+    else if (m_ThemeChoice == EGUITheme::Light)
+        checked = EWin32GUICommand::ThemeLight;
+
+    CheckMenuRadioItem(m_MM_Main, static_cast<UINT>(EWin32GUICommand::ThemeDark),
+        static_cast<UINT>(EWin32GUICommand::ThemeWindows), static_cast<UINT>(checked), MF_BYCOMMAND);
+}
+//---------------------------------------------------------------------------
 /*
     TWin32GUIMainWindow::Start
 
     Loads the registered tests and applies the command line's options: --project-name to the caption, and
     --filter and the partition options to which tests start out checked, and --filter to the filter box,
     and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout and the test
-    selection saved when it last closed.
+    selection saved when it last closed. WinMain() set the theme up for 'theme' before any window existed, so
+    the --help dialog had it too.
 */
-void TWin32GUIMainWindow::Start(TGUIOptions const& options)
+void TWin32GUIMainWindow::Start(TGUIOptions const& options, EGUITheme theme)
 {
     m_Options = options;
+    m_ThemeChoice = theme;
+    ShowThemeState();
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {

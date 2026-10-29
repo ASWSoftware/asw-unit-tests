@@ -340,9 +340,17 @@
             <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
             <BuildOrder>58</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_Glyphs.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_Glyphs.h</DependentOn>
+            <BuildOrder>65</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h</DependentOn>
             <BuildOrder>54</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\tests\Test_ASWUnitTests_Win32GUI_Palette.cpp">
+            <DependentOn>..\..\tests\Test_ASWUnitTests_Win32GUI_Palette.h</DependentOn>
+            <BuildOrder>67</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>
@@ -352,6 +360,10 @@
             <DependentOn>..\src\ASWUnitTests_Win32GUI_DPI.h</DependentOn>
             <BuildOrder>50</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_Glyphs.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_Glyphs.h</DependentOn>
+            <BuildOrder>64</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MainLayout.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_MainLayout.h</DependentOn>
             <BuildOrder>53</BuildOrder>
@@ -359,6 +371,14 @@
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MainWindow.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_MainWindow.h</DependentOn>
             <BuildOrder>55</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_MessageDialog.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_MessageDialog.h</DependentOn>
+            <BuildOrder>68</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_Palette.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_Palette.h</DependentOn>
+            <BuildOrder>66</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h</DependentOn>
@@ -375,6 +395,10 @@
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_TextDialog.cpp">
             <DependentOn>..\src\ASWUnitTests_Win32GUI_TextDialog.h</DependentOn>
             <BuildOrder>51</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\src\ASWUnitTests_Win32GUI_Theme.cpp">
+            <DependentOn>..\src\ASWUnitTests_Win32GUI_Theme.h</DependentOn>
+            <BuildOrder>69</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\src\ASWUnitTests_Win32GUI_WinMain.cpp">
             <BuildOrder>47</BuildOrder>

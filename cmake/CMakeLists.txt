@@ -81,11 +81,15 @@ if(WIN32)
     target_sources(ASWUnitTests PRIVATE
         ../win32/gui/src/ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_DPI.cpp
+        ../win32/gui/src/ASWUnitTests_Win32GUI_Glyphs.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_MainLayout.cpp
+        ../win32/gui/src/ASWUnitTests_Win32GUI_Palette.cpp
         ../win32/gui/src/ASWUnitTests_Win32GUI_System.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DPI.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_Glyphs.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_MainLayout.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_Palette.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp
     )
     target_include_directories(ASWUnitTests PRIVATE
@@ -126,7 +130,9 @@ if(WIN32)
         ${ASWUNITTESTS_SELF_TEST_SOURCES}
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_DPI.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_Glyphs.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_MainLayout.cpp
+        ../win32/tests/Test_ASWUnitTests_Win32GUI_Palette.cpp
         ../win32/tests/Test_ASWUnitTests_Win32GUI_System.cpp
     )
 
