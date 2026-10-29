@@ -55,6 +55,7 @@ struct TTextDialogState
 {
     std::wstring Text;
     TWin32GUIFont MonospaceFont;
+    TWin32GUITheme* Theme = nullptr;
 };
 
 //---------------------------------------------------------------------------
@@ -132,6 +133,8 @@ INT_PTR HandleDialogMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lPa
 
             // Without a limit, an EDIT control holds only 32K characters.
             HWND const textBox = GetDlgItem(dialog, TextBoxID);
+            state->Theme->AttachWindow(dialog);
+            state->Theme->Attach(textBox, EWin32GUIThemedControl::Edit);
             SendMessageW(textBox, EM_SETLIMITTEXT, 0, 0);
             SetWindowTextW(textBox, state->Text.c_str());
 
@@ -151,18 +154,6 @@ INT_PTR HandleDialogMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lPa
             {
                 EndDialog(dialog, LOWORD(wParam));
                 return TRUE;
-            }
-
-            return FALSE;
-
-        case WM_CTLCOLORSTATIC:
-            // A read-only text box is drawn like an editable one, as the VCL GUI runner's is, rather than gray.
-            if (reinterpret_cast<HWND>(lParam) == GetDlgItem(dialog, TextBoxID))
-            {
-                HDC const context = reinterpret_cast<HDC>(wParam);
-                SetTextColor(context, GetSysColor(COLOR_WINDOWTEXT));
-                SetBkColor(context, GetSysColor(COLOR_WINDOW));
-                return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_WINDOW));
             }
 
             return FALSE;
@@ -247,10 +238,11 @@ void SizeAndCenterDialog(HWND dialog)
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-void ShowTextDialog(HWND owner, std::string const& caption, std::string const& text)
+void ShowTextDialog(HWND owner, TWin32GUITheme& theme, std::string const& caption, std::string const& text)
 {
     TTextDialogState state;
     state.Text = UTF8ToWide(AdjustLineBreaks(text));
+    state.Theme = &theme;
 
     TWin32GUIDialogTemplate const dialogTemplate = BuildDialogTemplate(UTF8ToWide(caption));
 

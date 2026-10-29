@@ -31,10 +31,13 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <cstddef>
+#include <cwchar>
 #include <limits>
 #include <stdexcept>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_INIDocument.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -260,6 +263,33 @@ std::string GUISettingsFolderPath()
     return WideToUTF8(appData) + "\\ASWUnitTests";
 }
 //---------------------------------------------------------------------------
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == SPI_SETHIGHCONTRAST)
+        return true;
+
+    wchar_t const* const area = reinterpret_cast<wchar_t const*>(lParam);
+
+    return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
+}
+//---------------------------------------------------------------------------
+EGUITheme LoadGUIThemeFromLayoutFile()
+{
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+
+        if (!FileExists(path))
+            return EGUITheme::Windows;
+
+        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(path)));
+    }
+    catch (...)
+    {
+        return EGUITheme::Windows;
+    }
+}
+//---------------------------------------------------------------------------
 HICON MainIcon()
 {
     return LoadIconW(GetModuleHandleW(nullptr), L"MAINICON");
@@ -313,6 +343,24 @@ bool RemoveFile(std::string const& path)
     return DeleteFileW(UTF8ToWide(path).c_str()) != 0;
 }
 //---------------------------------------------------------------------------
+void SaveGUIThemeToLayoutFile(EGUITheme theme)
+{
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+        CreateFolderPath(GUISettingsFolderPath());
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUITheme(ini, theme);
+        WriteFileBytes(path, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default theme.
+    }
+}
+//---------------------------------------------------------------------------
 /*
     SetClipboardText
 
@@ -364,6 +412,27 @@ std::string WindowText(HWND window)
     text.resize(static_cast<std::size_t>(GetWindowTextW(window, &text[0], static_cast<int>(text.size()))));
 
     return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+bool WindowsAppsUseDarkTheme()
+{
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+
+    LSTATUS const status = RegGetValueW(HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme", RRF_RT_REG_DWORD,
+        nullptr, &value, &size);
+
+    return status == ERROR_SUCCESS && value == 0;
+}
+//---------------------------------------------------------------------------
+bool WindowsHighContrast()
+{
+    HIGHCONTRASTW highContrast = {};
+    highContrast.cbSize = sizeof(highContrast);
+
+    return SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0) != 0 &&
+        (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
 }
 //---------------------------------------------------------------------------
 void WriteFileBytes(std::string const& path, std::string const& bytes)

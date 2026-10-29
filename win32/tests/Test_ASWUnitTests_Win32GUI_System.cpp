@@ -120,6 +120,10 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast,
+        "IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote,
+        "LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_MainIcon_IsThisExecutablesSharedIcon,
         "MainIcon_IsThisExecutablesSharedIcon");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote,
@@ -130,6 +134,8 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
         "RemoveFile_DeletesOnlyAnExistingFile");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8,
         "WindowText_ConvertsNonASCIIToUTF8");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WindowsAppsUseDarkTheme_MatchesTheRegistry,
+        "WindowsAppsUseDarkTheme_MatchesTheRegistry");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing,
         "WriteFileBytes_ThrowsWhenTheFolderIsMissing");
 }
@@ -315,6 +321,75 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLa
         "the layout file's path with a .selection extension");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast()
+{
+    // Arrange: WM_SETTINGCHANGE's parameters, as Windows sends them.
+    wchar_t const appMode[] = L"ImmersiveColorSet";
+    wchar_t const other[] = L"Policy";
+
+    // Act
+    bool const forAppMode = IsThemeSettingChange(0, reinterpret_cast<LPARAM>(appMode));
+    bool const forHighContrast = IsThemeSettingChange(SPI_SETHIGHCONTRAST, 0);
+    bool const forOther = IsThemeSettingChange(0, reinterpret_cast<LPARAM>(other));
+    bool const forOtherSetting = IsThemeSettingChange(SPI_SETWORKAREA, 0);
+
+    // Assert
+    CheckTrue(forAppMode, __func__, __LINE__, "the app mode's change");
+    CheckTrue(forHighContrast, __func__, __LINE__, "high contrast's change");
+    CheckFalse(forOther, __func__, __LINE__, "another area's change");
+    CheckFalse(forOtherSetting, __func__, __LINE__, "another setting's change, with no area");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
+{
+    // Arrange: this runner's own layout file, which only a GUI would otherwise use, put back however the test
+    // ends.
+    std::string const path = GUILayoutFilePath();
+
+    struct TRestoreFile
+    {
+        std::string const Path;
+        bool const Existed;
+        std::string const Bytes;
+
+        ~TRestoreFile()
+        {
+            try
+            {
+                if (Existed)
+                    WriteFileBytes(Path, Bytes);
+                else
+                    RemoveFile(Path);
+            }
+            catch (...)
+            {
+            }
+        }
+    };
+
+    bool const existed = FileExists(path);
+    TRestoreFile const restoreFile{ path, existed, existed ? ReadFileBytes(path) : std::string() };
+
+    RemoveFile(path);
+    EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
+
+    // Act
+    SaveGUIThemeToLayoutFile(EGUITheme::Dark);
+    EGUITheme const dark = LoadGUIThemeFromLayoutFile();
+
+    WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
+    SaveGUIThemeToLayoutFile(EGUITheme::Light);
+    EGUITheme const light = LoadGUIThemeFromLayoutFile();
+    std::string const text = ReadFileBytes(path);
+
+    // Assert
+    CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
+    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
+    CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
+    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\n\r\n"), text, __func__,
+        __LINE__, "the layout stays");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_MainIcon_IsThisExecutablesSharedIcon()
 {
     // Act: every runner that compiles this test embeds the ASWUnitTests icon.
@@ -398,6 +473,36 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_WindowText_ConvertsNonASCIIToUTF8(
     CheckEquals(std::string("a\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80"), titledText, __func__, __LINE__,
         "every character converted");
     CheckEquals(std::string(), untitledText, __func__, __LINE__, "no text");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_WindowsAppsUseDarkTheme_MatchesTheRegistry()
+{
+    // Arrange: the setting read another way, with RegQueryValueExW(). This machine's setting can't be changed
+    // here, so only agreement with it can be checked.
+    bool expected = false;
+    HKEY key = nullptr;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", 0,
+        KEY_READ, &key) == ERROR_SUCCESS)
+    {
+        DWORD value = 1;
+        DWORD size = sizeof(value);
+        DWORD type = 0;
+
+        if (RegQueryValueExW(key, L"AppsUseLightTheme", nullptr, &type, reinterpret_cast<BYTE*>(&value), &size) ==
+            ERROR_SUCCESS && type == REG_DWORD)
+        {
+            expected = value == 0;
+        }
+
+        RegCloseKey(key);
+    }
+
+    // Act
+    bool const dark = WindowsAppsUseDarkTheme();
+
+    // Assert
+    CheckEquals(expected, dark, __func__, __LINE__, "dark when AppsUseLightTheme is 0");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_WriteFileBytes_ThrowsWhenTheFolderIsMissing()

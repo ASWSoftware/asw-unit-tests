@@ -37,6 +37,8 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Theme.h"
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -64,6 +66,12 @@ std::string GUISelectionFilePath();
 // The folder that holds the GUI runners' layout and selection files, %APPDATA%\ASWUnitTests. It may not exist
 // yet (see CreateFolderPath()).
 std::string GUISettingsFolderPath();
+// Whether a WM_SETTINGCHANGE message's parameters are about a setting that Use Windows Setting follows: the
+// app mode (Windows names its change "ImmersiveColorSet") or high contrast.
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam);
+// The theme saved in the layout file (see GUILayoutFilePath() and LoadGUITheme()); Windows when there's no file
+// or it can't be read.
+EGUITheme LoadGUIThemeFromLayoutFile();
 // This executable's icon, its MAINICON resource (resource/ASWUnitTests_Icon.rc, or Icon_MainIcon in a RAD Studio
 // project), at the standard icon size; nullptr if it has none. Shared, so it's never destroyed.
 HICON MainIcon();
@@ -75,11 +83,19 @@ std::vector<std::string> ProcessArguments();
 std::string ReadFileBytes(std::string const& path);
 // Deletes the file. False if it couldn't be deleted, e.g. because it doesn't exist.
 bool RemoveFile(std::string const& path);
+// Saves 'theme' in the layout file (see GUILayoutFilePath() and SaveGUITheme()), keeping the layout and any
+// other values in it. Not saving it (e.g. a read-only profile) only means the next start uses the default.
+void SaveGUIThemeToLayoutFile(EGUITheme theme);
 // Replaces the clipboard's content with the text, for 'owner' (a window of this process). Throws
 // std::runtime_error if it can't, e.g. while another program has the clipboard open.
 void SetClipboardText(HWND owner, std::string const& text);
 // The window's text, e.g. a control's, converted to UTF-8.
 std::string WindowText(HWND window);
+// Whether Windows' setting for apps is dark: AppsUseLightTheme is 0 under
+// HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize. False if it can't be read.
+bool WindowsAppsUseDarkTheme();
+// Whether a high contrast theme is on.
+bool WindowsHighContrast();
 // Replaces the file's content with 'bytes', unchanged, creating the file if needed (but not its folder).
 // Throws std::runtime_error if it can't be written.
 void WriteFileBytes(std::string const& path, std::string const& bytes);

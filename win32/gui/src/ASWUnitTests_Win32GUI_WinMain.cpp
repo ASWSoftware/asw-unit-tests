@@ -30,10 +30,12 @@ limitations under the License.
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_CommandLine.h"
+#include "ASWUnitTests_GUI_Theme.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_MainWindow.h"
 #include "ASWUnitTests_Win32GUI_System.h"
 #include "ASWUnitTests_Win32GUI_TextDialog.h"
+#include "ASWUnitTests_Win32GUI_Theme.h"
 //---------------------------------------------------------------------------
 
 #if defined(__MINGW32__)
@@ -57,16 +59,16 @@ char const ApplicationTitle[] = "ASWUnitTests";
 
 //---------------------------------------------------------------------------
 
-void ShowUnhandledException(std::string const& description);
+void ShowUnhandledException(ASWUnitTests::TWin32GUITheme& theme, std::string const& description);
 
 //---------------------------------------------------------------------------
 /*
     ShowUnhandledException
 
-    Reports an exception that escaped to WinMain(). Called from its catch blocks, so it throws nothing: if the
-    text dialog can't be shown, a message box is.
+    Reports an exception that escaped to WinMain(), in the GUI's theme. Called from its catch blocks, so it
+    throws nothing: if the text dialog can't be shown, a message box is.
 */
-void ShowUnhandledException(std::string const& description)
+void ShowUnhandledException(ASWUnitTests::TWin32GUITheme& theme, std::string const& description)
 {
     try
     {
@@ -74,7 +76,7 @@ void ShowUnhandledException(std::string const& description)
 
         try
         {
-            ASWUnitTests::ShowTextDialog(nullptr, ApplicationTitle, text);
+            ASWUnitTests::ShowTextDialog(nullptr, theme, ApplicationTitle, text);
         }
         catch (...)
         {
@@ -95,6 +97,8 @@ void ShowUnhandledException(std::string const& description)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
 {
     int exitCode = ASWUnitTests::ExitCode_Success;
+    // Before any window, and destroyed after them.
+    ASWUnitTests::TWin32GUITheme theme;
 
     try
     {
@@ -110,15 +114,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
         ASWUnitTests::TGUICommandLineResult const commandLine =
             ASWUnitTests::TGUICommandLine::Parse(ASWUnitTests::ProcessArguments(), options);
 
+        // The saved theme, before any window, so the --help dialog has it too: Use Windows Setting with
+        // --layout-ignore, which ignores the saved layout file, and --layout-reset, which deletes it.
+        ASWUnitTests::EGUITheme const themeChoice = options.LayoutIgnore || options.LayoutReset ?
+                ASWUnitTests::EGUITheme::Windows : ASWUnitTests::LoadGUIThemeFromLayoutFile();
+        theme.SetDark(ASWUnitTests::GUIThemeIsDark(themeChoice, ASWUnitTests::WindowsAppsUseDarkTheme(),
+            ASWUnitTests::WindowsHighContrast()));
+
         if (commandLine.EarlyExitCode.has_value())
         {
-            ASWUnitTests::ShowTextDialog(nullptr, ApplicationTitle, commandLine.Message);
+            ASWUnitTests::ShowTextDialog(nullptr, theme, ApplicationTitle, commandLine.Message);
             return *commandLine.EarlyExitCode;
         }
 
-        ASWUnitTests::TWin32GUIMainWindow mainWindow;
+        ASWUnitTests::TWin32GUIMainWindow mainWindow(theme);
         mainWindow.Create();
-        mainWindow.Start(options);
+        mainWindow.Start(options, themeChoice);
         mainWindow.Show(showCommand);
         mainWindow.RunMessageLoop();
 
@@ -132,12 +143,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
     }
     catch (std::exception const& exception)
     {
-        ShowUnhandledException(exception.what());
+        ShowUnhandledException(theme, exception.what());
         exitCode = ASWUnitTests::ExitCode_UnhandledException;
     }
     catch (...)
     {
-        ShowUnhandledException("Unknown");
+        ShowUnhandledException(theme, "Unknown");
         exitCode = ASWUnitTests::ExitCode_UnhandledExceptionUnknown;
     }
 

@@ -381,14 +381,17 @@ Reset Layout** restores the default layout right away; `--layout-ignore` and `--
 (below) control this from the command line. Since the file is named after the executable, the two
 GUI runners, and each project's own build of them, keep separate layouts.
 
-In the VCL GUI runner, **View > Theme** chooses a light or dark look. **Use Windows Setting**, the
+In both GUI runners, **View > Theme** chooses a light or dark look. **Use Windows Setting**, the
 default, follows Windows' app mode setting (Settings > Personalization > Colors), and switches as
 soon as it changes, but stays light while high contrast is on, so the window shows high contrast's
-own colors. **Light** and **Dark** keep that look whatever Windows is set to. Dark is RAD Studio's
-Carbon VCL style, and light the standard Windows look. A choice applies right away and is saved in
-the layout file at once, so the next session starts with it; **View > Reset Layout** leaves it as
-it is. The Theme commands are disabled during a run, and a change of the Windows setting during one
-applies when it ends. The Win32 GUI runner always has the standard Windows look, for now.
+own colors. **Light** and **Dark** keep that look whatever Windows is set to. Light is the standard
+Windows look. Dark is RAD Studio's Carbon VCL style in the VCL GUI runner, and the Win32 GUI runner
+paints the same colors itself. A choice applies right away and is saved in the layout file at once,
+so the next session starts with it; **View > Reset Layout** leaves it as it is. The Theme commands
+are disabled during a run, and a change of the Windows setting during one applies when it ends. In
+the Win32 GUI runner's dark look, the title bar is dark unless Windows shows the accent color on
+title bars, which it then keeps while the window is active, and the Export JUnit Report dialog,
+Windows' own, stays light.
 
 The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
 as long as the command line doesn't choose them itself (no `--run`, `--filter`, or partition
@@ -430,12 +433,12 @@ these differences:
 - `--exit` (GUI-only, requires `--run`) closes the window when that run finishes, and exits with the
   same code the console runner would; a run ended with Stop exits with `1`. Without `--exit`, the
   GUI always exits with `0`.
-- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, or the VCL GUI runner's
-  theme, so the window opens with the defaults and the saved ones are left as they are. A theme
-  chosen in the View menu then lasts only until the window closes.
-- `--layout-reset` (GUI-only) deletes the saved window layout, and with it the VCL GUI runner's
-  theme, and opens with the defaults, which is a way to recover if a saved layout ever causes a
-  problem. The layout is saved again when the window closes.
+- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, or the theme, so the
+  window opens with the defaults and the saved ones are left as they are. A theme chosen in the View
+  menu then lasts only until the window closes.
+- `--layout-reset` (GUI-only) deletes the saved window layout, and with it the theme, and opens with
+  the defaults, which is a way to recover if a saved layout ever causes a problem. The layout is
+  saved again when the window closes.
 
 A GUI process doesn't make a Windows command prompt wait for it, so a script that needs `--exit`'s
 exit code should start it with `start /wait` (or its own language's equivalent; Bash, including Git

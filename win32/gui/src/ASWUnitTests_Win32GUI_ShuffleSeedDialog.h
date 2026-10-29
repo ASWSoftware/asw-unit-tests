@@ -29,6 +29,8 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Shuffle.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_Theme.h"
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -36,8 +38,8 @@ namespace ASWUnitTests
 // Shows a modal dialog, owned by 'owner', for choosing between a new random seed for each shuffled run and one
 // seed for every run, starting from 'shuffle's current choice. Clicking OK applies the choice to 'shuffle', which
 // also turns shuffling on, and returns true; Cancel changes nothing and returns false. Throws std::runtime_error
-// if the dialog can't be shown.
-bool ShowShuffleSeedDialog(HWND owner, TGUIShuffle& shuffle);
+// if the dialog can't be shown. The dialog has 'theme''s look.
+bool ShowShuffleSeedDialog(HWND owner, TWin32GUITheme& theme, TGUIShuffle& shuffle);
 
 } // namespace ASWUnitTests
 
