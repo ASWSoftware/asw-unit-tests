@@ -61,6 +61,7 @@ limitations under the License.
 #include "ASWUnitTests_Registry.h"
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
+#include "UT_Helper_ExceptionTypes.h"
 #include "UT_Helper_StringChecks.h"
 //---------------------------------------------------------------------------
 
@@ -7205,6 +7206,8 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "SetExceptionExpected_AssertFailureStillFailsAndIsRecorded");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded,
         "SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesAnyType,
+        "SetExceptionExpected_MatchesAnyType");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage,
         "SetExceptionExpected_MatchesTypeAndMessage");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_SetLogSuppressed_SilencesFixtureOutput,
@@ -7220,6 +7223,7 @@ TTest_ASWUnitTests_TestBase::TTest_ASWUnitTests_TestBase()
         "StringChecks_CompareMixedTypesAsTextAndKeepNullRules");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues,
         "Throws_ChecksTypeAndMessageAndContinues");
+    RegisterTest(&TTest_ASWUnitTests_TestBase::Test_Throws_MatchesAnyType, "Throws_MatchesAnyType");
     RegisterTest(&TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue,
         "TrueFalse_FailureNamesTheExpectedValue");
 }
@@ -9291,6 +9295,71 @@ void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_EarlierCheckFailureS
         "all four Check-then-expected-exception tests ran");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesAnyType()
+{
+    // Arrange
+    TFixture_AnyTypeExceptionExpectations fixture;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::string const unknown = "an object that is neither a std::exception nor an RTL Exception";
+#else
+    std::string const unknown = "a non-std::exception object";
+#endif
+    std::string const wrongType = "expected exception type was not thrown (caught a different exception): ";
+    std::string const noMessage = "expected exception message to contain \"needle\" but caught an exception without a "
+        "message: an object of type \"";
+    // A part of each failed test's record (a class name's full form differs by compiler).
+    std::vector<std::pair<char const*, std::string> > const failures =
+    {
+        { "CheckFailedThenIntThrown_Fails", "deliberate Check failure before the expected exception" },
+        { "ClassExpected_MessageExpected_Fails", noMessage },
+        { "ClassExpected_MessageExpected_Fails", "TFixturePlainError\"" },
+        { "ClassExpected_SubclassThrownMessageExpected_Fails", noMessage },
+        { "ClassExpected_SubclassThrownMessageExpected_Fails", "TFixtureNonStdSubError\"" },
+        { "IntExpected_AssertFails_Fails", "deliberate Assert failure while an int is expected" },
+        { "IntExpected_DoubleThrown_Fails", wrongType + unknown },
+        { "IntExpected_MessageExpected_Fails", noMessage + "int\"" },
+        { "IntExpected_NoneThrown_Fails", "expected an int that never comes" },
+        { "IntExpected_StdExceptionThrown_Fails", wrongType + "boom" },
+        { "IntThenStdTypeExpected_IntThrown_Fails", wrongType + unknown },
+        { "MixinExpected_StdExceptionWithoutMixinThrown_Fails", wrongType + "boom" },
+        { "MixinExpected_TaggedErrorMessageAbsent_Fails", "expected exception message to contain \"needle\" but caught: boom" },
+        { "StdTypeExpected_IntThrown_Fails", wrongType + unknown },
+    };
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(17), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass: " + record.Message);
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    for (std::pair<char const*, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, std::string(failure.first) + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, std::string(failure.first) + "'s message");
+    }
+
+    // A type name still mangled, as bcc32c's type_info::name() is (e.g. "$i"), would start with '$'.
+    for (char const* const testName : { "ClassExpected_MessageExpected_Fails", "IntExpected_MessageExpected_Fails" })
+        CheckNotContains(FindRecord(results, testName)->Message, "$", __func__, __LINE__, testName);
+#if !defined(_MSC_VER)
+    // MSVC writes it "`anonymous namespace'".
+    CheckContains(FindRecord(results, "ClassExpected_MessageExpected_Fails")->Message,
+        "(anonymous namespace)::TFixturePlainError\"", __func__, __LINE__, "a class in an anonymous namespace");
+#endif
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_SetExceptionExpected_MatchesTypeAndMessage()
 {
     // Arrange
@@ -9777,6 +9846,61 @@ void TTest_ASWUnitTests_TestBase::Test_Throws_ChecksTypeAndMessageAndContinues()
         "a non-std::exception object is a wrong type");
     CheckEndsWith(wrongType->Message, "): Expected a different exception type but caught: boom. wrong type",
         __func__, __LINE__, "a wrong type shows what was caught");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_TestBase::Test_Throws_MatchesAnyType()
+{
+    // Arrange
+    TFixture_AnyTypeThrowsChecks fixture;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    std::string const unknown = "an object that is neither a std::exception nor an RTL Exception";
+#else
+    std::string const unknown = "a non-std::exception object";
+#endif
+    std::string const noMessage = "): Expected the exception message to contain \"needle\" but caught an exception "
+        "without a message: an object of type \"";
+    // A part of each failed test's record (a class name's full form differs by compiler).
+    std::vector<std::pair<char const*, std::string> > const failures =
+    {
+        { "AssertThrows_IntMessageExpected_Fails", noMessage + "int\". an int has no message" },
+        { "CheckThrows_ClassSubclassMessageExpected_Fails", noMessage },
+        { "CheckThrows_ClassSubclassMessageExpected_Fails", "TFixtureNonStdSubError\". a subclass with no message" },
+        { "CheckThrows_IntExpectedAssertFailsInside_Fails", "inner assert" },
+        { "CheckThrows_IntExpectedDoubleThrown_Fails", "): Expected a different exception type but caught: " + unknown +
+          ". int expected, double thrown" },
+        { "CheckThrows_IntExpectedStdExceptionThrown_Fails",
+          "): Expected a different exception type but caught: boom. int expected, std::exception thrown" },
+        { "CheckThrows_MixinMessageAbsent_Fails",
+          "): Expected the exception message to contain \"needle\" but caught: boom. the subclass's what() is checked" },
+        { "CheckThrows_PlainClassMessageExpected_Fails", noMessage },
+        { "CheckThrows_PlainClassMessageExpected_Fails", "TFixturePlainError\". a class with no message" },
+        { "CheckThrows_StdStringMessageExpected_Fails", noMessage },
+        { "CheckThrows_StdStringMessageExpected_Fails", "basic_string<char" },
+    };
+
+    // Act
+    fixture.Run(TestFilter(), std::nullopt, std::nullopt, false);
+
+    // Assert
+    TTestResults const& results = fixture.Results();
+    CheckEquals(static_cast<size_t>(12), results.CaseRecords.size(), __func__, __LINE__, "one record per registered test");
+
+    for (TTestCaseRecord const& record : results.CaseRecords)
+    {
+        if (NameEndsWith(record.TestName, "_Passes"))
+            CheckEquals(TTestOutcome::Pass, record.Outcome, __func__, __LINE__, record.TestName + " should pass: " + record.Message);
+        else if (NameEndsWith(record.TestName, "_Fails"))
+            CheckEquals(TTestOutcome::Fail, record.Outcome, __func__, __LINE__, record.TestName + " should fail");
+        else
+            Fail(__func__, __LINE__, record.TestName + " name must end with _Passes or _Fails");
+    }
+
+    for (std::pair<char const*, std::string> const& failure : failures)
+    {
+        TTestCaseRecord const* const record = FindRecord(results, failure.first);
+        AssertTrue(record != nullptr, __func__, __LINE__, std::string(failure.first) + " has a record");
+        CheckContains(record->Message, failure.second, __func__, __LINE__, std::string(failure.first) + "'s message");
+    }
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_TestBase::Test_TrueFalse_FailureNamesTheExpectedValue()

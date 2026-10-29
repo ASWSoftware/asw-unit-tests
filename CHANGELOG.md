@@ -54,6 +54,13 @@ versioned baseline.
   `CheckNear(10, count, 1, ...)`, which were ambiguous before, and `long double`. With any
   floating-point value, all three are compared as their common type; three integers are compared
   exactly and shown as integers.
+- `SetExceptionExpected<TException>()`, `CheckThrows<TException>` and `AssertThrows<TException>`
+  take any type that can be thrown, e.g. `int`, `char const*` or a class that doesn't derive from
+  `std::exception`. Before, the Throws methods didn't compile with one, and
+  `SetExceptionExpected<TException>()` didn't compile with `int` and never matched a class.
+  Expecting a message substring from a type with no message (neither a `std::exception` nor an RTL
+  exception) fails, naming the type that was caught, e.g. `an object of type "int"`. A class also
+  matches a `std::exception` subclass derived from it, whose `what()` is then checked.
 
 ### Changed
 
@@ -95,6 +102,14 @@ versioned baseline.
   `CheckNear`/`AssertNear`, with "Invalid tolerance ...: it must be zero or more". Before, the
   NotNear methods passed with one, whatever the values. A test that passes a negative tolerance must
   pass its absolute value instead.
+- When a test expects a specific type with `SetExceptionExpected<TException>()` and throws an object
+  of another type that is neither a `std::exception` nor an RTL exception, the failure now reads
+  "expected exception type was not thrown (caught a different exception): a non-std::exception
+  object", as for any other wrong type, instead of "expected a specific exception type, but a
+  non-std::exception object was thrown instead."
+- In RTL builds, `SetExceptionExpected<TException>()` no longer compiles with an RTL class that
+  isn't an `Exception` or a subclass (e.g. `TStringList`), which could never match, as the Throws
+  methods already didn't. Expect `Exception` or the class that's actually raised instead.
 
 ### Fixed
 
@@ -115,6 +130,11 @@ versioned baseline.
   instead of the one the run started with: rounding to nearest, whatever rounding mode was set, and
   with llvm-mingw, `long double` arithmetic at `double` precision. Each test now starts with the
   floating-point environment of the thread that runs the tests, as it does without a timeout.
+- With RAD Studio's 32-bit compiler (`bcc32c`), type names in failure messages, such as
+  `CheckIsType`'s, were shown as the compiler mangles them, e.g. `$N@TShape` or `$i`. They're now
+  shown as written, e.g. `N::TShape` or `int`, as with the other compilers. A pointer to a `const`
+  or `volatile` class, and a template whose argument is in an anonymous namespace, are still shown
+  as mangled.
 
 ## [1.4.0] - 2026-10-14
 

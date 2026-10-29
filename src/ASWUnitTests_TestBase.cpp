@@ -52,6 +52,11 @@ limitations under the License.
 #    define ASWUNITTESTS_CXXABI_DEMANGLE_ENABLED 1
 #  endif
 #endif
+// _rtl_unmangle(), for TypeName() with bcc32c, whose std::type_info::name() is Borland-mangled (see
+// BorlandTypeName()).
+#if defined(__BORLANDC__) && !defined(_WIN64)
+#  include <unmangle.h>
+#endif
 //---------------------------------------------------------------------------
 
 namespace
@@ -70,6 +75,10 @@ struct TWorkerState
 thread_local TWorkerState* t_WorkerState = nullptr;
 
 //---------------------------------------------------------------------------
+
+#if defined(__BORLANDC__) && !defined(_WIN64)
+std::string BorlandTypeName(char const* name);
+#endif
 
 std::string CStringDisplayText(char const* str);
 std::string CStringDisplayText(wchar_t const* str);
@@ -136,6 +145,67 @@ template <typename TString>
 bool StartsWithIgnoringASCIICase(TString const& text, TString const& prefix);
 
 //---------------------------------------------------------------------------
+#if defined(__BORLANDC__) && !defined(_WIN64)
+/*
+    BorlandTypeName
+
+    Returns 'name', a std::type_info::name() from bcc32c, readably (e.g. "int" for "$i", "N::TNamed" for
+    "$N@TNamed"), or as it is when it can't be read. It's a Borland-mangled type, which _rtl_unmangle() reads as the
+    argument of a function f(): as it is for a built-in type ("@f$qi", "@f$qpxc"), or for a class, or a pointer to
+    one, with the class's length in front ("@f$q8N@TNamed", "@f$qp8N@TNamed"). An anonymous namespace, which
+    _rtl_unmangle() can't read, is given a name of its own first, then shown as "(anonymous namespace)".
+*/
+std::string BorlandTypeName(char const* name)
+{
+    if ((name == nullptr) || (name[0] != '$'))
+        return (name == nullptr) ? std::string() : std::string(name);
+
+    std::string const anonymous = "12_GLOBAL__N_1@";
+    std::string const anonymousStandIn = "ASWUnitTestsAnonymousNamespace@";
+    std::string code(name + 1);
+
+    for (std::size_t at = code.find(anonymous); at != std::string::npos;
+         at = code.find(anonymous, at + anonymousStandIn.size()))
+        code.replace(at, anonymous.size(), anonymousStandIn);
+
+    std::size_t const pointers = std::min(code.find_first_not_of('p'), code.size());
+    std::string const symbols[2] =
+    {
+        "@f$q" + code,
+        "@f$q" + code.substr(0, pointers) + std::to_string(code.size() - pointers) + code.substr(pointers)
+    };
+    // After a pointer, an 'x' or 'w' is const or volatile, which the second form would read as part of a class's
+    // name (e.g. "xN::TNamed *" for "$pxN@TNamed"), so only the first is tried.
+    bool const qualifiedPointee = (pointers > 0) && (pointers < code.size()) &&
+        ((code[pointers] == 'x') || (code[pointers] == 'w'));
+
+    for (std::string symbol : symbols)
+    {
+        if (qualifiedPointee && (symbol != symbols[0]))
+            break;
+
+        char unmangled[1024] = {};
+        _umKind const kind = _rtl_unmangle(&symbol[0], unmangled, sizeof(unmangled) - 1, nullptr, nullptr, 1);
+        std::string const text(unmangled);
+        std::size_t const arguments = text.find("f(");
+
+        if (((kind & (UM_ERRMASK | UM_NOT_MANGLED)) != 0) || (arguments == std::string::npos) ||
+            (text.back() != ')'))
+            continue;
+
+        std::string type = text.substr(arguments + 2, text.size() - arguments - 3);
+        std::string const standInQualifier = anonymousStandIn.substr(0, anonymousStandIn.size() - 1) + "::";
+        for (std::size_t at = type.find(standInQualifier); at != std::string::npos;
+             at = type.find(standInQualifier, at + 1))
+            type.replace(at, standInQualifier.size(), "(anonymous namespace)::");
+
+        return type;
+    }
+
+    return name;
+}
+//---------------------------------------------------------------------------
+#endif
 /*
     CStringDisplayText
 
@@ -2468,6 +2538,15 @@ std::string TTestGroupBase::DescribeException(System::Sysutils::Exception& ex)
 }
 //---------------------------------------------------------------------------
 #endif
+std::string TTestGroupBase::DescribeUnknownException()
+{
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    return "an object that is neither a std::exception nor an RTL Exception";
+#else
+    return "a non-std::exception object";
+#endif
+}
+//---------------------------------------------------------------------------
 std::string TTestGroupBase::ExceptionMessage(std::exception const& ex)
 {
     return ex.what();
@@ -2487,7 +2566,7 @@ bool TTestGroupBase::ExceptionTypeExpected() const
         return true;
 #endif
 
-    return m_ExpectedExceptionTypeChecker != nullptr;
+    return (m_ExpectedExceptionTypeChecker != nullptr) || (m_ExpectedOtherExceptionTypeChecker != nullptr);
 }
 //---------------------------------------------------------------------------
 void TTestGroupBase::Fail(std::string const& method, int line, std::string const& msg)
@@ -3065,6 +3144,7 @@ void TTestGroupBase::SetExceptionExpected(bool expected, std::string const& meth
     m_ExceptionExpectedText = method + " (" + std::to_string(line) + "): " + msg;
     m_ExpectedExceptionMessage.clear();
     m_ExpectedExceptionTypeChecker = nullptr;
+    m_ExpectedOtherExceptionTypeChecker = nullptr;
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     m_ExpectedRTLExceptionTypeChecker = nullptr;
 #endif
@@ -3212,8 +3292,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
         };
 
     // Scores an exception caught while one was expected. 'typeMatches' is whether it satisfies the requested
-    // type (true when no specific type was requested), 'message' is the text checked for the expected substring,
-    // and 'description' is how the exception is shown in a failure detail.
+    // type (true when no specific type was requested), 'message' is the text checked for the expected substring
+    // (nullopt for an exception that has none, which fails a message check), and 'description' is how the
+    // exception is shown in a failure detail.
     // Records a pass, unless a Check* failure earlier in the test means it failed after all, even if everything
     // after that (including an expected exception arriving) went as intended. Every path that would otherwise
     // pass the test goes through here, so none of them can overlook an earlier Check* failure.
@@ -3231,10 +3312,11 @@ void TTestGroupBase::Test(ITestCase& testCase)
             finish(TTestOutcome::Pass, "passed", std::string());
         };
 
-    auto finishExpectedException = [&](bool typeMatches, std::string const& message, std::string const& description)
+    auto finishExpectedException = [&](bool typeMatches, std::optional<std::string> const& message,
+                                       std::string const& description)
         {
             bool const messageMatches = m_ExpectedExceptionMessage.empty() ||
-                (message.find(m_ExpectedExceptionMessage) != std::string::npos);
+                ((message != std::nullopt) && (message->find(m_ExpectedExceptionMessage) != std::string::npos));
 
             if (typeMatches && messageMatches)
             {
@@ -3247,6 +3329,9 @@ void TTestGroupBase::Test(ITestCase& testCase)
             std::string detail;
             if (!typeMatches)
                 detail = "expected exception type was not thrown (caught a different exception): " + description;
+            else if (message == std::nullopt)
+                detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage +
+                    "\" but caught an exception without a message: " + description;
             else
                 detail = "expected exception message to contain \"" + m_ExpectedExceptionMessage + "\" but caught: " +
                     description;
@@ -3355,7 +3440,8 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             // A type/message check is only requested via the templated SetExceptionExpected<TException>()
             // overload; the plain bool overload leaves both null/empty, matching any exception (legacy behavior).
-            // A requested RTL exception type (see ExceptionTypeExpected()) never matches a std::exception.
+            // A requested RTL exception type or non-class type (see ExceptionTypeExpected()) never matches a
+            // std::exception.
             bool const typeMatches = (m_ExpectedExceptionTypeChecker != nullptr) ?
                     m_ExpectedExceptionTypeChecker(ex) : !ExceptionTypeExpected();
             finishExpectedException(typeMatches, ex.what(), ex.what());
@@ -3403,16 +3489,16 @@ void TTestGroupBase::Test(ITestCase& testCase)
         {
             if (ExceptionTypeExpected())
             {
-                // A specific type was requested, but what was thrown isn't an exception class this framework
-                // can inspect to confirm the type (or message) matched. Treat that as a failure, not a pass.
-                m_Results.FailedCount++;
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-                finish(TTestOutcome::Fail, "failed", "expected a specific exception type, but an object that is "
-                    "neither a std::exception nor an RTL Exception was thrown instead.");
-#else
-                finish(TTestOutcome::Fail, "failed",
-                    "expected a specific exception type, but a non-std::exception object was thrown instead.");
-#endif
+                // Only a requested type not derived from std::exception can match here, and it has no message. A
+                // requested std::exception or RTL type never matches.
+                std::optional<std::string> caught;
+                if (m_ExpectedOtherExceptionTypeChecker != nullptr)
+                    caught = m_ExpectedOtherExceptionTypeChecker();
+
+                if (caught != std::nullopt)
+                    finishExpectedException(true, std::nullopt, *caught);
+                else
+                    finishExpectedException(false, std::nullopt, DescribeUnknownException());
             }
             else
             {
@@ -3427,12 +3513,7 @@ void TTestGroupBase::Test(ITestCase& testCase)
                 throw; // Fatal
 
             // The same description CallAndDescribeException() gives it.
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-            finish(TTestOutcome::Fail, "failed",
-                "Unexpected exception: an object that is neither a std::exception nor an RTL Exception");
-#else
-            finish(TTestOutcome::Fail, "failed", "Unexpected exception: a non-std::exception object");
-#endif
+            finish(TTestOutcome::Fail, "failed", "Unexpected exception: " + DescribeUnknownException());
         }
     }
 }
@@ -3519,7 +3600,11 @@ std::string TTestGroupBase::TypeName(std::type_info const& type)
     }
 #endif
 
+#if defined(__BORLANDC__) && !defined(_WIN64)
+    return BorlandTypeName(type.name());
+#else
     return type.name();
+#endif
 }
 //---------------------------------------------------------------------------
 

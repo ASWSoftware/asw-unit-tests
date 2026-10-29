@@ -608,11 +608,21 @@ int32_t i = TStrTool::StrToInt32(invalid);
 ```
 
 If the wrong exception type is thrown, or its message doesn't contain the given substring, the test
-fails with a message showing what was actually caught. This only works for exceptions deriving from
-`std::exception`, or from RAD Studio's RTL `Exception` class when
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled. A thrown object that doesn't
-can't be inspected, so a type/message expectation against it fails with an explanatory message
-rather than silently passing.
+fails with a message showing what was actually caught. The type can be any type that can be thrown:
+a `std::exception` class, RAD Studio's RTL `Exception` class or a subclass when
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled, a class of your own, or even
+`int` or `char const*` (the type a string literal is thrown as):
+
+```
+SetExceptionExpected<int>(__func__, __LINE__, "the legacy parser throws its error code");
+LegacyParse("x");
+```
+
+Only a `std::exception` (its `what()`) and an RTL exception (its `Message`) have a message, so
+expecting a substring from any other type fails, naming the type that was caught (e.g.
+`caught an exception without a message: an object of type "int"`). A class that doesn't derive from
+`std::exception` also matches a `std::exception` subclass derived from it, whose `what()` is then
+checked.
 
 An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails
 the test rather than counting as the expected exception, and so does a failed `Check*` earlier in
@@ -632,11 +642,11 @@ CheckEquals(3u, list.Count(), __func__, __LINE__, "a failed call leaves the list
 CheckNoThrow([&] { list.At(2); }, __func__, __LINE__, "last index");
 ```
 
-The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, and with
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL exception types too. A failed
-`Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the thrown exception; it ends the
-test as usual, unless the requested type is that framework exception (e.g.
-`CheckThrows<TExceptTrue>`).
+The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, of any type (e.g.
+`CheckThrows<int>`), and with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL
+exception types too. A failed `Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the
+thrown exception; it ends the test as usual, unless the requested type is that framework exception
+(e.g. `CheckThrows<TExceptTrue>`).
 
 ### RAD Studio RTL Exceptions (VCL/FMX)
 
@@ -838,8 +848,8 @@ CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
 // Check failed for: "Test_Create" (42): Expected type "TCircle" but was "TSquare". the factory makes a circle
 ```
 
-Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form
-(e.g. a namespace or `class ` prefix) depends on the compiler. With
+Type names come from `std::type_info::name()`, demangled with GCC, Clang and RAD Studio's
+compilers, so their exact form (e.g. a namespace or `class ` prefix) depends on the compiler. With
 [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, a `TObject` descendant is named
 by its `ClassName()` instead (e.g. `TStringList`), the same with every compiler.
 

@@ -474,16 +474,11 @@ private:
         {
             return DescribeException(ex);
         }
-        catch (...)
-        {
-            return std::string("an object that is neither a std::exception nor an RTL Exception");
-        }
-#else
-        catch (...)
-        {
-            return std::string("a non-std::exception object");
-        }
 #endif
+        catch (...)
+        {
+            return DescribeUnknownException();
+        }
 
         return std::nullopt;
     }
@@ -564,6 +559,18 @@ private:
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     static std::string DescribeException(System::Sysutils::Exception& ex);
 #endif
+
+    // Describes 'ex', caught as a TException that is neither a std::exception nor an RTL exception, and so has no
+    // message, by its type (its dynamic type, for a polymorphic class), e.g. "an object of type \"int\"".
+    template <typename TException>
+    static std::string DescribeOtherException(TException const& ex)
+    {
+        return "an object of type \"" + TypeName(typeid(ex)) + "\"";
+    }
+
+    // Describes an exception that is neither a std::exception nor (in RTL builds) an RTL exception, whose type isn't
+    // known, e.g. "a non-std::exception object".
+    static std::string DescribeUnknownException();
 
     // The message a Throws method checks for its expected substring: what(), or an RTL exception's Message.
     static std::string ExceptionMessage(std::exception const& ex);
@@ -678,6 +685,22 @@ private:
             compare(std::to_string(expected), std::to_string(actual));
     }
 
+    // True when TException is a type the Throws methods and SetExceptionExpected<TException>() can expect: any type
+    // that can be thrown and caught by reference (an object type, but not an array). In RTL builds, an RTL class
+    // (a System::TObject descendant) must be an Exception or a subclass.
+    template <typename TException>
+    static constexpr bool IsExpectableException()
+    {
+        if constexpr (!std::is_object<TException>::value || std::is_array<TException>::value)
+            return false;
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        else if constexpr (std::is_base_of<System::TObject, TException>::value)
+            return std::is_base_of<System::Sysutils::Exception, TException>::value;
+#endif
+        else
+            return true;
+    }
+
     template <typename TInteger>
     static bool IsNonNegative(TInteger value)
     {
@@ -749,6 +772,22 @@ private:
         return value;
     }
 
+    // The std::exception 'ex' is, for a Throws method's message check: 'ex' itself, or for a polymorphic class not
+    // derived from std::exception, the std::exception it's part of (e.g. when TException is a mixin base of a
+    // std::runtime_error subclass); nullptr when there's none.
+    template <typename TException>
+    static std::exception const* StdExceptionOf(TException const& ex)
+    {
+        static_cast<void>(ex);
+
+        if constexpr (std::is_base_of<std::exception, TException>::value)
+            return std::addressof(ex);
+        else if constexpr (std::is_polymorphic<TException>::value)
+            return dynamic_cast<std::exception const*>(std::addressof(ex));
+        else
+            return nullptr;
+    }
+
     // Returns 'text' as UTF-8, for the templates for mixed string types (see ForwardAsUTF8()). A null C string is
     // empty text; see IsNullText().
     static std::string TextToUTF8(std::string const& text);
@@ -784,19 +823,15 @@ private:
     }
 
     // Runs 'callable' for the Throws methods (e.g. CheckThrows()) and returns why it failed, or an empty string when
-    // it threw a TException (or a subclass) whose message contains 'expectedMessage'. A failure signal from this
-    // framework (e.g. an Assert* failure inside 'callable') passes straight through, failing the test as usual,
-    // unless TException asks for one (e.g. TExceptTrue).
+    // it threw a TException (or a subclass) whose message contains 'expectedMessage', when that isn't empty (a
+    // TException with no message then fails). A failure signal from this framework (e.g. an Assert* failure inside
+    // 'callable') passes straight through, failing the test as usual, unless TException asks for one (e.g.
+    // TExceptTrue).
     template <typename TException, typename TCallable>
     static std::string ThrowsFailure(TCallable&& callable, std::string const& expectedMessage)
     {
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-        constexpr bool isRTLException = std::is_base_of<System::Sysutils::Exception, TException>::value;
-#else
-        constexpr bool isRTLException = false;
-#endif
-        static_assert(std::is_base_of<std::exception, TException>::value || isRTLException,
-            "TException must be a std::exception, or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception, or a subclass");
+        static_assert(IsExpectableException<TException>(), "TException must be a type that can be thrown and caught "
+            "by reference (not an array), and with ASWUNITTESTS_RTL_EXCEPTIONS an RTL class must be an Exception");
 
         bool caught = false;
         std::string failure;
@@ -822,11 +857,8 @@ private:
 
                     caught = true;
 
-                    if (!expectedMessage.empty() && (ExceptionMessage(ex).find(expectedMessage) == std::string::npos))
-                    {
-                        failure = "Expected the exception message to contain \"" + expectedMessage + "\" but caught: " +
-                            DescribeException(ex);
-                    }
+                    if (!expectedMessage.empty())
+                        failure = ThrowsMessageFailure(ex, expectedMessage);
                 }
             });
 
@@ -837,6 +869,33 @@ private:
             return "Expected an exception but none was thrown";
 
         return failure;
+    }
+
+    // Why 'ex', a TException a Throws method caught, fails its non-empty 'expectedMessage', or an empty string when
+    // its message contains it: an RTL exception's Message, or a std::exception's what() (see StdExceptionOf()). Any
+    // other type has no message, so it fails.
+    template <typename TException>
+    static std::string ThrowsMessageFailure(TException& ex, std::string const& expectedMessage)
+    {
+        std::string const expected = "Expected the exception message to contain \"" + expectedMessage + "\" but caught";
+
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+        if constexpr (std::is_base_of<System::Sysutils::Exception, TException>::value)
+        {
+            if (ExceptionMessage(ex).find(expectedMessage) == std::string::npos)
+                return expected + ": " + DescribeException(ex);
+        }
+        else
+#endif
+        {
+            std::exception const* const stdEx = StdExceptionOf(ex);
+            if (stdEx == nullptr)
+                return expected + " an exception without a message: " + DescribeOtherException(ex);
+            if (ExceptionMessage(*stdEx).find(expectedMessage) == std::string::npos)
+                return expected + ": " + DescribeException(*stdEx);
+        }
+
+        return std::string();
     }
 
     template <typename TInteger>
@@ -923,7 +982,8 @@ private:
             return std::addressof(value);
     }
 
-    // 'type''s name for a failure message, demangled where the compiler's name() is mangled (e.g. GCC and Clang).
+    // 'type''s name for a failure message, demangled where the compiler's name() is mangled (e.g. GCC, Clang and
+    // bcc32c).
     static std::string TypeName(std::type_info const& type);
 
     // The work of the Near and NotNear templates for mixed types (see 'which'). A float or double common type goes to
@@ -988,6 +1048,11 @@ protected:
     std::string m_ExceptionExpectedText;
     std::string m_ExpectedExceptionMessage;
     std::function<bool (std::exception const&)> m_ExpectedExceptionTypeChecker;
+    // For an expected type not derived from std::exception (see SetExceptionExpected<TException>()): called only from
+    // Test()'s catch (...) handler, which no std::exception or RTL exception reaches, it rethrows the exception being
+    // handled to match it against that type, and returns its description (see DescribeOtherException()) when it
+    // matches, or nullopt.
+    std::function<std::optional<std::string> ()> m_ExpectedOtherExceptionTypeChecker;
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
     std::function<bool (System::Sysutils::Exception&)> m_ExpectedRTLExceptionTypeChecker;
 #endif
@@ -1074,14 +1139,19 @@ protected:
     // ReportTimedOutTest() for what happens if it doesn't finish in time.
     virtual void RunWithTimeout(ITestCase& testCase, std::optional<unsigned int> testTimeoutSeconds, bool catchCrashes);
     virtual void SetExceptionExpected(bool expected, std::string const& method, int line, std::string const& msg);
-    // Expects a specific exception type (matched polymorphically, so a base class also matches its subclasses).
-    // When 'expectedMessage' is non-empty, the caught exception's what() must also contain it as a substring.
-    // With ASWUNITTESTS_RTL_EXCEPTIONS enabled (see ASWUnitTests_Exception.h), 'TException' may also be an RTL
-    // exception class (System::Sysutils::Exception or a subclass), whose Message is checked instead of what().
+    // Expects a specific exception type, of any kind (e.g. a std::exception class, another class, or int), matched
+    // polymorphically, so a base class also matches its subclasses. When 'expectedMessage' is non-empty, the caught
+    // exception's what() must also contain it as a substring; a type with no message (neither a std::exception nor
+    // an RTL exception) then fails. With ASWUNITTESTS_RTL_EXCEPTIONS enabled (see ASWUnitTests_Exception.h),
+    // 'TException' may also be an RTL exception class (System::Sysutils::Exception or a subclass), whose Message is
+    // checked instead of what().
     template <typename TException>
     void SetExceptionExpected(std::string const& method, int line, std::string const& msg,
         std::string const& expectedMessage = std::string())
     {
+        static_assert(IsExpectableException<TException>(), "TException must be a type that can be thrown and caught "
+            "by reference (not an array), and with ASWUNITTESTS_RTL_EXCEPTIONS an RTL class must be an Exception");
+
         SetExceptionExpected(true, method, line, msg);
         m_ExpectedExceptionMessage = expectedMessage;
 #if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
@@ -1095,10 +1165,36 @@ protected:
         else
 #endif
         {
-            m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
-                {
-                    return dynamic_cast<TException const*>(&ex) != nullptr;
-                };
+            // A class also matches a std::exception it's a base of (e.g. a mixin of a std::runtime_error subclass).
+            if constexpr (std::is_class_v<TException>)
+            {
+                m_ExpectedExceptionTypeChecker = [](std::exception const& ex)
+                    {
+                        return dynamic_cast<TException const*>(&ex) != nullptr;
+                    };
+            }
+
+            if constexpr (!std::is_base_of_v<std::exception, TException>)
+            {
+                m_ExpectedOtherExceptionTypeChecker = []()
+                    {
+                        std::optional<std::string> description;
+
+                        try
+                        {
+                            throw;
+                        }
+                        catch (TException const& ex)
+                        {
+                            description = DescribeOtherException(ex);
+                        }
+                        catch (...)
+                        {
+                        }
+
+                        return description;
+                    };
+            }
         }
     }
     virtual void SetTestFailedCheck(std::string const& method, int line, std::string const& msg);
@@ -1571,10 +1667,12 @@ protected: // Assertion/Check methods - Type (dynamic type, via dynamic_cast)
 protected: // Assertion/Check methods - Throws (exception from a callable)
     // Each runs 'callable' (e.g. a lambda) and checks whether it throws. Unlike with SetExceptionExpected(), the test
     // carries on afterwards (unless an Assert method fails), so it can check several calls and the state after each.
-    // The Throws methods pass when 'callable' throws a TException or a subclass (TException being a std::exception,
-    // or with ASWUNITTESTS_RTL_EXCEPTIONS an RTL Exception) whose message contains 'expectedMessage', when that isn't
-    // empty. A failure signal from this framework inside 'callable' (e.g. an Assert* failure, Fail() or Skip()) still
-    // ends the test as usual, unless TException asks for one.
+    // The Throws methods pass when 'callable' throws a TException or a subclass (TException being of any kind, as
+    // with SetExceptionExpected<TException>(), e.g. a std::exception class, with ASWUNITTESTS_RTL_EXCEPTIONS an RTL
+    // Exception, another class, or int) whose message contains 'expectedMessage', when that isn't empty: what(), or an
+    // RTL exception's Message. A TException with no message then fails. A failure signal from this framework inside
+    // 'callable' (e.g. an Assert* failure, Fail() or Skip()) still ends the test as usual, unless TException asks for
+    // one.
     template <typename TCallable>
     void AssertNoThrow(TCallable&& callable, std::string const& method, int line, std::string const& msg)
     {

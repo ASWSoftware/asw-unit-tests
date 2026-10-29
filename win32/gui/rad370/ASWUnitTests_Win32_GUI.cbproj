@@ -307,6 +307,10 @@
             <DependentOn>..\..\..\tests\Test_ASWUnitTests_Version.h</DependentOn>
             <BuildOrder>44</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\tests\UT_Helper_ExceptionTypes.cpp">
+            <DependentOn>..\..\..\tests\UT_Helper_ExceptionTypes.h</DependentOn>
+            <BuildOrder>61</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\tests\UT_Helper_StringChecks.cpp">
             <DependentOn>..\..\..\tests\UT_Helper_StringChecks.h</DependentOn>
             <BuildOrder>60</BuildOrder>

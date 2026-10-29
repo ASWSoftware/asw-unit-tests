@@ -94,6 +94,7 @@ private: // Test methods
     void Test_Same_ComparesAddressesNotContent();
     void Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
+    void Test_SetExceptionExpected_MatchesAnyType();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
@@ -103,6 +104,7 @@ private: // Test methods
     void Test_StartsWith_ShowsTextAndPrefix();
     void Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules();
     void Test_Throws_ChecksTypeAndMessageAndContinues();
+    void Test_Throws_MatchesAnyType();
     void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:
