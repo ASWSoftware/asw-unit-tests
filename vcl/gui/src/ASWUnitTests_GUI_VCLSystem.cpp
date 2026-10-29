@@ -30,13 +30,34 @@ limitations under the License.
 #include <System.Classes.hpp>
 #include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
+#include <Vcl.Styles.hpp> // Links the unit that registers the engine loading VCL style resources, e.g. Carbon.
+#include <Vcl.Themes.hpp>
+#include <windows.h>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_INIDocument.h"
 #include "ASWUnitTests_GUI_Strings.h"
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
 
+//---------------------------------------------------------------------------
+/*
+    ApplyGUITheme
+
+    TrySetStyle() leaves the style as it is if the dark style's resource isn't linked in (the GUI project's
+    Custom_Styles), as in the VCL console runner, or the Vcl.Styles unit isn't, which loads it.
+*/
+bool ApplyGUITheme(EGUITheme theme)
+{
+    bool const dark = GUIThemeIsDark(theme, WindowsAppsUseDarkTheme(), WindowsHighContrast());
+    System::UnicodeString const styleName = dark ? "Carbon" : "Windows";
+
+    if (System::Sysutils::SameText(Vcl::Themes::TStyleManager::ActiveStyle->Name, styleName))
+        return false;
+
+    return Vcl::Themes::TStyleManager::TrySetStyle(styleName, false);
+}
 //---------------------------------------------------------------------------
 System::UnicodeString GUILayoutFilePath()
 {
@@ -52,6 +73,22 @@ System::UnicodeString GUILayoutFilePath()
 System::UnicodeString GUISelectionFilePath()
 {
     return System::Sysutils::ChangeFileExt(GUILayoutFilePath(), ".selection");
+}
+//---------------------------------------------------------------------------
+EGUITheme LoadGUIThemeFromLayoutFile()
+{
+    try
+    {
+        System::UnicodeString const path = GUILayoutFilePath();
+        if (!System::Sysutils::FileExists(path))
+            return EGUITheme::Windows;
+
+        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(path)));
+    }
+    catch (...)
+    {
+        return EGUITheme::Windows;
+    }
 }
 //---------------------------------------------------------------------------
 std::vector<std::string> ProcessArguments()
@@ -72,6 +109,45 @@ std::string ReadFileBytes(System::UnicodeString const& path)
         return std::string();
 
     return std::string(reinterpret_cast<char const*>(&bytes[0]), static_cast<std::size_t>(bytes.Length));
+}
+//---------------------------------------------------------------------------
+void SaveGUIThemeToLayoutFile(EGUITheme theme)
+{
+    try
+    {
+        System::UnicodeString const path = GUILayoutFilePath();
+        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUITheme(ini, theme);
+        WriteFileBytes(path, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default theme.
+    }
+}
+//---------------------------------------------------------------------------
+bool WindowsAppsUseDarkTheme()
+{
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+
+    LSTATUS const status = ::RegGetValueW(HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme",
+        RRF_RT_REG_DWORD, nullptr, &value, &size);
+
+    return status == ERROR_SUCCESS && value == 0;
+}
+//---------------------------------------------------------------------------
+bool WindowsHighContrast()
+{
+    HIGHCONTRASTW highContrast{};
+    highContrast.cbSize = sizeof(highContrast);
+
+    return ::SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0) &&
+        (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
 }
 //---------------------------------------------------------------------------
 void WriteFileBytes(System::UnicodeString const& path, std::string const& bytes)

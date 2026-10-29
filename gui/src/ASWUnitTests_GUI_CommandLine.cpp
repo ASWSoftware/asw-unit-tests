@@ -45,9 +45,11 @@ std::string TGUICommandLine::GUIOptionsHelp()
         "                      returning the same exit code the console runner would.\n"
         "                      Requires --run.\n"
         "  --layout-ignore     Neither load nor save the window layout (its size,\n"
-        "                      position, and panel sizes); open with the defaults.\n"
-        "  --layout-reset      Delete the saved window layout and open with the\n"
-        "                      defaults; the layout is saved again on closing.\n"
+        "                      position, and panel sizes) or the VCL GUI's theme;\n"
+        "                      open with the defaults.\n"
+        "  --layout-reset      Delete the saved window layout (and the VCL GUI's\n"
+        "                      theme) and open with the defaults; the layout is saved\n"
+        "                      again on closing.\n"
         "\n"
         "Ignored by the GUI: --list, --pause, and the color options.\n";
 }

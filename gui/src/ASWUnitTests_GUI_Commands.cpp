@@ -55,6 +55,7 @@ TGUICommandStates GUICommandStates(TGUICommandContext const& context)
     states.ShuffleOrder = idle;
     states.ShuffleSeed = idle;
     states.Stop = context.Running;
+    states.Theme = idle;
 
     return states;
 }

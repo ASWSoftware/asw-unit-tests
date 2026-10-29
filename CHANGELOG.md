@@ -27,6 +27,13 @@ versioned baseline.
   before.
 - `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
   `ASWUNITTESTS_GUI_SOURCES`.
+- A dark theme in the VCL GUI runner, with **View > Theme** to choose it: **Use Windows Setting**
+  (the default) follows Windows' app mode setting, switching as soon as it changes, and **Light**
+  and **Dark** override it. The choice applies without a restart and is saved in the layout file;
+  `--layout-ignore` and `--layout-reset` cover it as they do the layout. Dark is RAD Studio's Carbon
+  VCL style, so a project of your own that runs its tests in the VCL GUI runner needs Carbon among
+  its custom styles (Project > Options > Application > Appearance) for it, and a `WinMain()` that
+  applies the saved theme as `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` does.
 - A `TCLIParser::ParseArguments()` overload that takes the arguments as a
   `std::vector<std::string>`, the program name first, as in `argv`.
 - `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,

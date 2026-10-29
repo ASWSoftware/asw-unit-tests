@@ -43,8 +43,10 @@ private:
 private: // Test methods
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
+    void Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote();
     void Test_ProcessArguments_MatchesParamCount();
     void Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote();
+    void Test_WindowsAppsUseDarkTheme_MatchesTheRegistry();
 
 public:
     TTest_ASWUnitTests_GUI_VCLSystem();

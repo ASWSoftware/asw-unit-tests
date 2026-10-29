@@ -176,6 +176,10 @@
             <DependentOn>..\gui\src\ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>31</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\gui\src\ASWUnitTests_GUI_Theme.cpp">
+            <DependentOn>..\gui\src\ASWUnitTests_GUI_Theme.h</DependentOn>
+            <BuildOrder>58</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\gui\src\ASWUnitTests_GUI_Tree.cpp">
             <DependentOn>..\gui\src\ASWUnitTests_GUI_Tree.h</DependentOn>
             <BuildOrder>42</BuildOrder>
@@ -215,6 +219,10 @@
         <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_TestList.cpp">
             <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_TestList.h</DependentOn>
             <BuildOrder>35</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_Theme.cpp">
+            <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_Theme.h</DependentOn>
+            <BuildOrder>59</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\gui\tests\Test_ASWUnitTests_GUI_Tree.cpp">
             <DependentOn>..\gui\tests\Test_ASWUnitTests_GUI_Tree.h</DependentOn>

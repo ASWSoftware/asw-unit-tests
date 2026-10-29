@@ -20,6 +20,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../gui/tests/Test_ASWUnitTests_GUI_Selection.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Shuffle.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_TestList.cpp
+    ../gui/tests/Test_ASWUnitTests_GUI_Theme.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Tree.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_View.cpp
     ../tests/Test_ASWTools_Random.cpp
