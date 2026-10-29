@@ -1568,7 +1568,6 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
 
             break;
 
-        case WM_TIMER:
         case PBM_DELTAPOS:
         case PBM_SETPOS:
         case PBM_SETRANGE:
@@ -1577,7 +1576,8 @@ LRESULT TWin32GUITheme::HandleControlMessage(HWND control, EWin32GUIThemedContro
         case PBM_STEPIT:
             if (kind == EWin32GUIThemedControl::ProgressBar)
             {
-                // The themed bar animates toward a new position by itself; this one shows it at once.
+                // The themed bar animates toward a new position by itself; this one shows it at once. Not on the
+                // themed bar's WM_TIMER, which only steps that animation, drawing nothing while dark.
                 LRESULT const result = DefSubclassProc(control, message, wParam, lParam);
                 InvalidateRect(control, nullptr, FALSE);
                 return result;
