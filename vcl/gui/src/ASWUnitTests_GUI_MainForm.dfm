@@ -238,7 +238,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     Height = 19
     Panels = <
       item
-        Width = 120
+        Width = 170
       end
       item
         Width = 100

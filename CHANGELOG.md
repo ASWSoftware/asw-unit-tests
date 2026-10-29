@@ -135,6 +135,8 @@ versioned baseline.
   full. It now shows every finished test, and starts each run empty.
 - The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
   twice, e.g. "(F9) (F9)".
+- The VCL GUI runner's status bar cut off its first panel's text, e.g. "Checked: 44 / 44 show", and
+  now has room for up to "Checked: 9999 / 9999 shown".
 - With `--catch-crashes` and `--test-timeout-seconds` together, a crash that came while a test was
   logging or recording a result, such as one in a run observer's `OnLog()`, left the run waiting
   forever at the next test. The run now continues with the next test, as after any other crash.

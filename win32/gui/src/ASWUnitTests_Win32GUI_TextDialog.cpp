@@ -138,9 +138,9 @@ INT_PTR HandleDialogMessage(HWND dialog, UINT message, WPARAM wParam, LPARAM lPa
             SendMessageW(textBox, EM_SETLIMITTEXT, 0, 0);
             SetWindowTextW(textBox, state->Text.c_str());
 
-            // Shown before the main window exists (e.g. for --help), it has a taskbar button of its own.
-            if (GetWindow(dialog, GW_OWNER) == nullptr)
-                SendMessageW(dialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(MainIcon()));
+            // In its title bar, as the VCL GUI runner's sizeable text dialog has the application's icon, and on its
+            // own taskbar button when it's shown before the main window exists (e.g. for --help).
+            SendMessageW(dialog, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(MainIcon()));
 
             SizeAndCenterDialog(dialog);
             ApplyDPI(dialog);

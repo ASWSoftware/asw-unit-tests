@@ -974,11 +974,11 @@ void TWin32GUITheme::DrawListRow(NMLVCUSTOMDRAW const& draw, COLORREF textColor)
 /*
     TWin32GUITheme::DrawMenuItem
 
-    As Carbon draws the menus: the item under the mouse or the keyboard in the highlight, with a frame; a
-    separator as a line; a menu item's caption after a gutter for its check mark (a tick, or a dot for a radio
-    item), its shortcut at the right, and a submenu's arrow. The & letters are underlined only once the
-    keyboard has been used (ODS_NOACCEL). Windows draws its own submenu arrow after WM_DRAWITEM, unless the
-    item is clipped out of the context.
+    As Carbon draws the menus: the item under the mouse or the keyboard in the highlight, with a frame, unless
+    it's disabled; a separator as a line; a menu item's caption after a gutter for its check mark (a tick, or a
+    dot for a radio item), its shortcut at the right, and a submenu's arrow. The & letters are underlined only
+    once the keyboard has been used (ODS_NOACCEL). Windows draws its own submenu arrow after WM_DRAWITEM,
+    unless the item is clipped out of the context.
 */
 void TWin32GUITheme::DrawMenuItem(DRAWITEMSTRUCT const& draw)
 {
@@ -990,8 +990,9 @@ void TWin32GUITheme::DrawMenuItem(DRAWITEMSTRUCT const& draw)
     HDC const context = draw.hDC;
     RECT const rect = draw.rcItem;
     UINT const dpi = m_MenuBarWindow != nullptr ? WindowDPI(m_MenuBarWindow) : USER_DEFAULT_SCREEN_DPI;
-    bool const selected = (draw.itemState & (ODS_SELECTED | ODS_HOTLIGHT)) != 0;
     bool const disabled = (draw.itemState & (ODS_DISABLED | ODS_GRAYED)) != 0;
+    // As Carbon: a disabled item under the mouse or the keyboard looks as it does otherwise.
+    bool const selected = !disabled && (draw.itemState & (ODS_SELECTED | ODS_HOTLIGHT)) != 0;
     COLORREF const background = selected ? m_Palette.Highlight : item->TopLevel ? m_Palette.Panel :
                 m_Palette.MenuBackground;
 
