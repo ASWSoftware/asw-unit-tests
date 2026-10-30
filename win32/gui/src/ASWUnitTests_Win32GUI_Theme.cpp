@@ -775,22 +775,15 @@ void TWin32GUITheme::ApplyToMenu(HMENU menu, std::vector<std::unique_ptr<TMenuIt
             items.push_back(std::move(item));
         }
 
-        if (menu == m_MenuBar)
-        {
-            // A menu bar item keeps the width it was first measured at, whatever changes, e.g. an owner-drawn
-            // width, too narrow for the standard look, so it's replaced by a new one. A menu measures its items
-            // each time it opens.
-            change.fMask |= MIIM_ID | MIIM_STATE | MIIM_SUBMENU;
-            change.wID = info.wID;
-            change.fState = info.fState;
-            change.hSubMenu = info.hSubMenu;
-            RemoveMenu(menu, static_cast<UINT>(position), MF_BYPOSITION);
-            InsertMenuItemW(menu, static_cast<UINT>(position), TRUE, &change);
-        }
-        else
-        {
-            SetMenuItemInfoW(menu, static_cast<UINT>(position), TRUE, &change);
-        }
+        // An item keeps what Windows worked out for it in the look it was last shown in, whatever changes: a menu
+        // bar item its width, and a menu's item, once only shown owner-drawn, has no caption in the standard look.
+        // So each is replaced by a new one.
+        change.fMask |= MIIM_ID | MIIM_STATE | MIIM_SUBMENU;
+        change.wID = info.wID;
+        change.fState = info.fState;
+        change.hSubMenu = info.hSubMenu;
+        RemoveMenu(menu, static_cast<UINT>(position), MF_BYPOSITION);
+        InsertMenuItemW(menu, static_cast<UINT>(position), TRUE, &change);
 
         if (info.hSubMenu != nullptr)
         {
