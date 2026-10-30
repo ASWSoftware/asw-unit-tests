@@ -26,6 +26,7 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Win32GUI_System.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -116,10 +117,14 @@ TTest_ASWUnitTests_Win32GUI_System::TTest_ASWUnitTests_Win32GUI_System()
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_ExpandFileName_ResolvesDotFolders,
         "ExpandFileName_ResolvesDotFolders");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_FileExists_IsTrueOnlyForAFile, "FileExists_IsTrueOnlyForAFile");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_FileNamesInFolder_ListsOnlyTheFiles,
+        "FileNamesInFolder_ListsOnlyTheFiles");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUILayoutFilePath_IsPerExeUnderAppData,
         "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles,
+        "GUIThemesFolderPath_IsSharedBesideTheLayoutFiles");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast,
         "IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote,
@@ -289,6 +294,36 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_FileExists_IsTrueOnlyForAFile()
     CheckFalse(FileExists(m_ScratchFolder), __func__, __LINE__, "a folder isn't a file");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_FileNamesInFolder_ListsOnlyTheFiles()
+{
+    // Arrange: two files, one with a non-ASCII name (U+4E2D), and a folder named like a theme file.
+    WriteFileBytes(ScratchPath("Ocean.ini"), "x");
+    WriteFileBytes(ScratchPath("\xE4\xB8\xAD.ini"), std::string());
+    CreateFolderPath(ScratchPath("Folder.ini"));
+    WriteFileBytes(ScratchPath("Folder.ini\\Inside.ini"), "x");
+
+    // Act
+    std::vector<std::string> names = FileNamesInFolder(m_ScratchFolder);
+    std::vector<std::string> const missing = FileNamesInFolder(ScratchPath("Missing"));
+
+    // Assert: both sorted the same way, as where a non-ASCII byte sorts depends on whether char is signed.
+    std::vector<std::string> expected = { "Ocean.ini", "\xE4\xB8\xAD.ini" };
+    std::sort(expected.begin(), expected.end());
+    std::sort(names.begin(), names.end());
+    std::string expectedText;
+    std::string listed;
+
+    for (std::string const& name : expected)
+        expectedText += name + "\n";
+
+    for (std::string const& name : names)
+        listed += name + "\n";
+
+    CheckEquals(expectedText, listed, __func__, __LINE__,
+        "the files' names, in UTF-8, without the folder, its subfolder or the files in it");
+    CheckTrue(missing.empty(), __func__, __LINE__, "none for a missing folder");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_GUILayoutFilePath_IsPerExeUnderAppData()
 {
     // Arrange
@@ -319,6 +354,13 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_GUISelectionFilePath_IsBesideTheLa
     // Assert
     CheckEquals(layoutPath.substr(0, layoutPath.size() - 4) + ".selection", selectionPath, __func__, __LINE__,
         "the layout file's path with a .selection extension");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_System::Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles()
+{
+    // Act and Assert: the same for every executable, unlike the layout file.
+    CheckEquals(GUISettingsFolderPath() + "\\Themes", GUIThemesFolderPath(), __func__, __LINE__,
+        "a Themes folder in the settings folder");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast()
@@ -372,6 +414,7 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWh
 
     RemoveFile(path);
     EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
+    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile();
 
     // Act
     SaveGUIThemeToLayoutFile(EGUITheme::Dark);
@@ -380,14 +423,24 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWh
     WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
     SaveGUIThemeToLayoutFile(EGUITheme::Light);
     EGUITheme const light = LoadGUIThemeFromLayoutFile();
+    SaveGUIDarkThemeToLayoutFile("Deep \xC3\x89" "cume");
+    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile();
     std::string const text = ReadFileBytes(path);
+
+    RemoveFile(path);
+    SaveGUIDarkThemeToLayoutFile("Ocean");
+    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile();
 
     // Assert
     CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
+    CheckEquals(std::string("Carbon"), noFileDarkTheme, __func__, __LINE__, "and the dark theme Carbon");
     CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
     CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
-    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\n\r\n"), text, __func__,
-        __LINE__, "the layout stays");
+    CheckEquals(std::string("Deep \xC3\x89" "cume"), darkTheme, __func__, __LINE__,
+        "the dark theme saved beside it, in UTF-8");
+    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\nDarkTheme=Deep \xC3\x89" "cume\r\n"
+        "\r\n"), text, __func__, __LINE__, "the layout stays");
+    CheckEquals(std::string("Ocean"), darkThemeInNewFile, __func__, __LINE__, "the dark theme saved in a new file");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_MainIcon_IsThisExecutablesSharedIcon()

@@ -393,6 +393,33 @@ the Win32 GUI runner's dark look, the title bar is dark unless Windows shows the
 title bars, which it then keeps while the window is active, and the Export JUnit Report dialog,
 Windows' own, stays light.
 
+**View > Theme > Dark Theme** chooses the dark look's colors: Carbon, built in, or a theme file of
+your own, used whenever the look is dark, with Dark or with Use Windows Setting (high contrast keeps
+its own colors). Theme files go in `%APPDATA%\ASWUnitTests\Themes`, which **Open Themes Folder**
+opens, and are shared by every test app; the menu lists each one by its file name. The choice is
+saved in the layout file with the theme, and a problem with a theme file, such as a misspelled role,
+a color that isn't one or a missing file, is reported in the Log tab, with Carbon's colors used in
+its place.
+
+The Win32 GUI runner's theme files are INI files, `<Name>.ini`, and **Save Theme Template...** saves
+Carbon's colors as one to start from, every role listed under a comment on what its group colors:
+
+```ini
+[Theme]
+Base=Dark
+
+[Colors]
+Window=#0F2238
+Panel=#1B3350
+```
+
+`Base=Dark` is required. Each line under `[Colors]` sets a role's color as `#RRGGBB`, and a role
+left out keeps Carbon's color. Choosing the theme again reads its file again, so a change shows at
+once. The VCL GUI runner's theme files are VCL style files, `<Name>.vsf`, made with RAD Studio's
+Bitmap Style Designer. Each needs a style name of its own, not that of a style the project already
+has, such as Carbon. A style file is loaded once per session, so a change to it shows after a
+restart.
+
 The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
 as long as the command line doesn't choose them itself (no `--run`, `--filter`, or partition
 options). What it saves is what Run Selected would run, the checked tests that are shown; the filter

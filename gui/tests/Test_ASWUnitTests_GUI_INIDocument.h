@@ -47,8 +47,10 @@ private: // Test methods
     void Test_Constructor_ReadsTrimmedNamesAndValues();
     void Test_Constructor_SkipsLinesTMemIniFileSkips();
     void Test_DeleteKey_RemovesOnlyThatKey();
+    void Test_KeyNames_ListsEachKeyAsWritten();
     void Test_ReadString_IgnoresCase();
     void Test_ReadString_MissingIsEmpty();
+    void Test_SectionNames_ListsEachSectionOnce();
     void Test_Text_EmptyDocumentIsEmpty();
     void Test_Text_RoundTripsWhatItRead();
     void Test_WriteString_AddsNewKeysAndSectionsAtTheEnd();

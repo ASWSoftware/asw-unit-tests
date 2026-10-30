@@ -36,25 +36,45 @@ limitations under the License.
 namespace ASWUnitTests
 {
 
-// Sets the VCL style for 'theme' (see GUIThemeIsDark()): Carbon, which the GUI project links in, when it's dark,
+// Sets the VCL style for 'theme' (see GUIThemeIsDark()): 'darkStyle' (see LoadGUIDarkStyle()) when it's dark,
 // otherwise the default unstyled look. Returns whether the active style changed. Call it on the main thread;
 // before any form exists, each form is created in that style, and afterward it restyles the open ones.
-bool ApplyGUITheme(EGUITheme theme);
+bool ApplyGUITheme(EGUITheme theme, System::UnicodeString const& darkStyle);
+// The names of the files (not folders) in the folder, without the folder, converted to UTF-8; empty if the
+// folder doesn't exist or can't be listed.
+std::vector<std::string> FileNamesInFolder(System::UnicodeString const& folderPath);
 // This executable's layout file, %APPDATA%\ASWUnitTests\<exe name>.ini, so each test app built on the GUI
 // keeps its own layout, shared by all of its build configurations.
 System::UnicodeString GUILayoutFilePath();
 // This executable's selection file, beside its layout file (see GUILayoutFilePath()): its name with a
 // ".selection" extension.
 System::UnicodeString GUISelectionFilePath();
+// The folder that holds the theme files both GUI runners share, whatever executable runs them:
+// %APPDATA%\ASWUnitTests\Themes. The VCL GUI runner's are VCL style files, "<name>.vsf". It may not exist yet.
+System::UnicodeString GUIThemesFolderPath();
+// The VCL style the dark theme 'darkTheme' is, for ApplyGUITheme(): Carbon, which the GUI project links in, for
+// GUIDefaultDarkThemeName(); otherwise the style in GUIThemesFolderPath()'s "<darkTheme>.vsf", loaded the first
+// time it's needed. Adds a line for the log to 'problems' (see GUIThemeProblemLine()), and gives Carbon, when
+// the file is missing, isn't a VCL style, or has the name of a style already loaded from elsewhere.
+System::UnicodeString LoadGUIDarkStyle(std::string const& darkTheme, std::vector<std::string>& problems);
+// The dark theme SaveGUIDarkThemeToLayoutFile() saved in the layout file (see GUILayoutFilePath()), or
+// GUIDefaultDarkThemeName() if there's none or it can't be read.
+std::string LoadGUIDarkThemeFromLayoutFile();
 // The theme SaveGUIThemeToLayoutFile() saved in the layout file (see GUILayoutFilePath()), or Windows if there's
 // none or it can't be read.
 EGUITheme LoadGUIThemeFromLayoutFile();
+// Opens the folder in a File Explorer window. Throws an RTL exception if it can't, e.g. because the folder
+// doesn't exist.
+void OpenFolderInExplorer(System::UnicodeString const& folderPath);
 // This process's command-line arguments, without the program name, converted to UTF-8, for
 // TGUICommandLine::Parse().
 std::vector<std::string> ProcessArguments();
 // The file's bytes, unchanged, e.g. UTF-8 text for TGUIINIDocument. Throws an RTL exception if it can't be
 // read.
 std::string ReadFileBytes(System::UnicodeString const& path);
+// Saves 'name', the dark theme's, in the layout file (see GUILayoutFilePath()), keeping its other values, and
+// creating it if needed. Ignores any error, which only means the next start uses the default dark theme.
+void SaveGUIDarkThemeToLayoutFile(std::string const& name);
 // Saves 'theme' in the layout file (see GUILayoutFilePath()), keeping its other values, and creating it if needed.
 // Ignores any error, which only means the next start uses the default theme.
 void SaveGUIThemeToLayoutFile(EGUITheme theme);

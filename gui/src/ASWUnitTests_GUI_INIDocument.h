@@ -81,8 +81,13 @@ public:
 
     // Removes the key, if there is one. Its section stays, even if it's then empty.
     void DeleteKey(std::string const& section, std::string const& key);
+    // The names of the section's keys, as written and in order, a repeated key's each time, as TMemIniFile's
+    // ReadSection() gives them; empty if the section doesn't exist.
+    std::vector<std::string> KeyNames(std::string const& section) const;
     // The key's value, or empty if the section or key doesn't exist.
     std::optional<std::string> ReadString(std::string const& section, std::string const& key) const;
+    // The names of the sections, as written and in order.
+    std::vector<std::string> SectionNames() const;
     // The document's text, as described above; empty for an empty document.
     std::string Text() const;
     // Sets the key's value, adding the key at the end of its section, and the section at the end of the

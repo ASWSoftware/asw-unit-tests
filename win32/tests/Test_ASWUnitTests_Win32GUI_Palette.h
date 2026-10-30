@@ -43,8 +43,11 @@ private:
 private: // Test methods
     void Test_BlendColors_MixesEachChannelInProportion();
     void Test_CarbonPalette_HasCarbonsColors();
+    void Test_CarbonThemeFileText_ReadsBackAsCarbon();
     void Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground();
     void Test_IsDarkColor_IsByTheLuma();
+    void Test_PaletteRoles_ListEveryMemberOnce();
+    void Test_PaletteWithThemeColors_SetsOnlyTheirRoles();
 
 public:
     TTest_ASWUnitTests_Win32GUI_Palette();

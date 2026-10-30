@@ -59,8 +59,10 @@ private: // Test methods
     void Test_ExpandFileName_MakesARelativePathAbsolute();
     void Test_ExpandFileName_ResolvesDotFolders();
     void Test_FileExists_IsTrueOnlyForAFile();
+    void Test_FileNamesInFolder_ListsOnlyTheFiles();
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
+    void Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles();
     void Test_IsThemeSettingChange_IsTrueForTheAppModeAndHighContrast();
     void Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote();
     void Test_MainIcon_IsThisExecutablesSharedIcon();

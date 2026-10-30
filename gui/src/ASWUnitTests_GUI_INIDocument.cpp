@@ -167,6 +167,20 @@ TGUIINIDocument::TSection* TGUIINIDocument::FindSection(std::string const& secti
     return const_cast<TSection*>(static_cast<TGUIINIDocument const*>(this)->FindSection(section));
 }
 //---------------------------------------------------------------------------
+std::vector<std::string> TGUIINIDocument::KeyNames(std::string const& section) const
+{
+    std::vector<std::string> names;
+    TSection const* const found = FindSection(section);
+
+    if (found != nullptr)
+    {
+        for (TKey const& key : found->Keys)
+            names.push_back(key.Name);
+    }
+
+    return names;
+}
+//---------------------------------------------------------------------------
 std::optional<std::string> TGUIINIDocument::ReadString(std::string const& section, std::string const& key) const
 {
     TSection const* const found = FindSection(section);
@@ -180,6 +194,16 @@ std::optional<std::string> TGUIINIDocument::ReadString(std::string const& sectio
     }
 
     return std::nullopt;
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> TGUIINIDocument::SectionNames() const
+{
+    std::vector<std::string> names;
+
+    for (TSection const& section : m_Sections)
+        names.push_back(section.Name);
+
+    return names;
 }
 //---------------------------------------------------------------------------
 std::string TGUIINIDocument::Text() const

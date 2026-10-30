@@ -25,6 +25,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <exception>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Utils.h"
@@ -114,10 +115,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
         ASWUnitTests::TGUICommandLineResult const commandLine =
             ASWUnitTests::TGUICommandLine::Parse(ASWUnitTests::ProcessArguments(), options);
 
-        // The saved theme, before any window, so the --help dialog has it too: Use Windows Setting with
-        // --layout-ignore, which ignores the saved layout file, and --layout-reset, which deletes it.
-        ASWUnitTests::EGUITheme const themeChoice = options.LayoutIgnore || options.LayoutReset ?
-                ASWUnitTests::EGUITheme::Windows : ASWUnitTests::LoadGUIThemeFromLayoutFile();
+        // The saved theme and dark theme, before any window, so the --help dialog has them too: Use Windows
+        // Setting and Carbon with --layout-ignore, which ignores the saved layout file, and --layout-reset, which
+        // deletes it.
+        bool const savedTheme = !options.LayoutIgnore && !options.LayoutReset;
+        ASWUnitTests::EGUITheme const themeChoice = savedTheme ? ASWUnitTests::LoadGUIThemeFromLayoutFile() :
+                ASWUnitTests::EGUITheme::Windows;
+        std::string const darkTheme = savedTheme ? ASWUnitTests::LoadGUIDarkThemeFromLayoutFile() :
+                ASWUnitTests::GUIDefaultDarkThemeName();
+        std::vector<std::string> const themeProblems = theme.SetDarkTheme(darkTheme);
         theme.SetDark(ASWUnitTests::GUIThemeIsDark(themeChoice, ASWUnitTests::WindowsAppsUseDarkTheme(),
             ASWUnitTests::WindowsHighContrast()));
 
@@ -129,7 +135,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
 
         ASWUnitTests::TWin32GUIMainWindow mainWindow(theme);
         mainWindow.Create();
-        mainWindow.Start(options, themeChoice);
+        mainWindow.Start(options, themeChoice, darkTheme, themeProblems);
         mainWindow.Show(showCommand);
         mainWindow.RunMessageLoop();
 

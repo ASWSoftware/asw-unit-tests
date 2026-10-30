@@ -57,6 +57,9 @@ std::string ExeFileName();
 std::string ExpandFileName(std::string const& path);
 // Whether a file (not a folder) exists at the path.
 bool FileExists(std::string const& path);
+// The names of the files (not folders) in the folder, without the folder, in the order Windows lists them;
+// empty if the folder doesn't exist or can't be listed.
+std::vector<std::string> FileNamesInFolder(std::string const& folderPath);
 // This executable's layout file, %APPDATA%\ASWUnitTests\<exe name>.ini, so each test app built on the GUI
 // keeps its own layout, shared by all of its build configurations.
 std::string GUILayoutFilePath();
@@ -66,15 +69,24 @@ std::string GUISelectionFilePath();
 // The folder that holds the GUI runners' layout and selection files, %APPDATA%\ASWUnitTests. It may not exist
 // yet (see CreateFolderPath()).
 std::string GUISettingsFolderPath();
+// The folder that holds the theme files both GUI runners share (see TGUIThemeFile), whatever executable runs
+// them: %APPDATA%\ASWUnitTests\Themes. It may not exist yet (see CreateFolderPath()).
+std::string GUIThemesFolderPath();
 // Whether a WM_SETTINGCHANGE message's parameters are about a setting that Use Windows Setting follows: the
 // app mode (Windows names its change "ImmersiveColorSet") or high contrast.
 bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam);
+// The dark theme saved in the layout file (see GUILayoutFilePath() and LoadGUIDarkTheme());
+// GUIDefaultDarkThemeName() when there's no file or it can't be read.
+std::string LoadGUIDarkThemeFromLayoutFile();
 // The theme saved in the layout file (see GUILayoutFilePath() and LoadGUITheme()); Windows when there's no file
 // or it can't be read.
 EGUITheme LoadGUIThemeFromLayoutFile();
 // This executable's icon, its MAINICON resource (resource/ASWUnitTests_Icon.rc, or Icon_MainIcon in a RAD Studio
 // project), at the standard icon size; nullptr if it has none. Shared, so it's never destroyed.
 HICON MainIcon();
+// Opens the folder in a File Explorer window, for 'owner' (a window of this process, or nullptr). Throws
+// std::runtime_error if it can't, e.g. because the folder doesn't exist.
+void OpenFolderInExplorer(HWND owner, std::string const& folderPath);
 // This process's command-line arguments, without the program name, converted to UTF-8, for
 // TGUICommandLine::Parse().
 std::vector<std::string> ProcessArguments();
@@ -83,6 +95,10 @@ std::vector<std::string> ProcessArguments();
 std::string ReadFileBytes(std::string const& path);
 // Deletes the file. False if it couldn't be deleted, e.g. because it doesn't exist.
 bool RemoveFile(std::string const& path);
+// Saves 'name', the dark theme's, in the layout file (see GUILayoutFilePath() and SaveGUIDarkTheme()), keeping
+// the layout and any other values in it. Not saving it (e.g. a read-only profile) only means the next start uses
+// the default.
+void SaveGUIDarkThemeToLayoutFile(std::string const& name);
 // Saves 'theme' in the layout file (see GUILayoutFilePath() and SaveGUITheme()), keeping the layout and any
 // other values in it. Not saving it (e.g. a read-only profile) only means the next start uses the default.
 void SaveGUIThemeToLayoutFile(EGUITheme theme);

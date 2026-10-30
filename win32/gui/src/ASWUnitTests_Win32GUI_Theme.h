@@ -78,8 +78,9 @@ enum class EWin32GUIThemedControl
 // TWin32GUITheme
 //
 // Whether the GUI is light (Windows' standard look, in the system colors) or
-// dark (painted in CarbonPalette()'s colors), applied to the windows and
-// controls attached to it, and switched live by SetDark(). Dark has:
+// dark (painted in CarbonPalette()'s colors, or a theme file's; see
+// SetDarkTheme()), applied to the windows and controls attached to it, and
+// switched live by SetDark() and SetDarkTheme(). Dark has:
 //   - the title bar Windows draws dark (DWMWA_USE_IMMERSIVE_DARK_MODE);
 //   - owner-drawn menus, and the menus' frames painted through a hook on
 //     this thread's menu windows;
@@ -167,6 +168,9 @@ private:
     // Attaches the scroll arrows a tab control creates when its tabs don't fit, if it has created them and they
     // aren't attached yet.
     void AttachUpDown(HWND tabControl);
+    // One of the dark tree check boxes' images, in the palette's colors, at 'dpi'; nullptr if it can't be made.
+    // 'state' is its index, as DarkCheckImages() numbers them.
+    HBITMAP CreateDarkCheckImage(int state, UINT dpi) const;
     // The dark tree check boxes for 'dpi', created if needed.
     HIMAGELIST DarkCheckImages(UINT dpi);
     void DrawButton(NMCUSTOMDRAW const& draw) const;
@@ -227,8 +231,18 @@ public:
     // Applies the current look again to everything attached, e.g. after a DPI change or a change of the system
     // colors.
     void Refresh();
+    // Applies the current look to 'menu', one of the attached menu bar's menus, after its items were changed,
+    // e.g. in WM_INITMENUPOPUP, leaving the menu bar and the other menus, which may be open, as they are.
+    void RefreshMenu(HMENU menu);
     // Switches to the dark look or back to the light one, and redraws everything attached.
     void SetDark(bool dark);
+    // Makes 'name' the dark theme: GUIDefaultDarkThemeName(), Carbon, or a theme file in GUIThemesFolderPath(),
+    // "<name>.ini", over Carbon's colors (see SetPalette()). Returns its problems as lines for the log (see
+    // GUIThemeProblemLine()): the file's (see ReadGUIThemeFile()), or that it's missing or can't be read, so
+    // Carbon is used.
+    std::vector<std::string> SetDarkTheme(std::string const& name);
+    // Makes 'palette' the dark look's colors, redrawing everything attached while dark.
+    void SetPalette(TWin32GUIPalette const& palette);
     // A skipped test's text color on the window color (see WindowColor()).
     COLORREF SkipTextColor() const;
     // The background of edit boxes, lists and the log.

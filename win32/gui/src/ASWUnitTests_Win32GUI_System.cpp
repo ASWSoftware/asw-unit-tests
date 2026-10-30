@@ -241,6 +241,25 @@ bool FileExists(std::string const& path)
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 //---------------------------------------------------------------------------
+std::vector<std::string> FileNamesInFolder(std::string const& folderPath)
+{
+    std::vector<std::string> names;
+    WIN32_FIND_DATAW found = {};
+    HANDLE const search = FindFirstFileW(UTF8ToWide(folderPath + "\\*").c_str(), &found);
+
+    if (search == INVALID_HANDLE_VALUE)
+        return names;
+
+    for (bool more = true; more; more = FindNextFileW(search, &found) != 0)
+    {
+        if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            names.push_back(WideToUTF8(found.cFileName));
+    }
+
+    FindClose(search);
+    return names;
+}
+//---------------------------------------------------------------------------
 std::string GUILayoutFilePath()
 {
     return GUISettingsFolderPath() + "\\" + WithExtension(ExeFileName(), ".ini");
@@ -263,6 +282,11 @@ std::string GUISettingsFolderPath()
     return WideToUTF8(appData) + "\\ASWUnitTests";
 }
 //---------------------------------------------------------------------------
+std::string GUIThemesFolderPath()
+{
+    return GUISettingsFolderPath() + "\\Themes";
+}
+//---------------------------------------------------------------------------
 bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
 {
     if (wParam == SPI_SETHIGHCONTRAST)
@@ -271,6 +295,23 @@ bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
     wchar_t const* const area = reinterpret_cast<wchar_t const*>(lParam);
 
     return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
+}
+//---------------------------------------------------------------------------
+std::string LoadGUIDarkThemeFromLayoutFile()
+{
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+
+        if (!FileExists(path))
+            return GUIDefaultDarkThemeName();
+
+        return LoadGUIDarkTheme(TGUIINIDocument(ReadFileBytes(path)));
+    }
+    catch (...)
+    {
+        return GUIDefaultDarkThemeName();
+    }
 }
 //---------------------------------------------------------------------------
 EGUITheme LoadGUIThemeFromLayoutFile()
@@ -293,6 +334,25 @@ EGUITheme LoadGUIThemeFromLayoutFile()
 HICON MainIcon()
 {
     return LoadIconW(GetModuleHandleW(nullptr), L"MAINICON");
+}
+//---------------------------------------------------------------------------
+/*
+    OpenFolderInExplorer
+
+    ShellExecuteW() returns a value above 32 on success, and otherwise an error code that, as documented, isn't
+    always GetLastError()'s, so the error is described from GetLastError() only when it has one.
+*/
+void OpenFolderInExplorer(HWND owner, std::string const& folderPath)
+{
+    SetLastError(ERROR_SUCCESS);
+    INT_PTR const result = reinterpret_cast<INT_PTR>(ShellExecuteW(owner, L"open", UTF8ToWide(folderPath).c_str(),
+        nullptr, nullptr, SW_SHOWNORMAL));
+
+    if (result <= 32)
+    {
+        DWORD const error = GetLastError();
+        throw FileError("open the folder", folderPath, error != ERROR_SUCCESS ? error : ERROR_PATH_NOT_FOUND);
+    }
 }
 //---------------------------------------------------------------------------
 std::vector<std::string> ProcessArguments()
@@ -341,6 +401,24 @@ std::string ReadFileBytes(std::string const& path)
 bool RemoveFile(std::string const& path)
 {
     return DeleteFileW(UTF8ToWide(path).c_str()) != 0;
+}
+//---------------------------------------------------------------------------
+void SaveGUIDarkThemeToLayoutFile(std::string const& name)
+{
+    try
+    {
+        std::string const path = GUILayoutFilePath();
+        CreateFolderPath(GUISettingsFolderPath());
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUIDarkTheme(ini, name);
+        WriteFileBytes(path, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default dark theme.
+    }
 }
 //---------------------------------------------------------------------------
 void SaveGUIThemeToLayoutFile(EGUITheme theme)

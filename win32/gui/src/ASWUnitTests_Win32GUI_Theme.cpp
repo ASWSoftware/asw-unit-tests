@@ -28,10 +28,16 @@ limitations under the License.
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <exception>
+#include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include <vsstyle.h>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Theme.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_Glyphs.h"
+#include "ASWUnitTests_Win32GUI_System.h"
 //---------------------------------------------------------------------------
 
 // RAD Studio's Win32 (bcc32c) links its own Windows import libraries, which don't include SetWindowTheme()'s.
@@ -969,10 +975,38 @@ LRESULT CALLBACK TWin32GUITheme::ControlProc(HWND control, UINT message, WPARAM 
 }
 //---------------------------------------------------------------------------
 /*
+    TWin32GUITheme::CreateDarkCheckImage
+
+    Carbon's check box, 13 pixels at 96 DPI, in the middle of the tree's 16-pixel state image.
+*/
+HBITMAP TWin32GUITheme::CreateDarkCheckImage(int state, UINT dpi) const
+{
+    int const cell = ScaleForDPI(16, dpi);
+    int const box = ScaleForDPI(13, dpi);
+    int const offset = (cell - box) / 2;
+    int const border = (std::max)(1, ScaleForDPI(1, dpi));
+
+    TGlyphCanvas canvas(cell, cell, m_Palette.Window);
+
+    if (state > 0)
+    {
+        RECT const outside = { offset, offset, offset + box, offset + box };
+        canvas.FillRect(outside, m_Palette.CheckBoxBorder);
+        canvas.FillRect(Inset(outside, border), m_Palette.CheckBoxFill);
+
+        if (state == 2)
+            canvas.Blend(EWin32GUIGlyph::Cross, offset, offset, box, m_Palette.CheckMark);
+        else if (state == 3)
+            canvas.Blend(EWin32GUIGlyph::Square, offset, offset, box, m_Palette.CheckMark);
+    }
+
+    return canvas.CreateBitmap();
+}
+//---------------------------------------------------------------------------
+/*
     TWin32GUITheme::DarkCheckImages
 
-    Carbon's check boxes, 13 pixels at 96 DPI, in the middle of the tree's 16-pixel state images, in the order
-    TVS_EX_PARTIALCHECKBOXES numbers them: none, unchecked, checked (a cross), partial (a square).
+    In the order TVS_EX_PARTIALCHECKBOXES numbers them: none, unchecked, checked (a cross), partial (a square).
 */
 HIMAGELIST TWin32GUITheme::DarkCheckImages(UINT dpi)
 {
@@ -983,10 +1017,6 @@ HIMAGELIST TWin32GUITheme::DarkCheckImages(UINT dpi)
     }
 
     int const cell = ScaleForDPI(16, dpi);
-    int const box = ScaleForDPI(13, dpi);
-    int const offset = (cell - box) / 2;
-    int const border = (std::max)(1, ScaleForDPI(1, dpi));
-
     HIMAGELIST const images = ImageList_Create(cell, cell, ILC_COLOR32, 4, 0);
 
     if (images == nullptr)
@@ -994,21 +1024,7 @@ HIMAGELIST TWin32GUITheme::DarkCheckImages(UINT dpi)
 
     for (int state = 0; state < 4; ++state)
     {
-        TGlyphCanvas canvas(cell, cell, m_Palette.Window);
-
-        if (state > 0)
-        {
-            RECT const outside = { offset, offset, offset + box, offset + box };
-            canvas.FillRect(outside, m_Palette.CheckBoxBorder);
-            canvas.FillRect(Inset(outside, border), m_Palette.CheckBoxFill);
-
-            if (state == 2)
-                canvas.Blend(EWin32GUIGlyph::Cross, offset, offset, box, m_Palette.CheckMark);
-            else if (state == 3)
-                canvas.Blend(EWin32GUIGlyph::Square, offset, offset, box, m_Palette.CheckMark);
-        }
-
-        HBITMAP const bitmap = canvas.CreateBitmap();
+        HBITMAP const bitmap = CreateDarkCheckImage(state, dpi);
 
         if (bitmap != nullptr)
         {
@@ -2543,6 +2559,36 @@ void TWin32GUITheme::Refresh()
         RedrawWindow(window, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::RefreshMenu
+
+    Only the items of 'menu' and its submenus are made again, and the old ones forgotten, so the items of the
+    menu bar and of the other menus keep theirs.
+*/
+void TWin32GUITheme::RefreshMenu(HMENU menu)
+{
+    if (m_MenuBar == nullptr || menu == nullptr)
+        return;
+
+    std::vector<std::unique_ptr<TMenuItem> > items;
+    ApplyToMenu(menu, items);
+
+    // The menus just walked: 'menu', and those of its submenus' new items.
+    std::vector<HMENU> walked = { menu };
+
+    for (std::unique_ptr<TMenuItem> const& item : items)
+        walked.push_back(item->Menu);
+
+    m_MenuItems.erase(std::remove_if(m_MenuItems.begin(), m_MenuItems.end(),
+        [&walked](std::unique_ptr<TMenuItem> const& item)
+        {
+            return std::find(walked.begin(), walked.end(), item->Menu) != walked.end();
+        }), m_MenuItems.end());
+
+    for (std::unique_ptr<TMenuItem>& item : items)
+        m_MenuItems.push_back(std::move(item));
+}
+//---------------------------------------------------------------------------
 void TWin32GUITheme::SetDark(bool dark)
 {
     if (dark == m_Dark)
@@ -2550,6 +2596,87 @@ void TWin32GUITheme::SetDark(bool dark)
 
     m_Dark = dark;
     Refresh();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::SetDarkTheme
+
+    A file that can't be read leaves Carbon's colors, as does one ReadGUIThemeFile() finds unusable.
+*/
+std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
+{
+    std::vector<std::string> problems;
+    TWin32GUIPalette palette = CarbonPalette();
+
+    if (name != GUIDefaultDarkThemeName())
+    {
+        try
+        {
+            std::string const path = GUIThemesFolderPath() + "\\" + name + ".ini";
+
+            if (!FileExists(path))
+            {
+                problems.push_back(GUIThemeProblemLine(name, "There's no theme file " + path + ", so " +
+                    GUIDefaultDarkThemeName() + " is used instead."));
+            }
+            else
+            {
+                TGUIThemeFile const file = ReadGUIThemeFile(ReadFileBytes(path), PaletteRoleNames());
+
+                for (std::string const& problem : file.Problems)
+                    problems.push_back(GUIThemeProblemLine(name, problem));
+
+                palette = PaletteWithThemeColors(palette, file.Colors);
+            }
+        }
+        catch (std::exception const& exception)
+        {
+            problems.push_back(GUIThemeProblemLine(name, "Its theme file couldn't be read, so " +
+                GUIDefaultDarkThemeName() + " is used instead: " + exception.what()));
+        }
+    }
+
+    SetPalette(palette);
+    return problems;
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUITheme::SetPalette
+
+    The brushes are made again in the new colors, and the old ones deleted once the menus no longer use them.
+    The dark check boxes are drawn again into their image lists, which the trees keep.
+*/
+void TWin32GUITheme::SetPalette(TWin32GUIPalette const& palette)
+{
+    m_Palette = palette;
+
+    HBRUSH const oldBrushes[] = { m_MenuBrush, m_PanelBrush, m_WindowBrush };
+    m_MenuBrush = CreateSolidBrush(m_Palette.MenuBackground);
+    m_PanelBrush = CreateSolidBrush(m_Palette.Panel);
+    m_WindowBrush = CreateSolidBrush(m_Palette.Window);
+
+    for (std::pair<UINT, HIMAGELIST> const& entry : m_DarkCheckImages)
+    {
+        for (int state = 0; state < 4; ++state)
+        {
+            HBITMAP const bitmap = CreateDarkCheckImage(state, entry.first);
+
+            if (bitmap != nullptr)
+            {
+                ImageList_Replace(entry.second, state, bitmap, nullptr);
+                DeleteObject(bitmap);
+            }
+        }
+    }
+
+    if (m_Dark)
+        Refresh();
+
+    for (HBRUSH const brush : oldBrushes)
+    {
+        if (brush != nullptr)
+            DeleteObject(brush);
+    }
 }
 //---------------------------------------------------------------------------
 COLORREF TWin32GUITheme::SkipTextColor() const

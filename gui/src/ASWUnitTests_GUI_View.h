@@ -100,6 +100,9 @@ std::string GUIDefaultJUnitReportFileName(std::string const& exeFileName);
 TestFilter GUIFilterBoxFilter(std::string const& text);
 // The first line of 'text', e.g. for the Failures & Skips list's Detail column.
 std::string GUIFirstLine(std::string const& text);
+// 'text', e.g. a theme file's name, as a menu item's caption: each '&' doubled, so it shows rather than making
+// the next letter the item's accelerator.
+std::string GUIMenuItemText(std::string const& text);
 // The status bar's panels' text, in order: the checked and shown tests, the run's progress, the passed, failed
 // and skipped counts, the run's elapsed time (empty if no run has started), the shuffle setting ('shuffleText',
 // from TGUIShuffle::StatusText()), and 'message'.

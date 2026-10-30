@@ -37,6 +37,11 @@ versioned baseline.
   runner paints Carbon's colors itself, so it needs nothing more; its message boxes are its own
   dialogs, in its theme, and its tree, results tabs and progress bar are drawn without flicker as
   the window is resized.
+- Theme files for the dark look in both GUI runners, chosen in **View > Theme > Dark Theme**, which
+  lists Carbon and the files in `%APPDATA%\ASWUnitTests\Themes`, shared by every test app. The Win32
+  GUI runner's are INI files that set any of its colors by role, and **Save Theme Template...**
+  saves Carbon's as one to start from; the VCL GUI runner's are VCL style files (`.vsf`). The
+  choice is saved in the layout file, and a theme file's problems are reported in the log.
 - An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
   runners now have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which
   draws them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32

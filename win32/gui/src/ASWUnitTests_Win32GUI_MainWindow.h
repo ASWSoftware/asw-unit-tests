@@ -78,9 +78,11 @@ enum class EWin32GUICommand : WORD
     ExpandAll,
     ExportJUnitReport,
     FocusFilter,
+    OpenThemesFolder,
     ResetLayout,
     RunFailed,
     RunSelected,
+    SaveThemeTemplate,
     SelectAll,
     SelectFailed,
     SelectNone,
@@ -126,6 +128,8 @@ private:
     HWND m_Lbl_Filter;
     HWND m_LV_Failures;
     HWND m_Mem_Detail;
+    // View > Theme > Dark Theme, which FillDarkThemeMenu() fills each time it opens.
+    HMENU m_MI_ViewDarkTheme;
     HMENU m_MM_Main;
     HWND m_PB_Progress;
     HWND m_PC_Results;
@@ -146,6 +150,11 @@ private:
     TGUICommandStates m_CommandStates;
     // The test that has started but not yet finished, if any.
     std::optional<std::size_t> m_CurrentTestIndex;
+    // The View > Theme > Dark Theme choice: GUIDefaultDarkThemeName() or a theme file's name.
+    std::string m_DarkTheme;
+    // The dark themes View > Theme > Dark Theme lists, in its order, each item's command ID being
+    // FirstDarkThemeCommand plus its index here.
+    std::vector<std::string> m_DarkThemeNames;
     // The detail pane's height and the test tree's width, in pixels at m_DPI.
     int m_DetailHeight;
     UINT m_DPI;
@@ -244,6 +253,8 @@ private:
     void ExportJUnitReport();
     // Ends the run on an unhandled exception that escaped TTestHandler::Run(), described by 'description'.
     void FailRunOnUnhandledException(std::string const& description);
+    // Lists Carbon and the theme files in View > Theme > Dark Theme, as it opens; see the definition.
+    void FillDarkThemeMenu();
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     bool IsToolbarButton(HWND control) const;
     void LayOut();
@@ -299,10 +310,14 @@ private:
     // Saves the test selection to GUISelectionFilePath(). Not saving it only means the next start checks every
     // test.
     void SaveSelection();
+    // Saves Carbon as a theme file to start from, where the user chooses; see the definition.
+    void SaveThemeTemplate();
     // Shows the results page 'page' (0 Failures & Skips, 1 Log), as clicking its tab does.
     void SelectResultsPage(int page);
     // The test tree's selected node, or nullptr if none is.
     HTREEITEM SelectedTreeItem() const;
+    // Chooses View > Theme > Dark Theme's 'name', saving it, and applies it; see the definition.
+    void SetDarkTheme(std::string const& name);
     // Sets a test tree node's status image from m_TestList.
     void SetNodeImage(HTREEITEM item);
     // Sets the progress bar's position; see the definition.
@@ -359,9 +374,11 @@ public:
     // else was asked for.
     void Show(int showCommand);
     // Loads the registered tests, applies the command line's options, and restores the saved layout and selection;
-    // see the definition. 'theme' is the View > Theme choice the window's theme was set up for. Call after
-    // Create(), before Show().
-    void Start(TGUIOptions const& options, EGUITheme theme);
+    // see the definition. 'theme' and 'darkTheme' are the View > Theme and Dark Theme choices the window's theme
+    // was set up for, and 'themeProblems' what TWin32GUITheme::SetDarkTheme() found wrong, noted in the log. Call
+    // after Create(), before Show().
+    void Start(TGUIOptions const& options, EGUITheme theme, std::string const& darkTheme,
+        std::vector<std::string> const& themeProblems);
     // Whether a run ended with a test that timed out or crashed. A timed-out test's abandoned thread may still be
     // running, using one of the test groups, and after a crash their state may be corrupted, so the caller should
     // then end the process, as the console runner does, without destroying this window and its tests.

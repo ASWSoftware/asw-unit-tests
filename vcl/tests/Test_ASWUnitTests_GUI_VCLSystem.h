@@ -41,8 +41,11 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_FileNamesInFolder_ListsOnlyTheFiles();
     void Test_GUILayoutFilePath_IsPerExeUnderAppData();
     void Test_GUISelectionFilePath_IsBesideTheLayoutFile();
+    void Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles();
+    void Test_LoadGUIDarkStyle_GivesCarbonForAnyProblem();
     void Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote();
     void Test_ProcessArguments_MatchesParamCount();
     void Test_ReadFileBytes_ReadsWhatWriteFileBytesWrote();
