@@ -10,11 +10,10 @@ versioned baseline.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-30
+
 ### Added
 
-- `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
-  `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
-  operating system), describing the build the framework was compiled for.
 - A Win32 GUI runner, `ASWUnitTests_Win32_GUI`, with the same window, features and command line
   options as the VCL GUI runner, built on the Windows API alone, so it needs neither the VCL nor
   RAD Studio: it builds with CMake (MSVC, MinGW, Clang) as well as with RAD Studio, for Win32 and
@@ -22,49 +21,32 @@ versioned baseline.
   Windows, and a project of your own can build it with your tests by including
   `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`; the README's "Win32 GUI Runner" section
   covers both, and RAD Studio.
-- `ASWUNITTESTS_CORE_SOURCES` in `src\ASWUnitTests_Sources.cmake`: the framework's sources without
-  `main.cpp`, for a runner with its own entry point. `ASWUNITTESTS_SOURCES` lists the same files as
-  before.
-- `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units as
-  `ASWUNITTESTS_GUI_SOURCES`.
-- A dark theme in both GUI runners, with **View > Theme** to choose it: **Use Windows Setting**
-  (the default) follows Windows' app mode setting, switching as soon as it changes, and **Light**
-  and **Dark** override it. The choice applies without a restart and is saved in the layout file;
-  `--layout-ignore` and `--layout-reset` cover it as they do the layout. In the VCL GUI runner, dark
-  is RAD Studio's Carbon VCL style, so a project of your own that runs its tests in it needs Carbon
-  among its custom styles (Project > Options > Application > Appearance) for it, and a `WinMain()`
-  that applies the saved theme as `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` does. The Win32 GUI
-  runner paints Carbon's colors itself, so it needs nothing more; its message boxes are its own
-  dialogs, in its theme, and its tree, results tabs and progress bar are drawn without flicker as
-  the window is resized.
-- Theme files for the dark look in both GUI runners, chosen in **View > Theme > Dark Theme**, which
-  lists Carbon and the files in `%APPDATA%\ASWUnitTests\Themes`, shared by every test app. The Win32
-  GUI runner's are INI files that set any of its colors by role, and **Save Theme Template...**
-  saves Carbon's as one to start from; the VCL GUI runner's are VCL style files (`.vsf`). The
-  choice is saved in the layout file, and a theme file's problems are reported in the log.
-- Four more built-in dark themes in the Win32 GUI runner, tints of Carbon: Ember (warm brown),
-  Forest (green), Midnight (blue) and Plum (purple), listed in **View > Theme > Dark Theme** above
-  the theme files. The colors that show how tests did (the tree's status dots, failed and skipped
-  text, a failed run's progress bar) stay Carbon's.
-- Four of RAD Studio's dark VCL styles as built-in dark themes in both GUI runners, beside Carbon:
-  Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and Tablet Dark. The VCL GUI runner's project
-  links them in, and a VCL GUI project of your own lists the ones it links; the Win32 GUI runner
-  paints their colors. The Win32 GUI runner's theme files can also set `ButtonText`,
-  `ButtonHotText` and `SelectionText`, new roles for a button's text and the tree's selected text.
+- Themes in both GUI runners, chosen in **View > Theme**: **Use Windows Setting** (the default)
+  follows Windows' app mode setting, switching as soon as it changes, and **Light** and **Dark**
+  override it. **View > Theme > Dark Theme** chooses the dark look's colors: one of five of RAD
+  Studio's dark VCL styles (Carbon, the default, Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and
+  Tablet Dark), in the Win32 GUI runner also one of four tints of Carbon (Ember, Forest, Midnight
+  and Plum), or a theme file of your own in `%APPDATA%\ASWUnitTests\Themes`, shared by every test
+  app, which **Open Themes Folder** opens. The Win32 GUI runner's theme files are INI files that set
+  any of its colors by role, and **Save Theme Template...** saves Carbon's as one to start from; the
+  VCL GUI runner's are VCL style files (`.vsf`). The choice applies without a restart and is saved
+  in the layout file, `--layout-ignore` and `--layout-reset` cover it as they do the layout, and a
+  theme file's problems are reported in the log. The Win32 GUI runner paints the themes itself, so
+  it needs nothing more. The VCL GUI runner uses the VCL styles, so a project of your own that runs
+  its tests in it needs them among its custom styles (Project > Options > Application >
+  Appearance), Carbon at least, without which Dark shows the light look, and a `WinMain()` that
+  applies the saved theme (see Changed). The README's "GUI Runners" section has the details.
 - An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
-  runners now have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which
-  draws them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32
-  GUI runner of your own built with CMake gets the icon too, in Explorer, its title bar and the
-  taskbar; to use your own, remove that script from the list (the README's "Win32 GUI Runner" shows
-  how) and name your icon `MAINICON`. `ASWUNITTESTS_RESOURCE_DIR` is the `resource` folder, which
-  `ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS` now includes.
-- A `TCLIParser::ParseArguments()` overload that takes the arguments as a
-  `std::vector<std::string>`, the program name first, as in `argv`.
-- `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,
-  UTF-32 on Linux), and, on Windows, `CommandLineArguments()` and `SystemErrorText()`: a command
-  line split into UTF-8 arguments, and a `GetLastError()` code's description.
-- `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
-  to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
+  runners have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which draws
+  them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32 GUI
+  runner of your own built with CMake gets the icon too, in Explorer, its title bar and the taskbar;
+  to use your own, remove that script from the list (the README's "Win32 GUI Runner" shows how) and
+  name your icon `MAINICON`. `ASWUNITTESTS_RESOURCE_DIR` is the `resource` folder, which
+  `ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS` includes.
+- `ASWUNITTESTS_CORE_SOURCES` in `src\ASWUnitTests_Sources.cmake`: the framework's sources without
+  `main.cpp`, for a runner with its own entry point (`ASWUNITTESTS_SOURCES` lists the same files as
+  before), and `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units
+  as `ASWUNITTESTS_GUI_SOURCES`.
 - The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
   and `IC` forms) take two texts of different types: a `std::string` with a C string, and narrow
   text with wide text, which didn't compile before. Two narrow or two wide texts are compared as
@@ -92,24 +74,37 @@ versioned baseline.
   Expecting a message substring from a type with no message (neither a `std::exception` nor an RTL
   exception) fails, naming the type that was caught, e.g. `an object of type "int"`. A class also
   matches a `std::exception` subclass derived from it, whose `what()` is then checked.
+- A `TCLIParser::ParseArguments()` overload that takes the arguments as a
+  `std::vector<std::string>`, the program name first, as in `argv`.
+- `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,
+  UTF-32 on Linux), and, on Windows, `CommandLineArguments()` and `SystemErrorText()`: a command
+  line split into UTF-8 arguments, and a `GetLastError()` code's description.
+- `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
+  to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
+- `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
+  `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
+  operating system), describing the build the framework was compiled for.
 
 ### Changed
 
 - The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
   build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
 - The VCL GUI runner's units that don't need the VCL moved from `vcl\gui\src` to a new `gui\src`
-  folder, so other GUI runners can share them: `ASWUnitTests_GUI_CommandLine`,
+  folder, shared with the Win32 GUI runner: `ASWUnitTests_GUI_CommandLine`,
   `ASWUnitTests_GUI_Layout`, `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`,
-  `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, plus the new
-  `ASWUnitTests_GUI_Commands`, `ASWUnitTests_GUI_INIDocument`, `ASWUnitTests_GUI_Tree` and
-  `ASWUnitTests_GUI_View`. A project that builds the VCL GUI must compile them from `gui\src` and add
-  that folder to its include path.
-  Their VCL-only parts moved to the new `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h`, which the
-  project must also compile: `GUILayoutFilePath()`, `GUISelectionFilePath()`, and
+  `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, beside the new
+  `ASWUnitTests_GUI_Commands`, `ASWUnitTests_GUI_INIDocument`, `ASWUnitTests_GUI_Theme`,
+  `ASWUnitTests_GUI_Tree` and `ASWUnitTests_GUI_View`. A project that builds the VCL GUI runner
+  must compile them from `gui\src` and add that folder to its include path. Their VCL-only parts
+  moved to the new `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.cpp`, which the project must also
+  compile: `GUILayoutFilePath()`, `GUISelectionFilePath()`, and
   `TGUICommandLine::ProcessArguments()`, now the free function `ProcessArguments()`. A `WinMain()`
-  modeled on `ASWUnitTests_VCL_GUI.cpp` must include that header and call
-  `ASWUnitTests::ProcessArguments()` instead. The layout functions now take a `TGUIINIDocument`
-  instead of a `TCustomIniFile`, and a `TGUIRect` instead of a `TRect`.
+  modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` must follow the new one: it includes
+  `ASWUnitTests_GUI_Theme.h` and `ASWUnitTests_GUI_VCLSystem.h`, calls
+  `ASWUnitTests::ProcessArguments()`, applies the saved theme before creating the main form, and
+  passes the theme to the form's `Start()`, which now takes it as well as the options. The layout
+  functions now take a `TGUIINIDocument` instead of a `TCustomIniFile`, and a `TGUIRect` instead of
+  a `TRect`.
 - The VCL GUI runner reads and writes its layout file (`%APPDATA%\ASWUnitTests\<exe name>.ini`)
   itself, the same way `TMemIniFile` did, so files saved by earlier versions load as before and are
   written the same way. A size or position written in hexadecimal by hand is now ignored, as an
@@ -680,7 +675,8 @@ Initial versioned release, switching the project to semantic versioning and addi
 (test group registration, `Check`/`Assert` methods, RAD Studio and CMake build support, etc.) is
 treated as the baseline and is not itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1
