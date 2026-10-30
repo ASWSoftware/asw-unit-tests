@@ -119,9 +119,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int showCommand)
         // Setting and Carbon with --layout-ignore, which ignores the saved layout file, and --layout-reset, which
         // deletes it.
         bool const savedTheme = !options.LayoutIgnore && !options.LayoutReset;
-        ASWUnitTests::EGUITheme const themeChoice = savedTheme ? ASWUnitTests::LoadGUIThemeFromLayoutFile() :
+        std::string const layoutPath = ASWUnitTests::GUILayoutFilePath();
+        ASWUnitTests::EGUITheme const themeChoice = savedTheme ? ASWUnitTests::LoadGUIThemeFromLayoutFile(layoutPath) :
                 ASWUnitTests::EGUITheme::Windows;
-        std::string const darkTheme = savedTheme ? ASWUnitTests::LoadGUIDarkThemeFromLayoutFile() :
+        std::string const darkTheme = savedTheme ? ASWUnitTests::LoadGUIDarkThemeFromLayoutFile(layoutPath) :
                 ASWUnitTests::GUIDefaultDarkThemeName();
         std::vector<std::string> const themeProblems = theme.SetDarkTheme(darkTheme);
         theme.SetDark(ASWUnitTests::GUIThemeIsDark(themeChoice, ASWUnitTests::WindowsAppsUseDarkTheme(),

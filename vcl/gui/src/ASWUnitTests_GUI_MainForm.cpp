@@ -1472,10 +1472,10 @@ void TFormASWUnitTestsGUIMain::SetDarkTheme(std::string const& name)
     m_DarkTheme = name;
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIDarkThemeToLayoutFile(name);
+        SaveGUIDarkThemeToLayoutFile(GUILayoutFilePath(), name);
 
     std::vector<std::string> problems;
-    m_DarkStyle = LoadGUIDarkStyle(name, problems);
+    m_DarkStyle = LoadGUIDarkStyle(GUIThemesFolderPath(), name, problems);
     ApplyTheme();
 
     if (GUIThemeIsDark(m_Theme, WindowsAppsUseDarkTheme(), WindowsHighContrast()))
@@ -1535,7 +1535,7 @@ void TFormASWUnitTestsGUIMain::SetTheme(EGUITheme theme)
     ShowThemeState();
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIThemeToLayoutFile(theme);
+        SaveGUIThemeToLayoutFile(GUILayoutFilePath(), theme);
 
     ApplyTheme();
 }

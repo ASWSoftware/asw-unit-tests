@@ -75,12 +75,12 @@ std::string GUIThemesFolderPath();
 // Whether a WM_SETTINGCHANGE message's parameters are about a setting that Use Windows Setting follows: the
 // app mode (Windows names its change "ImmersiveColorSet") or high contrast.
 bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam);
-// The dark theme saved in the layout file (see GUILayoutFilePath() and LoadGUIDarkTheme());
+// The dark theme saved in the layout file at 'layoutPath', e.g. GUILayoutFilePath()'s (see LoadGUIDarkTheme());
 // GUIDefaultDarkThemeName() when there's no file or it can't be read.
-std::string LoadGUIDarkThemeFromLayoutFile();
-// The theme saved in the layout file (see GUILayoutFilePath() and LoadGUITheme()); Windows when there's no file
-// or it can't be read.
-EGUITheme LoadGUIThemeFromLayoutFile();
+std::string LoadGUIDarkThemeFromLayoutFile(std::string const& layoutPath);
+// The theme saved in the layout file at 'layoutPath', e.g. GUILayoutFilePath()'s (see LoadGUITheme()); Windows
+// when there's no file or it can't be read.
+EGUITheme LoadGUIThemeFromLayoutFile(std::string const& layoutPath);
 // This executable's icon, its MAINICON resource (resource/ASWUnitTests_Icon.rc, or Icon_MainIcon in a RAD Studio
 // project), at the standard icon size; nullptr if it has none. Shared, so it's never destroyed.
 HICON MainIcon();
@@ -95,13 +95,14 @@ std::vector<std::string> ProcessArguments();
 std::string ReadFileBytes(std::string const& path);
 // Deletes the file. False if it couldn't be deleted, e.g. because it doesn't exist.
 bool RemoveFile(std::string const& path);
-// Saves 'name', the dark theme's, in the layout file (see GUILayoutFilePath() and SaveGUIDarkTheme()), keeping
-// the layout and any other values in it. Not saving it (e.g. a read-only profile) only means the next start uses
-// the default.
-void SaveGUIDarkThemeToLayoutFile(std::string const& name);
-// Saves 'theme' in the layout file (see GUILayoutFilePath() and SaveGUITheme()), keeping the layout and any
-// other values in it. Not saving it (e.g. a read-only profile) only means the next start uses the default.
-void SaveGUIThemeToLayoutFile(EGUITheme theme);
+// Saves 'name', the dark theme's, in the layout file at 'layoutPath', e.g. GUILayoutFilePath() (see
+// SaveGUIDarkTheme()), keeping the layout and any other values in it, and creating the file and its folder if
+// needed. Not saving it (e.g. a read-only profile) only means the next start uses the default.
+void SaveGUIDarkThemeToLayoutFile(std::string const& layoutPath, std::string const& name);
+// Saves 'theme' in the layout file at 'layoutPath', e.g. GUILayoutFilePath() (see SaveGUITheme()), keeping the
+// layout and any other values in it, and creating the file and its folder if needed. Not saving it (e.g. a
+// read-only profile) only means the next start uses the default.
+void SaveGUIThemeToLayoutFile(std::string const& layoutPath, EGUITheme theme);
 // Replaces the clipboard's content with the text, for 'owner' (a window of this process). Throws
 // std::runtime_error if it can't, e.g. while another program has the clipboard open.
 void SetClipboardText(HWND owner, std::string const& text);

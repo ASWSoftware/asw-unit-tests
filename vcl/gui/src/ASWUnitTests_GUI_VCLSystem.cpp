@@ -114,7 +114,8 @@ System::UnicodeString GUIThemesFolderPath()
     A file whose style has the name of one already registered, e.g. Carbon's own file renamed, can't be loaded
     either. Every error gives Carbon, with a line in 'problems'.
 */
-System::UnicodeString LoadGUIDarkStyle(std::string const& darkTheme, std::vector<std::string>& problems)
+System::UnicodeString LoadGUIDarkStyle(System::UnicodeString const& themesFolder, std::string const& darkTheme,
+    std::vector<std::string>& problems)
 {
     // Each file loaded so far, by its path in lowercase, and the name of its style.
     static std::vector<std::pair<System::UnicodeString, System::UnicodeString> > loaded;
@@ -128,8 +129,7 @@ System::UnicodeString LoadGUIDarkStyle(std::string const& darkTheme, std::vector
 
     try
     {
-        System::UnicodeString const path = System::Ioutils::TPath::Combine(GUIThemesFolderPath(),
-            FromUTF8(darkTheme) + ".vsf");
+        System::UnicodeString const path = System::Ioutils::TPath::Combine(themesFolder, FromUTF8(darkTheme) + ".vsf");
         System::UnicodeString const key = System::Sysutils::AnsiLowerCase(path);
 
         for (std::pair<System::UnicodeString, System::UnicodeString> const& entry : loaded)
@@ -181,15 +181,14 @@ System::UnicodeString LoadGUIDarkStyle(std::string const& darkTheme, std::vector
     return carbon;
 }
 //---------------------------------------------------------------------------
-std::string LoadGUIDarkThemeFromLayoutFile()
+std::string LoadGUIDarkThemeFromLayoutFile(System::UnicodeString const& layoutPath)
 {
     try
     {
-        System::UnicodeString const path = GUILayoutFilePath();
-        if (!System::Sysutils::FileExists(path))
+        if (!System::Sysutils::FileExists(layoutPath))
             return GUIDefaultDarkThemeName();
 
-        return LoadGUIDarkTheme(TGUIINIDocument(ReadFileBytes(path)));
+        return LoadGUIDarkTheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
     }
     catch (...)
     {
@@ -197,15 +196,14 @@ std::string LoadGUIDarkThemeFromLayoutFile()
     }
 }
 //---------------------------------------------------------------------------
-EGUITheme LoadGUIThemeFromLayoutFile()
+EGUITheme LoadGUIThemeFromLayoutFile(System::UnicodeString const& layoutPath)
 {
     try
     {
-        System::UnicodeString const path = GUILayoutFilePath();
-        if (!System::Sysutils::FileExists(path))
+        if (!System::Sysutils::FileExists(layoutPath))
             return EGUITheme::Windows;
 
-        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(path)));
+        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
     }
     catch (...)
     {
@@ -246,17 +244,16 @@ std::string ReadFileBytes(System::UnicodeString const& path)
     return std::string(reinterpret_cast<char const*>(&bytes[0]), static_cast<std::size_t>(bytes.Length));
 }
 //---------------------------------------------------------------------------
-void SaveGUIDarkThemeToLayoutFile(std::string const& name)
+void SaveGUIDarkThemeToLayoutFile(System::UnicodeString const& layoutPath, std::string const& name)
 {
     try
     {
-        System::UnicodeString const path = GUILayoutFilePath();
-        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
+        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(layoutPath));
 
         // Starting from the file's current text keeps the layout and any other values in it.
-        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        TGUIINIDocument ini(System::Sysutils::FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
         SaveGUIDarkTheme(ini, name);
-        WriteFileBytes(path, ini.Text());
+        WriteFileBytes(layoutPath, ini.Text());
     }
     catch (...)
     {
@@ -264,17 +261,16 @@ void SaveGUIDarkThemeToLayoutFile(std::string const& name)
     }
 }
 //---------------------------------------------------------------------------
-void SaveGUIThemeToLayoutFile(EGUITheme theme)
+void SaveGUIThemeToLayoutFile(System::UnicodeString const& layoutPath, EGUITheme theme)
 {
     try
     {
-        System::UnicodeString const path = GUILayoutFilePath();
-        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
+        System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(layoutPath));
 
         // Starting from the file's current text keeps the layout and any other values in it.
-        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        TGUIINIDocument ini(System::Sysutils::FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
         SaveGUITheme(ini, theme);
-        WriteFileBytes(path, ini.Text());
+        WriteFileBytes(layoutPath, ini.Text());
     }
     catch (...)
     {

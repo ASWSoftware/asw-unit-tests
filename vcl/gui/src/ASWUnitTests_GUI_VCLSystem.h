@@ -53,16 +53,18 @@ System::UnicodeString GUISelectionFilePath();
 // %APPDATA%\ASWUnitTests\Themes. The VCL GUI runner's are VCL style files, "<name>.vsf". It may not exist yet.
 System::UnicodeString GUIThemesFolderPath();
 // The VCL style the dark theme 'darkTheme' is, for ApplyGUITheme(): Carbon, which the GUI project links in, for
-// GUIDefaultDarkThemeName(); otherwise the style in GUIThemesFolderPath()'s "<darkTheme>.vsf", loaded the first
-// time it's needed. Adds a line for the log to 'problems' (see GUIThemeProblemLine()), and gives Carbon, when
-// the file is missing, isn't a VCL style, or has the name of a style already loaded from elsewhere.
-System::UnicodeString LoadGUIDarkStyle(std::string const& darkTheme, std::vector<std::string>& problems);
-// The dark theme SaveGUIDarkThemeToLayoutFile() saved in the layout file (see GUILayoutFilePath()), or
-// GUIDefaultDarkThemeName() if there's none or it can't be read.
-std::string LoadGUIDarkThemeFromLayoutFile();
-// The theme SaveGUIThemeToLayoutFile() saved in the layout file (see GUILayoutFilePath()), or Windows if there's
-// none or it can't be read.
-EGUITheme LoadGUIThemeFromLayoutFile();
+// GUIDefaultDarkThemeName(); otherwise the style in "<darkTheme>.vsf" in 'themesFolder', e.g.
+// GUIThemesFolderPath(), loaded the first time it's needed. Adds a line for the log to 'problems' (see
+// GUIThemeProblemLine()), and gives Carbon, when the file is missing, isn't a VCL style, or has the name of a
+// style already loaded from elsewhere.
+System::UnicodeString LoadGUIDarkStyle(System::UnicodeString const& themesFolder, std::string const& darkTheme,
+    std::vector<std::string>& problems);
+// The dark theme SaveGUIDarkThemeToLayoutFile() saved in the layout file at 'layoutPath', e.g.
+// GUILayoutFilePath(), or GUIDefaultDarkThemeName() if there's none or it can't be read.
+std::string LoadGUIDarkThemeFromLayoutFile(System::UnicodeString const& layoutPath);
+// The theme SaveGUIThemeToLayoutFile() saved in the layout file at 'layoutPath', e.g. GUILayoutFilePath(), or
+// Windows if there's none or it can't be read.
+EGUITheme LoadGUIThemeFromLayoutFile(System::UnicodeString const& layoutPath);
 // Opens the folder in a File Explorer window. Throws an RTL exception if it can't, e.g. because the folder
 // doesn't exist.
 void OpenFolderInExplorer(System::UnicodeString const& folderPath);
@@ -72,12 +74,13 @@ std::vector<std::string> ProcessArguments();
 // The file's bytes, unchanged, e.g. UTF-8 text for TGUIINIDocument. Throws an RTL exception if it can't be
 // read.
 std::string ReadFileBytes(System::UnicodeString const& path);
-// Saves 'name', the dark theme's, in the layout file (see GUILayoutFilePath()), keeping its other values, and
-// creating it if needed. Ignores any error, which only means the next start uses the default dark theme.
-void SaveGUIDarkThemeToLayoutFile(std::string const& name);
-// Saves 'theme' in the layout file (see GUILayoutFilePath()), keeping its other values, and creating it if needed.
-// Ignores any error, which only means the next start uses the default theme.
-void SaveGUIThemeToLayoutFile(EGUITheme theme);
+// Saves 'name', the dark theme's, in the layout file at 'layoutPath', e.g. GUILayoutFilePath(), keeping its other
+// values, and creating it and its folder if needed. Ignores any error, which only means the next start uses the
+// default dark theme.
+void SaveGUIDarkThemeToLayoutFile(System::UnicodeString const& layoutPath, std::string const& name);
+// Saves 'theme' in the layout file at 'layoutPath', e.g. GUILayoutFilePath(), keeping its other values, and
+// creating it and its folder if needed. Ignores any error, which only means the next start uses the default theme.
+void SaveGUIThemeToLayoutFile(System::UnicodeString const& layoutPath, EGUITheme theme);
 // Whether Windows' app mode setting is dark; false if it can't be read, as on a Windows version without it.
 bool WindowsAppsUseDarkTheme();
 // Whether Windows' high contrast is on.

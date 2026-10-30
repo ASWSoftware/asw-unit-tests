@@ -58,12 +58,14 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
         // restyled. --layout-reset's deletion of the layout file, which also holds the theme and the dark theme,
         // comes later.
         bool const savedTheme = !options.LayoutIgnore && !options.LayoutReset;
-        ASWUnitTests::EGUITheme const theme = savedTheme ? ASWUnitTests::LoadGUIThemeFromLayoutFile() :
+        System::UnicodeString const layoutPath = ASWUnitTests::GUILayoutFilePath();
+        ASWUnitTests::EGUITheme const theme = savedTheme ? ASWUnitTests::LoadGUIThemeFromLayoutFile(layoutPath) :
                 ASWUnitTests::EGUITheme::Windows;
-        std::string const darkTheme = savedTheme ? ASWUnitTests::LoadGUIDarkThemeFromLayoutFile() :
+        std::string const darkTheme = savedTheme ? ASWUnitTests::LoadGUIDarkThemeFromLayoutFile(layoutPath) :
                 ASWUnitTests::GUIDefaultDarkThemeName();
         std::vector<std::string> themeProblems;
-        System::UnicodeString const darkStyle = ASWUnitTests::LoadGUIDarkStyle(darkTheme, themeProblems);
+        System::UnicodeString const darkStyle = ASWUnitTests::LoadGUIDarkStyle(ASWUnitTests::GUIThemesFolderPath(),
+            darkTheme, themeProblems);
         ASWUnitTests::ApplyGUITheme(theme, darkStyle);
 
         if (commandLine.EarlyExitCode.has_value())

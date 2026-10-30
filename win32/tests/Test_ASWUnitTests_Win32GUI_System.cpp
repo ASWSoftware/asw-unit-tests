@@ -384,57 +384,32 @@ void TTest_ASWUnitTests_Win32GUI_System::Test_IsThemeSettingChange_IsTrueForTheA
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_System::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
 {
-    // Arrange: this runner's own layout file, which only a GUI would otherwise use, put back however the test
-    // ends.
-    std::string const path = GUILayoutFilePath();
+    // Arrange: a layout file in a folder that doesn't exist yet, not this runner's own, which a GUI running these
+    // tests is using.
+    std::string const path = ScratchPath("Settings\\Layout.ini");
 
-    struct TRestoreFile
-    {
-        std::string const Path;
-        bool const Existed;
-        std::string const Bytes;
-
-        ~TRestoreFile()
-        {
-            try
-            {
-                if (Existed)
-                    WriteFileBytes(Path, Bytes);
-                else
-                    RemoveFile(Path);
-            }
-            catch (...)
-            {
-            }
-        }
-    };
-
-    bool const existed = FileExists(path);
-    TRestoreFile const restoreFile{ path, existed, existed ? ReadFileBytes(path) : std::string() };
-
-    RemoveFile(path);
-    EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
-    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile();
+    EGUITheme const noFile = LoadGUIThemeFromLayoutFile(path);
+    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile(path);
 
     // Act
-    SaveGUIThemeToLayoutFile(EGUITheme::Dark);
-    EGUITheme const dark = LoadGUIThemeFromLayoutFile();
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Dark);
+    EGUITheme const dark = LoadGUIThemeFromLayoutFile(path);
 
     WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
-    SaveGUIThemeToLayoutFile(EGUITheme::Light);
-    EGUITheme const light = LoadGUIThemeFromLayoutFile();
-    SaveGUIDarkThemeToLayoutFile("Deep \xC3\x89" "cume");
-    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile();
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Light);
+    EGUITheme const light = LoadGUIThemeFromLayoutFile(path);
+    SaveGUIDarkThemeToLayoutFile(path, "Deep \xC3\x89" "cume");
+    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile(path);
     std::string const text = ReadFileBytes(path);
 
     RemoveFile(path);
-    SaveGUIDarkThemeToLayoutFile("Ocean");
-    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile();
+    SaveGUIDarkThemeToLayoutFile(path, "Ocean");
+    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile(path);
 
     // Assert
     CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
     CheckEquals(std::string("Carbon"), noFileDarkTheme, __func__, __LINE__, "and the dark theme Carbon");
-    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
+    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file, and its new folder");
     CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
     CheckEquals(std::string("Deep \xC3\x89" "cume"), darkTheme, __func__, __LINE__,
         "the dark theme saved beside it, in UTF-8");

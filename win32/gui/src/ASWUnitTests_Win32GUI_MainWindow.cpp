@@ -743,7 +743,8 @@ void TWin32GUIMainWindow::ApplyDPI()
     // e.g. the dark tree's check boxes and the menus' sizes, for the new DPI.
     m_Theme.Refresh();
 
-    // The status bar's parts' widths, from the .dfm's panels.
+    // The status bar's parts' widths, from the .dfm's panels; the last, the status message's, takes the rest of
+    // the bar, as VCL's TStatusBar gives its last panel.
     std::vector<int> rightEdges;
     int right = 0;
 
@@ -752,6 +753,9 @@ void TWin32GUIMainWindow::ApplyDPI()
         right += ScaleForDPI(width, m_DPI);
         rightEdges.push_back(right);
     }
+
+    if (!rightEdges.empty())
+        rightEdges.back() = -1;
 
     SendMessageW(m_SB_Status, SB_SETPARTS, rightEdges.size(), reinterpret_cast<LPARAM>(rightEdges.data()));
 
@@ -2619,7 +2623,7 @@ void TWin32GUIMainWindow::SetDarkTheme(std::string const& name)
     m_DarkTheme = name;
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIDarkThemeToLayoutFile(name);
+        SaveGUIDarkThemeToLayoutFile(GUILayoutFilePath(), name);
 
     std::vector<std::string> const problems = m_Theme.SetDarkTheme(name);
 
@@ -2707,7 +2711,7 @@ void TWin32GUIMainWindow::SetTheme(EGUITheme theme)
     ShowThemeState();
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIThemeToLayoutFile(theme);
+        SaveGUIThemeToLayoutFile(GUILayoutFilePath(), theme);
 
     ApplyTheme();
 }

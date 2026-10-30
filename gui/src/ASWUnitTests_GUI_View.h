@@ -109,7 +109,7 @@ std::string GUIMenuItemText(std::string const& text);
 std::vector<std::string> GUIStatusPanels(TGUITestList const& testList, size_t runFinishedCount, size_t runTotalCount,
     std::optional<double> elapsedSeconds, std::string const& shuffleText, std::string const& message);
 // The status bar's panel widths at 96 DPI, in order, one per panel GUIStatusPanels() fills, as the VCL GUI
-// runner's form has them.
+// runner's form has them. The last panel, the status message's, takes the rest of the bar in both runners.
 std::vector<int> GUIStatusPanelWidths();
 // The result a test is given when an unhandled exception, described by 'description', ended the run while it
 // was running.

@@ -187,39 +187,41 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUIThemesFolderPath_IsSharedBesideTh
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIDarkStyle_GivesCarbonForAnyProblem()
 {
-    // Arrange: a missing theme, and a file that isn't a style, in the real Themes folder, which is put back as it
-    // was however the test ends.
+    // Arrange: a missing theme, and a file that isn't a style, in a Themes folder of the test's own, not the real
+    // one, which a GUI running these tests lists. Each name is the process's, as a style file, once loaded, isn't
+    // read again. The folder is deleted however the test ends.
     std::string const suffix = std::to_string(GetCurrentProcessId());
-    std::string const missingName = "ASWUnitTests_NoSuchTheme_" + suffix;
-    std::string const invalidName = "ASWUnitTests_NotAStyle_" + suffix;
-    System::UnicodeString const folder = GUIThemesFolderPath();
-    System::UnicodeString const invalidPath = System::Ioutils::TPath::Combine(folder, FromUTF8(invalidName) + ".vsf");
+    std::string const missingName = "NoSuchTheme_" + suffix;
+    std::string const invalidName = "NotAStyle_" + suffix;
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString("ASWUnitTests_VCLSystem_Themes_") + FromUTF8(suffix));
 
-    struct TRestoreFolder
+    struct TDeleteFolder
     {
         System::UnicodeString const Folder;
-        System::UnicodeString const File;
-        bool const Existed;
 
-        ~TRestoreFolder()
+        ~TDeleteFolder()
         {
-            System::Sysutils::DeleteFile(File);
-
-            if (!Existed)
-                System::Sysutils::RemoveDir(Folder);
+            try
+            {
+                System::Ioutils::TDirectory::Delete(Folder, true);
+            }
+            catch (...)
+            {
+            }
         }
-    } const restoreFolder{ folder, invalidPath, System::Sysutils::DirectoryExists(folder) };
+    } const deleteFolder{ folder };
 
     System::Sysutils::ForceDirectories(folder);
-    WriteFileBytes(invalidPath, "not a VCL style");
+    WriteFileBytes(System::Ioutils::TPath::Combine(folder, FromUTF8(invalidName) + ".vsf"), "not a VCL style");
 
     // Act
     std::vector<std::string> carbonProblems;
-    System::UnicodeString const carbon = LoadGUIDarkStyle("Carbon", carbonProblems);
+    System::UnicodeString const carbon = LoadGUIDarkStyle(folder, "Carbon", carbonProblems);
     std::vector<std::string> missingProblems;
-    System::UnicodeString const missing = LoadGUIDarkStyle(missingName, missingProblems);
+    System::UnicodeString const missing = LoadGUIDarkStyle(folder, missingName, missingProblems);
     std::vector<std::string> invalidProblems;
-    System::UnicodeString const invalid = LoadGUIDarkStyle(invalidName, invalidProblems);
+    System::UnicodeString const invalid = LoadGUIDarkStyle(folder, invalidName, invalidProblems);
 
     // Assert
     CheckEquals(std::string("Carbon"), ToUTF8(carbon), __func__, __LINE__, "the built-in theme's style");
@@ -237,57 +239,52 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIDarkStyle_GivesCarbonForAnyPr
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
 {
-    // Arrange: this runner's own layout file, which only a GUI would otherwise use, put back however the test
-    // ends.
-    System::UnicodeString const path = GUILayoutFilePath();
+    // Arrange: a layout file in a folder that doesn't exist yet, not this runner's own, which a GUI running these
+    // tests is using. The folder is deleted however the test ends.
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString("ASWUnitTests_VCLSystem_Layout_") + System::Sysutils::IntToStr(static_cast<int>(
+            GetCurrentProcessId())));
+    System::UnicodeString const path = System::Ioutils::TPath::Combine(System::Ioutils::TPath::Combine(folder,
+        "Settings"), "Layout.ini");
 
-    struct TRestoreFile
+    struct TDeleteFolder
     {
-        System::UnicodeString const Path;
-        bool const Existed;
-        std::string const Bytes;
+        System::UnicodeString const Folder;
 
-        ~TRestoreFile()
+        ~TDeleteFolder()
         {
             try
             {
-                if (Existed)
-                    WriteFileBytes(Path, Bytes);
-                else
-                    System::Sysutils::DeleteFile(Path);
+                System::Ioutils::TDirectory::Delete(Folder, true);
             }
             catch (...)
             {
             }
         }
-    };
+    } const deleteFolder{ folder };
 
-    bool const existed = System::Sysutils::FileExists(path);
-    TRestoreFile const restoreFile{ path, existed, existed ? ReadFileBytes(path) : std::string() };
-
-    System::Sysutils::DeleteFile(path);
-    EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
-    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile();
+    EGUITheme const noFile = LoadGUIThemeFromLayoutFile(path);
+    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile(path);
 
     // Act
-    SaveGUIThemeToLayoutFile(EGUITheme::Dark);
-    EGUITheme const dark = LoadGUIThemeFromLayoutFile();
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Dark);
+    EGUITheme const dark = LoadGUIThemeFromLayoutFile(path);
 
     WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
-    SaveGUIThemeToLayoutFile(EGUITheme::Light);
-    EGUITheme const light = LoadGUIThemeFromLayoutFile();
-    SaveGUIDarkThemeToLayoutFile("Deep \xC3\x89" "cume");
-    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile();
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Light);
+    EGUITheme const light = LoadGUIThemeFromLayoutFile(path);
+    SaveGUIDarkThemeToLayoutFile(path, "Deep \xC3\x89" "cume");
+    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile(path);
     std::string const text = ReadFileBytes(path);
 
     System::Sysutils::DeleteFile(path);
-    SaveGUIDarkThemeToLayoutFile("Ocean");
-    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile();
+    SaveGUIDarkThemeToLayoutFile(path, "Ocean");
+    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile(path);
 
     // Assert
     CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
     CheckEquals(std::string("Carbon"), noFileDarkTheme, __func__, __LINE__, "and the dark theme Carbon");
-    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
+    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file, and its new folder");
     CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
     CheckEquals(std::string("Deep \xC3\x89" "cume"), darkTheme, __func__, __LINE__,
         "the dark theme saved beside it, in UTF-8");
