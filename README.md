@@ -122,9 +122,10 @@ it currently builds the test executable directly rather than packaging or instal
 
 ## Versions
 
-ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the VCL
-GUI's caption. Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop` branch
-carries the next planned version with a pre-release, e.g. `1.2.0-dev.1`, which comes before `1.2.0`.
+ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the GUI
+runners' caption. Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop`
+branch carries the next planned version with a pre-release, e.g. `1.2.0-dev.1`, which comes before
+`1.2.0`.
 `src/ASWUnitTests_Version.h` has the version as macros, for code that supports several ASWUnitTests
 versions, and as constants in the `ASWUnitTests` namespace:
 
@@ -502,9 +503,8 @@ applies the saved theme and starts the main form. For the dark theme, also add R
 style to the application (Project > Options > Application > Appearance, which this repository's
 project has as `Custom_Styles`); without it, Dark shows the light look. The other built-in dark
 themes (Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and Tablet Dark) are listed only if their
-styles are added too. For the ASWUnitTests icon,
-set the application's icon to `resource\ASWUnitTests.ico` there too, as this repository's project
-does.
+styles are added too. For the ASWUnitTests icon, set the application's icon to
+`resource\ASWUnitTests.ico` there too, as this repository's project does.
 
 ### Win32 GUI Runner
 
@@ -1376,8 +1376,9 @@ find_package(Threads REQUIRED)
 target_link_libraries(MyTests PRIVATE Threads::Threads)
 ```
 
-For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the same for the
-[Win32 GUI runner](#win32-gui-runner); see that section.
+`ASWUNITTESTS_CORE_SOURCES` lists the same files without `main.cpp`, for a runner with an entry
+point of its own. For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the
+same for the [Win32 GUI runner](#win32-gui-runner); see that section.
 
 ### RAD Studio / Visual Studio / other IDE projects
 

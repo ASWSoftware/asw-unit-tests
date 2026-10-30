@@ -15,6 +15,8 @@ ASWUnitTests is a lightweight C++ console unit-testing framework.
 - `rad370/` contains the RAD Studio 13.1 project and Windows build scripts.
 - `vcl/` contains RAD Studio projects that link the VCL and define `ASWUNITTESTS_RTL_EXCEPTIONS`, exercising the framework's opt-in RTL support (RTL exceptions and the `System::String` overloads): `vcl/console/rad370/` is a VCL console project (with its own build scripts) that runs the full self-test suite plus the RTL-specific and GUI unit tests in `vcl/tests/`. `vcl/gui/rad370/` is the VCL GUI runner project (with its own build scripts, and a project group that also opens the console project), built from the sources in `vcl/gui/src/`. The console project also compiles the GUI's non-form units, so their tests run without the GUI.
 - `win32/` contains the Win32 GUI runner, which uses only the Windows API (no VCL) and has the VCL GUI runner's features: `win32/gui/src/` holds its units, its `WinMain()`, its manifest and `ASWUnitTests_Win32GUI_Sources.cmake`, from which `cmake/CMakeLists.txt` builds the `ASWUnitTests_Win32_GUI` target on Windows. `win32/gui/rad370/` is its RAD Studio project (Win32 and Win64x, with its own build scripts). `win32/tests/` has the tests of its units that need no window, which the CMake console target and the `rad370` console project also compile on Windows.
+- `cmake/` contains the CMake project, which builds the console runner and, on Windows, the Win32 GUI runner.
+- `resource/` contains the ASWUnitTests icon, `ASWUnitTests.ico`, and `ASWUnitTests_Icon.rc`, which embeds it in the CMake builds; `make_icon.ps1` draws the icon and writes the `.ico` and its `icon_<size>.png` files.
 - `README.md` contains usage and integration examples.
 - `.uncrustify.cfg` and `.githooks/` define the repository formatting workflow.
 
@@ -71,7 +73,7 @@ Keep all source files (`.cpp`/`.h`) plain ASCII, including comments. MSVC reads 
 
 ## Building and Testing
 
-The RAD Studio debug build can be run from `rad370/Build_Win64x_Debug.bat` when the `Rad370` environment variable points to the RAD Studio installation. The release script is `rad370/Build_Win64x_Release.bat`. Neither pauses before exiting by default; pass `--pause` to have the console prompt "press enter to continue" first, e.g. when running from an IDE that would otherwise close the console immediately.
+The RAD Studio debug build can be built with `rad370/Build_Win64x_Debug.bat`, run from `rad370/`, when the `Rad370` environment variable points to the RAD Studio installation. The release script is `rad370/Build_Win64x_Release.bat`. The scripts only build; the executable, `build/bin/<Config>/ASWUnitTests.exe`, doesn't pause before exiting by default. Pass it `--pause` to have the console prompt "press enter to continue" first, e.g. when running from an IDE that would otherwise close the console immediately (the RAD Studio projects' debugger parameters do).
 
 For other environments, use the repository's CMake configuration when present or the IDE's native project configuration. Tests should be run outside the debugger unless debugging an expected exception is intentional. Before considering a change complete:
 
