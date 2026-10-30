@@ -103,6 +103,11 @@ std::string GUIFirstLine(std::string const& text);
 // 'text', e.g. a theme file's name, as a menu item's caption: each '&' doubled, so it shows rather than making
 // the next letter the item's accelerator.
 std::string GUIMenuItemText(std::string const& text);
+// 'texts', a menu's items in order, as captions (see GUIMenuItemText()), each with an accelerator of its own: the
+// first ASCII letter or digit, ignoring case, that's neither in 'takenLetters' (the menu's other items') nor an
+// earlier text's, preferring one that starts a word. A text with none left gets none.
+std::vector<std::string> GUIMenuItemTextsWithAccelerators(std::vector<std::string> const& texts,
+    std::string const& takenLetters);
 // The status bar's panels' text, in order: the checked and shown tests, the run's progress, the passed, failed
 // and skipped counts, the run's elapsed time (empty if no run has started), the shuffle setting ('shuffleText',
 // from TGUIShuffle::StatusText()), and 'message'.

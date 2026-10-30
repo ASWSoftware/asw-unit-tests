@@ -61,6 +61,26 @@ bool ApplyGUITheme(EGUITheme theme, System::UnicodeString const& darkStyle)
     return Vcl::Themes::TStyleManager::TrySetStyle(styleName, false);
 }
 //---------------------------------------------------------------------------
+std::vector<std::string> BuiltInGUIDarkThemeNames()
+{
+    std::vector<std::string> names = { GUIDefaultDarkThemeName() };
+    System::DynamicArray<System::UnicodeString> const styles = Vcl::Themes::TStyleManager::StyleNames;
+
+    for (std::string const& name : GUIVCLStyleDarkThemeNames())
+    {
+        for (int i = 0; i < styles.Length; ++i)
+        {
+            if (System::Sysutils::SameText(styles[i], FromUTF8(name)))
+            {
+                names.push_back(name);
+                break;
+            }
+        }
+    }
+
+    return names;
+}
+//---------------------------------------------------------------------------
 std::vector<std::string> FileNamesInFolder(System::UnicodeString const& folderPath)
 {
     std::vector<std::string> names;
@@ -112,7 +132,8 @@ System::UnicodeString GUIThemesFolderPath()
     A style, once loaded, stays registered for the process, under the name the file gives it, and can't be
     loaded again, so a file loaded before gives the style it loaded, and a change to it shows after a restart.
     A file whose style has the name of one already registered, e.g. Carbon's own file renamed, can't be loaded
-    either. Every error gives Carbon, with a line in 'problems'.
+    either. Every error gives Carbon, with a line in 'problems'. A built-in style that isn't linked in is looked
+    for as a file.
 */
 System::UnicodeString LoadGUIDarkStyle(System::UnicodeString const& themesFolder, std::string const& darkTheme,
     std::vector<std::string>& problems)
@@ -122,8 +143,11 @@ System::UnicodeString LoadGUIDarkStyle(System::UnicodeString const& themesFolder
 
     System::UnicodeString const carbon = "Carbon";
 
-    if (darkTheme == GUIDefaultDarkThemeName())
-        return carbon;
+    for (std::string const& name : BuiltInGUIDarkThemeNames())
+    {
+        if (System::Sysutils::SameText(FromUTF8(name), FromUTF8(darkTheme)))
+            return FromUTF8(name);
+    }
 
     std::string problem;
 

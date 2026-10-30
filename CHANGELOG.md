@@ -42,6 +42,15 @@ versioned baseline.
   GUI runner's are INI files that set any of its colors by role, and **Save Theme Template...**
   saves Carbon's as one to start from; the VCL GUI runner's are VCL style files (`.vsf`). The
   choice is saved in the layout file, and a theme file's problems are reported in the log.
+- Four more built-in dark themes in the Win32 GUI runner, tints of Carbon: Ember (warm brown),
+  Forest (green), Midnight (blue) and Plum (purple), listed in **View > Theme > Dark Theme** above
+  the theme files. The colors that show how tests did (the tree's status dots, failed and skipped
+  text, a failed run's progress bar) stay Carbon's.
+- Four of RAD Studio's dark VCL styles as built-in dark themes in both GUI runners, beside Carbon:
+  Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and Tablet Dark. The VCL GUI runner's project
+  links them in, and a VCL GUI project of your own lists the ones it links; the Win32 GUI runner
+  paints their colors. The Win32 GUI runner's theme files can also set `ButtonText`,
+  `ButtonHotText` and `SelectionText`, new roles for a button's text and the tree's selected text.
 - An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
   runners now have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which
   draws them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32

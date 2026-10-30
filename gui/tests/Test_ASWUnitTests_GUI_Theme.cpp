@@ -98,6 +98,8 @@ TTest_ASWUnitTests_GUI_Theme::TTest_ASWUnitTests_GUI_Theme()
         "GUIThemeIsDark_FollowsTheChoiceOrWindows");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_GUIThemeNames_ListsTheFilesOfOneKindSorted,
         "GUIThemeNames_ListsTheFilesOfOneKindSorted");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon,
+        "GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_LoadGUIDarkTheme_DefaultsToCarbon,
         "LoadGUIDarkTheme_DefaultsToCarbon");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_LoadGUITheme_DefaultsToWindows, "LoadGUITheme_DefaultsToWindows");
@@ -177,16 +179,31 @@ void TTest_ASWUnitTests_GUI_Theme::Test_GUIThemeNames_ListsTheFilesOfOneKindSort
     // Arrange: the Themes folder's files, in the order a listing might give them.
     std::vector<std::string> const files = {
         "ocean.ini", "Zest.ini", "Notes.txt", "Carbon.ini", "OCEAN.INI", ".ini", "apple.Ini", "carbon.INI",
-        "Ocean.ini.bak", "Forest.vsf", "ini", "Two Words.ini",
+        "Ocean.ini.bak", "Forest.vsf", "ini", "Two Words.ini", "plum.ini",
     };
+    std::vector<std::string> const carbon = { "Carbon" };
+    std::vector<std::string> const builtIns = { "Carbon", "Plum", "Zest" };
 
     // Act and Assert
-    CheckEquals(std::string("apple\nocean\nTwo Words\nZest\n"), JoinLines(GUIThemeNames(files, ".ini")), __func__,
-        __LINE__, "the .ini files' names, sorted ignoring case, a name once, without Carbon or a bare extension");
-    CheckEquals(std::string("Forest\n"), JoinLines(GUIThemeNames(files, ".vsf")), __func__, __LINE__,
+    CheckEquals(std::string("apple\nocean\nplum\nTwo Words\nZest\n"), JoinLines(GUIThemeNames(files, ".ini", carbon)),
+        __func__, __LINE__, "the .ini files' names, sorted ignoring case, a name once, without Carbon or a bare "
+        "extension");
+    CheckEquals(std::string("apple\nocean\nTwo Words\n"), JoinLines(GUIThemeNames(files, ".ini", builtIns)), __func__,
+        __LINE__, "without any built-in theme's name, ignoring case");
+    CheckEquals(std::string("Forest\n"), JoinLines(GUIThemeNames(files, ".vsf", carbon)), __func__, __LINE__,
         "the VCL GUI runner's .vsf files");
-    CheckEmpty(JoinLines(GUIThemeNames(std::vector<std::string>(), ".ini")), __func__, __LINE__,
+    CheckEmpty(JoinLines(GUIThemeNames(std::vector<std::string>(), ".ini", carbon)), __func__, __LINE__,
         "an empty or missing folder");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Theme::Test_GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon()
+{
+    // Act
+    std::vector<std::string> const names = GUIVCLStyleDarkThemeNames();
+
+    // Assert: RAD Studio's style names, which the VCL GUI runner's project links in.
+    CheckEquals(std::string("Charcoal Dark Slate\nCobalt XEMedia\nOnyx Blue\nTablet Dark\n"), JoinLines(names), __func__,
+        __LINE__, "the picked styles, sorted, Carbon not among them");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Theme::Test_LoadGUIDarkTheme_DefaultsToCarbon()

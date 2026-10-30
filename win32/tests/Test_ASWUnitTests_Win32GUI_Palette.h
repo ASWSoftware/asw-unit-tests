@@ -42,12 +42,16 @@ private:
 
 private: // Test methods
     void Test_BlendColors_MixesEachChannelInProportion();
+    void Test_BuiltInDarkThemes_AreCarbonThenItsTints();
+    void Test_BuiltInDarkThemes_KeepTextReadable();
     void Test_CarbonPalette_HasCarbonsColors();
     void Test_CarbonThemeFileText_ReadsBackAsCarbon();
     void Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground();
+    void Test_FindBuiltInDarkTheme_IgnoresCase();
     void Test_IsDarkColor_IsByTheLuma();
     void Test_PaletteRoles_ListEveryMemberOnce();
     void Test_PaletteWithThemeColors_SetsOnlyTheirRoles();
+    void Test_TintedCarbonPalette_TintsOnlyTheGraysAndTheAccent();
 
 public:
     TTest_ASWUnitTests_Win32GUI_Palette();

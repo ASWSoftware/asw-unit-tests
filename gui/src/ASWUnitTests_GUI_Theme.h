@@ -92,8 +92,8 @@ struct TGUIThemeFile
 
 // 'rgb', 0xRRGGBB, as a theme file writes a color: "#RRGGBB", in uppercase.
 std::string FormatGUIThemeColor(std::uint32_t rgb);
-// The built-in dark theme's name, "Carbon": the default for LoadGUIDarkTheme(), and a name GUIThemeNames()
-// leaves out, so a theme file can't take it.
+// The name of the built-in dark theme both runners have, "Carbon": the default for LoadGUIDarkTheme(), and one
+// of the built-in names GUIThemeNames() leaves out, so a theme file can't take it.
 std::string GUIDefaultDarkThemeName();
 // Whether 'theme' is dark: Light and Dark as chosen, and Windows as 'windowsAppsUseDark' (Windows' app mode
 // setting) says, except that it's light while 'highContrast' is on, so the window shows high contrast's own
@@ -101,11 +101,17 @@ std::string GUIDefaultDarkThemeName();
 bool GUIThemeIsDark(EGUITheme theme, bool windowsAppsUseDark, bool highContrast);
 // The names of the themes among 'fileNames', the files in the Themes folder: each one that ends in
 // 'extension' (e.g. ".ini"), ignoring (ASCII) case, without it, sorted ignoring case, and each name once.
-// Leaves out GUIDefaultDarkThemeName(), ignoring case, and a file named just 'extension'.
-std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames, std::string const& extension);
+// Leaves out 'builtInNames', the runner's built-in dark themes (GUIDefaultDarkThemeName() among them), ignoring
+// case, which a file can't replace, and a file named just 'extension'.
+std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames, std::string const& extension,
+    std::vector<std::string> const& builtInNames);
 // A line for the log about one of the dark theme 'themeName''s problems (e.g. one of TGUIThemeFile's), as both
 // GUI runners word it: Dark theme "<name>": <problem>
 std::string GUIThemeProblemLine(std::string const& themeName, std::string const& problem);
+// The dark themes both runners have built in besides Carbon, sorted: RAD Studio's dark VCL styles, by their
+// style names, which the VCL GUI runner links in and the Win32 GUI runner has the colors of
+// (BuiltInDarkThemes()).
+std::vector<std::string> GUIVCLStyleDarkThemeNames();
 // Reads the dark theme SaveGUIDarkTheme() wrote to 'ini', its [View] section's DarkTheme key: the name of a
 // theme file, or GUIDefaultDarkThemeName() when it's missing or empty, or is that name in another case.
 std::string LoadGUIDarkTheme(TGUIINIDocument const& ini);

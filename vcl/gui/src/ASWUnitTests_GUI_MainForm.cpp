@@ -29,6 +29,7 @@ limitations under the License.
 #pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cwchar>
 #include <exception>
@@ -688,20 +689,28 @@ void TFormASWUnitTestsGUIMain::ApplyPanelSizes(TGUILayout const& layout)
 /*
     TFormASWUnitTestsGUIMain::ApplyTheme
 
-    Not during a run, since restyling recreates the windows the run is updating; SetRunning() calls it again
-    once the run has ended. The window is restyled once it handles the message the style change posts; see
-    FormWindowProc().
+    Queued rather than at once: under a VCL style, a menu item's click comes from the form's style hook, which a
+    style change frees, and which uses itself again once the click returns (an access violation in
+    TFormStyleHook::TMainMenuBarStyleHook::Invalidate(), switching dark themes with the mouse). Not during a run,
+    since restyling recreates the windows the run is updating; SetRunning() calls it again once the run has
+    ended. The window is restyled once it handles the message the style change posts; see FormWindowProc().
 */
 void TFormASWUnitTestsGUIMain::ApplyTheme()
 {
-    if (m_Running)
+    TThread::ForceQueue(nullptr, [this]()
     {
-        m_ThemeChangePending = true;
-        return;
-    }
+        RunGuarded("changing the theme", [this]()
+        {
+            if (m_Running)
+            {
+                m_ThemeChangePending = true;
+                return;
+            }
 
-    m_ThemeChangePending = false;
-    ApplyGUITheme(m_Theme, m_DarkStyle);
+            m_ThemeChangePending = false;
+            ApplyGUITheme(m_Theme, m_DarkStyle);
+        });
+    });
 }
 //---------------------------------------------------------------------------
 /*
@@ -889,9 +898,10 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
 /*
     TFormASWUnitTestsGUIMain::FillDarkThemeMenu
 
-    Carbon first, then the VCL style files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or
-    removed since shows at once, above Open Themes Folder; the chosen one is checked. A chosen theme whose file is
-    missing is still listed, so choosing it again reports why it isn't used.
+    The built-in themes first (see BuiltInGUIDarkThemeNames()), Carbon at the top, then a line and the VCL style
+    files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or removed since shows at once, above
+    Open Themes Folder; the chosen one is checked. A chosen theme whose file is missing is still listed, so
+    choosing it again reports why it isn't used.
 */
 void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
 {
@@ -900,8 +910,10 @@ void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
 
     m_DarkThemeItems.clear();
 
-    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf");
-    names.insert(names.begin(), GUIDefaultDarkThemeName());
+    std::vector<std::string> names = BuiltInGUIDarkThemeNames();
+    size_t const builtInCount = names.size();
+    std::vector<std::string> const files = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf", names);
+    names.insert(names.end(), files.begin(), files.end());
 
     // Windows' file names ignore case, so a name saved in another case is still that file's.
     std::vector<std::string>::const_iterator chosen = std::find_if(names.begin(), names.end(),
@@ -914,20 +926,32 @@ void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
         chosen = names.insert(names.end(), m_DarkTheme);
 
     size_t const chosenIndex = static_cast<size_t>(chosen - names.begin());
+    // A built-in theme's accelerator, other than Open Themes Folder's O; a style file's name has none.
+    std::vector<std::string> const builtInCaptions = GUIMenuItemTextsWithAccelerators(
+        std::vector<std::string>(names.begin(), names.begin() + static_cast<std::ptrdiff_t>(builtInCount)), "o");
+    int position = 0;
 
     for (size_t i = 0; i < names.size(); ++i)
     {
+        // A line between the built-in themes and the files.
+        if (i == builtInCount)
+        {
+            TMenuItem* const line = new TMenuItem(this);
+            m_DarkThemeItems.push_back(line);
+            line->Caption = "-";
+            MI_ViewDarkTheme->Insert(position++, line);
+        }
+
         TMenuItem* const item = new TMenuItem(this);
         m_DarkThemeItems.push_back(item);
 
-        // Carbon's C is its accelerator; a style file's name has none.
-        item->Caption = FromUTF8((i == 0 ? "&" : "") + GUIMenuItemText(names[i]));
+        item->Caption = FromUTF8(i < builtInCount ? builtInCaptions[i] : GUIMenuItemText(names[i]));
         item->Checked = i == chosenIndex;
         item->Enabled = Act_ThemeDark->Enabled;
         item->OnClick = DarkThemeItemClick;
         item->RadioItem = true;
         item->Tag = static_cast<NativeInt>(i);
-        MI_ViewDarkTheme->Insert(static_cast<int>(i), item);
+        MI_ViewDarkTheme->Insert(position++, item);
     }
 
     m_DarkThemeNames = names;

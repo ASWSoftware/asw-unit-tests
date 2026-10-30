@@ -1074,7 +1074,7 @@ void TWin32GUITheme::DrawButton(NMCUSTOMDRAW const& draw) const
     RECT textRect = face;
     int const oldMode = SetBkMode(context, TRANSPARENT);
     COLORREF const oldColor = SetTextColor(context, disabled ? m_Palette.DisabledText : hot || pressed ?
-                m_Palette.HotText : m_Palette.ControlText);
+                m_Palette.ButtonHotText : m_Palette.ButtonText);
     DrawTextW(context, text.c_str(), -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE |
         (HidesAccelerators(button) ? DT_HIDEPREFIX : 0));
     SetTextColor(context, oldColor);
@@ -2014,7 +2014,7 @@ LRESULT TWin32GUITheme::OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const
     if (draw.nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
     {
         draw.nmcd.uItemState &= ~static_cast<UINT>(CDIS_SELECTED | CDIS_HOT | CDIS_FOCUS);
-        draw.clrText = selected ? m_Palette.HotText : m_Palette.WindowText;
+        draw.clrText = selected ? m_Palette.SelectionText : m_Palette.WindowText;
         draw.clrTextBk = selected ? m_Palette.Selection : m_Palette.Window;
 
         return selected ? CDRF_NOTIFYPOSTPAINT : CDRF_DODEFAULT;
@@ -2594,14 +2594,20 @@ void TWin32GUITheme::SetDark(bool dark)
 /*
     TWin32GUITheme::SetDarkTheme
 
-    A file that can't be read leaves Carbon's colors, as does one ReadGUIThemeFile() finds unusable.
+    A built-in theme's name comes before a file's, so a theme file of the same name isn't read. A file that
+    can't be read leaves Carbon's colors, as does one ReadGUIThemeFile() finds unusable.
 */
 std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
 {
     std::vector<std::string> problems;
     TWin32GUIPalette palette = CarbonPalette();
+    TWin32GUIBuiltInTheme const* const builtIn = FindBuiltInDarkTheme(name);
 
-    if (name != GUIDefaultDarkThemeName())
+    if (builtIn != nullptr)
+    {
+        palette = builtIn->Palette;
+    }
+    else
     {
         try
         {
