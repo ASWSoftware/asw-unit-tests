@@ -33,6 +33,7 @@ limitations under the License.
 #include <System.IOUtils.hpp>
 #include <System.SysUtils.hpp>
 #include <System.Win.Registry.hpp>
+#include <Vcl.Themes.hpp>
 #include <windows.h>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
@@ -53,6 +54,8 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
     : inherited("ASWUnitTests_GUI_VCLSystem_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_BuiltInGUIDarkThemeNames_AreCarbonAndTheLinkedStyles,
+        "BuiltInGUIDarkThemeNames_AreCarbonAndTheLinkedStyles");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_FileNamesInFolder_ListsOnlyTheFiles,
         "FileNamesInFolder_ListsOnlyTheFiles");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUILayoutFilePath_IsPerExeUnderAppData,
@@ -95,6 +98,31 @@ void TTest_ASWUnitTests_GUI_VCLSystem::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_BuiltInGUIDarkThemeNames_AreCarbonAndTheLinkedStyles()
+{
+    // Arrange: the styles this runner links in, none in the console runner, all of them in the GUI.
+    System::DynamicArray<System::UnicodeString> const styles = Vcl::Themes::TStyleManager::StyleNames;
+    std::string expected = GUIDefaultDarkThemeName() + "\n";
+
+    for (std::string const& name : GUIVCLStyleDarkThemeNames())
+    {
+        for (int i = 0; i < styles.Length; ++i)
+        {
+            if (System::Sysutils::SameText(styles[i], FromUTF8(name)))
+                expected += name + "\n";
+        }
+    }
+
+    // Act
+    std::string names;
+
+    for (std::string const& name : BuiltInGUIDarkThemeNames())
+        names += name + "\n";
+
+    // Assert
+    CheckEquals(expected, names, __func__, __LINE__, "Carbon first, then each linked style, in order");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_FileNamesInFolder_ListsOnlyTheFiles()
 {

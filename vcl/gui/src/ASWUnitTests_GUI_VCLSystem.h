@@ -40,6 +40,10 @@ namespace ASWUnitTests
 // otherwise the default unstyled look. Returns whether the active style changed. Call it on the main thread;
 // before any form exists, each form is created in that style, and afterward it restyles the open ones.
 bool ApplyGUITheme(EGUITheme theme, System::UnicodeString const& darkStyle);
+// The dark themes this runner has built in, for the View > Theme > Dark Theme menu: Carbon (see
+// GUIDefaultDarkThemeName()), then each of GUIVCLStyleDarkThemeNames() whose VCL style is linked in (the GUI
+// project's Custom_Styles), by its style name.
+std::vector<std::string> BuiltInGUIDarkThemeNames();
 // The names of the files (not folders) in the folder, without the folder, converted to UTF-8; empty if the
 // folder doesn't exist or can't be listed.
 std::vector<std::string> FileNamesInFolder(System::UnicodeString const& folderPath);
@@ -52,11 +56,11 @@ System::UnicodeString GUISelectionFilePath();
 // The folder that holds the theme files both GUI runners share, whatever executable runs them:
 // %APPDATA%\ASWUnitTests\Themes. The VCL GUI runner's are VCL style files, "<name>.vsf". It may not exist yet.
 System::UnicodeString GUIThemesFolderPath();
-// The VCL style the dark theme 'darkTheme' is, for ApplyGUITheme(): Carbon, which the GUI project links in, for
-// GUIDefaultDarkThemeName(); otherwise the style in "<darkTheme>.vsf" in 'themesFolder', e.g.
-// GUIThemesFolderPath(), loaded the first time it's needed. Adds a line for the log to 'problems' (see
-// GUIThemeProblemLine()), and gives Carbon, when the file is missing, isn't a VCL style, or has the name of a
-// style already loaded from elsewhere.
+// The VCL style the dark theme 'darkTheme' is, for ApplyGUITheme(): the built-in style of that name, ignoring
+// case (see BuiltInGUIDarkThemeNames()), Carbon included; otherwise the style in "<darkTheme>.vsf" in
+// 'themesFolder', e.g. GUIThemesFolderPath(), loaded the first time it's needed. Adds a line for the log to
+// 'problems' (see GUIThemeProblemLine()), and gives Carbon, when the file is missing, isn't a VCL style, or has
+// the name of a style already loaded from elsewhere.
 System::UnicodeString LoadGUIDarkStyle(System::UnicodeString const& themesFolder, std::string const& darkTheme,
     std::vector<std::string>& problems);
 // The dark theme SaveGUIDarkThemeToLayoutFile() saved in the layout file at 'layoutPath', e.g.

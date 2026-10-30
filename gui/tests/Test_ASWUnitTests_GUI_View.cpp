@@ -61,6 +61,8 @@ TTest_ASWUnitTests_GUI_View::TTest_ASWUnitTests_GUI_View()
         "GUIFirstLine_StopsAtTheFirstLineBreak");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemText_DoublesEachAmpersand,
         "GUIMenuItemText_DoublesEachAmpersand");
+    RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemTextsWithAccelerators_GiveEachALetterOfItsOwn,
+        "GUIMenuItemTextsWithAccelerators_GiveEachALetterOfItsOwn");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanels_ShowCountsAndMessage,
         "GUIStatusPanels_ShowCountsAndMessage");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanelWidths_OnePerPanel, "GUIStatusPanelWidths_OnePerPanel");
@@ -226,6 +228,40 @@ void TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemText_DoublesEachAmpersand()
     CheckEquals(std::string("\xC3\x89" "cume && co"), GUIMenuItemText("\xC3\x89" "cume & co"), __func__, __LINE__,
         "UTF-8 left as it is");
     CheckEmpty(GUIMenuItemText(std::string()), __func__, __LINE__, "empty");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemTextsWithAccelerators_GiveEachALetterOfItsOwn()
+{
+    // Arrange
+    auto const join = [](std::vector<std::string> const& captions)
+        {
+            std::string text;
+
+            for (std::string const& caption : captions)
+                text += caption + "\n";
+
+            return text;
+        };
+
+    std::vector<std::string> const themes = {
+        "Carbon", "Charcoal Dark Slate", "Cobalt XEMedia", "Ember", "Forest", "Midnight", "Onyx Blue", "Plum",
+        "Tablet Dark"
+    };
+
+    // Act and Assert
+    CheckEquals(std::string("&Carbon\nCharcoal &Dark Slate\nCobalt &XEMedia\n&Ember\n&Forest\n&Midnight\nOnyx &Blue\n"
+        "&Plum\n&Tablet Dark\n"), join(GUIMenuItemTextsWithAccelerators(themes, "so")), __func__, __LINE__,
+        "a word's first letter not taken before, by the menu's other items or an earlier text");
+    CheckEquals(std::string("S&ave\n"), join(GUIMenuItemTextsWithAccelerators({ "Save" }, "S")), __func__, __LINE__,
+        "else any letter, ignoring case");
+    CheckEquals(std::string("&A\nA&&&B\n"), join(GUIMenuItemTextsWithAccelerators({ "A", "A&B" }, "")), __func__,
+        __LINE__, "an '&' doubled, not an accelerator");
+    CheckEquals(std::string("\xC3\x89&cume\n"), join(GUIMenuItemTextsWithAccelerators({ "\xC3\x89" "cume" }, "")),
+        __func__, __LINE__, "an ASCII letter only");
+    CheckEquals(std::string("&x\nx\n"), join(GUIMenuItemTextsWithAccelerators({ "x", "x" }, "")), __func__, __LINE__,
+        "none when none is left");
+    CheckEmpty(join(GUIMenuItemTextsWithAccelerators(std::vector<std::string>(), "so")), __func__, __LINE__,
+        "no texts, no captions");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanels_ShowCountsAndMessage()

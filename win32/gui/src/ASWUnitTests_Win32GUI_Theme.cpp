@@ -1074,7 +1074,7 @@ void TWin32GUITheme::DrawButton(NMCUSTOMDRAW const& draw) const
     RECT textRect = face;
     int const oldMode = SetBkMode(context, TRANSPARENT);
     COLORREF const oldColor = SetTextColor(context, disabled ? m_Palette.DisabledText : hot || pressed ?
-                m_Palette.HotText : m_Palette.ControlText);
+                m_Palette.ButtonHotText : m_Palette.ButtonText);
     DrawTextW(context, text.c_str(), -1, &textRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE |
         (HidesAccelerators(button) ? DT_HIDEPREFIX : 0));
     SetTextColor(context, oldColor);
@@ -2014,7 +2014,7 @@ LRESULT TWin32GUITheme::OnTreeCustomDraw(NMTVCUSTOMDRAW& draw) const
     if (draw.nmcd.dwDrawStage == CDDS_ITEMPREPAINT)
     {
         draw.nmcd.uItemState &= ~static_cast<UINT>(CDIS_SELECTED | CDIS_HOT | CDIS_FOCUS);
-        draw.clrText = selected ? m_Palette.HotText : m_Palette.WindowText;
+        draw.clrText = selected ? m_Palette.SelectionText : m_Palette.WindowText;
         draw.clrTextBk = selected ? m_Palette.Selection : m_Palette.Window;
 
         return selected ? CDRF_NOTIFYPOSTPAINT : CDRF_DODEFAULT;

@@ -176,6 +176,11 @@ std::string GUIThemeProblemLine(std::string const& themeName, std::string const&
     return "Dark theme \"" + themeName + "\": " + problem;
 }
 //---------------------------------------------------------------------------
+std::vector<std::string> GUIVCLStyleDarkThemeNames()
+{
+    return { "Charcoal Dark Slate", "Cobalt XEMedia", "Onyx Blue", "Tablet Dark" };
+}
+//---------------------------------------------------------------------------
 std::string LoadGUIDarkTheme(TGUIINIDocument const& ini)
 {
     std::optional<std::string> const name = ini.ReadString(ViewSection, DarkThemeKey);

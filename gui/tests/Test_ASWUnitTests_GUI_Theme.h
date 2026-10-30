@@ -44,6 +44,7 @@ private: // Test methods
     void Test_FormatGUIThemeColor_RoundTripsThroughParse();
     void Test_GUIThemeIsDark_FollowsTheChoiceOrWindows();
     void Test_GUIThemeNames_ListsTheFilesOfOneKindSorted();
+    void Test_GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon();
     void Test_LoadGUIDarkTheme_DefaultsToCarbon();
     void Test_LoadGUITheme_DefaultsToWindows();
     void Test_LoadGUITheme_ReadsEachThemeIgnoringCase();

@@ -29,6 +29,7 @@ limitations under the License.
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <set>
 #include <string>
@@ -37,6 +38,7 @@ limitations under the License.
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Theme.h"
+#include "ASWUnitTests_GUI_View.h"
 #include "ASWUnitTests_Win32GUI_Palette.h"
 //---------------------------------------------------------------------------
 
@@ -166,21 +168,36 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_AreCarbonThenIt
     std::vector<TWin32GUIBuiltInTheme> const& themes = BuiltInDarkThemes();
 
     // Assert
+    std::vector<std::string> nameList;
     std::string names;
-    // The menu's other items' accelerators: Save Theme Template and Open Themes Folder.
-    std::set<char> letters = { 's', 'o' };
-    bool lettersDiffer = true;
 
     for (TWin32GUIBuiltInTheme const& theme : themes)
     {
+        nameList.push_back(theme.Name);
         names += theme.Name + "\n";
-        lettersDiffer = lettersDiffer && !theme.Name.empty() &&
-            letters.insert(static_cast<char>(std::tolower(static_cast<unsigned char>(theme.Name[0])))).second;
     }
 
-    CheckEquals(std::string("Carbon\nEmber\nForest\nMidnight\nPlum\n"), names, __func__, __LINE__,
-        "Carbon first, then the tints by name");
-    CheckTrue(lettersDiffer, __func__, __LINE__, "each with a first letter of its own, for its accelerator");
+    CheckEquals(std::string("Carbon\nCharcoal Dark Slate\nCobalt XEMedia\nEmber\nForest\nMidnight\nOnyx Blue\nPlum\n"
+        "Tablet Dark\n"), names, __func__, __LINE__, "Carbon first, then the VCL styles and the tints by name");
+
+    for (std::string const& style : GUIVCLStyleDarkThemeNames())
+    {
+        CheckTrue(std::find(nameList.begin(), nameList.end(), style) != nameList.end(), __func__, __LINE__,
+            "the VCL GUI runner's built-in style " + style + ", by its name");
+    }
+
+    // The menu's other items' accelerators: Save Theme Template's and Open Themes Folder's.
+    std::set<char> letters = { 's', 'o' };
+    bool lettersDiffer = true;
+
+    for (std::string const& caption : GUIMenuItemTextsWithAccelerators(nameList, "so"))
+    {
+        std::size_t const accelerator = caption.find('&');
+        lettersDiffer = lettersDiffer && accelerator != std::string::npos && accelerator + 1 < caption.size() &&
+            letters.insert(static_cast<char>(std::tolower(static_cast<unsigned char>(caption[accelerator + 1])))).second;
+    }
+
+    CheckTrue(lettersDiffer, __func__, __LINE__, "each with an accelerator of its own in the menu");
     AssertFalse(themes.empty(), __func__, __LINE__, "Carbon is there");
     TWin32GUIPalette const carbon = CarbonPalette();
     bool sameAsCarbon = true;
@@ -194,23 +211,30 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_AreCarbonThenIt
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_KeepTextReadable()
 {
-    // Arrange: each text color the GUI draws on a background, with that background.
+    // Arrange: each text color the GUI draws on a background, with that background, a gradient's by its middle,
+    // where the text is.
     struct TPair
     {
         COLORREF TWin32GUIPalette::* Text;
         COLORREF TWin32GUIPalette::* Background;
+        COLORREF TWin32GUIPalette::* BackgroundBottom;
         char const* Name;
     };
 
     TPair const pairs[] = {
-        { &TWin32GUIPalette::WindowText, &TWin32GUIPalette::Window, "WindowText on Window" },
-        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::Panel, "ControlText on Panel" },
-        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::MenuBackground, "ControlText on MenuBackground" },
-        { &TWin32GUIPalette::HotText, &TWin32GUIPalette::Highlight, "HotText on Highlight" },
-        { &TWin32GUIPalette::HotText, &TWin32GUIPalette::Selection, "HotText on Selection" },
-        { &TWin32GUIPalette::FailureText, &TWin32GUIPalette::Window, "FailureText on Window" },
-        { &TWin32GUIPalette::SkipText, &TWin32GUIPalette::Window, "SkipText on Window" },
-        { &TWin32GUIPalette::TooltipText, &TWin32GUIPalette::TooltipBackground, "TooltipText on TooltipBackground" },
+        { &TWin32GUIPalette::WindowText, &TWin32GUIPalette::Window, nullptr, "WindowText on Window" },
+        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::Panel, nullptr, "ControlText on Panel" },
+        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::MenuBackground, nullptr, "ControlText on MenuBackground" },
+        { &TWin32GUIPalette::ButtonText, &TWin32GUIPalette::ButtonFaceTop, &TWin32GUIPalette::ButtonFaceBottom,
+          "ButtonText on the button's face" },
+        { &TWin32GUIPalette::ButtonHotText, &TWin32GUIPalette::ButtonHotFaceTop, &TWin32GUIPalette::ButtonHotFaceBottom,
+          "ButtonHotText on the hot button's face" },
+        { &TWin32GUIPalette::HotText, &TWin32GUIPalette::Highlight, nullptr, "HotText on Highlight" },
+        { &TWin32GUIPalette::SelectionText, &TWin32GUIPalette::Selection, nullptr, "SelectionText on Selection" },
+        { &TWin32GUIPalette::FailureText, &TWin32GUIPalette::Window, nullptr, "FailureText on Window" },
+        { &TWin32GUIPalette::SkipText, &TWin32GUIPalette::Window, nullptr, "SkipText on Window" },
+        { &TWin32GUIPalette::TooltipText, &TWin32GUIPalette::TooltipBackground, nullptr,
+          "TooltipText on TooltipBackground" },
     };
 
     // Act
@@ -220,7 +244,10 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_KeepTextReadabl
     {
         for (TPair const& pair : pairs)
         {
-            if (ContrastRatio(theme.Palette.*pair.Text, theme.Palette.*pair.Background) < 4.5)
+            COLORREF const background = pair.BackgroundBottom == nullptr ? theme.Palette.*pair.Background :
+                    BlendColors(theme.Palette.*pair.Background, theme.Palette.*pair.BackgroundBottom, 1, 2);
+
+            if (ContrastRatio(theme.Palette.*pair.Text, background) < 4.5)
                 unreadable += theme.Name + ": " + pair.Name + "\n";
         }
     }

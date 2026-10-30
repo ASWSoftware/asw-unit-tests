@@ -49,6 +49,7 @@ private: // Test methods
     void Test_GUIFilterBoxFilter_MatchesAnywhereIgnoringCase();
     void Test_GUIFirstLine_StopsAtTheFirstLineBreak();
     void Test_GUIMenuItemText_DoublesEachAmpersand();
+    void Test_GUIMenuItemTextsWithAccelerators_GiveEachALetterOfItsOwn();
     void Test_GUIStatusPanels_ShowCountsAndMessage();
     void Test_GUIStatusPanelWidths_OnePerPanel();
     void Test_GUIUnhandledExceptionRecord_FailsTheRunningTest();

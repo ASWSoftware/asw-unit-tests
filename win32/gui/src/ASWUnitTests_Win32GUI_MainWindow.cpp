@@ -1563,6 +1563,10 @@ void TWin32GUIMainWindow::FillDarkThemeMenu()
         DeleteMenu(m_MI_ViewDarkTheme, 0, MF_BYPOSITION);
 
     UINT const enabled = m_CommandStates.Theme ? MF_ENABLED : MF_GRAYED;
+    // A built-in theme's accelerator, other than Save Theme Template's S and Open Themes Folder's O; a theme
+    // file's name has none.
+    std::vector<std::string> const builtInCaptions = GUIMenuItemTextsWithAccelerators(
+        std::vector<std::string>(names.begin(), names.begin() + static_cast<std::ptrdiff_t>(builtInCount)), "so");
 
     for (std::size_t i = 0; i < names.size(); ++i)
     {
@@ -1570,9 +1574,8 @@ void TWin32GUIMainWindow::FillDarkThemeMenu()
         if (i == builtInCount)
             AppendMenuW(m_MI_ViewDarkTheme, MF_SEPARATOR, 0, nullptr);
 
-        // A built-in theme's first letter is its accelerator; a theme file's name has none.
         UINT const id = static_cast<UINT>(FirstDarkThemeCommand + i);
-        std::wstring const caption = UTF8ToWide((i < builtInCount ? "&" : "") + GUIMenuItemText(names[i]));
+        std::wstring const caption = UTF8ToWide(i < builtInCount ? builtInCaptions[i] : GUIMenuItemText(names[i]));
         AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, id, caption.c_str());
 
         // Only it, as nothing else is checked yet, so the range needn't span the line above the files.

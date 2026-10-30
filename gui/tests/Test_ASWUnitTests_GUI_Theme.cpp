@@ -98,6 +98,8 @@ TTest_ASWUnitTests_GUI_Theme::TTest_ASWUnitTests_GUI_Theme()
         "GUIThemeIsDark_FollowsTheChoiceOrWindows");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_GUIThemeNames_ListsTheFilesOfOneKindSorted,
         "GUIThemeNames_ListsTheFilesOfOneKindSorted");
+    RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon,
+        "GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_LoadGUIDarkTheme_DefaultsToCarbon,
         "LoadGUIDarkTheme_DefaultsToCarbon");
     RegisterTest(&TTest_ASWUnitTests_GUI_Theme::Test_LoadGUITheme_DefaultsToWindows, "LoadGUITheme_DefaultsToWindows");
@@ -192,6 +194,16 @@ void TTest_ASWUnitTests_GUI_Theme::Test_GUIThemeNames_ListsTheFilesOfOneKindSort
         "the VCL GUI runner's .vsf files");
     CheckEmpty(JoinLines(GUIThemeNames(std::vector<std::string>(), ".ini", carbon)), __func__, __LINE__,
         "an empty or missing folder");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_Theme::Test_GUIVCLStyleDarkThemeNames_AreSortedWithoutCarbon()
+{
+    // Act
+    std::vector<std::string> const names = GUIVCLStyleDarkThemeNames();
+
+    // Assert: RAD Studio's style names, which the VCL GUI runner's project links in.
+    CheckEquals(std::string("Charcoal Dark Slate\nCobalt XEMedia\nOnyx Blue\nTablet Dark\n"), JoinLines(names), __func__,
+        __LINE__, "the picked styles, sorted, Carbon not among them");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_Theme::Test_LoadGUIDarkTheme_DefaultsToCarbon()

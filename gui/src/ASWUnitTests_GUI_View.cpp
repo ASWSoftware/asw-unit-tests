@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
+#include <cstddef>
 #include <iomanip>
 #include <sstream>
 //---------------------------------------------------------------------------
@@ -174,6 +175,63 @@ std::string GUIMenuItemText(std::string const& text)
     }
 
     return caption;
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> GUIMenuItemTextsWithAccelerators(std::vector<std::string> const& texts,
+    std::string const& takenLetters)
+{
+    auto const lower = [](char c)
+        {
+            return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+        };
+    auto const isAccelerator = [](char c)
+        {
+            return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+        };
+
+    std::string taken;
+
+    for (char const c : takenLetters)
+        taken += lower(c);
+
+    std::vector<std::string> captions;
+
+    for (std::string const& text : texts)
+    {
+        std::size_t chosen = std::string::npos;
+
+        // A letter that starts a word first, then any.
+        for (int pass = 0; pass < 2 && chosen == std::string::npos; ++pass)
+        {
+            for (std::size_t i = 0; i < text.size() && chosen == std::string::npos; ++i)
+            {
+                bool const startsWord = i == 0 || text[i - 1] == ' ';
+
+                if (isAccelerator(text[i]) && (pass == 1 || startsWord) && taken.find(lower(text[i])) ==
+                    std::string::npos)
+                {
+                    chosen = i;
+                }
+            }
+        }
+
+        if (chosen != std::string::npos)
+            taken += lower(text[chosen]);
+
+        std::string caption;
+
+        for (std::size_t i = 0; i < text.size(); ++i)
+        {
+            if (i == chosen)
+                caption += '&';
+
+            caption += GUIMenuItemText(text.substr(i, 1));
+        }
+
+        captions.push_back(caption);
+    }
+
+    return captions;
 }
 //---------------------------------------------------------------------------
 std::vector<std::string> GUIStatusPanels(TGUITestList const& testList, size_t runFinishedCount, size_t runTotalCount,

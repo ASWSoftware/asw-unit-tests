@@ -52,7 +52,7 @@ struct TWin32GUIPalette
 {
     // Push buttons: the outline around them, the border, and the face's gradient from top to bottom, normal,
     // hot (under the mouse), pressed and disabled; the default button's (and the focused one's) line inside
-    // its border.
+    // its border; the text, and a hot or pressed button's.
     COLORREF ButtonBorder;
     COLORREF ButtonDefaultFrame;
     COLORREF ButtonDisabledBorder;
@@ -64,9 +64,11 @@ struct TWin32GUIPalette
     COLORREF ButtonHotBorder;
     COLORREF ButtonHotFaceBottom;
     COLORREF ButtonHotFaceTop;
+    COLORREF ButtonHotText;
     COLORREF ButtonOutline;
     COLORREF ButtonPressedFaceBottom;
     COLORREF ButtonPressedFaceTop;
+    COLORREF ButtonText;
     // Check boxes (the test tree's too) and radio buttons: the box's or circle's border, its inside, and the
     // mark (a cross, the partial state's square, the radio button's dot); the border under the mouse, and the
     // mark of a disabled one.
@@ -75,8 +77,8 @@ struct TWin32GUIPalette
     COLORREF CheckBoxHotBorder;
     COLORREF CheckMark;
     COLORREF CheckMarkDisabled;
-    // The text of labels, buttons, radio buttons and check boxes, menus, the inactive tab, the list's header
-    // and the status bar.
+    // The text of labels, radio buttons and check boxes, menus, the inactive tab, the list's header and the
+    // status bar.
     COLORREF ControlText;
     // Disabled text, but the menus' (see MenuBarDisabledText and MenuDisabledText).
     COLORREF DisabledText;
@@ -95,7 +97,7 @@ struct TWin32GUIPalette
     // The menu item under the mouse or the keyboard, and its frame.
     COLORREF Highlight;
     COLORREF HighlightFrame;
-    // Text over Highlight or Selection, and a hot or pressed button's.
+    // Text over Highlight.
     COLORREF HotText;
     // A disabled item's text, in the menu bar and in a menu.
     COLORREF MenuBarDisabledText;
@@ -115,9 +117,10 @@ struct TWin32GUIPalette
     COLORREF ProgressFailedBottom;
     COLORREF ProgressFailedTop;
     COLORREF ProgressTrack;
-    // The selected node or row in the tree and the list, and its frame.
+    // The selected node or row in the tree and the list, its frame, and its text.
     COLORREF Selection;
     COLORREF SelectionFrame;
+    COLORREF SelectionText;
     COLORREF SkipText;
     // Spin buttons, such as the results tabs' scroll arrows when the tabs don't fit: the outline around each, its
     // face's gradient from top to bottom, normal, hot and disabled, the edge a pressed one shows at its top and
@@ -199,9 +202,10 @@ struct TWin32GUIBuiltInTheme
 // 'from' at 0, 'to' at 'denominator', e.g. one row of a gradient. 'from' if 'denominator' isn't positive; the
 // proportion is kept within 0 and 1.
 COLORREF BlendColors(COLORREF from, COLORREF to, int numerator, int denominator);
-// The dark themes built in: Carbon (GUIDefaultDarkThemeName(), CarbonPalette()) first, then Carbon tinted (see
-// TintedCarbonPalette()): Ember (warm brown), Forest (green), Midnight (blue) and Plum (purple). Their names'
-// first letters differ, for the menu's accelerators, from each other's and from the menu's other items'.
+// The dark themes built in: Carbon (GUIDefaultDarkThemeName(), CarbonPalette()) first, then by name the
+// others: RAD Studio's dark VCL styles the VCL GUI runner has too (GUIVCLStyleDarkThemeNames(), e.g.
+// OnyxBluePalette()), and Carbon tinted (see TintedCarbonPalette()): Ember (warm brown), Forest (green), Midnight
+// (blue) and Plum (purple).
 std::vector<TWin32GUIBuiltInTheme> const& BuiltInDarkThemes();
 // The colors of RAD Studio's Carbon style, the VCL GUI runner's dark theme, read from its .vsf file and from
 // the VCL GUI runner as it draws under it.
@@ -210,6 +214,10 @@ TWin32GUIPalette CarbonPalette();
 // comments saying what the file is and what each group of roles colors, and CRLF line breaks: the template
 // View > Theme > Dark Theme > Save Theme Template writes.
 std::string CarbonThemeFileText();
+// The colors of RAD Studio's Charcoal Dark Slate VCL style, as CarbonPalette() has Carbon's.
+TWin32GUIPalette CharcoalDarkSlatePalette();
+// The colors of RAD Studio's Cobalt XEMedia VCL style, as CarbonPalette() has Carbon's.
+TWin32GUIPalette CobaltXEMediaPalette();
 // The color of a failed test's text on 'background': RGB(200, 0, 0), or RGB(255, 100, 100) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF FailureTextColorOn(COLORREF background);
@@ -219,6 +227,8 @@ TWin32GUIBuiltInTheme const* FindBuiltInDarkTheme(std::string const& name);
 // Whether 'color' is dark, by its luma (Rec. 601 weights) being below 128, as the VCL GUI runner decides
 // whether a background needs lighter text colors.
 bool IsDarkColor(COLORREF color);
+// The colors of RAD Studio's Onyx Blue VCL style, as CarbonPalette() has Carbon's.
+TWin32GUIPalette OnyxBluePalette();
 // The names of PaletteRoles(), in their order, for ReadGUIThemeFile().
 std::vector<std::string> PaletteRoleNames();
 // Every member of TWin32GUIPalette, once, in the struct's order, with its name and group.
@@ -229,6 +239,8 @@ TWin32GUIPalette PaletteWithThemeColors(TWin32GUIPalette palette, std::vector<TG
 // The color of a skipped test's text on 'background': RGB(190, 120, 0), or RGB(255, 190, 70) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF SkipTextColorOn(COLORREF background);
+// The colors of RAD Studio's Tablet Dark VCL style, as CarbonPalette() has Carbon's.
+TWin32GUIPalette TabletDarkPalette();
 // Carbon's palette tinted: each of its grays turned toward 'hue' (in degrees, 0 red, 120 green, 240 blue), by
 // up to 'tint' of its chroma (0 to 1), most in the dark backgrounds and less as a gray gets lighter, so text
 // stays nearly white; its accent (the highlight, the default button's frame and the progress bar) turned to
