@@ -26,8 +26,14 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Win32GUI_Palette.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
+#include <cctype>
+#include <string>
+#include <vector>
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_Win32GUI_Palette.h"
 //---------------------------------------------------------------------------
 
@@ -46,9 +52,15 @@ TTest_ASWUnitTests_Win32GUI_Palette::TTest_ASWUnitTests_Win32GUI_Palette()
         "BlendColors_MixesEachChannelInProportion");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonPalette_HasCarbonsColors,
         "CarbonPalette_HasCarbonsColors");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonThemeFileText_ReadsBackAsCarbon,
+        "CarbonThemeFileText_ReadsBackAsCarbon");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground,
         "FailureAndSkipTextColorOn_AreLighterOnADarkBackground");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_IsDarkColor_IsByTheLuma, "IsDarkColor_IsByTheLuma");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteRoles_ListEveryMemberOnce,
+        "PaletteRoles_ListEveryMemberOnce");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteWithThemeColors_SetsOnlyTheirRoles,
+        "PaletteWithThemeColors_SetsOnlyTheirRoles");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_Win32GUI_Palette::~TTest_ASWUnitTests_Win32GUI_Palette()
@@ -109,6 +121,65 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonPalette_HasCarbonsColors()
     CheckEquals(RGB(255, 190, 70), palette.SkipText, __func__, __LINE__, "a skip on the dark window");
     CheckTrue(IsDarkColor(palette.Window) && IsDarkColor(palette.Panel) && !IsDarkColor(palette.WindowText) &&
         !IsDarkColor(palette.ControlText), __func__, __LINE__, "dark backgrounds, light text");
+    CheckEquals(RGB(215, 40, 40), palette.TreeStatusFailed, __func__, __LINE__, "the tree's failed dot, as light's");
+    CheckEquals(RGB(16, 160, 16), palette.TreeStatusPassed, __func__, __LINE__, "the tree's passed dot, as light's");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonThemeFileText_ReadsBackAsCarbon()
+{
+    // Act
+    std::string const text = CarbonThemeFileText();
+    TGUIThemeFile const file = ReadGUIThemeFile(text, PaletteRoleNames());
+    TWin32GUIPalette const blank = {};
+    TWin32GUIPalette const readBack = PaletteWithThemeColors(blank, file.Colors);
+
+    // Assert
+    CheckTrue(file.Usable, __func__, __LINE__, "a usable theme file");
+    CheckEquals(std::string(), std::string(file.Problems.empty() ? "" : file.Problems.front()), __func__, __LINE__,
+        "with no problems");
+    CheckEquals(PaletteRoles().size(), file.Colors.size(), __func__, __LINE__, "setting every role");
+
+    TWin32GUIPalette const carbon = CarbonPalette();
+    std::string differences;
+
+    for (TWin32GUIPaletteRole const& role : PaletteRoles())
+    {
+        if (readBack.*role.Color != carbon.*role.Color)
+            differences += std::string(differences.empty() ? "" : ", ") + role.Name;
+    }
+
+    CheckEmpty(differences, __func__, __LINE__, "to Carbon's colors");
+
+    CheckTrue(text.compare(0, 30, "; An ASWUnitTests theme file: ") == 0, __func__, __LINE__,
+        "starting with what it is");
+    CheckTrue(text.find("\r\n[Theme]\r\nBase=Dark\r\n\r\n[Colors]\r\n; Push buttons: ") != std::string::npos,
+        __func__, __LINE__, "Base=Dark, then the colors, under their groups' comments");
+    CheckTrue(text.find("\r\n\r\n; Tooltips.\r\nTooltipBackground=#515151\r\nTooltipText=#EAEAEA\r\n\r\n") !=
+        std::string::npos, __func__, __LINE__, "a group, with a blank line on each side");
+
+    bool lineBreaksAreCRLF = true;
+    bool ascii = true;
+    std::size_t longest = 0;
+    std::size_t lineStart = 0;
+
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        if (static_cast<unsigned char>(text[i]) > 0x7F)
+            ascii = false;
+
+        if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r'))
+            lineBreaksAreCRLF = false;
+
+        if (text[i] == '\n')
+        {
+            longest = (std::max)(longest, i - lineStart - 1);
+            lineStart = i + 1;
+        }
+    }
+
+    CheckTrue(lineBreaksAreCRLF, __func__, __LINE__, "CRLF line breaks");
+    CheckTrue(ascii, __func__, __LINE__, "plain ASCII");
+    CheckTrue(longest <= 110, __func__, __LINE__, "no line longer than 110: " + std::to_string(longest));
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_Palette::Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground()
@@ -133,6 +204,90 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_IsDarkColor_IsByTheLuma()
     CheckFalse(IsDarkColor(RGB(0, 255, 0)), __func__, __LINE__, "green, luma 149");
     CheckTrue(IsDarkColor(RGB(255, 0, 0)), __func__, __LINE__, "red, luma 76");
     CheckFalse(IsDarkColor(RGB(255, 255, 0)), __func__, __LINE__, "yellow, luma 225");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteRoles_ListEveryMemberOnce()
+{
+    // Arrange
+    std::vector<TWin32GUIPaletteRole> const& roles = PaletteRoles();
+
+    // Act: each role's member set to its own number, so two roles of one member would leave the first's wrong.
+    TWin32GUIPalette palette = {};
+
+    for (std::size_t i = 0; i < roles.size(); ++i)
+        palette.*roles[i].Color = static_cast<COLORREF>(i + 1);
+
+    // Assert
+    CheckEquals(sizeof(TWin32GUIPalette) / sizeof(COLORREF), roles.size(), __func__, __LINE__,
+        "as many roles as the palette has members");
+
+    std::string wrong;
+
+    for (std::size_t i = 0; i < roles.size(); ++i)
+    {
+        if (palette.*roles[i].Color != static_cast<COLORREF>(i + 1))
+            wrong += std::string(wrong.empty() ? "" : ", ") + roles[i].Name;
+    }
+
+    CheckEmpty(wrong, __func__, __LINE__, "each a member of its own");
+
+    std::vector<std::string> const names = PaletteRoleNames();
+    std::string repeated;
+
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        for (std::size_t j = i + 1; j < names.size(); ++j)
+        {
+            // Theme files match them ignoring case.
+            bool const same = names[i].size() == names[j].size() && std::equal(names[i].begin(), names[i].end(),
+                names[j].begin(), [](char a, char b)
+                {
+                    return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                });
+
+            if (same)
+                repeated += names[j] + " ";
+        }
+    }
+
+    CheckEmpty(repeated, __func__, __LINE__, "names that differ, ignoring case");
+    CheckEquals(roles.size(), names.size(), __func__, __LINE__, "PaletteRoleNames(), one per role");
+    CheckTrue(!roles.empty() && roles.front().Group != nullptr, __func__, __LINE__, "the first role starts a group");
+    CheckEquals(std::string("ButtonBorder"), names.front(), __func__, __LINE__, "named as its member");
+    CheckEquals(std::string("WindowText"), names.back(), __func__, __LINE__, "in the struct's order");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteWithThemeColors_SetsOnlyTheirRoles()
+{
+    // Arrange
+    TWin32GUIPalette const carbon = CarbonPalette();
+    std::vector<TGUIThemeColor> colors(3);
+    colors[0].Role = "Window";
+    colors[0].RGB = 0x102030;
+    colors[1].Role = "NotARole";
+    colors[1].RGB = 0xFFFFFF;
+    colors[2].Role = "TreeStatusPassed";
+    colors[2].RGB = 0xA0B0C0;
+
+    // Act
+    TWin32GUIPalette const palette = PaletteWithThemeColors(carbon, colors);
+
+    // Assert
+    CheckEquals(RGB(0x10, 0x20, 0x30), palette.Window, __func__, __LINE__, "#RRGGBB as a COLORREF");
+    CheckEquals(RGB(0xA0, 0xB0, 0xC0), palette.TreeStatusPassed, __func__, __LINE__, "a status dot");
+
+    std::string changed;
+
+    for (TWin32GUIPaletteRole const& role : PaletteRoles())
+    {
+        if (std::string(role.Name) != "Window" && std::string(role.Name) != "TreeStatusPassed" &&
+            palette.*role.Color != carbon.*role.Color)
+        {
+            changed += std::string(changed.empty() ? "" : ", ") + role.Name;
+        }
+    }
+
+    CheckEmpty(changed, __func__, __LINE__, "the others keep their colors, and an unknown role is left out");
 }
 //---------------------------------------------------------------------------
 

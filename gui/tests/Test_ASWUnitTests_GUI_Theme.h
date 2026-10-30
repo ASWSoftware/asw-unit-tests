@@ -41,9 +41,17 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_FormatGUIThemeColor_RoundTripsThroughParse();
     void Test_GUIThemeIsDark_FollowsTheChoiceOrWindows();
+    void Test_GUIThemeNames_ListsTheFilesOfOneKindSorted();
+    void Test_LoadGUIDarkTheme_DefaultsToCarbon();
     void Test_LoadGUITheme_DefaultsToWindows();
     void Test_LoadGUITheme_ReadsEachThemeIgnoringCase();
+    void Test_ParseGUIThemeColor_RejectsOtherForms();
+    void Test_ReadGUIThemeFile_NeedsBaseDark();
+    void Test_ReadGUIThemeFile_ReadsTheColorsItSets();
+    void Test_ReadGUIThemeFile_ReportsEachProblem();
+    void Test_SaveGUIDarkTheme_RoundTripsBesideTheTheme();
     void Test_SaveGUITheme_KeepsTheLayout();
     void Test_SaveGUITheme_RoundTrips();
 

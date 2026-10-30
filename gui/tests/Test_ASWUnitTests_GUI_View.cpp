@@ -59,6 +59,8 @@ TTest_ASWUnitTests_GUI_View::TTest_ASWUnitTests_GUI_View()
         "GUIFilterBoxFilter_MatchesAnywhereIgnoringCase");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIFirstLine_StopsAtTheFirstLineBreak,
         "GUIFirstLine_StopsAtTheFirstLineBreak");
+    RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemText_DoublesEachAmpersand,
+        "GUIMenuItemText_DoublesEachAmpersand");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanels_ShowCountsAndMessage,
         "GUIStatusPanels_ShowCountsAndMessage");
     RegisterTest(&TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanelWidths_OnePerPanel, "GUIStatusPanelWidths_OnePerPanel");
@@ -213,6 +215,17 @@ void TTest_ASWUnitTests_GUI_View::Test_GUIFirstLine_StopsAtTheFirstLineBreak()
     CheckEquals(std::string("first"), GUIFirstLine("first\nsecond\nthird"), __func__, __LINE__, "the first line");
     CheckEquals(std::string("only"), GUIFirstLine("only"), __func__, __LINE__, "a single line");
     CheckEmpty(GUIFirstLine("\nsecond"), __func__, __LINE__, "an empty first line");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_View::Test_GUIMenuItemText_DoublesEachAmpersand()
+{
+    // Act and Assert
+    CheckEquals(std::string("Ocean"), GUIMenuItemText("Ocean"), __func__, __LINE__, "plain text as it is");
+    CheckEquals(std::string("Salt && Pepper"), GUIMenuItemText("Salt & Pepper"), __func__, __LINE__, "one '&'");
+    CheckEquals(std::string("&&&&a&&"), GUIMenuItemText("&&a&"), __func__, __LINE__, "each of several");
+    CheckEquals(std::string("\xC3\x89" "cume && co"), GUIMenuItemText("\xC3\x89" "cume & co"), __func__, __LINE__,
+        "UTF-8 left as it is");
+    CheckEmpty(GUIMenuItemText(std::string()), __func__, __LINE__, "empty");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_View::Test_GUIStatusPanels_ShowCountsAndMessage()

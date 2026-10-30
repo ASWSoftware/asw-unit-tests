@@ -26,10 +26,39 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <optional>
 #include <string>
+#include <vector>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_INIDocument.h"
+//---------------------------------------------------------------------------
+
+namespace
+{
+
+//---------------------------------------------------------------------------
+
+std::string JoinNames(std::vector<std::string> const& names);
+
+//---------------------------------------------------------------------------
+/*
+    JoinNames
+
+    The names separated by commas, compared whole, so a failure shows the whole list.
+*/
+std::string JoinNames(std::vector<std::string> const& names)
+{
+    std::string text;
+
+    for (std::string const& name : names)
+        text += (text.empty() ? "" : ",") + name;
+
+    return text;
+}
+//---------------------------------------------------------------------------
+
+} // namespace
+
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -52,8 +81,12 @@ TTest_ASWUnitTests_GUI_INIDocument::TTest_ASWUnitTests_GUI_INIDocument()
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_Constructor_SkipsLinesTMemIniFileSkips,
         "Constructor_SkipsLinesTMemIniFileSkips");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_DeleteKey_RemovesOnlyThatKey, "DeleteKey_RemovesOnlyThatKey");
+    RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_KeyNames_ListsEachKeyAsWritten,
+        "KeyNames_ListsEachKeyAsWritten");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_ReadString_IgnoresCase, "ReadString_IgnoresCase");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_ReadString_MissingIsEmpty, "ReadString_MissingIsEmpty");
+    RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_SectionNames_ListsEachSectionOnce,
+        "SectionNames_ListsEachSectionOnce");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_Text_EmptyDocumentIsEmpty, "Text_EmptyDocumentIsEmpty");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_Text_RoundTripsWhatItRead, "Text_RoundTripsWhatItRead");
     RegisterTest(&TTest_ASWUnitTests_GUI_INIDocument::Test_WriteString_AddsNewKeysAndSectionsAtTheEnd,
@@ -166,6 +199,22 @@ void TTest_ASWUnitTests_GUI_INIDocument::Test_DeleteKey_RemovesOnlyThatKey()
         "a key is found ignoring case, and its emptied section stays, as with TMemIniFile");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_INIDocument::Test_KeyNames_ListsEachKeyAsWritten()
+{
+    // Arrange
+    TGUIINIDocument ini("[A]\r\n One = 1\r\nNoEquals\r\nTwo=2\r\nONE=again\r\n[B]\r\n[C]\r\nThree=3\r\n");
+
+    // Act and Assert
+    CheckEquals(std::string("One,Two,ONE"), JoinNames(ini.KeyNames("a")), __func__, __LINE__,
+        "trimmed, in order, a repeated key each time, found ignoring the section's case");
+    CheckEmpty(JoinNames(ini.KeyNames("B")), __func__, __LINE__, "an empty section");
+    CheckEmpty(JoinNames(ini.KeyNames("Missing")), __func__, __LINE__, "a missing section");
+
+    ini.WriteString("C", "Four", "4");
+    CheckEquals(std::string("Three,Four"), JoinNames(ini.KeyNames("C")), __func__, __LINE__,
+        "with a key written since");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_INIDocument::Test_ReadString_IgnoresCase()
 {
     // Arrange
@@ -184,6 +233,21 @@ void TTest_ASWUnitTests_GUI_INIDocument::Test_ReadString_MissingIsEmpty()
     // Act and Assert
     CheckFalse(ini.ReadString("Window", "Width").has_value(), __func__, __LINE__, "a missing key");
     CheckFalse(ini.ReadString("Panels", "Height").has_value(), __func__, __LINE__, "a missing section");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_INIDocument::Test_SectionNames_ListsEachSectionOnce()
+{
+    // Arrange
+    TGUIINIDocument ini("Before=section\r\n[ Colors ]\r\nA=1\r\n[Theme]\r\n[colors]\r\nB=2\r\n");
+
+    // Act and Assert
+    CheckEquals(std::string("Colors,Theme"), JoinNames(ini.SectionNames()), __func__, __LINE__,
+        "trimmed, in order, a repeated one once, as it's skipped");
+    CheckEmpty(JoinNames(TGUIINIDocument().SectionNames()), __func__, __LINE__, "an empty document");
+
+    ini.WriteString("View", "Theme", "Dark");
+    CheckEquals(std::string("Colors,Theme,View"), JoinNames(ini.SectionNames()), __func__, __LINE__,
+        "with a section written since");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_INIDocument::Test_Text_EmptyDocumentIsEmpty()

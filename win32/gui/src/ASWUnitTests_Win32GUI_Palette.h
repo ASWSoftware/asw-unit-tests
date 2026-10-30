@@ -29,6 +29,11 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_Windows.h"
 //---------------------------------------------------------------------------
+#include <string>
+#include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Theme.h"
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -37,8 +42,11 @@ namespace ASWUnitTests
 // TWin32GUIPalette
 //
 // The colors the dark theme paints with, one per role, each named for what
-// it colors. CarbonPalette() has Carbon's. The light theme is Windows'
-// standard look, in the system colors, so it has no palette.
+// it colors. CarbonPalette() has Carbon's, and a theme file sets any of
+// them by name (see PaletteRoles()), so a member's name is part of that
+// file's format: renaming one breaks the theme files that set it. The light
+// theme is Windows' standard look, in the system colors, so it has no
+// palette.
 /////////////////////////////////////////////////////////////////////////////
 struct TWin32GUIPalette
 {
@@ -141,9 +149,34 @@ struct TWin32GUIPalette
     COLORREF TooltipText;
     // The test tree's dotted lines between nodes.
     COLORREF TreeLine;
+    // The test tree's status dots: a test or group that failed, hasn't run, passed, is running, or was skipped.
+    // Light draws them in Carbon's colors.
+    COLORREF TreeStatusFailed;
+    COLORREF TreeStatusNotRun;
+    COLORREF TreeStatusPassed;
+    COLORREF TreeStatusRunning;
+    COLORREF TreeStatusSkipped;
     // The background of the edit boxes, the detail pane, the tree, the list and the log, and their text.
     COLORREF Window;
     COLORREF WindowText;
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TWin32GUIPaletteRole
+//
+// One of TWin32GUIPalette's colors, as a theme file sets it (see
+// PaletteRoles()).
+/////////////////////////////////////////////////////////////////////////////
+struct TWin32GUIPaletteRole
+{
+    // The member it is.
+    COLORREF TWin32GUIPalette::* Color;
+    // What this role and the ones after it, up to the next one with a Group, color, one line or more, for
+    // CarbonThemeFileText()'s comments; nullptr for those after it.
+    char const* Group;
+    // The member's name, which the theme file uses.
+    char const* Name;
 };
 
 //---------------------------------------------------------------------------
@@ -155,12 +188,23 @@ COLORREF BlendColors(COLORREF from, COLORREF to, int numerator, int denominator)
 // The colors of RAD Studio's Carbon style, the VCL GUI runner's dark theme, read from its .vsf file and from
 // the VCL GUI runner as it draws under it.
 TWin32GUIPalette CarbonPalette();
+// A theme file (see TGUIThemeFile) setting each of PaletteRoles() to Carbon's color, in their order, with
+// comments saying what the file is and what each group of roles colors, and CRLF line breaks: the template
+// View > Theme > Dark Theme > Save Theme Template writes.
+std::string CarbonThemeFileText();
 // The color of a failed test's text on 'background': RGB(200, 0, 0), or RGB(255, 100, 100) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF FailureTextColorOn(COLORREF background);
 // Whether 'color' is dark, by its luma (Rec. 601 weights) being below 128, as the VCL GUI runner decides
 // whether a background needs lighter text colors.
 bool IsDarkColor(COLORREF color);
+// The names of PaletteRoles(), in their order, for ReadGUIThemeFile().
+std::vector<std::string> PaletteRoleNames();
+// Every member of TWin32GUIPalette, once, in the struct's order, with its name and group.
+std::vector<TWin32GUIPaletteRole> const& PaletteRoles();
+// 'palette' with each of 'colors' (a theme file's, see ReadGUIThemeFile()) in place of its role's color; one
+// whose role isn't one of PaletteRoles() is left out.
+TWin32GUIPalette PaletteWithThemeColors(TWin32GUIPalette palette, std::vector<TGUIThemeColor> const& colors);
 // The color of a skipped test's text on 'background': RGB(190, 120, 0), or RGB(255, 190, 70) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF SkipTextColorOn(COLORREF background);

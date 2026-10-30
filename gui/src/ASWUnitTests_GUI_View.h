@@ -100,13 +100,16 @@ std::string GUIDefaultJUnitReportFileName(std::string const& exeFileName);
 TestFilter GUIFilterBoxFilter(std::string const& text);
 // The first line of 'text', e.g. for the Failures & Skips list's Detail column.
 std::string GUIFirstLine(std::string const& text);
+// 'text', e.g. a theme file's name, as a menu item's caption: each '&' doubled, so it shows rather than making
+// the next letter the item's accelerator.
+std::string GUIMenuItemText(std::string const& text);
 // The status bar's panels' text, in order: the checked and shown tests, the run's progress, the passed, failed
 // and skipped counts, the run's elapsed time (empty if no run has started), the shuffle setting ('shuffleText',
 // from TGUIShuffle::StatusText()), and 'message'.
 std::vector<std::string> GUIStatusPanels(TGUITestList const& testList, size_t runFinishedCount, size_t runTotalCount,
     std::optional<double> elapsedSeconds, std::string const& shuffleText, std::string const& message);
 // The status bar's panel widths at 96 DPI, in order, one per panel GUIStatusPanels() fills, as the VCL GUI
-// runner's form has them.
+// runner's form has them. The last panel, the status message's, takes the rest of the bar in both runners.
 std::vector<int> GUIStatusPanelWidths();
 // The result a test is given when an unhandled exception, described by 'description', ended the run while it
 // was running.

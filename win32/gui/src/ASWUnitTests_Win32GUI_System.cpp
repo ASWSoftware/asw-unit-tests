@@ -75,6 +75,7 @@ public:
 //---------------------------------------------------------------------------
 
 std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error);
+std::string FolderOf(std::string const& path);
 std::string WithExtension(std::string const& path, std::string const& extension);
 
 //---------------------------------------------------------------------------
@@ -86,6 +87,19 @@ std::string WithExtension(std::string const& path, std::string const& extension)
 std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error)
 {
     return std::runtime_error("Couldn't " + action + " " + path + ": " + SystemErrorText(error));
+}
+//---------------------------------------------------------------------------
+/*
+    FolderOf
+
+    The folder the path's file is in, without a trailing separator, e.g. "a\b" for "a\b\c.ini"; empty if the
+    path has no folder.
+*/
+std::string FolderOf(std::string const& path)
+{
+    std::size_t const separator = path.find_last_of("\\/");
+
+    return separator == std::string::npos ? std::string() : path.substr(0, separator);
 }
 //---------------------------------------------------------------------------
 /*
@@ -241,6 +255,25 @@ bool FileExists(std::string const& path)
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 //---------------------------------------------------------------------------
+std::vector<std::string> FileNamesInFolder(std::string const& folderPath)
+{
+    std::vector<std::string> names;
+    WIN32_FIND_DATAW found = {};
+    HANDLE const search = FindFirstFileW(UTF8ToWide(folderPath + "\\*").c_str(), &found);
+
+    if (search == INVALID_HANDLE_VALUE)
+        return names;
+
+    for (bool more = true; more; more = FindNextFileW(search, &found) != 0)
+    {
+        if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            names.push_back(WideToUTF8(found.cFileName));
+    }
+
+    FindClose(search);
+    return names;
+}
+//---------------------------------------------------------------------------
 std::string GUILayoutFilePath()
 {
     return GUISettingsFolderPath() + "\\" + WithExtension(ExeFileName(), ".ini");
@@ -263,6 +296,11 @@ std::string GUISettingsFolderPath()
     return WideToUTF8(appData) + "\\ASWUnitTests";
 }
 //---------------------------------------------------------------------------
+std::string GUIThemesFolderPath()
+{
+    return GUISettingsFolderPath() + "\\Themes";
+}
+//---------------------------------------------------------------------------
 bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
 {
     if (wParam == SPI_SETHIGHCONTRAST)
@@ -273,16 +311,29 @@ bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
     return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
 }
 //---------------------------------------------------------------------------
-EGUITheme LoadGUIThemeFromLayoutFile()
+std::string LoadGUIDarkThemeFromLayoutFile(std::string const& layoutPath)
 {
     try
     {
-        std::string const path = GUILayoutFilePath();
+        if (!FileExists(layoutPath))
+            return GUIDefaultDarkThemeName();
 
-        if (!FileExists(path))
+        return LoadGUIDarkTheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
+    }
+    catch (...)
+    {
+        return GUIDefaultDarkThemeName();
+    }
+}
+//---------------------------------------------------------------------------
+EGUITheme LoadGUIThemeFromLayoutFile(std::string const& layoutPath)
+{
+    try
+    {
+        if (!FileExists(layoutPath))
             return EGUITheme::Windows;
 
-        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(path)));
+        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
     }
     catch (...)
     {
@@ -293,6 +344,25 @@ EGUITheme LoadGUIThemeFromLayoutFile()
 HICON MainIcon()
 {
     return LoadIconW(GetModuleHandleW(nullptr), L"MAINICON");
+}
+//---------------------------------------------------------------------------
+/*
+    OpenFolderInExplorer
+
+    ShellExecuteW() returns a value above 32 on success, and otherwise an error code that, as documented, isn't
+    always GetLastError()'s, so the error is described from GetLastError() only when it has one.
+*/
+void OpenFolderInExplorer(HWND owner, std::string const& folderPath)
+{
+    SetLastError(ERROR_SUCCESS);
+    INT_PTR const result = reinterpret_cast<INT_PTR>(ShellExecuteW(owner, L"open", UTF8ToWide(folderPath).c_str(),
+        nullptr, nullptr, SW_SHOWNORMAL));
+
+    if (result <= 32)
+    {
+        DWORD const error = GetLastError();
+        throw FileError("open the folder", folderPath, error != ERROR_SUCCESS ? error : ERROR_PATH_NOT_FOUND);
+    }
 }
 //---------------------------------------------------------------------------
 std::vector<std::string> ProcessArguments()
@@ -343,17 +413,39 @@ bool RemoveFile(std::string const& path)
     return DeleteFileW(UTF8ToWide(path).c_str()) != 0;
 }
 //---------------------------------------------------------------------------
-void SaveGUIThemeToLayoutFile(EGUITheme theme)
+void SaveGUIDarkThemeToLayoutFile(std::string const& layoutPath, std::string const& name)
 {
     try
     {
-        std::string const path = GUILayoutFilePath();
-        CreateFolderPath(GUISettingsFolderPath());
+        std::string const folder = FolderOf(layoutPath);
+
+        if (!folder.empty())
+            CreateFolderPath(folder);
 
         // Starting from the file's current text keeps the layout and any other values in it.
-        TGUIINIDocument ini(FileExists(path) ? ReadFileBytes(path) : std::string());
+        TGUIINIDocument ini(FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
+        SaveGUIDarkTheme(ini, name);
+        WriteFileBytes(layoutPath, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default dark theme.
+    }
+}
+//---------------------------------------------------------------------------
+void SaveGUIThemeToLayoutFile(std::string const& layoutPath, EGUITheme theme)
+{
+    try
+    {
+        std::string const folder = FolderOf(layoutPath);
+
+        if (!folder.empty())
+            CreateFolderPath(folder);
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
         SaveGUITheme(ini, theme);
-        WriteFileBytes(path, ini.Text());
+        WriteFileBytes(layoutPath, ini.Text());
     }
     catch (...)
     {

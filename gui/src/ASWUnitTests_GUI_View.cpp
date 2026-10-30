@@ -161,6 +161,21 @@ std::string GUIFirstLine(std::string const& text)
     return text.substr(0, text.find('\n'));
 }
 //---------------------------------------------------------------------------
+std::string GUIMenuItemText(std::string const& text)
+{
+    std::string caption;
+
+    for (char const c : text)
+    {
+        if (c == '&')
+            caption += '&';
+
+        caption += c;
+    }
+
+    return caption;
+}
+//---------------------------------------------------------------------------
 std::vector<std::string> GUIStatusPanels(TGUITestList const& testList, size_t runFinishedCount, size_t runTotalCount,
     std::optional<double> elapsedSeconds, std::string const& shuffleText, std::string const& message)
 {

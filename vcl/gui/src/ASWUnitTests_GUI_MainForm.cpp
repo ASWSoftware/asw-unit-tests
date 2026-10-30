@@ -484,6 +484,16 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_FocusFilterExecute(TObject* /*Send
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_OpenThemesFolderExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Dark Theme > Open Themes Folder", []()
+    {
+        System::UnicodeString const folder = GUIThemesFolderPath();
+        System::Sysutils::ForceDirectories(folder);
+        OpenFolderInExplorer(folder);
+    });
+}
+//---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Act_ResetLayoutExecute(TObject* /*Sender*/)
 {
     RunGuarded("Reset Layout", [this]()
@@ -691,7 +701,7 @@ void TFormASWUnitTestsGUIMain::ApplyTheme()
     }
 
     m_ThemeChangePending = false;
-    ApplyGUITheme(m_Theme);
+    ApplyGUITheme(m_Theme, m_DarkStyle);
 }
 //---------------------------------------------------------------------------
 /*
@@ -830,6 +840,27 @@ void __fastcall TFormASWUnitTestsGUIMain::Edt_FilterChange(TObject* /*Sender*/)
     });
 }
 //---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::DarkThemeItemClick
+
+    Not while the Theme actions are disabled, during a run, as for them.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::DarkThemeItemClick(TObject* Sender)
+{
+    RunGuarded("Theme > Dark Theme", [this, Sender]()
+    {
+        TMenuItem const* const item = dynamic_cast<TMenuItem const*>(Sender);
+
+        if (item == nullptr || !Act_ThemeDark->Enabled || item->Tag < 0 ||
+            static_cast<size_t>(item->Tag) >= m_DarkThemeNames.size())
+        {
+            return;
+        }
+
+        SetDarkTheme(m_DarkThemeNames[static_cast<size_t>(item->Tag)]);
+    });
+}
+//---------------------------------------------------------------------------
 int TFormASWUnitTestsGUIMain::ExitCode() const
 {
     return m_Options.ExitAfterRun ? m_LastRunExitCode : ExitCode_Success;
@@ -853,6 +884,53 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
     m_StatusMessage = GUIUnhandledExceptionStatus(description);
     AppendLog(m_StatusMessage + "\n");
     UpdateDetail();
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::FillDarkThemeMenu
+
+    Carbon first, then the VCL style files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or
+    removed since shows at once, above Open Themes Folder; the chosen one is checked. A chosen theme whose file is
+    missing is still listed, so choosing it again reports why it isn't used.
+*/
+void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
+{
+    for (TMenuItem* const item : m_DarkThemeItems)
+        delete item;
+
+    m_DarkThemeItems.clear();
+
+    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf");
+    names.insert(names.begin(), GUIDefaultDarkThemeName());
+
+    // Windows' file names ignore case, so a name saved in another case is still that file's.
+    std::vector<std::string>::const_iterator chosen = std::find_if(names.begin(), names.end(),
+        [this](std::string const& name)
+    {
+        return System::Sysutils::AnsiSameText(FromUTF8(name), FromUTF8(m_DarkTheme));
+    });
+
+    if (chosen == names.end())
+        chosen = names.insert(names.end(), m_DarkTheme);
+
+    size_t const chosenIndex = static_cast<size_t>(chosen - names.begin());
+
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+        TMenuItem* const item = new TMenuItem(this);
+        m_DarkThemeItems.push_back(item);
+
+        // Carbon's C is its accelerator; a style file's name has none.
+        item->Caption = FromUTF8((i == 0 ? "&" : "") + GUIMenuItemText(names[i]));
+        item->Checked = i == chosenIndex;
+        item->Enabled = Act_ThemeDark->Enabled;
+        item->OnClick = DarkThemeItemClick;
+        item->RadioItem = true;
+        item->Tag = static_cast<NativeInt>(i);
+        MI_ViewDarkTheme->Insert(static_cast<int>(i), item);
+    }
+
+    m_DarkThemeNames = names;
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::FormClose(TObject* /*Sender*/, TCloseAction& /*Action*/)
@@ -1055,6 +1133,19 @@ void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresDblClick(TObject* /*Sender*
         TV_Tests->Selected = node;
         node->MakeVisible();
         TV_Tests->SetFocus();
+    });
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::MI_ViewDarkThemeClick
+
+    The VCL calls a parent item's OnClick as its submenu opens.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::MI_ViewDarkThemeClick(TObject* /*Sender*/)
+{
+    RunGuarded("the Dark Theme menu", [this]()
+    {
+        FillDarkThemeMenu();
     });
 }
 //---------------------------------------------------------------------------
@@ -1369,6 +1460,35 @@ void TFormASWUnitTestsGUIMain::SaveSelection()
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetDarkTheme
+
+    Applied at once while dark; while light, its file is still loaded, so its problems show in the log, and the
+    status bar says it shows once the theme is dark. A VCL style file already loaded isn't read again (see
+    LoadGUIDarkStyle()).
+*/
+void TFormASWUnitTestsGUIMain::SetDarkTheme(std::string const& name)
+{
+    m_DarkTheme = name;
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIDarkThemeToLayoutFile(GUILayoutFilePath(), name);
+
+    std::vector<std::string> problems;
+    m_DarkStyle = LoadGUIDarkStyle(GUIThemesFolderPath(), name, problems);
+    ApplyTheme();
+
+    if (GUIThemeIsDark(m_Theme, WindowsAppsUseDarkTheme(), WindowsHighContrast()))
+        m_StatusMessage = "Dark theme: " + name + ".";
+    else
+        m_StatusMessage = "Dark theme: " + name + ", shown while the theme is dark.";
+
+    for (std::string const& problem : problems)
+        AppendLog(problem + "\n");
+
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
 {
     int const image = static_cast<int>(GUINodeStatus(m_TestList, NodeRef(node->Data)));
@@ -1415,7 +1535,7 @@ void TFormASWUnitTestsGUIMain::SetTheme(EGUITheme theme)
     ShowThemeState();
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIThemeToLayoutFile(theme);
+        SaveGUIThemeToLayoutFile(GUILayoutFilePath(), theme);
 
     ApplyTheme();
 }
@@ -1441,10 +1561,13 @@ void TFormASWUnitTestsGUIMain::ShowThemeState()
     and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout saved when it
     last closed.
 */
-void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options, EGUITheme theme)
+void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options, EGUITheme theme, std::string const& darkTheme,
+    System::UnicodeString const& darkStyle, std::vector<std::string> const& themeProblems)
 {
     m_Options = options;
     m_Theme = theme;
+    m_DarkTheme = darkTheme;
+    m_DarkStyle = darkStyle;
     ShowThemeState();
 
     m_Observer.LogTextCallback = [this](std::string const& text)
@@ -1488,6 +1611,9 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options, EGUITheme theme
 
     for (std::string const& note : GUICommandLineNotes(m_Options, "VCL forms or controls"))
         AppendLog(note + "\n");
+
+    for (std::string const& problem : themeProblems)
+        AppendLog(problem + "\n");
 
     if (m_Options.LayoutReset)
         ResetSavedLayout();
@@ -1657,6 +1783,7 @@ void TFormASWUnitTestsGUIMain::UpdateCommands()
     Act_ShuffleOrder->Enabled = states.ShuffleOrder;
     Act_ShuffleSeed->Enabled = states.ShuffleSeed;
     Act_Stop->Enabled = states.Stop;
+    Act_OpenThemesFolder->Enabled = states.Theme;
     Act_ThemeDark->Enabled = states.Theme;
     Act_ThemeLight->Enabled = states.Theme;
     Act_ThemeWindows->Enabled = states.Theme;

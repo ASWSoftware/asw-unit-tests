@@ -28,9 +28,12 @@ limitations under the License.
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -39,6 +42,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_INIDocument.h"
 #include "ASWUnitTests_GUI_Selection.h"
+#include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_GUI_Tree.h"
 #include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
@@ -55,7 +59,12 @@ namespace ASWUnitTests
 namespace
 {
 
+// The command ID of View > Theme > Dark Theme's first theme, Carbon, after the EWin32GUICommand IDs; each of the
+// others' is the next (see TWin32GUIMainWindow::m_DarkThemeNames), up to MaxDarkThemes of them.
+WORD const FirstDarkThemeCommand = 2000;
 wchar_t const MainWindowClassName[] = L"ASWUnitTests_Win32GUI_Main";
+// The most themes View > Theme > Dark Theme lists, Carbon included.
+std::size_t const MaxDarkThemes = 1000;
 // Posted by PostToUI(), so the message loop runs the queued actions.
 UINT const RunQueuedMessage = WM_APP + 1;
 // The title of the GUI's windows, as the VCL GUI runner's Application->Title.
@@ -71,9 +80,11 @@ EWin32GUICommand const AllCommands[] = {
     EWin32GUICommand::ExpandAll,
     EWin32GUICommand::ExportJUnitReport,
     EWin32GUICommand::FocusFilter,
+    EWin32GUICommand::OpenThemesFolder,
     EWin32GUICommand::ResetLayout,
     EWin32GUICommand::RunFailed,
     EWin32GUICommand::RunSelected,
+    EWin32GUICommand::SaveThemeTemplate,
     EWin32GUICommand::SelectAll,
     EWin32GUICommand::SelectFailed,
     EWin32GUICommand::SelectNone,
@@ -132,6 +143,8 @@ public:
 BOOL CALLBACK AddMonitorWorkArea(HMONITOR monitor, HDC context, LPRECT bounds, LPARAM workAreas);
 void AppendCommand(HMENU menu, EWin32GUICommand command, wchar_t const* caption);
 HMENU AppendSubmenu(HMENU menuBar, wchar_t const* caption);
+std::optional<std::string> AskSaveFilePath(HWND owner, wchar_t const* title, wchar_t const* filter,
+    wchar_t const* defaultExtension, std::string const& initialPath);
 char const* CommandName(EWin32GUICommand command);
 bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command);
 COLORREF LogLineColor(std::string const& line, TWin32GUITheme const& theme);
@@ -185,6 +198,54 @@ HMENU AppendSubmenu(HMENU menuBar, wchar_t const* caption)
 }
 //---------------------------------------------------------------------------
 /*
+    AskSaveFilePath
+
+    The path chosen in Windows' Save dialog, or nullopt if it was canceled. The dialog starts at 'initialPath',
+    given its folder and its file name separately, so a folder that doesn't exist (any more) only means it starts
+    in its default folder. Throws std::runtime_error if the dialog can't be shown.
+*/
+std::optional<std::string> AskSaveFilePath(HWND owner, wchar_t const* title, wchar_t const* filter,
+    wchar_t const* defaultExtension, std::string const& initialPath)
+{
+    std::wstring const initial = UTF8ToWide(initialPath);
+    std::size_t const separator = initial.find_last_of(L"\\/");
+    std::wstring const initialFolder = separator == std::wstring::npos ? std::wstring() :
+            initial.substr(0, separator + 1);
+    std::wstring const initialName = separator == std::wstring::npos ? initial : initial.substr(separator + 1);
+
+    // Room for the longest path Windows allows, plus the terminating null.
+    std::vector<wchar_t> fileName(32768, L'\0');
+    std::copy(initialName.begin(), initialName.begin() +
+        static_cast<std::ptrdiff_t>((std::min)(initialName.size(), fileName.size() - 1)), fileName.begin());
+
+    OPENFILENAMEW dialog = {};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = filter;
+    dialog.lpstrFile = fileName.data();
+    dialog.nMaxFile = static_cast<DWORD>(fileName.size());
+    dialog.lpstrInitialDir = initialFolder.empty() ? nullptr : initialFolder.c_str();
+    dialog.lpstrTitle = title;
+    dialog.Flags = OFN_ENABLESIZING | OFN_EXPLORER | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    dialog.lpstrDefExt = defaultExtension;
+
+    if (GetSaveFileNameW(&dialog) == 0)
+    {
+        DWORD const error = CommDlgExtendedError();
+
+        if (error != 0)
+        {
+            throw std::runtime_error("Couldn't show the " + WideToUTF8(title) + " dialog (error " +
+                std::to_string(error) + ")");
+        }
+
+        return std::nullopt; // Canceled.
+    }
+
+    return WideToUTF8(fileName.data());
+}
+//---------------------------------------------------------------------------
+/*
     CommandName
 
     The command's name in an error report, as the VCL GUI runner's RunGuarded() calls it.
@@ -217,6 +278,9 @@ char const* CommandName(EWin32GUICommand command)
         case EWin32GUICommand::FocusFilter:
             return "Filter";
 
+        case EWin32GUICommand::OpenThemesFolder:
+            return "Theme > Dark Theme > Open Themes Folder";
+
         case EWin32GUICommand::ResetLayout:
             return "Reset Layout";
 
@@ -225,6 +289,9 @@ char const* CommandName(EWin32GUICommand command)
 
         case EWin32GUICommand::RunSelected:
             return "Run Selected";
+
+        case EWin32GUICommand::SaveThemeTemplate:
+            return "Theme > Dark Theme > Save Theme Template";
 
         case EWin32GUICommand::SelectAll:
             return "Select All";
@@ -285,6 +352,9 @@ bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command)
         case EWin32GUICommand::FocusFilter:
             return states.FocusFilter;
 
+        case EWin32GUICommand::OpenThemesFolder:
+            return states.Theme;
+
         case EWin32GUICommand::ResetLayout:
             return states.ResetLayout;
 
@@ -293,6 +363,9 @@ bool IsCommandEnabled(TGUICommandStates const& states, EWin32GUICommand command)
 
         case EWin32GUICommand::RunSelected:
             return states.RunSelected;
+
+        case EWin32GUICommand::SaveThemeTemplate:
+            return states.Theme;
 
         case EWin32GUICommand::SelectAll:
             return states.SelectAll;
@@ -528,6 +601,7 @@ TWin32GUIMainWindow::TWin32GUIMainWindow(TWin32GUITheme& theme)
       m_Lbl_Filter(nullptr),
       m_LV_Failures(nullptr),
       m_Mem_Detail(nullptr),
+      m_MI_ViewDarkTheme(nullptr),
       m_MM_Main(nullptr),
       m_PB_Progress(nullptr),
       m_PC_Results(nullptr),
@@ -538,6 +612,8 @@ TWin32GUIMainWindow::TWin32GUIMainWindow(TWin32GUITheme& theme)
       m_Accelerators(nullptr),
       m_CloseAfterRun(false),
       m_Closing(false),
+      m_DarkTheme(GUIDefaultDarkThemeName()),
+      m_DarkThemeNames(1, GUIDefaultDarkThemeName()),
       m_DetailHeight(TWin32GUIMainSizes::DefaultDetailHeight),
       m_DPI(USER_DEFAULT_SCREEN_DPI),
       m_FocusBeforeRun(nullptr),
@@ -667,7 +743,8 @@ void TWin32GUIMainWindow::ApplyDPI()
     // e.g. the dark tree's check boxes and the menus' sizes, for the new DPI.
     m_Theme.Refresh();
 
-    // The status bar's parts' widths, from the .dfm's panels.
+    // The status bar's parts' widths, from the .dfm's panels; the last, the status message's, takes the rest of
+    // the bar, as VCL's TStatusBar gives its last panel.
     std::vector<int> rightEdges;
     int right = 0;
 
@@ -676,6 +753,9 @@ void TWin32GUIMainWindow::ApplyDPI()
         right += ScaleForDPI(width, m_DPI);
         rightEdges.push_back(right);
     }
+
+    if (!rightEdges.empty())
+        rightEdges.back() = -1;
 
     SendMessageW(m_SB_Status, SB_SETPARTS, rightEdges.size(), reinterpret_cast<LPARAM>(rightEdges.data()));
 
@@ -741,6 +821,8 @@ void TWin32GUIMainWindow::ApplyTheme()
         return;
 
     m_Theme.SetDark(dark);
+    // The tree's status dots are the dark theme's own colors while dark.
+    CreateStatusImages();
     RecolorLog();
 }
 //---------------------------------------------------------------------------
@@ -1042,6 +1124,13 @@ void TWin32GUIMainWindow::CreateMenuBar()
     AppendCommand(theme, EWin32GUICommand::ThemeWindows, L"Use &Windows Setting");
     AppendCommand(theme, EWin32GUICommand::ThemeLight, L"&Light");
     AppendCommand(theme, EWin32GUICommand::ThemeDark, L"&Dark");
+    AppendMenuW(theme, MF_SEPARATOR, 0, nullptr);
+    // Filled with the theme files each time it opens; Carbon until then.
+    m_MI_ViewDarkTheme = AppendSubmenu(theme, L"Dark &Theme");
+    AppendMenuW(m_MI_ViewDarkTheme, MF_STRING, FirstDarkThemeCommand, L"&Carbon");
+    AppendMenuW(m_MI_ViewDarkTheme, MF_SEPARATOR, 0, nullptr);
+    AppendCommand(m_MI_ViewDarkTheme, EWin32GUICommand::SaveThemeTemplate, L"&Save Theme Template...");
+    AppendCommand(m_MI_ViewDarkTheme, EWin32GUICommand::OpenThemesFolder, L"&Open Themes Folder");
 
     HMENU const options = AppendSubmenu(m_MM_Main, L"&Options");
     AppendCommand(options, EWin32GUICommand::ShuffleOrder, L"Run in &Shuffled Order");
@@ -1057,20 +1146,33 @@ void TWin32GUIMainWindow::CreateMenuBar()
 
     Draws one colored dot per TGUITestStatus into a new image list for the test tree, in the enum's order, so
     a status converts directly to its image index. Drawn at runtime, scaled to m_DPI, as the VCL GUI runner
-    draws its own, rather than stored as images.
+    draws its own, rather than stored as images. In the dark theme's colors while dark, and else in Carbon's,
+    which are the light look's too.
 */
 void TWin32GUIMainWindow::CreateStatusImages()
 {
+    TWin32GUIPalette const palette = m_Theme.IsDark() ? m_Theme.Palette() : CarbonPalette();
+
     // In TGUITestStatus order: NotRun, Running, Passed, Failed, Skipped.
     COLORREF const colors[] = {
-        RGB(190, 190, 190),
-        RGB(0, 120, 215),
-        RGB(16, 160, 16),
-        RGB(215, 40, 40),
-        RGB(230, 165, 0),
+        palette.TreeStatusNotRun,
+        palette.TreeStatusRunning,
+        palette.TreeStatusPassed,
+        palette.TreeStatusFailed,
+        palette.TreeStatusSkipped,
     };
-    // Each dot's background, left out by ImageList_AddMasked().
-    COLORREF const transparent = RGB(255, 0, 255);
+    // Each dot's background, left out by ImageList_AddMasked(): a color none of the dots has, as a theme file may
+    // give one any color.
+    COLORREF transparent = RGB(255, 0, 255);
+
+    for (COLORREF const candidate : { RGB(255, 0, 255), RGB(0, 255, 255), RGB(255, 255, 0), RGB(1, 2, 3),
+                                      RGB(254, 0, 254), RGB(0, 254, 254) })
+    {
+        transparent = candidate;
+
+        if (std::find(std::begin(colors), std::end(colors), candidate) == std::end(colors))
+            break;
+    }
 
     int const size = ScaleForDPI(16, m_DPI);
     int const inset = ScaleForDPI(3, m_DPI);
@@ -1263,6 +1365,11 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     SendMessageW(m_Edt_Filter, EM_SETSEL, 0, -1);
                     break;
 
+                case EWin32GUICommand::OpenThemesFolder:
+                    CreateFolderPath(GUIThemesFolderPath());
+                    OpenFolderInExplorer(m_Window, GUIThemesFolderPath());
+                    break;
+
                 case EWin32GUICommand::ResetLayout:
                     ResetLayout();
                     break;
@@ -1284,6 +1391,10 @@ void TWin32GUIMainWindow::DoCommand(EWin32GUICommand command)
                     }
 
                     RunCheckedTests();
+                    break;
+
+                case EWin32GUICommand::SaveThemeTemplate:
+                    SaveThemeTemplate();
                     break;
 
                 case EWin32GUICommand::SelectAll:
@@ -1345,9 +1456,7 @@ int TWin32GUIMainWindow::ExitCode() const
     TWin32GUIMainWindow::ExportJUnitReport
 
     Saves the latest run's JUnit report, the same one --report-junit writes, e.g. when --report-junit wasn't
-    given. The dialog starts at --report-junit's path if there is one, and then at the last one chosen. It's
-    given the folder and the file name separately, so a folder that doesn't exist (any more) only means it
-    starts in its default folder.
+    given. The dialog starts at --report-junit's path if there is one, and then at the last one chosen.
 */
 void TWin32GUIMainWindow::ExportJUnitReport()
 {
@@ -1364,43 +1473,14 @@ void TWin32GUIMainWindow::ExportJUnitReport()
         m_ExportJUnitReportPath = GUIDefaultJUnitReportFileName(ExeFileName());
     }
 
-    std::wstring const initialPath = UTF8ToWide(m_ExportJUnitReportPath);
-    std::size_t const separator = initialPath.find_last_of(L"\\/");
-    std::wstring const initialFolder = separator == std::wstring::npos ? std::wstring() :
-            initialPath.substr(0, separator + 1);
-    std::wstring const initialName = separator == std::wstring::npos ? initialPath : initialPath.substr(separator + 1);
+    // The .dfm's SD_JUnitReport: its title, filter and default extension.
+    std::optional<std::string> const path = AskSaveFilePath(m_Window, L"Export JUnit Report",
+        L"JUnit XML reports (*.xml)\0*.xml\0All files (*.*)\0*.*\0", L"xml", m_ExportJUnitReportPath);
 
-    // Room for the longest path Windows allows, plus the terminating null.
-    std::vector<wchar_t> fileName(32768, L'\0');
-    std::copy(initialName.begin(), initialName.begin() +
-        static_cast<std::ptrdiff_t>((std::min)(initialName.size(), fileName.size() - 1)), fileName.begin());
-
-    // The .dfm's SD_JUnitReport: its filter, default extension, title and options.
-    OPENFILENAMEW dialog = {};
-    dialog.lStructSize = sizeof(dialog);
-    dialog.hwndOwner = m_Window;
-    dialog.lpstrFilter = L"JUnit XML reports (*.xml)\0*.xml\0All files (*.*)\0*.*\0";
-    dialog.lpstrFile = fileName.data();
-    dialog.nMaxFile = static_cast<DWORD>(fileName.size());
-    dialog.lpstrInitialDir = initialFolder.empty() ? nullptr : initialFolder.c_str();
-    dialog.lpstrTitle = L"Export JUnit Report";
-    dialog.Flags = OFN_ENABLESIZING | OFN_EXPLORER | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-    dialog.lpstrDefExt = L"xml";
-
-    if (GetSaveFileNameW(&dialog) == 0)
-    {
-        DWORD const error = CommDlgExtendedError();
-
-        if (error != 0)
-        {
-            throw std::runtime_error("Couldn't show the Export JUnit Report dialog (error " + std::to_string(error) +
-                ")");
-        }
-
+    if (!path.has_value())
         return; // Canceled.
-    }
 
-    m_ExportJUnitReportPath = WideToUTF8(fileName.data());
+    m_ExportJUnitReportPath = *path;
 
     std::string error;
 
@@ -1434,6 +1514,70 @@ void TWin32GUIMainWindow::FailRunOnUnhandledException(std::string const& descrip
     m_StatusMessage = GUIUnhandledExceptionStatus(description);
     AppendLog(m_StatusMessage + "\n");
     UpdateDetail();
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::FillDarkThemeMenu
+
+    Carbon first, then the theme files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or removed
+    since shows at once, then Save Theme Template and Open Themes Folder; the chosen one has the radio check. A
+    chosen theme whose file is missing is still listed, so choosing it again reports why it isn't used.
+*/
+void TWin32GUIMainWindow::FillDarkThemeMenu()
+{
+    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".ini");
+    names.insert(names.begin(), GUIDefaultDarkThemeName());
+
+    // Windows' file names ignore case, so a name saved in another case is still that file's.
+    auto const sameName = [](std::string const& a, std::string const& b)
+        {
+            std::wstring const wideA = UTF8ToWide(a);
+            std::wstring const wideB = UTF8ToWide(b);
+
+            return CompareStringOrdinal(wideA.c_str(), static_cast<int>(wideA.size()), wideB.c_str(),
+                static_cast<int>(wideB.size()), TRUE) == CSTR_EQUAL;
+        };
+
+    std::vector<std::string>::const_iterator chosen = std::find_if(names.begin(), names.end(),
+        [this, &sameName](std::string const& name)
+        {
+            return sameName(name, m_DarkTheme);
+        });
+
+    if (chosen == names.end())
+        chosen = names.insert(names.end(), m_DarkTheme);
+
+    std::size_t const chosenIndex = static_cast<std::size_t>(chosen - names.begin());
+
+    if (names.size() > MaxDarkThemes)
+        names.erase(names.begin() + static_cast<std::ptrdiff_t>(MaxDarkThemes), names.end());
+
+    while (GetMenuItemCount(m_MI_ViewDarkTheme) > 0)
+        DeleteMenu(m_MI_ViewDarkTheme, 0, MF_BYPOSITION);
+
+    UINT const enabled = m_CommandStates.Theme ? MF_ENABLED : MF_GRAYED;
+
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        // Carbon's C is its accelerator; a theme file's name has none.
+        std::wstring const caption = UTF8ToWide((i == 0 ? "&" : "") + GUIMenuItemText(names[i]));
+        AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, FirstDarkThemeCommand + i, caption.c_str());
+    }
+
+    if (chosenIndex < names.size())
+    {
+        CheckMenuRadioItem(m_MI_ViewDarkTheme, FirstDarkThemeCommand, static_cast<UINT>(FirstDarkThemeCommand +
+            names.size() - 1), static_cast<UINT>(FirstDarkThemeCommand + chosenIndex), MF_BYCOMMAND);
+    }
+
+    AppendMenuW(m_MI_ViewDarkTheme, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, static_cast<UINT_PTR>(EWin32GUICommand::SaveThemeTemplate),
+        L"&Save Theme Template...");
+    AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, static_cast<UINT_PTR>(EWin32GUICommand::OpenThemesFolder),
+        L"&Open Themes Folder");
+
+    m_DarkThemeNames = names;
+    m_Theme.RefreshMenu(m_MI_ViewDarkTheme);
 }
 //---------------------------------------------------------------------------
 HWND TWin32GUIMainWindow::Handle() const
@@ -1484,6 +1628,23 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
                 return 0;
             }
 
+            std::size_t const darkTheme = static_cast<std::size_t>(id) - FirstDarkThemeCommand;
+
+            if (id >= FirstDarkThemeCommand && darkTheme < m_DarkThemeNames.size())
+            {
+                // As DoCommand() does, nothing while the Theme commands are disabled.
+                if (!m_CommandStates.Theme)
+                    return 0;
+
+                std::string const name = m_DarkThemeNames[darkTheme];
+
+                RunGuarded("Theme > Dark Theme", [this, &name]()
+                    {
+                        SetDarkTheme(name);
+                    });
+                return 0;
+            }
+
             if (reinterpret_cast<HWND>(lParam) == m_Edt_Filter && HIWORD(wParam) == EN_CHANGE)
             {
                 if (m_SettingFilterText)
@@ -1508,6 +1669,18 @@ LRESULT TWin32GUIMainWindow::HandleMessage(UINT message, WPARAM wParam, LPARAM l
         case WM_DPICHANGED:
             OnDPIChanged(HIWORD(wParam), *reinterpret_cast<RECT const*>(lParam));
             return 0;
+
+        case WM_INITMENUPOPUP:
+            if (reinterpret_cast<HMENU>(wParam) == m_MI_ViewDarkTheme)
+            {
+                RunGuarded("the Dark Theme menu", [this]()
+                {
+                    FillDarkThemeMenu();
+                });
+                return 0;
+            }
+
+            break;
 
         case WM_NCDESTROY:
             m_Window = nullptr;
@@ -2393,6 +2566,39 @@ void TWin32GUIMainWindow::SaveSelection()
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SaveThemeTemplate
+
+    Writes CarbonThemeFileText() where the user chooses, starting in GUIThemesFolderPath(), created if needed,
+    where View > Theme > Dark Theme lists it once it's saved there.
+*/
+void TWin32GUIMainWindow::SaveThemeTemplate()
+{
+    std::string const folder = GUIThemesFolderPath();
+    CreateFolderPath(folder);
+
+    std::optional<std::string> const path = AskSaveFilePath(m_Window, L"Save Theme Template",
+        L"Theme files (*.ini)\0*.ini\0All files (*.*)\0*.*\0", L"ini", folder + "\\My Theme.ini");
+
+    if (!path.has_value())
+        return; // Canceled.
+
+    try
+    {
+        WriteFileBytes(*path, CarbonThemeFileText());
+    }
+    catch (std::exception const& exception)
+    {
+        std::string const message = "The theme template couldn't be written to:\n" + *path + "\n\n" +
+            exception.what();
+        ShowMessageDialog(m_Window, m_Theme, Title, message, EWin32GUIMessageIcon::Error);
+        return;
+    }
+
+    m_StatusMessage = "Theme template saved.";
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 void TWin32GUIMainWindow::SelectResultsPage(int page)
 {
     // Unlike a click on a tab, this sends no TCN_SELCHANGE.
@@ -2403,6 +2609,39 @@ void TWin32GUIMainWindow::SelectResultsPage(int page)
 HTREEITEM TWin32GUIMainWindow::SelectedTreeItem() const
 {
     return RelatedTreeItem(m_TV_Tests, nullptr, TVGN_CARET);
+}
+//---------------------------------------------------------------------------
+/*
+    TWin32GUIMainWindow::SetDarkTheme
+
+    Read from its file again even if it's the current one, so a change to the file shows. Applied at once
+    while dark; while light, it's still read, so its problems show in the log, and the status bar says it shows
+    once the theme is dark.
+*/
+void TWin32GUIMainWindow::SetDarkTheme(std::string const& name)
+{
+    m_DarkTheme = name;
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIDarkThemeToLayoutFile(GUILayoutFilePath(), name);
+
+    std::vector<std::string> const problems = m_Theme.SetDarkTheme(name);
+
+    if (m_Theme.IsDark())
+    {
+        CreateStatusImages();
+        RecolorLog();
+        m_StatusMessage = "Dark theme: " + name + ".";
+    }
+    else
+    {
+        m_StatusMessage = "Dark theme: " + name + ", shown while the theme is dark.";
+    }
+
+    for (std::string const& problem : problems)
+        AppendLog(problem + "\n");
+
+    UpdateStatusBar();
 }
 //---------------------------------------------------------------------------
 void TWin32GUIMainWindow::SetNodeImage(HTREEITEM item)
@@ -2472,7 +2711,7 @@ void TWin32GUIMainWindow::SetTheme(EGUITheme theme)
     ShowThemeState();
 
     if (!m_Options.LayoutIgnore)
-        SaveGUIThemeToLayoutFile(theme);
+        SaveGUIThemeToLayoutFile(GUILayoutFilePath(), theme);
 
     ApplyTheme();
 }
@@ -2549,14 +2788,19 @@ void TWin32GUIMainWindow::ShowThemeState()
     Loads the registered tests and applies the command line's options: --project-name to the caption, and
     --filter and the partition options to which tests start out checked, and --filter to the filter box,
     and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout and the test
-    selection saved when it last closed. WinMain() set the theme up for 'theme' before any window existed, so
-    the --help dialog had it too.
+    selection saved when it last closed. WinMain() set the theme up for 'theme' and 'darkTheme' before any
+    window existed, so the --help dialog had it too, and its problems are noted in the log, where they stay
+    until the first run clears it.
 */
-void TWin32GUIMainWindow::Start(TGUIOptions const& options, EGUITheme theme)
+void TWin32GUIMainWindow::Start(TGUIOptions const& options, EGUITheme theme, std::string const& darkTheme,
+    std::vector<std::string> const& themeProblems)
 {
     m_Options = options;
     m_ThemeChoice = theme;
+    m_DarkTheme = darkTheme;
     ShowThemeState();
+    // The dark theme's status dots, if WinMain() set up a theme file.
+    CreateStatusImages();
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {
@@ -2598,6 +2842,9 @@ void TWin32GUIMainWindow::Start(TGUIOptions const& options, EGUITheme theme)
 
     for (std::string const& note : GUICommandLineNotes(m_Options, "windows or controls"))
         AppendLog(note + "\n");
+
+    for (std::string const& problem : themeProblems)
+        AppendLog(problem + "\n");
 
     if (m_Options.LayoutReset)
         ResetSavedLayout();

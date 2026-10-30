@@ -59,7 +59,7 @@ struct TGUICommandContext
 // Whether each of a GUI runner's commands is enabled, one member per
 // command, named as in the VCL GUI runner's actions (e.g. RunSelected for
 // Act_RunSelected), plus the filter box. Theme is the GUI runners' View >
-// Theme menu, its three commands together.
+// Theme menu, its commands together, its Dark Theme submenu's included.
 /////////////////////////////////////////////////////////////////////////////
 struct TGUICommandStates
 {

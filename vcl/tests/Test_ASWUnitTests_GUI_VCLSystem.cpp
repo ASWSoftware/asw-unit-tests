@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_GUI_VCLSystem.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -52,10 +53,16 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_GUI_VCLSystem::TTest_ASWUnitTests_GUI_VCLSystem()
     : inherited("ASWUnitTests_GUI_VCLSystem_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_FileNamesInFolder_ListsOnlyTheFiles,
+        "FileNamesInFolder_ListsOnlyTheFiles");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUILayoutFilePath_IsPerExeUnderAppData,
         "GUILayoutFilePath_IsPerExeUnderAppData");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayoutFile,
         "GUISelectionFilePath_IsBesideTheLayoutFile");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles,
+        "GUIThemesFolderPath_IsSharedBesideTheLayoutFiles");
+    RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIDarkStyle_GivesCarbonForAnyProblem,
+        "LoadGUIDarkStyle_GivesCarbonForAnyProblem");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote,
         "LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote");
     RegisterTest(&TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount, "ProcessArguments_MatchesParamCount");
@@ -89,6 +96,57 @@ void TTest_ASWUnitTests_GUI_VCLSystem::TearDown_Test(ITestCase& /*testCase*/)
 // /////// Begin tests after this line ///////////////////////
 
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_FileNamesInFolder_ListsOnlyTheFiles()
+{
+    // Arrange: two files, one with a non-ASCII name (U+4E2D), and a folder named like a style file, in a folder
+    // deleted however the test ends.
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString("ASWUnitTests_VCLSystem_") + System::Sysutils::IntToStr(static_cast<int>(
+            GetCurrentProcessId())));
+
+    struct TDeleteFolder
+    {
+        System::UnicodeString const Folder;
+
+        ~TDeleteFolder()
+        {
+            try
+            {
+                System::Ioutils::TDirectory::Delete(Folder, true);
+            }
+            catch (...)
+            {
+            }
+        }
+    } const deleteFolder{ folder };
+
+    System::Sysutils::ForceDirectories(System::Ioutils::TPath::Combine(folder, "Folder.vsf"));
+    WriteFileBytes(System::Ioutils::TPath::Combine(folder, "Ocean.vsf"), "x");
+    WriteFileBytes(System::Ioutils::TPath::Combine(folder, System::UnicodeString(L"\x4E2D.vsf")), std::string());
+    WriteFileBytes(System::Ioutils::TPath::Combine(folder, "Folder.vsf\\Inside.vsf"), "x");
+
+    // Act
+    std::vector<std::string> names = FileNamesInFolder(folder);
+    std::vector<std::string> const missing = FileNamesInFolder(System::Ioutils::TPath::Combine(folder, "Missing"));
+
+    // Assert: both sorted the same way, as where a non-ASCII byte sorts depends on whether char is signed.
+    std::vector<std::string> expected = { "Ocean.vsf", "\xE4\xB8\xAD.vsf" };
+    std::sort(expected.begin(), expected.end());
+    std::sort(names.begin(), names.end());
+    std::string expectedText;
+    std::string listed;
+
+    for (std::string const& name : expected)
+        expectedText += name + "\n";
+
+    for (std::string const& name : names)
+        listed += name + "\n";
+
+    CheckEquals(expectedText, listed, __func__, __LINE__,
+        "the files' names, in UTF-8, without the folder, its subfolder or the files in it");
+    CheckTrue(missing.empty(), __func__, __LINE__, "none for a missing folder");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUILayoutFilePath_IsPerExeUnderAppData()
 {
     // Arrange
@@ -120,54 +178,119 @@ void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUISelectionFilePath_IsBesideTheLayo
         __LINE__, "the layout file's path with a .selection extension");
 }
 //---------------------------------------------------------------------------
-void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_GUIThemesFolderPath_IsSharedBesideTheLayoutFiles()
 {
-    // Arrange: this runner's own layout file, which only a GUI would otherwise use, put back however the test
-    // ends.
-    System::UnicodeString const path = GUILayoutFilePath();
+    // Act and Assert: the same for every executable, unlike the layout file.
+    CheckEquals(ToUTF8(System::Ioutils::TPath::Combine(System::Sysutils::ExtractFileDir(GUILayoutFilePath()),
+        "Themes")), ToUTF8(GUIThemesFolderPath()), __func__, __LINE__, "a Themes folder beside the layout file");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIDarkStyle_GivesCarbonForAnyProblem()
+{
+    // Arrange: a missing theme, and a file that isn't a style, in a Themes folder of the test's own, not the real
+    // one, which a GUI running these tests lists. Each name is the process's, as a style file, once loaded, isn't
+    // read again. The folder is deleted however the test ends.
+    std::string const suffix = std::to_string(GetCurrentProcessId());
+    std::string const missingName = "NoSuchTheme_" + suffix;
+    std::string const invalidName = "NotAStyle_" + suffix;
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString("ASWUnitTests_VCLSystem_Themes_") + FromUTF8(suffix));
 
-    struct TRestoreFile
+    struct TDeleteFolder
     {
-        System::UnicodeString const Path;
-        bool const Existed;
-        std::string const Bytes;
+        System::UnicodeString const Folder;
 
-        ~TRestoreFile()
+        ~TDeleteFolder()
         {
             try
             {
-                if (Existed)
-                    WriteFileBytes(Path, Bytes);
-                else
-                    System::Sysutils::DeleteFile(Path);
+                System::Ioutils::TDirectory::Delete(Folder, true);
             }
             catch (...)
             {
             }
         }
-    };
+    } const deleteFolder{ folder };
 
-    bool const existed = System::Sysutils::FileExists(path);
-    TRestoreFile const restoreFile{ path, existed, existed ? ReadFileBytes(path) : std::string() };
-
-    System::Sysutils::DeleteFile(path);
-    EGUITheme const noFile = LoadGUIThemeFromLayoutFile();
+    System::Sysutils::ForceDirectories(folder);
+    WriteFileBytes(System::Ioutils::TPath::Combine(folder, FromUTF8(invalidName) + ".vsf"), "not a VCL style");
 
     // Act
-    SaveGUIThemeToLayoutFile(EGUITheme::Dark);
-    EGUITheme const dark = LoadGUIThemeFromLayoutFile();
+    std::vector<std::string> carbonProblems;
+    System::UnicodeString const carbon = LoadGUIDarkStyle(folder, "Carbon", carbonProblems);
+    std::vector<std::string> missingProblems;
+    System::UnicodeString const missing = LoadGUIDarkStyle(folder, missingName, missingProblems);
+    std::vector<std::string> invalidProblems;
+    System::UnicodeString const invalid = LoadGUIDarkStyle(folder, invalidName, invalidProblems);
+
+    // Assert
+    CheckEquals(std::string("Carbon"), ToUTF8(carbon), __func__, __LINE__, "the built-in theme's style");
+    CheckTrue(carbonProblems.empty(), __func__, __LINE__, "with no problems");
+    CheckEquals(std::string("Carbon"), ToUTF8(missing), __func__, __LINE__, "Carbon for a missing file");
+    AssertEquals(static_cast<size_t>(1), missingProblems.size(), __func__, __LINE__, "with one problem");
+    std::string const missingStart = "Dark theme \"" + missingName + "\": There's no style file ";
+    CheckEquals(missingStart, missingProblems.front().substr(0, missingStart.size()), __func__, __LINE__,
+        "saying so");
+    CheckEquals(std::string("Carbon"), ToUTF8(invalid), __func__, __LINE__, "Carbon for a file that isn't a style");
+    AssertEquals(static_cast<size_t>(1), invalidProblems.size(), __func__, __LINE__, "with one problem");
+    CheckEquals("Dark theme \"" + invalidName + "\": Its file isn't a VCL style file, so Carbon is used instead.",
+        invalidProblems.front(), __func__, __LINE__, "saying so");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_GUI_VCLSystem::Test_LoadGUIThemeFromLayoutFile_ReadsWhatSaveWrote()
+{
+    // Arrange: a layout file in a folder that doesn't exist yet, not this runner's own, which a GUI running these
+    // tests is using. The folder is deleted however the test ends.
+    System::UnicodeString const folder = System::Ioutils::TPath::Combine(System::Ioutils::TPath::GetTempPath(),
+        System::UnicodeString("ASWUnitTests_VCLSystem_Layout_") + System::Sysutils::IntToStr(static_cast<int>(
+            GetCurrentProcessId())));
+    System::UnicodeString const path = System::Ioutils::TPath::Combine(System::Ioutils::TPath::Combine(folder,
+        "Settings"), "Layout.ini");
+
+    struct TDeleteFolder
+    {
+        System::UnicodeString const Folder;
+
+        ~TDeleteFolder()
+        {
+            try
+            {
+                System::Ioutils::TDirectory::Delete(Folder, true);
+            }
+            catch (...)
+            {
+            }
+        }
+    } const deleteFolder{ folder };
+
+    EGUITheme const noFile = LoadGUIThemeFromLayoutFile(path);
+    std::string const noFileDarkTheme = LoadGUIDarkThemeFromLayoutFile(path);
+
+    // Act
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Dark);
+    EGUITheme const dark = LoadGUIThemeFromLayoutFile(path);
 
     WriteFileBytes(path, "[Window]\r\nMaximized=1\r\n");
-    SaveGUIThemeToLayoutFile(EGUITheme::Light);
-    EGUITheme const light = LoadGUIThemeFromLayoutFile();
+    SaveGUIThemeToLayoutFile(path, EGUITheme::Light);
+    EGUITheme const light = LoadGUIThemeFromLayoutFile(path);
+    SaveGUIDarkThemeToLayoutFile(path, "Deep \xC3\x89" "cume");
+    std::string const darkTheme = LoadGUIDarkThemeFromLayoutFile(path);
     std::string const text = ReadFileBytes(path);
+
+    System::Sysutils::DeleteFile(path);
+    SaveGUIDarkThemeToLayoutFile(path, "Ocean");
+    std::string const darkThemeInNewFile = LoadGUIDarkThemeFromLayoutFile(path);
 
     // Assert
     CheckTrue(noFile == EGUITheme::Windows, __func__, __LINE__, "Windows without a layout file");
-    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file");
+    CheckEquals(std::string("Carbon"), noFileDarkTheme, __func__, __LINE__, "and the dark theme Carbon");
+    CheckTrue(dark == EGUITheme::Dark, __func__, __LINE__, "the theme saved in a new file, and its new folder");
     CheckTrue(light == EGUITheme::Light, __func__, __LINE__, "the theme saved in an existing file");
-    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\n\r\n"), text, __func__,
-        __LINE__, "the layout stays");
+    CheckEquals(std::string("Deep \xC3\x89" "cume"), darkTheme, __func__, __LINE__,
+        "the dark theme saved beside it, in UTF-8");
+    CheckEquals(std::string("[Window]\r\nMaximized=1\r\n\r\n[View]\r\nTheme=Light\r\nDarkTheme=Deep \xC3\x89" "cume\r\n"
+        "\r\n"), text, __func__, __LINE__, "the layout stays");
+    CheckEquals(std::string("Ocean"), darkThemeInNewFile, __func__, __LINE__, "the dark theme saved in a new file");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_GUI_VCLSystem::Test_ProcessArguments_MatchesParamCount()
