@@ -2594,14 +2594,20 @@ void TWin32GUITheme::SetDark(bool dark)
 /*
     TWin32GUITheme::SetDarkTheme
 
-    A file that can't be read leaves Carbon's colors, as does one ReadGUIThemeFile() finds unusable.
+    A built-in theme's name comes before a file's, so a theme file of the same name isn't read. A file that
+    can't be read leaves Carbon's colors, as does one ReadGUIThemeFile() finds unusable.
 */
 std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
 {
     std::vector<std::string> problems;
     TWin32GUIPalette palette = CarbonPalette();
+    TWin32GUIBuiltInTheme const* const builtIn = FindBuiltInDarkTheme(name);
 
-    if (name != GUIDefaultDarkThemeName())
+    if (builtIn != nullptr)
+    {
+        palette = builtIn->Palette;
+    }
+    else
     {
         try
         {

@@ -28,6 +28,9 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <set>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -35,6 +38,50 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_Win32GUI_Palette.h"
+//---------------------------------------------------------------------------
+
+namespace
+{
+
+//---------------------------------------------------------------------------
+
+double ContrastRatio(COLORREF a, COLORREF b);
+double RelativeLuminance(COLORREF color);
+
+//---------------------------------------------------------------------------
+/*
+    ContrastRatio
+
+    WCAG 2's contrast ratio of two colors, 1 to 21; text needs at least 4.5 on its background to be readable.
+*/
+double ContrastRatio(COLORREF a, COLORREF b)
+{
+    double const lighter = (std::max)(RelativeLuminance(a), RelativeLuminance(b));
+    double const darker = (std::min)(RelativeLuminance(a), RelativeLuminance(b));
+
+    return (lighter + 0.05) / (darker + 0.05);
+}
+//---------------------------------------------------------------------------
+/*
+    RelativeLuminance
+
+    WCAG 2's relative luminance of an sRGB color, 0 for black to 1 for white.
+*/
+double RelativeLuminance(COLORREF color)
+{
+    auto const linear = [](BYTE channel)
+        {
+            double const value = channel / 255.0;
+
+            return value <= 0.04045 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+        };
+
+    return 0.2126 * linear(GetRValue(color)) + 0.7152 * linear(GetGValue(color)) + 0.0722 * linear(GetBValue(color));
+}
+//---------------------------------------------------------------------------
+
+} // namespace
+
 //---------------------------------------------------------------------------
 
 namespace ASWUnitTests
@@ -50,17 +97,25 @@ TTest_ASWUnitTests_Win32GUI_Palette::TTest_ASWUnitTests_Win32GUI_Palette()
 {
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_BlendColors_MixesEachChannelInProportion,
         "BlendColors_MixesEachChannelInProportion");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_AreCarbonThenItsTints,
+        "BuiltInDarkThemes_AreCarbonThenItsTints");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_KeepTextReadable,
+        "BuiltInDarkThemes_KeepTextReadable");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonPalette_HasCarbonsColors,
         "CarbonPalette_HasCarbonsColors");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonThemeFileText_ReadsBackAsCarbon,
         "CarbonThemeFileText_ReadsBackAsCarbon");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground,
         "FailureAndSkipTextColorOn_AreLighterOnADarkBackground");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_FindBuiltInDarkTheme_IgnoresCase,
+        "FindBuiltInDarkTheme_IgnoresCase");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_IsDarkColor_IsByTheLuma, "IsDarkColor_IsByTheLuma");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteRoles_ListEveryMemberOnce,
         "PaletteRoles_ListEveryMemberOnce");
     RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteWithThemeColors_SetsOnlyTheirRoles,
         "PaletteWithThemeColors_SetsOnlyTheirRoles");
+    RegisterTest(&TTest_ASWUnitTests_Win32GUI_Palette::Test_TintedCarbonPalette_TintsOnlyTheGraysAndTheAccent,
+        "TintedCarbonPalette_TintsOnlyTheGraysAndTheAccent");
 }
 //---------------------------------------------------------------------------
 TTest_ASWUnitTests_Win32GUI_Palette::~TTest_ASWUnitTests_Win32GUI_Palette()
@@ -103,6 +158,75 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_BlendColors_MixesEachChannelInPro
     CheckEquals(white, BlendColors(black, white, 5, 4), __func__, __LINE__, "past the denominator is 'to'");
     CheckEquals(black, BlendColors(black, white, -1, 4), __func__, __LINE__, "below 0 is 'from'");
     CheckEquals(black, BlendColors(black, white, 1, 0), __func__, __LINE__, "'from' with no denominator");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_AreCarbonThenItsTints()
+{
+    // Act
+    std::vector<TWin32GUIBuiltInTheme> const& themes = BuiltInDarkThemes();
+
+    // Assert
+    std::string names;
+    // The menu's other items' accelerators: Save Theme Template and Open Themes Folder.
+    std::set<char> letters = { 's', 'o' };
+    bool lettersDiffer = true;
+
+    for (TWin32GUIBuiltInTheme const& theme : themes)
+    {
+        names += theme.Name + "\n";
+        lettersDiffer = lettersDiffer && !theme.Name.empty() &&
+            letters.insert(static_cast<char>(std::tolower(static_cast<unsigned char>(theme.Name[0])))).second;
+    }
+
+    CheckEquals(std::string("Carbon\nEmber\nForest\nMidnight\nPlum\n"), names, __func__, __LINE__,
+        "Carbon first, then the tints by name");
+    CheckTrue(lettersDiffer, __func__, __LINE__, "each with a first letter of its own, for its accelerator");
+    AssertFalse(themes.empty(), __func__, __LINE__, "Carbon is there");
+    TWin32GUIPalette const carbon = CarbonPalette();
+    bool sameAsCarbon = true;
+
+    for (TWin32GUIPaletteRole const& role : PaletteRoles())
+        sameAsCarbon = sameAsCarbon && themes.front().Palette.*role.Color == carbon.*role.Color;
+
+    CheckEquals(GUIDefaultDarkThemeName(), themes.front().Name, __func__, __LINE__, "the default first");
+    CheckTrue(sameAsCarbon, __func__, __LINE__, "in CarbonPalette()'s colors");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_BuiltInDarkThemes_KeepTextReadable()
+{
+    // Arrange: each text color the GUI draws on a background, with that background.
+    struct TPair
+    {
+        COLORREF TWin32GUIPalette::* Text;
+        COLORREF TWin32GUIPalette::* Background;
+        char const* Name;
+    };
+
+    TPair const pairs[] = {
+        { &TWin32GUIPalette::WindowText, &TWin32GUIPalette::Window, "WindowText on Window" },
+        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::Panel, "ControlText on Panel" },
+        { &TWin32GUIPalette::ControlText, &TWin32GUIPalette::MenuBackground, "ControlText on MenuBackground" },
+        { &TWin32GUIPalette::HotText, &TWin32GUIPalette::Highlight, "HotText on Highlight" },
+        { &TWin32GUIPalette::HotText, &TWin32GUIPalette::Selection, "HotText on Selection" },
+        { &TWin32GUIPalette::FailureText, &TWin32GUIPalette::Window, "FailureText on Window" },
+        { &TWin32GUIPalette::SkipText, &TWin32GUIPalette::Window, "SkipText on Window" },
+        { &TWin32GUIPalette::TooltipText, &TWin32GUIPalette::TooltipBackground, "TooltipText on TooltipBackground" },
+    };
+
+    // Act
+    std::string unreadable;
+
+    for (TWin32GUIBuiltInTheme const& theme : BuiltInDarkThemes())
+    {
+        for (TPair const& pair : pairs)
+        {
+            if (ContrastRatio(theme.Palette.*pair.Text, theme.Palette.*pair.Background) < 4.5)
+                unreadable += theme.Name + ": " + pair.Name + "\n";
+        }
+    }
+
+    // Assert
+    CheckEmpty(unreadable, __func__, __LINE__, "every text at WCAG's 4.5 to 1 or more on its background");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_Palette::Test_CarbonPalette_HasCarbonsColors()
@@ -193,6 +317,22 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_FailureAndSkipTextColorOn_AreLigh
     CheckEquals(RGB(190, 120, 0), SkipTextColorOn(RGB(255, 255, 255)), __func__, __LINE__, "skip on white");
     CheckEquals(RGB(255, 190, 70), SkipTextColorOn(RGB(0x19, 0x19, 0x19)), __func__, __LINE__,
         "skip on Carbon's window color");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_FindBuiltInDarkTheme_IgnoresCase()
+{
+    // Act
+    TWin32GUIBuiltInTheme const* const midnight = FindBuiltInDarkTheme("mIDNIGHT");
+    TWin32GUIBuiltInTheme const* const carbon = FindBuiltInDarkTheme("Carbon");
+
+    // Assert
+    AssertTrue(midnight != nullptr, __func__, __LINE__, "a built-in theme, in another case");
+    CheckEquals(std::string("Midnight"), midnight->Name, __func__, __LINE__, "with its own name");
+    AssertTrue(carbon != nullptr, __func__, __LINE__, "Carbon");
+    CheckEquals(std::string("Carbon"), carbon->Name, __func__, __LINE__, "named so");
+    CheckTrue(FindBuiltInDarkTheme("Midnight Blue") == nullptr, __func__, __LINE__, "none for a longer name");
+    CheckTrue(FindBuiltInDarkTheme("Midnigh") == nullptr, __func__, __LINE__, "none for a shorter one");
+    CheckTrue(FindBuiltInDarkTheme(std::string()) == nullptr, __func__, __LINE__, "none for an empty one");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_Win32GUI_Palette::Test_IsDarkColor_IsByTheLuma()
@@ -288,6 +428,43 @@ void TTest_ASWUnitTests_Win32GUI_Palette::Test_PaletteWithThemeColors_SetsOnlyTh
     }
 
     CheckEmpty(changed, __func__, __LINE__, "the others keep their colors, and an unknown role is left out");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_Win32GUI_Palette::Test_TintedCarbonPalette_TintsOnlyTheGraysAndTheAccent()
+{
+    // Arrange
+    TWin32GUIPalette const carbon = CarbonPalette();
+
+    // Act: grays toward blue, the accent green; and no tint, with the accent's own hue.
+    TWin32GUIPalette const tinted = TintedCarbonPalette(240.0, 0.1, 120.0);
+    TWin32GUIPalette const untinted = TintedCarbonPalette(240.0, 0.0, 120.0);
+
+    // Assert
+    CheckTrue(GetBValue(tinted.Window) > GetRValue(tinted.Window) && GetBValue(tinted.Window) > GetGValue(tinted.Window),
+        __func__, __LINE__, "a dark gray turns blue");
+    // HSL's lightness, the highest channel and the lowest added, here blue and red.
+    CheckTrue(std::abs(GetBValue(tinted.Window) + GetRValue(tinted.Window) - 2 * GetRValue(carbon.Window)) <= 1,
+        __func__, __LINE__, "keeping its lightness");
+    CheckTrue(GetBValue(tinted.WindowText) - GetRValue(tinted.WindowText) < GetBValue(tinted.Window) -
+        GetRValue(tinted.Window), __func__, __LINE__, "a light one less, so text stays nearly white");
+    CheckEquals(RGB(255, 255, 255), tinted.HotText, __func__, __LINE__, "white stays white");
+    CheckTrue(GetGValue(tinted.Highlight) > GetRValue(tinted.Highlight) && GetGValue(tinted.Highlight) >
+        GetBValue(tinted.Highlight), __func__, __LINE__, "the accent takes its own hue");
+    CheckEquals(carbon.Window, untinted.Window, __func__, __LINE__, "no tint leaves a gray as it is");
+    CheckEquals(carbon.Panel, untinted.Panel, __func__, __LINE__, "every gray");
+
+    // The colors that say how a test did.
+    COLORREF TWin32GUIPalette::* const kept[] = {
+        &TWin32GUIPalette::FailureText, &TWin32GUIPalette::ProgressFailedBottom, &TWin32GUIPalette::ProgressFailedTop,
+        &TWin32GUIPalette::SkipText, &TWin32GUIPalette::TreeStatusFailed, &TWin32GUIPalette::TreeStatusNotRun,
+        &TWin32GUIPalette::TreeStatusPassed, &TWin32GUIPalette::TreeStatusRunning, &TWin32GUIPalette::TreeStatusSkipped
+    };
+    bool statusKept = true;
+
+    for (COLORREF TWin32GUIPalette::* const color : kept)
+        statusKept = statusKept && tinted.*color == carbon.*color;
+
+    CheckTrue(statusKept, __func__, __LINE__, "the status colors stay Carbon's");
 }
 //---------------------------------------------------------------------------
 

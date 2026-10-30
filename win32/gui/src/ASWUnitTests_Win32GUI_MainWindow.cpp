@@ -1519,14 +1519,21 @@ void TWin32GUIMainWindow::FailRunOnUnhandledException(std::string const& descrip
 /*
     TWin32GUIMainWindow::FillDarkThemeMenu
 
-    Carbon first, then the theme files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or removed
-    since shows at once, then Save Theme Template and Open Themes Folder; the chosen one has the radio check. A
-    chosen theme whose file is missing is still listed, so choosing it again reports why it isn't used.
+    The built-in themes first, Carbon at the top, then the theme files in GUIThemesFolderPath() (see
+    GUIThemeNames()), so a file added or removed since shows at once, then Save Theme Template and Open Themes
+    Folder; the chosen one has the radio check. A chosen theme whose file is missing is still listed, so choosing
+    it again reports why it isn't used.
 */
 void TWin32GUIMainWindow::FillDarkThemeMenu()
 {
-    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".ini");
-    names.insert(names.begin(), GUIDefaultDarkThemeName());
+    std::vector<std::string> names;
+
+    for (TWin32GUIBuiltInTheme const& theme : BuiltInDarkThemes())
+        names.push_back(theme.Name);
+
+    std::size_t const builtInCount = names.size();
+    std::vector<std::string> const files = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".ini", names);
+    names.insert(names.end(), files.begin(), files.end());
 
     // Windows' file names ignore case, so a name saved in another case is still that file's.
     auto const sameName = [](std::string const& a, std::string const& b)
@@ -1559,15 +1566,18 @@ void TWin32GUIMainWindow::FillDarkThemeMenu()
 
     for (std::size_t i = 0; i < names.size(); ++i)
     {
-        // Carbon's C is its accelerator; a theme file's name has none.
-        std::wstring const caption = UTF8ToWide((i == 0 ? "&" : "") + GUIMenuItemText(names[i]));
-        AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, FirstDarkThemeCommand + i, caption.c_str());
-    }
+        // A line between the built-in themes and the files.
+        if (i == builtInCount)
+            AppendMenuW(m_MI_ViewDarkTheme, MF_SEPARATOR, 0, nullptr);
 
-    if (chosenIndex < names.size())
-    {
-        CheckMenuRadioItem(m_MI_ViewDarkTheme, FirstDarkThemeCommand, static_cast<UINT>(FirstDarkThemeCommand +
-            names.size() - 1), static_cast<UINT>(FirstDarkThemeCommand + chosenIndex), MF_BYCOMMAND);
+        // A built-in theme's first letter is its accelerator; a theme file's name has none.
+        UINT const id = static_cast<UINT>(FirstDarkThemeCommand + i);
+        std::wstring const caption = UTF8ToWide((i < builtInCount ? "&" : "") + GUIMenuItemText(names[i]));
+        AppendMenuW(m_MI_ViewDarkTheme, MF_STRING | enabled, id, caption.c_str());
+
+        // Only it, as nothing else is checked yet, so the range needn't span the line above the files.
+        if (i == chosenIndex)
+            CheckMenuRadioItem(m_MI_ViewDarkTheme, id, id, id, MF_BYCOMMAND);
     }
 
     AppendMenuW(m_MI_ViewDarkTheme, MF_SEPARATOR, 0, nullptr);

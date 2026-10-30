@@ -25,7 +25,10 @@ limitations under the License.
 #include "ASWUnitTests_Win32GUI_Palette.h"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -35,9 +38,69 @@ namespace
 
 //---------------------------------------------------------------------------
 
+COLORREF FromHSL(double hue, double saturation, double lightness);
 COLORREF FromRGB(std::uint32_t rgb);
+bool SameText(std::string const& a, std::string const& b);
+void ToHSL(COLORREF color, double& hue, double& saturation, double& lightness);
 std::uint32_t ToRGB(COLORREF color);
 
+//---------------------------------------------------------------------------
+/*
+    FromHSL
+
+    The color with 'hue' (in degrees, any number of turns), 'saturation' and 'lightness' (0 to 1 each), each
+    channel rounded to the nearest.
+*/
+COLORREF FromHSL(double hue, double saturation, double lightness)
+{
+    double const chroma = (1.0 - std::fabs(2.0 * lightness - 1.0)) * saturation;
+    double const sector = std::fmod(std::fmod(hue, 360.0) + 360.0, 360.0) / 60.0;
+    double const second = chroma * (1.0 - std::fabs(std::fmod(sector, 2.0) - 1.0));
+    double red = 0.0;
+    double green = 0.0;
+    double blue = 0.0;
+
+    switch (static_cast<int>(sector))
+    {
+        case 0:
+            red = chroma;
+            green = second;
+            break;
+
+        case 1:
+            red = second;
+            green = chroma;
+            break;
+
+        case 2:
+            green = chroma;
+            blue = second;
+            break;
+
+        case 3:
+            green = second;
+            blue = chroma;
+            break;
+
+        case 4:
+            red = second;
+            blue = chroma;
+            break;
+
+        default:
+            red = chroma;
+            blue = second;
+            break;
+    }
+
+    double const lowest = lightness - chroma / 2.0;
+    auto const channel = [lowest](double value)
+        {
+            return static_cast<BYTE>(std::lround((std::min)(1.0, (std::max)(0.0, value + lowest)) * 255.0));
+        };
+
+    return RGB(channel(red), channel(green), channel(blue));
+}
 //---------------------------------------------------------------------------
 /*
     FromRGB
@@ -47,6 +110,57 @@ std::uint32_t ToRGB(COLORREF color);
 COLORREF FromRGB(std::uint32_t rgb)
 {
     return RGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+}
+//---------------------------------------------------------------------------
+/*
+    SameText
+
+    Whether 'a' and 'b' are the same, ignoring the case of ASCII letters.
+*/
+bool SameText(std::string const& a, std::string const& b)
+{
+    auto const lower = [](char c)
+        {
+            return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+        };
+
+    if (a.size() != b.size())
+        return false;
+
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        if (lower(a[i]) != lower(b[i]))
+            return false;
+    }
+
+    return true;
+}
+//---------------------------------------------------------------------------
+/*
+    ToHSL
+
+    The color's hue (in degrees, 0 up to 360; 0 for a gray), saturation and lightness (0 to 1 each).
+*/
+void ToHSL(COLORREF color, double& hue, double& saturation, double& lightness)
+{
+    double const red = GetRValue(color) / 255.0;
+    double const green = GetGValue(color) / 255.0;
+    double const blue = GetBValue(color) / 255.0;
+    double const highest = (std::max)(red, (std::max)(green, blue));
+    double const lowest = (std::min)(red, (std::min)(green, blue));
+    double const chroma = highest - lowest;
+
+    lightness = (highest + lowest) / 2.0;
+    saturation = chroma <= 0.0 ? 0.0 : chroma / (1.0 - std::fabs(2.0 * lightness - 1.0));
+
+    if (chroma <= 0.0)
+        hue = 0.0;
+    else if (highest == red)
+        hue = 60.0 * std::fmod((green - blue) / chroma + 6.0, 6.0);
+    else if (highest == green)
+        hue = 60.0 * ((blue - red) / chroma + 2.0);
+    else
+        hue = 60.0 * ((red - green) / chroma + 4.0);
 }
 //---------------------------------------------------------------------------
 /*
@@ -82,6 +196,24 @@ COLORREF BlendColors(COLORREF from, COLORREF to, int numerator, int denominator)
 
     return RGB(channel(GetRValue(from), GetRValue(to)), channel(GetGValue(from), GetGValue(to)),
         channel(GetBValue(from), GetBValue(to)));
+}
+//---------------------------------------------------------------------------
+/*
+    BuiltInDarkThemes
+
+    Each tint's hue and strength, and its accent's hue, chosen by eye in the runner.
+*/
+std::vector<TWin32GUIBuiltInTheme> const& BuiltInDarkThemes()
+{
+    static std::vector<TWin32GUIBuiltInTheme> const themes = {
+        { GUIDefaultDarkThemeName(), CarbonPalette() },
+        { "Ember", TintedCarbonPalette(25.0, 0.09, 30.0) },
+        { "Forest", TintedCarbonPalette(140.0, 0.08, 155.0) },
+        { "Midnight", TintedCarbonPalette(220.0, 0.10, 205.0) },
+        { "Plum", TintedCarbonPalette(285.0, 0.09, 295.0) }
+    };
+
+    return themes;
 }
 //---------------------------------------------------------------------------
 /*
@@ -234,6 +366,17 @@ std::string CarbonThemeFileText()
 COLORREF FailureTextColorOn(COLORREF background)
 {
     return IsDarkColor(background) ? RGB(255, 100, 100) : RGB(200, 0, 0);
+}
+//---------------------------------------------------------------------------
+TWin32GUIBuiltInTheme const* FindBuiltInDarkTheme(std::string const& name)
+{
+    for (TWin32GUIBuiltInTheme const& theme : BuiltInDarkThemes())
+    {
+        if (SameText(theme.Name, name))
+            return &theme;
+    }
+
+    return nullptr;
 }
 //---------------------------------------------------------------------------
 bool IsDarkColor(COLORREF color)
@@ -394,6 +537,50 @@ TWin32GUIPalette PaletteWithThemeColors(TWin32GUIPalette palette, std::vector<TG
 COLORREF SkipTextColorOn(COLORREF background)
 {
     return IsDarkColor(background) ? RGB(255, 190, 70) : RGB(190, 120, 0);
+}
+//---------------------------------------------------------------------------
+/*
+    TintedCarbonPalette
+
+    A gray (a color whose HSL saturation is under 0.1) keeps its lightness and gets the chroma 'tint' times
+    (1 - its lightness); a colored one keeps its saturation and lightness and gets 'accentHue'.
+*/
+TWin32GUIPalette TintedCarbonPalette(double hue, double tint, double accentHue)
+{
+    // The colors that say how a test did.
+    COLORREF TWin32GUIPalette::* const kept[] = {
+        &TWin32GUIPalette::FailureText, &TWin32GUIPalette::ProgressFailedBottom, &TWin32GUIPalette::ProgressFailedTop,
+        &TWin32GUIPalette::SkipText, &TWin32GUIPalette::TreeStatusFailed, &TWin32GUIPalette::TreeStatusNotRun,
+        &TWin32GUIPalette::TreeStatusPassed, &TWin32GUIPalette::TreeStatusRunning, &TWin32GUIPalette::TreeStatusSkipped
+    };
+
+    TWin32GUIPalette palette = CarbonPalette();
+
+    for (TWin32GUIPaletteRole const& role : PaletteRoles())
+    {
+        if (std::find(std::begin(kept), std::end(kept), role.Color) != std::end(kept))
+            continue;
+
+        COLORREF& color = palette.*role.Color;
+        double colorHue = 0.0;
+        double saturation = 0.0;
+        double lightness = 0.0;
+        ToHSL(color, colorHue, saturation, lightness);
+
+        if (saturation < 0.1)
+        {
+            // The chroma as HSL's saturation, which is relative to the most chroma the lightness allows.
+            double const room = 1.0 - std::fabs(2.0 * lightness - 1.0);
+            double const chroma = tint * (1.0 - lightness);
+            color = FromHSL(hue, room > 0.0 ? (std::min)(1.0, chroma / room) : 0.0, lightness);
+        }
+        else
+        {
+            color = FromHSL(accentHue, saturation, lightness);
+        }
+    }
+
+    return palette;
 }
 //---------------------------------------------------------------------------
 

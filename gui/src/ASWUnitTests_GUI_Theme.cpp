@@ -141,7 +141,8 @@ bool GUIThemeIsDark(EGUITheme theme, bool windowsAppsUseDark, bool highContrast)
     return windowsAppsUseDark && !highContrast;
 }
 //---------------------------------------------------------------------------
-std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames, std::string const& extension)
+std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames, std::string const& extension,
+    std::vector<std::string> const& builtInNames)
 {
     std::vector<std::string> names;
 
@@ -154,13 +155,16 @@ std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames
         }
 
         std::string const name = fileName.substr(0, fileName.size() - extension.size());
-        bool const listed = std::any_of(names.begin(), names.end(), [&name](std::string const& other)
+        auto const sameName = [&name](std::string const& other)
             {
                 return SameText(other, name);
-            });
+            };
 
-        if (!listed && !SameText(name, GUIDefaultDarkThemeName()))
+        if (std::none_of(names.begin(), names.end(), sameName) &&
+            std::none_of(builtInNames.begin(), builtInNames.end(), sameName))
+        {
             names.push_back(name);
+        }
     }
 
     std::stable_sort(names.begin(), names.end(), &LessText);

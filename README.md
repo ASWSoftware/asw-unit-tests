@@ -393,13 +393,15 @@ the Win32 GUI runner's dark look, the title bar is dark unless Windows shows the
 title bars, which it then keeps while the window is active, and the Export JUnit Report dialog,
 Windows' own, stays light.
 
-**View > Theme > Dark Theme** chooses the dark look's colors: Carbon, built in, or a theme file of
+**View > Theme > Dark Theme** chooses the dark look's colors: a built-in theme or a theme file of
 your own, used whenever the look is dark, with Dark or with Use Windows Setting (high contrast keeps
-its own colors). Theme files go in `%APPDATA%\ASWUnitTests\Themes`, which **Open Themes Folder**
-opens, and are shared by every test app; the menu lists each one by its file name. The choice is
-saved in the layout file with the theme, and a problem with a theme file, such as a misspelled role,
-a color that isn't one or a missing file, is reported in the Log tab, with Carbon's colors used in
-its place.
+its own colors). Both runners have Carbon built in, and the Win32 GUI runner also has four tints of
+it: Ember (warm brown), Forest (green), Midnight (blue) and Plum (purple), which keep Carbon's
+colors for how tests did. Theme files go in `%APPDATA%\ASWUnitTests\Themes`, which **Open Themes
+Folder** opens, and are shared by every test app; the menu lists each one by its file name, below
+the built-in themes, and leaves out a file named like one of them. The choice is saved in the layout
+file with the theme, and a problem with a theme file, such as a misspelled role, a color that isn't
+one or a missing file, is reported in the Log tab, with Carbon's colors used in its place.
 
 The Win32 GUI runner's theme files are INI files, `<Name>.ini`, and **Save Theme Template...** saves
 Carbon's colors as one to start from, every role listed under a comment on what its group colors:

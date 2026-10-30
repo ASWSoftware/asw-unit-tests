@@ -177,15 +177,20 @@ void TTest_ASWUnitTests_GUI_Theme::Test_GUIThemeNames_ListsTheFilesOfOneKindSort
     // Arrange: the Themes folder's files, in the order a listing might give them.
     std::vector<std::string> const files = {
         "ocean.ini", "Zest.ini", "Notes.txt", "Carbon.ini", "OCEAN.INI", ".ini", "apple.Ini", "carbon.INI",
-        "Ocean.ini.bak", "Forest.vsf", "ini", "Two Words.ini",
+        "Ocean.ini.bak", "Forest.vsf", "ini", "Two Words.ini", "plum.ini",
     };
+    std::vector<std::string> const carbon = { "Carbon" };
+    std::vector<std::string> const builtIns = { "Carbon", "Plum", "Zest" };
 
     // Act and Assert
-    CheckEquals(std::string("apple\nocean\nTwo Words\nZest\n"), JoinLines(GUIThemeNames(files, ".ini")), __func__,
-        __LINE__, "the .ini files' names, sorted ignoring case, a name once, without Carbon or a bare extension");
-    CheckEquals(std::string("Forest\n"), JoinLines(GUIThemeNames(files, ".vsf")), __func__, __LINE__,
+    CheckEquals(std::string("apple\nocean\nplum\nTwo Words\nZest\n"), JoinLines(GUIThemeNames(files, ".ini", carbon)),
+        __func__, __LINE__, "the .ini files' names, sorted ignoring case, a name once, without Carbon or a bare "
+        "extension");
+    CheckEquals(std::string("apple\nocean\nTwo Words\n"), JoinLines(GUIThemeNames(files, ".ini", builtIns)), __func__,
+        __LINE__, "without any built-in theme's name, ignoring case");
+    CheckEquals(std::string("Forest\n"), JoinLines(GUIThemeNames(files, ".vsf", carbon)), __func__, __LINE__,
         "the VCL GUI runner's .vsf files");
-    CheckEmpty(JoinLines(GUIThemeNames(std::vector<std::string>(), ".ini")), __func__, __LINE__,
+    CheckEmpty(JoinLines(GUIThemeNames(std::vector<std::string>(), ".ini", carbon)), __func__, __LINE__,
         "an empty or missing folder");
 }
 //---------------------------------------------------------------------------

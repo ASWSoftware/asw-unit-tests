@@ -179,12 +179,30 @@ struct TWin32GUIPaletteRole
     char const* Name;
 };
 
+
+/////////////////////////////////////////////////////////////////////////////
+// TWin32GUIBuiltInTheme
+//
+// A dark theme the Win32 GUI runner has built in, which View > Theme >
+// Dark Theme lists before the theme files (see BuiltInDarkThemes()).
+/////////////////////////////////////////////////////////////////////////////
+struct TWin32GUIBuiltInTheme
+{
+    // Its name, as the menu lists it and the layout file saves it.
+    std::string Name;
+    TWin32GUIPalette Palette;
+};
+
 //---------------------------------------------------------------------------
 
 // 'from' mixed with 'to' in the proportion 'numerator' / 'denominator', each channel rounded to the nearest:
 // 'from' at 0, 'to' at 'denominator', e.g. one row of a gradient. 'from' if 'denominator' isn't positive; the
 // proportion is kept within 0 and 1.
 COLORREF BlendColors(COLORREF from, COLORREF to, int numerator, int denominator);
+// The dark themes built in: Carbon (GUIDefaultDarkThemeName(), CarbonPalette()) first, then Carbon tinted (see
+// TintedCarbonPalette()): Ember (warm brown), Forest (green), Midnight (blue) and Plum (purple). Their names'
+// first letters differ, for the menu's accelerators, from each other's and from the menu's other items'.
+std::vector<TWin32GUIBuiltInTheme> const& BuiltInDarkThemes();
 // The colors of RAD Studio's Carbon style, the VCL GUI runner's dark theme, read from its .vsf file and from
 // the VCL GUI runner as it draws under it.
 TWin32GUIPalette CarbonPalette();
@@ -195,6 +213,9 @@ std::string CarbonThemeFileText();
 // The color of a failed test's text on 'background': RGB(200, 0, 0), or RGB(255, 100, 100) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF FailureTextColorOn(COLORREF background);
+// The built-in dark theme named 'name', ignoring (ASCII) case, e.g. as a layout file saved it; nullptr if
+// there's none (see BuiltInDarkThemes()).
+TWin32GUIBuiltInTheme const* FindBuiltInDarkTheme(std::string const& name);
 // Whether 'color' is dark, by its luma (Rec. 601 weights) being below 128, as the VCL GUI runner decides
 // whether a background needs lighter text colors.
 bool IsDarkColor(COLORREF color);
@@ -208,6 +229,12 @@ TWin32GUIPalette PaletteWithThemeColors(TWin32GUIPalette palette, std::vector<TG
 // The color of a skipped test's text on 'background': RGB(190, 120, 0), or RGB(255, 190, 70) on a dark
 // background (see IsDarkColor()), as the VCL GUI runner's.
 COLORREF SkipTextColorOn(COLORREF background);
+// Carbon's palette tinted: each of its grays turned toward 'hue' (in degrees, 0 red, 120 green, 240 blue), by
+// up to 'tint' of its chroma (0 to 1), most in the dark backgrounds and less as a gray gets lighter, so text
+// stays nearly white; its accent (the highlight, the default button's frame and the progress bar) turned to
+// 'accentHue'. The colors that say how a test did (the tree's status dots, the failed and skipped text and the
+// failed progress bar) stay Carbon's.
+TWin32GUIPalette TintedCarbonPalette(double hue, double tint, double accentHue);
 
 } // namespace ASWUnitTests
 

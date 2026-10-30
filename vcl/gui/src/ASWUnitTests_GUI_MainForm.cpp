@@ -900,7 +900,8 @@ void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
 
     m_DarkThemeItems.clear();
 
-    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf");
+    std::vector<std::string> names = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf",
+        { GUIDefaultDarkThemeName() });
     names.insert(names.begin(), GUIDefaultDarkThemeName());
 
     // Windows' file names ignore case, so a name saved in another case is still that file's.

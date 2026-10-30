@@ -236,10 +236,10 @@ public:
     void RefreshMenu(HMENU menu);
     // Switches to the dark look or back to the light one, and redraws everything attached.
     void SetDark(bool dark);
-    // Makes 'name' the dark theme: GUIDefaultDarkThemeName(), Carbon, or a theme file in GUIThemesFolderPath(),
-    // "<name>.ini", over Carbon's colors (see SetPalette()). Returns its problems as lines for the log (see
-    // GUIThemeProblemLine()): the file's (see ReadGUIThemeFile()), or that it's missing or can't be read, so
-    // Carbon is used.
+    // Makes 'name' the dark theme: one of BuiltInDarkThemes() (ignoring case), or a theme file in
+    // GUIThemesFolderPath(), "<name>.ini", over Carbon's colors (see SetPalette()). Returns its problems as lines
+    // for the log (see GUIThemeProblemLine()): the file's (see ReadGUIThemeFile()), or that it's missing or can't
+    // be read, so Carbon is used.
     std::vector<std::string> SetDarkTheme(std::string const& name);
     // Makes 'palette' the dark look's colors, redrawing everything attached while dark.
     void SetPalette(TWin32GUIPalette const& palette);
