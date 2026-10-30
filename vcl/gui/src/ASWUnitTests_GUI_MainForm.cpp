@@ -689,20 +689,28 @@ void TFormASWUnitTestsGUIMain::ApplyPanelSizes(TGUILayout const& layout)
 /*
     TFormASWUnitTestsGUIMain::ApplyTheme
 
-    Not during a run, since restyling recreates the windows the run is updating; SetRunning() calls it again
-    once the run has ended. The window is restyled once it handles the message the style change posts; see
-    FormWindowProc().
+    Queued rather than at once: under a VCL style, a menu item's click comes from the form's style hook, which a
+    style change frees, and which uses itself again once the click returns (an access violation in
+    TFormStyleHook::TMainMenuBarStyleHook::Invalidate(), switching dark themes with the mouse). Not during a run,
+    since restyling recreates the windows the run is updating; SetRunning() calls it again once the run has
+    ended. The window is restyled once it handles the message the style change posts; see FormWindowProc().
 */
 void TFormASWUnitTestsGUIMain::ApplyTheme()
 {
-    if (m_Running)
+    TThread::ForceQueue(nullptr, [this]()
     {
-        m_ThemeChangePending = true;
-        return;
-    }
+        RunGuarded("changing the theme", [this]()
+        {
+            if (m_Running)
+            {
+                m_ThemeChangePending = true;
+                return;
+            }
 
-    m_ThemeChangePending = false;
-    ApplyGUITheme(m_Theme, m_DarkStyle);
+            m_ThemeChangePending = false;
+            ApplyGUITheme(m_Theme, m_DarkStyle);
+        });
+    });
 }
 //---------------------------------------------------------------------------
 /*
