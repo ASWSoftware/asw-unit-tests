@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake rad370 src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests) do (
+for %%D in (build cmake gui\src gui\tests rad370 resource src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src win32\tests) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -43,6 +43,96 @@ call :CopyFile "README.md" "README.md"
 if errorlevel 1 exit /b 1
 call :CopyFile "cmake\CMakeLists.txt" "cmake\CMakeLists.txt"
 if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_CommandLine.cpp" "gui\src\ASWUnitTests_GUI_CommandLine.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_CommandLine.h" "gui\src\ASWUnitTests_GUI_CommandLine.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Commands.cpp" "gui\src\ASWUnitTests_GUI_Commands.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Commands.h" "gui\src\ASWUnitTests_GUI_Commands.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_INIDocument.cpp" "gui\src\ASWUnitTests_GUI_INIDocument.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_INIDocument.h" "gui\src\ASWUnitTests_GUI_INIDocument.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Layout.cpp" "gui\src\ASWUnitTests_GUI_Layout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Layout.h" "gui\src\ASWUnitTests_GUI_Layout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.cpp" "gui\src\ASWUnitTests_GUI_RunObserver.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.h" "gui\src\ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Selection.cpp" "gui\src\ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Selection.h" "gui\src\ASWUnitTests_GUI_Selection.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.cpp" "gui\src\ASWUnitTests_GUI_Shuffle.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Shuffle.h" "gui\src\ASWUnitTests_GUI_Shuffle.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Sources.cmake" "gui\src\ASWUnitTests_GUI_Sources.cmake"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.cpp" "gui\src\ASWUnitTests_GUI_TestList.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_TestList.h" "gui\src\ASWUnitTests_GUI_TestList.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Theme.cpp" "gui\src\ASWUnitTests_GUI_Theme.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Theme.h" "gui\src\ASWUnitTests_GUI_Theme.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Tree.cpp" "gui\src\ASWUnitTests_GUI_Tree.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Tree.h" "gui\src\ASWUnitTests_GUI_Tree.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_View.cpp" "gui\src\ASWUnitTests_GUI_View.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_View.h" "gui\src\ASWUnitTests_GUI_View.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_CommandLine.cpp" "gui\tests\Test_ASWUnitTests_GUI_CommandLine.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_CommandLine.h" "gui\tests\Test_ASWUnitTests_GUI_CommandLine.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Commands.cpp" "gui\tests\Test_ASWUnitTests_GUI_Commands.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Commands.h" "gui\tests\Test_ASWUnitTests_GUI_Commands.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_INIDocument.cpp" "gui\tests\Test_ASWUnitTests_GUI_INIDocument.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_INIDocument.h" "gui\tests\Test_ASWUnitTests_GUI_INIDocument.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Layout.cpp" "gui\tests\Test_ASWUnitTests_GUI_Layout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Layout.h" "gui\tests\Test_ASWUnitTests_GUI_Layout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_RunObserver.h" "gui\tests\Test_ASWUnitTests_GUI_RunObserver.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Selection.cpp" "gui\tests\Test_ASWUnitTests_GUI_Selection.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Selection.h" "gui\tests\Test_ASWUnitTests_GUI_Selection.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp" "gui\tests\Test_ASWUnitTests_GUI_Shuffle.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Shuffle.h" "gui\tests\Test_ASWUnitTests_GUI_Shuffle.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_TestList.cpp" "gui\tests\Test_ASWUnitTests_GUI_TestList.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_TestList.h" "gui\tests\Test_ASWUnitTests_GUI_TestList.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Theme.cpp" "gui\tests\Test_ASWUnitTests_GUI_Theme.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Theme.h" "gui\tests\Test_ASWUnitTests_GUI_Theme.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Tree.cpp" "gui\tests\Test_ASWUnitTests_GUI_Tree.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Tree.h" "gui\tests\Test_ASWUnitTests_GUI_Tree.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_View.cpp" "gui\tests\Test_ASWUnitTests_GUI_View.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_View.h" "gui\tests\Test_ASWUnitTests_GUI_View.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "rad370\ASWUnitTests.cbproj" "rad370\ASWUnitTests.cbproj"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\ASWUnitTestsPCH1.h" "rad370\ASWUnitTestsPCH1.h"
@@ -54,6 +144,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win32_Debug.bat" "rad370\Build_Win32_Debug.bat"
 if errorlevel 1 exit /b 1
 call :CopyFile "rad370\Build_Win32_Release.bat" "rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "resource\ASWUnitTests.ico" "resource\ASWUnitTests.ico"
+if errorlevel 1 exit /b 1
+call :CopyFile "resource\ASWUnitTests_Icon.rc" "resource\ASWUnitTests_Icon.rc"
 if errorlevel 1 exit /b 1
 call :CopyFile "src\ASWUnitTests_CLI.cpp" "src\ASWUnitTests_CLI.cpp"
 if errorlevel 1 exit /b 1
@@ -155,6 +249,14 @@ call :CopyFile "tests\Test_ASWUnitTests_Version.cpp" "tests\Test_ASWUnitTests_Ve
 if errorlevel 1 exit /b 1
 call :CopyFile "tests\Test_ASWUnitTests_Version.h" "tests\Test_ASWUnitTests_Version.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_ExceptionTypes.cpp" "tests\UT_Helper_ExceptionTypes.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_ExceptionTypes.h" "tests\UT_Helper_ExceptionTypes.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_StringChecks.cpp" "tests\UT_Helper_StringChecks.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "tests\UT_Helper_StringChecks.h" "tests\UT_Helper_StringChecks.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.cpp" "toTest\ASWTools_Common.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "toTest\ASWTools_Common.h" "toTest\ASWTools_Common.h"
@@ -195,31 +297,11 @@ call :CopyFile "vcl\gui\rad370\Build_Win32_Debug.bat" "vcl\gui\rad370\Build_Win3
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\rad370\Build_Win32_Release.bat" "vcl\gui\rad370\Build_Win32_Release.bat"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_CommandLine.cpp" "vcl\gui\src\ASWUnitTests_GUI_CommandLine.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_CommandLine.h" "vcl\gui\src\ASWUnitTests_GUI_CommandLine.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Layout.cpp" "vcl\gui\src\ASWUnitTests_GUI_Layout.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Layout.h" "vcl\gui\src\ASWUnitTests_GUI_Layout.h"
-if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.cpp" "vcl\gui\src\ASWUnitTests_GUI_MainForm.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.dfm" "vcl\gui\src\ASWUnitTests_GUI_MainForm.dfm"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_MainForm.h" "vcl\gui\src\ASWUnitTests_GUI_MainForm.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.cpp" "vcl\gui\src\ASWUnitTests_GUI_RunObserver.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h" "vcl\gui\src\ASWUnitTests_GUI_RunObserver.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp" "vcl\gui\src\ASWUnitTests_GUI_Selection.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Selection.h" "vcl\gui\src\ASWUnitTests_GUI_Selection.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Shuffle.cpp" "vcl\gui\src\ASWUnitTests_GUI_Shuffle.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Shuffle.h" "vcl\gui\src\ASWUnitTests_GUI_Shuffle.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.cpp" "vcl\gui\src\ASWUnitTests_GUI_ShuffleSeedDialog.cpp"
 if errorlevel 1 exit /b 1
@@ -229,41 +311,21 @@ call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.cpp" "vcl\gui\src\ASWUnitTe
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_Strings.h" "vcl\gui\src\ASWUnitTests_GUI_Strings.h"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TestList.cpp" "vcl\gui\src\ASWUnitTests_GUI_TestList.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TestList.h" "vcl\gui\src\ASWUnitTests_GUI_TestList.h"
-if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TextDialog.cpp" "vcl\gui\src\ASWUnitTests_GUI_TextDialog.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_TextDialog.h" "vcl\gui\src\ASWUnitTests_GUI_TextDialog.h"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.cpp" "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.cpp"
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_VCLSystem.cpp" "vcl\gui\src\ASWUnitTests_GUI_VCLSystem.cpp"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.h" "vcl\tests\Test_ASWUnitTests_GUI_CommandLine.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Layout.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Layout.h" "vcl\tests\Test_ASWUnitTests_GUI_Layout.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h" "vcl\tests\Test_ASWUnitTests_GUI_RunObserver.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Selection.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Selection.h" "vcl\tests\Test_ASWUnitTests_GUI_Selection.h"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Shuffle.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Shuffle.cpp"
-if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Shuffle.h" "vcl\tests\Test_ASWUnitTests_GUI_Shuffle.h"
+call :CopyFile "vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h" "vcl\gui\src\ASWUnitTests_GUI_VCLSystem.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp" "vcl\tests\Test_ASWUnitTests_GUI_Strings.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_Strings.h" "vcl\tests\Test_ASWUnitTests_GUI_Strings.h"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_TestList.cpp" "vcl\tests\Test_ASWUnitTests_GUI_TestList.cpp"
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_VCLSystem.cpp" "vcl\tests\Test_ASWUnitTests_GUI_VCLSystem.cpp"
 if errorlevel 1 exit /b 1
-call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_TestList.h" "vcl\tests\Test_ASWUnitTests_GUI_TestList.h"
+call :CopyFile "vcl\tests\Test_ASWUnitTests_GUI_VCLSystem.h" "vcl\tests\Test_ASWUnitTests_GUI_VCLSystem.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLExceptions.cpp" "vcl\tests\Test_ASWUnitTests_RTLExceptions.cpp"
 if errorlevel 1 exit /b 1
@@ -272,6 +334,100 @@ if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp" "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.h" "vcl\tests\Test_ASWUnitTests_RTLStrings.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj" "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\ASWUnitTests_Win32_GUIPCH1.h" "win32\gui\rad370\ASWUnitTests_Win32_GUIPCH1.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win64x_Debug.bat" "win32\gui\rad370\Build_Win64x_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win64x_Release.bat" "win32\gui\rad370\Build_Win64x_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win32_Debug.bat" "win32\gui\rad370\Build_Win32_Debug.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\rad370\Build_Win32_Release.bat" "win32\gui\rad370\Build_Win32_Release.bat"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI.manifest" "win32\gui\src\ASWUnitTests_Win32GUI.manifest"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h" "win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h" "win32\gui\src\ASWUnitTests_Win32GUI_DPI.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.h" "win32\gui\src\ASWUnitTests_Win32GUI_Glyphs.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainLayout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h" "win32\gui\src\ASWUnitTests_Win32GUI_MainWindow.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc" "win32\gui\src\ASWUnitTests_Win32GUI_Manifest.rc"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_MessageDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Palette.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Palette.h" "win32\gui\src\ASWUnitTests_Win32GUI_Palette.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_ShuffleSeedDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake" "win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.h" "win32\gui\src\ASWUnitTests_Win32GUI_Splitter.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_System.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_System.h" "win32\gui\src\ASWUnitTests_Win32GUI_System.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h" "win32\gui\src\ASWUnitTests_Win32GUI_TextDialog.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Theme.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_Theme.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Theme.h" "win32\gui\src\ASWUnitTests_Win32GUI_Theme.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp" "win32\gui\src\ASWUnitTests_Win32GUI_WinMain.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h" "win32\gui\src\ASWUnitTests_Win32GUI_Windows.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DialogTemplate.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h" "win32\tests\Test_ASWUnitTests_Win32GUI_DPI.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.h" "win32\tests\Test_ASWUnitTests_Win32GUI_Glyphs.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h" "win32\tests\Test_ASWUnitTests_Win32GUI_MainLayout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.h" "win32\tests\Test_ASWUnitTests_Win32GUI_Palette.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp" "win32\tests\Test_ASWUnitTests_Win32GUI_System.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "win32\tests\Test_ASWUnitTests_Win32GUI_System.h" "win32\tests\Test_ASWUnitTests_Win32GUI_System.h"
 if errorlevel 1 exit /b 1
 
 echo Deployment completed successfully.

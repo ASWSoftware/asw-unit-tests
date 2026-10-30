@@ -7,6 +7,10 @@
 # core header has a matching .cpp, so listing ASWUNITTESTS_SOURCES is
 # enough; CMake/IDEs associate each header with its .cpp automatically.
 #
+# ASWUNITTESTS_CORE_SOURCES is the same list without main.cpp, for a runner
+# that brings its own entry point, such as the Win32 GUI runner
+# (win32/gui/src/ASWUnitTests_Win32GUI_Sources.cmake includes this file).
+#
 # Usage, from the consuming project's own CMakeLists.txt (never edit this
 # repository's own cmake/CMakeLists.txt or rad370/ASWUnitTests.cbproj to add
 # your tests):
@@ -20,7 +24,7 @@
 
 set(ASWUNITTESTS_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
-set(ASWUNITTESTS_SOURCES
+set(ASWUNITTESTS_CORE_SOURCES
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_CLI.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Console.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_CrashGuard.cpp"
@@ -32,5 +36,9 @@ set(ASWUNITTESTS_SOURCES
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_TestBase.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Utils.cpp"
     "${ASWUNITTESTS_SOURCE_DIR}/ASWUnitTests_Version.cpp"
+)
+
+set(ASWUNITTESTS_SOURCES
+    ${ASWUNITTESTS_CORE_SOURCES}
     "${ASWUNITTESTS_SOURCE_DIR}/main.cpp"
 )

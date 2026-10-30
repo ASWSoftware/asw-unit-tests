@@ -26,6 +26,11 @@ framework, and contributions are expected to keep it that way.
 5. Check compiler warnings and errors; a change should not introduce new ones.
 6. If you touched platform-specific code (`#if defined(_WIN32)` or similar), validate both the
    Windows and the portable path if you can.
+7. If you touched the RTL support (`ASWUNITTESTS_RTL_EXCEPTIONS`), the GUI runners (`gui/src/`,
+   `vcl/gui/src/`, `win32/gui/src/`) or framework code they use, also build and run the projects
+   [AGENTS.md](AGENTS.md#building-and-testing) lists for them: the VCL console and VCL GUI projects,
+   the CMake `ASWUnitTests_Win32_GUI` target and the Win32 GUI's RAD Studio project. Check the
+   affected GUI behavior by hand.
 
 ## Formatting
 

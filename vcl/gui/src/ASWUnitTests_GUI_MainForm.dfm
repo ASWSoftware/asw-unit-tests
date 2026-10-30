@@ -238,7 +238,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     Height = 19
     Panels = <
       item
-        Width = 120
+        Width = 170
       end
       item
         Width = 100
@@ -267,7 +267,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     Top = 80
     object Act_RunSelected: TAction
       Caption = '&Run Selected'
-      Hint = 'Run the checked tests that are shown (F9)'
+      Hint = 'Run the checked tests that are shown'
       ShortCut = 120
       OnExecute = Act_RunSelectedExecute
     end
@@ -296,7 +296,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     object Act_CopyDetails: TAction
       Caption = '&Copy Details'
       Enabled = False
-      Hint = 'Copy the selected test'#39's details to the clipboard (Ctrl+Shift+C)'
+      Hint = 'Copy the selected test'#39's details to the clipboard'
       ShortCut = 24643
       OnExecute = Act_CopyDetailsExecute
     end
@@ -313,7 +313,7 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     end
     object Act_FocusFilter: TAction
       Caption = '&Filter'
-      Hint = 'Move to the filter box (Ctrl+F)'
+      Hint = 'Move to the filter box'
       ShortCut = 16454
       OnExecute = Act_FocusFilterExecute
     end
@@ -340,14 +340,15 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
     end
     object Act_ShuffleOrder: TAction
       Caption = 'Run in &Shuffled Order'
-      Hint =
-        'Run the groups, and each group'#39's tests, in a random order, to f' +
-        'ind tests that depend on running in a particular order (--shuffle)'
+      Hint = 
+        'Run the groups, and each group'#39's tests, in a random order, to fi' +
+        'nd tests that depend on running in a particular order (--shuffle' +
+        ')'
       OnExecute = Act_ShuffleOrderExecute
     end
     object Act_ShuffleSeed: TAction
       Caption = 'Shuffle S&eed...'
-      Hint =
+      Hint = 
         'Choose a new random seed for each shuffled run, or one seed for ' +
         'every run to repeat its order (--shuffle-seed)'
       OnExecute = Act_ShuffleSeedExecute
@@ -361,6 +362,32 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       Caption = '&Collapse All'
       Hint = 'Collapse the test tree to its top-level suites and groups'
       OnExecute = Act_CollapseAllExecute
+    end
+    object Act_ThemeWindows: TAction
+      Caption = 'Use &Windows Setting'
+      Checked = True
+      GroupIndex = 1
+      Hint = 'Use the light or dark theme, as Windows'#39' app mode is set'
+      OnExecute = Act_ThemeWindowsExecute
+    end
+    object Act_ThemeLight: TAction
+      Caption = '&Light'
+      GroupIndex = 1
+      Hint = 'Use the light theme, whatever Windows is set to'
+      OnExecute = Act_ThemeLightExecute
+    end
+    object Act_ThemeDark: TAction
+      Caption = '&Dark'
+      GroupIndex = 1
+      Hint = 'Use the dark theme, whatever Windows is set to'
+      OnExecute = Act_ThemeDarkExecute
+    end
+    object Act_OpenThemesFolder: TAction
+      Caption = '&Open Themes Folder'
+      Hint =
+        'Open the folder of the VCL style files View > Theme > Dark Theme' +
+        ' lists'
+      OnExecute = Act_OpenThemesFolderExecute
     end
   end
   object IL_Status: TImageList
@@ -428,6 +455,37 @@ object FormASWUnitTestsGUIMain: TFormASWUnitTestsGUIMain
       end
       object MI_ViewResetLayout: TMenuItem
         Action = Act_ResetLayout
+      end
+      object MI_ViewSeparator2: TMenuItem
+        Caption = '-'
+      end
+      object MI_ViewTheme: TMenuItem
+        Caption = '&Theme'
+        object MI_ViewThemeWindows: TMenuItem
+          Action = Act_ThemeWindows
+          RadioItem = True
+        end
+        object MI_ViewThemeLight: TMenuItem
+          Action = Act_ThemeLight
+          RadioItem = True
+        end
+        object MI_ViewThemeDark: TMenuItem
+          Action = Act_ThemeDark
+          RadioItem = True
+        end
+        object MI_ViewThemeSeparator1: TMenuItem
+          Caption = '-'
+        end
+        object MI_ViewDarkTheme: TMenuItem
+          Caption = 'Dark &Theme'
+          OnClick = MI_ViewDarkThemeClick
+          object MI_ViewDarkThemeSeparator1: TMenuItem
+            Caption = '-'
+          end
+          object MI_ViewDarkThemeOpenFolder: TMenuItem
+            Action = Act_OpenThemesFolder
+          end
+        end
       end
     end
     object MI_Options: TMenuItem

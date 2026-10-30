@@ -27,8 +27,8 @@ limitations under the License.
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_Registry.h"
+//---------------------------------------------------------------------------
 #include "ASWUnitTests_StdOutRedirect.h"
 //---------------------------------------------------------------------------
 
@@ -64,6 +64,8 @@ TTest_ASWUnitTests_CLI::TTest_ASWUnitTests_CLI()
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Pause, "ParseArguments_Pause");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_ReportAndProjectName, "ParseArguments_ReportAndProjectName");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle, "ParseArguments_Shuffle");
+    RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_Strings_SkipProgramNameAndKeepUTF8,
+        "ParseArguments_Strings_SkipProgramNameAndKeepUTF8");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout, "ParseArguments_TestTimeout");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseColorMode, "ParseColorMode");
     RegisterTest(&TTest_ASWUnitTests_CLI::Test_ParseUnsignedInt_Invalid, "ParseUnsignedInt_Invalid");
@@ -404,6 +406,28 @@ void TTest_ASWUnitTests_CLI::Test_ParseArguments_Shuffle()
 
     CheckTrue(resultBadSeed.has_value() && *resultBadSeed == ExitCode_InvalidArguments,
         __func__, __LINE__, "--shuffle-seed with a non-numeric argument is rejected");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_CLI::Test_ParseArguments_Strings_SkipProgramNameAndKeepUTF8()
+{
+    // Arrange: a program name that looks like an option, then a filter and a report path with U+00E9 and U+03A9,
+    // which isn't in the Windows-1252 code page.
+    std::vector<std::string> const args = { "--version", "--filter", "*\xC3\xA9*", "--report-junit",
+                                            "r\xCE\xA9.xml" };
+    TCLIOptions options;
+    std::optional<int> result;
+
+    // Act
+    {
+        TStdOutRedirect const suppressOutput;
+        result = TCLIParser::ParseArguments(args, options);
+    }
+
+    // Assert
+    CheckFalse(result.has_value(), __func__, __LINE__, "the program name isn't parsed, so --version doesn't exit");
+    CheckEquals(std::string("*\xC3\xA9*"), options.FilterPattern, __func__, __LINE__, "the filter, byte for byte");
+    CheckEquals(std::string("r\xCE\xA9.xml"), options.JunitReportPath, __func__, __LINE__,
+        "the report path, byte for byte");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_CLI::Test_ParseArguments_TestTimeout()

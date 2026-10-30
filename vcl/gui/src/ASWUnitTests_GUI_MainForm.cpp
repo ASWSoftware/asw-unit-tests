@@ -29,28 +29,33 @@ limitations under the License.
 #pragma resource "*.dfm"
 //---------------------------------------------------------------------------
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <cwchar>
 #include <exception>
 #include <functional>
-#include <iomanip>
 #include <memory>
-#include <sstream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 //---------------------------------------------------------------------------
-#include <System.IniFiles.hpp>
 #include <System.IOUtils.hpp>
 #include <Vcl.Clipbrd.hpp>
+#include <Vcl.Themes.hpp>
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CLI.h"
 #include "ASWUnitTests_Exception.h"
 #include "ASWUnitTests_JUnitReport.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Commands.h"
 #include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_ShuffleSeedDialog.h"
 #include "ASWUnitTests_GUI_Strings.h"
 #include "ASWUnitTests_GUI_TextDialog.h"
+#include "ASWUnitTests_GUI_Tree.h"
+#include "ASWUnitTests_GUI_VCLSystem.h"
+#include "ASWUnitTests_GUI_View.h"
 //---------------------------------------------------------------------------
 
 namespace
@@ -58,35 +63,31 @@ namespace
 
 using namespace ASWUnitTests;
 
-TColor const FailureColor = static_cast<TColor>(RGB(200, 0, 0));
-TColor const SkipColor = static_cast<TColor>(RGB(190, 120, 0));
-
-// What a test tree node stands for. A node's Data holds its kind and an index (see NodeData()): a suite
-// node's into TGUITestList::SuitePaths(), a group node's into its GroupNames(), and a test node's into the
-// list itself.
-enum class TNodeKind
-{
-    Suite,
-    Group,
-    Test,
-};
+//---------------------------------------------------------------------------
 
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data);
 size_t DataToIndex(void* data);
-std::string FirstLine(std::string const& text);
-std::string FormatSeconds(double seconds);
+TColor FailureColor();
 void* IndexToData(size_t index);
+bool IsDarkBackground();
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam);
 TColor LogLineColor(std::string const& line);
-std::vector<TRect> MonitorWorkAreas();
-void* NodeData(TNodeKind kind, size_t index);
-size_t NodeIndex(void* data);
-TNodeKind NodeKind(void* data);
+TColor LogTextColor();
+std::vector<TGUIRect> MonitorWorkAreas();
+void* NodeData(TGUINodeRef const& ref);
+TGUINodeRef NodeRef(void* data);
+TColor SkipColor();
+TGUIRect ToGUIRect(TRect const& rect);
 TNodeCheckState ToNodeCheckState(TGUICheckState state);
 
 //---------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------
-// Adds a node as the last child of 'parent', or as the last top-level node when 'parent' is nullptr.
+/*
+    AddTreeNode
+
+    Adds a node as the last child of 'parent', or as the last top-level node when 'parent' is nullptr.
+*/
 TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& text, void* data)
 {
     if (parent == nullptr)
@@ -95,23 +96,24 @@ TTreeNode* AddTreeNode(TTreeNodes* nodes, TTreeNode* parent, std::string const& 
     return nodes->AddChildObject(parent, FromUTF8(text), data);
 }
 //---------------------------------------------------------------------------
-// A Failures & Skips list item's Data holds its test's index into TGUITestList.
+/*
+    DataToIndex
+
+    A Failures & Skips list item's Data holds its test's index into TGUITestList.
+*/
 size_t DataToIndex(void* data)
 {
     return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
-std::string FirstLine(std::string const& text)
+/*
+    FailureColor
+
+    The text color of a failure in the log and the Failures & Skips list, lighter on a dark background.
+*/
+TColor FailureColor()
 {
-    return text.substr(0, text.find('\n'));
-}
-//---------------------------------------------------------------------------
-// e.g. "0.84 s"
-std::string FormatSeconds(double seconds)
-{
-    std::ostringstream text;
-    text << std::fixed << std::setprecision(2) << seconds << " s";
-    return text.str();
+    return IsDarkBackground() ? static_cast<TColor>(RGB(255, 100, 100)) : static_cast<TColor>(RGB(200, 0, 0));
 }
 //---------------------------------------------------------------------------
 void* IndexToData(size_t index)
@@ -119,57 +121,126 @@ void* IndexToData(size_t index)
     return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index));
 }
 //---------------------------------------------------------------------------
-// The Log tab's color for one line of the framework's log output: its failure lines (a failed test or
-// check, an unhandled exception, a fatal SetUp_Test()/TearDown_Test() error, a group whose constructor
-// or SetUp_Group() threw, or a test that timed out or crashed) and its skip lines stand out.
-TColor LogLineColor(std::string const& line)
+/*
+    IsDarkBackground
+
+    Whether the active style's window color is dark, by its luma, so text colors that read well on white need
+    lighter variants. Also true for a dark high contrast theme, whose window color the unstyled look uses.
+*/
+bool IsDarkBackground()
 {
-    if (line.find("***Test failed") != std::string::npos || line.find("**Check failed") != std::string::npos ||
-        line.find("\" - failed (") != std::string::npos || line.find("Unhandled exception") != std::string::npos ||
-        line.find("!!FATAL ERROR!!") != std::string::npos || line.find("!!ERROR!!") != std::string::npos ||
-        line.find("!!TIMEOUT!!") != std::string::npos || line.find("!!CRASH!!") != std::string::npos)
-        return FailureColor;
+    int const rgb = ColorToRGB(Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindow));
+    int const luma = (GetRValue(rgb) * 299 + GetGValue(rgb) * 587 + GetBValue(rgb) * 114) / 1000;
 
-    if (line.find("***Test skipped") != std::string::npos || line.find("\" - skipped (") != std::string::npos)
-        return SkipColor;
-
-    return clWindowText;
+    return luma < 128;
 }
 //---------------------------------------------------------------------------
-// Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
-std::vector<TRect> MonitorWorkAreas()
+/*
+    IsThemeSettingChange
+
+    Whether a WM_SETTINGCHANGE message's parameters are about a setting that Use Windows Setting follows:
+    the app mode, whose change Windows names "ImmersiveColorSet", or high contrast.
+*/
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
 {
-    std::vector<TRect> workAreas;
+    if (wParam == SPI_SETHIGHCONTRAST)
+        return true;
+
+    wchar_t const* const area = reinterpret_cast<wchar_t const*>(lParam);
+
+    return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
+}
+//---------------------------------------------------------------------------
+/*
+    LogLineColor
+
+    The Log tab's color for one line of the framework's log output; see ClassifyGUILogLine().
+*/
+TColor LogLineColor(std::string const& line)
+{
+    switch (ClassifyGUILogLine(line))
+    {
+        case TGUILogLineKind::Failure:
+            return FailureColor();
+
+        case TGUILogLineKind::Skip:
+            return SkipColor();
+
+        case TGUILogLineKind::Normal:
+            break;
+    }
+
+    return LogTextColor();
+}
+//---------------------------------------------------------------------------
+/*
+    LogTextColor
+
+    The Log tab's color for a line that isn't a failure or a skip: the active style's text color. Unstyled,
+    that's clWindowText, which the rich edit shows in its automatic color (see TTextAttributes::SetColor()).
+*/
+TColor LogTextColor()
+{
+    return Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindowText);
+}
+//---------------------------------------------------------------------------
+/*
+    MonitorWorkAreas
+
+    Every monitor's work area (the part the taskbar and other docked bars leave free), in screen pixels.
+*/
+std::vector<TGUIRect> MonitorWorkAreas()
+{
+    std::vector<TGUIRect> workAreas;
 
     for (int i = 0; i < Screen->MonitorCount; ++i)
-        workAreas.push_back(Screen->Monitors[i]->WorkareaRect);
+        workAreas.push_back(ToGUIRect(Screen->Monitors[i]->WorkareaRect));
 
     return workAreas;
 }
 //---------------------------------------------------------------------------
-// A test tree node's Data, from its kind and index (see TNodeKind). The kind takes the low two bits.
-void* NodeData(TNodeKind kind, size_t index)
+/*
+    NodeData
+
+    A test tree node's Data: which suite, group or test it stands for, encoded by EncodeGUINodeRef().
+*/
+void* NodeData(TGUINodeRef const& ref)
 {
-    return reinterpret_cast<void*>(static_cast<std::uintptr_t>(index) * 4 + static_cast<std::uintptr_t>(kind));
+    return reinterpret_cast<void*>(EncodeGUINodeRef(ref));
 }
 //---------------------------------------------------------------------------
-size_t NodeIndex(void* data)
+TGUINodeRef NodeRef(void* data)
 {
-    return static_cast<size_t>(reinterpret_cast<std::uintptr_t>(data) / 4);
+    return DecodeGUINodeRef(reinterpret_cast<std::uintptr_t>(data));
 }
 //---------------------------------------------------------------------------
-TNodeKind NodeKind(void* data)
+/*
+    SkipColor
+
+    The text color of a skip in the log and the Failures & Skips list, lighter on a dark background.
+*/
+TColor SkipColor()
 {
-    return static_cast<TNodeKind>(reinterpret_cast<std::uintptr_t>(data) % 4);
+    return IsDarkBackground() ? static_cast<TColor>(RGB(255, 190, 70)) : static_cast<TColor>(RGB(190, 120, 0));
+}
+//---------------------------------------------------------------------------
+TGUIRect ToGUIRect(TRect const& rect)
+{
+    return TGUIRect(rect.Left, rect.Top, rect.Right, rect.Bottom);
 }
 //---------------------------------------------------------------------------
 TNodeCheckState ToNodeCheckState(TGUICheckState state)
 {
     switch (state)
     {
-        case TGUICheckState::Checked: return ncsChecked;
-        case TGUICheckState::Partial: return ncsPartial;
-        case TGUICheckState::Unchecked: return ncsUnchecked;
+        case TGUICheckState::Checked:
+            return ncsChecked;
+
+        case TGUICheckState::Partial:
+            return ncsPartial;
+
+        case TGUICheckState::Unchecked:
+            return ncsUnchecked;
     }
 
     return ncsUnchecked;
@@ -237,6 +308,7 @@ public:
 
 } // namespace
 
+//---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
 // TFormASWUnitTestsGUIMain
@@ -254,10 +326,21 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
       m_RunFinishedCount(0),
       m_Running(false),
       m_RunTotalCount(0),
+      m_SettingFilterText(false),
       m_StatusMessage("Ready."),
       m_SyncingChecks(false),
+      m_Theme(EGUITheme::Windows),
+      m_ThemeChangePending(false),
       m_TreeNodesStale(false)
 {
+    m_FormWindowProc = WindowProc;
+    WindowProc = FormWindowProc;
+
+    // A VCL style's rich edit hook gives every color set in the log's text the style's text color instead, so
+    // failures and skips would lose theirs. Without seFont it leaves them, and LogLineColor() chooses colors
+    // that suit the style.
+    RE_Log->StyleElements = RE_Log->StyleElements >> seFont;
+
     m_TreeViewWindowProc = TV_Tests->WindowProc;
     TV_Tests->WindowProc = TV_TestsWindowProc;
 }
@@ -268,10 +351,11 @@ __fastcall TFormASWUnitTestsGUIMain::TFormASWUnitTestsGUIMain(TComponent* Owner)
     This form's own members (m_TestList, m_TestNodes, and so on) are destroyed before the VCL base class
     destroys its controls, and destroying a control can fire its events. So every event that reads those
     members is detached first, along with anything still queued for this form, so none can run against
-    members that no longer exist. The tree's own WindowProc is restored for the same reason.
+    members that no longer exist. The form's and the tree's own WindowProc are restored for the same reason.
 */
 __fastcall TFormASWUnitTestsGUIMain::~TFormASWUnitTestsGUIMain()
 {
+    WindowProc = m_FormWindowProc;
     TV_Tests->WindowProc = m_TreeViewWindowProc;
 
     Edt_Filter->OnChange = nullptr;
@@ -287,21 +371,7 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_AboutExecute(TObject* /*Sender*/)
 {
     RunGuarded("About", []()
     {
-        ShowTextDialog(System::UnicodeString("About ") + Application->Title,
-            TTestHandler::GetVersionFullStr() + "\n"
-            "VCL GUI runner\n"
-            "\n"
-            "App bits: "
-#if defined (_WIN64)
-            "64"
-#else
-            "32"
-#endif
-            "\n\n"
-            "https://github.com/ASWSoftware/asw-unit-tests\n"
-            "\n"
-            "Copyright 2026 ASW Software\n"
-            "Licensed under the Apache License, Version 2.0.\n");
+        ShowTextDialog(System::UnicodeString("About ") + Application->Title, GUIAboutText("VCL GUI runner"));
     });
 }
 //---------------------------------------------------------------------------
@@ -382,8 +452,8 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_ExportJUnitReportExecute(TObject* 
         else if (SD_JUnitReport->FileName.IsEmpty())
         {
             // e.g. "ASWUnitTests_VCL_GUI_JUnit.xml", in the dialog's default folder.
-            SD_JUnitReport->FileName = System::Sysutils::ChangeFileExt(
-                System::Sysutils::ExtractFileName(System::ParamStr(0)), "_JUnit.xml");
+            SD_JUnitReport->FileName = FromUTF8(GUIDefaultJUnitReportFileName(
+                ToUTF8(System::Sysutils::ExtractFileName(System::ParamStr(0)))));
         }
 
         if (!SD_JUnitReport->Execute(Handle))
@@ -412,6 +482,16 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_FocusFilterExecute(TObject* /*Send
 
         Edt_Filter->SetFocus();
         Edt_Filter->SelectAll();
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_OpenThemesFolderExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Dark Theme > Open Themes Folder", []()
+    {
+        System::UnicodeString const folder = GUIThemesFolderPath();
+        System::Sysutils::ForceDirectories(folder);
+        OpenFolderInExplorer(folder);
     });
 }
 //---------------------------------------------------------------------------
@@ -514,6 +594,30 @@ void __fastcall TFormASWUnitTestsGUIMain::Act_StopExecute(TObject* /*Sender*/)
     });
 }
 //---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeDarkExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Dark", [this]()
+    {
+        SetTheme(EGUITheme::Dark);
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeLightExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Light", [this]()
+    {
+        SetTheme(EGUITheme::Light);
+    });
+}
+//---------------------------------------------------------------------------
+void __fastcall TFormASWUnitTestsGUIMain::Act_ThemeWindowsExecute(TObject* /*Sender*/)
+{
+    RunGuarded("Theme > Use Windows Setting", [this]()
+    {
+        SetTheme(EGUITheme::Windows);
+    });
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::AddFailureItem(size_t testIndex)
 {
     TTestId const& test = m_TestList.Test(testIndex);
@@ -522,7 +626,7 @@ void TFormASWUnitTestsGUIMain::AddFailureItem(size_t testIndex)
     TListItem* const item = LV_Failures->Items->Add();
     item->Caption = FromUTF8(StatusName(m_TestList.Status(testIndex)));
     item->SubItems->Add(FromUTF8(test.GroupName + "." + test.TestName));
-    item->SubItems->Add(FromUTF8(result != nullptr ? FirstLine(result->Record.Message) : std::string()));
+    item->SubItems->Add(FromUTF8(result != nullptr ? GUIFirstLine(result->Record.Message) : std::string()));
     item->Data = IndexToData(testIndex);
 }
 //---------------------------------------------------------------------------
@@ -553,26 +657,11 @@ void TFormASWUnitTestsGUIMain::AppendLog(std::string const& text)
 /*
     TFormASWUnitTestsGUIMain::ApplyFilterBox
 
-    The text matches anywhere in a test's "Group.Test" full name, ignoring case, and may use the same '*'
-    and '?' wildcards as --filter. Unlike --filter, it's never anchored to the whole name, so "Parse?rg"
-    finds "...ParseArguments...", just as plain text would.
+    The text matches as GUIFilterBoxFilter() describes.
 */
 void TFormASWUnitTestsGUIMain::ApplyFilterBox()
 {
-    std::string const text = ToUTF8(Edt_Filter->Text.Trim());
-
-    if (text.empty())
-    {
-        m_TestList.SetVisibleFilter(TestFilter());
-    }
-    else
-    {
-        std::string const pattern = "*" + text + "*";
-        m_TestList.SetVisibleFilter([pattern](std::string const& fullTestName)
-        {
-            return TTestHandler::WildcardMatch(pattern, fullTestName, true);
-        });
-    }
+    m_TestList.SetVisibleFilter(GUIFilterBoxFilter(ToUTF8(Edt_Filter->Text)));
 
     BuildTestTree();
     UpdateDetail();
@@ -598,6 +687,33 @@ void TFormASWUnitTestsGUIMain::ApplyPanelSizes(TGUILayout const& layout)
 }
 //---------------------------------------------------------------------------
 /*
+    TFormASWUnitTestsGUIMain::ApplyTheme
+
+    Queued rather than at once: under a VCL style, a menu item's click comes from the form's style hook, which a
+    style change frees, and which uses itself again once the click returns (an access violation in
+    TFormStyleHook::TMainMenuBarStyleHook::Invalidate(), switching dark themes with the mouse). Not during a run,
+    since restyling recreates the windows the run is updating; SetRunning() calls it again once the run has
+    ended. The window is restyled once it handles the message the style change posts; see FormWindowProc().
+*/
+void TFormASWUnitTestsGUIMain::ApplyTheme()
+{
+    TThread::ForceQueue(nullptr, [this]()
+    {
+        RunGuarded("changing the theme", [this]()
+        {
+            if (m_Running)
+            {
+                m_ThemeChangePending = true;
+                return;
+            }
+
+            m_ThemeChangePending = false;
+            ApplyGUITheme(m_Theme, m_DarkStyle);
+        });
+    });
+}
+//---------------------------------------------------------------------------
+/*
     TFormASWUnitTestsGUIMain::BuildTestTree
 
     Rebuilds the tree from m_TestList: one node per group, in order, each with one child node per test, and
@@ -612,44 +728,18 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
         TV_Tests->Items->Clear();
         m_TestNodes.assign(m_TestList.Count(), nullptr);
 
-        // By index into m_TestList.SuitePaths(). A suite's node, and those of the suites holding it, are added
-        // just before its first group's, so suites and groups keep m_TestList's order, where each suite's
-        // groups are together.
-        std::vector<TTreeNode*> suiteNodes(m_TestList.SuitePaths().size(), nullptr);
-        std::function<TTreeNode* (std::string const&)> suiteNode = [&](std::string const& suitePath) -> TTreeNode*
-            {
-                if (suitePath.empty())
-                    return nullptr;
+        // Each node comes after its parent, so its parent's tree node already exists.
+        std::vector<TGUITreeNode> const nodes = BuildGUITree(m_TestList);
+        std::vector<TTreeNode*> treeNodes;
+        treeNodes.reserve(nodes.size());
 
-                size_t const suiteIndex = m_TestList.SuiteIndexOf(suitePath).value();
-
-                if (suiteNodes[suiteIndex] == nullptr)
-                {
-                    std::string const parentPath = ParentSuitePath(suitePath);
-                    suiteNodes[suiteIndex] = AddTreeNode(TV_Tests->Items, suiteNode(parentPath),
-                        NameInSuite(suitePath, parentPath), NodeData(TNodeKind::Suite, suiteIndex));
-                }
-
-                return suiteNodes[suiteIndex];
-            };
-
-        // Only visible tests get nodes, and a group or suite only gets one if any of its tests are visible.
-        std::vector<std::string> const& groupNames = m_TestList.GroupNames();
-        for (size_t groupIndex = 0; groupIndex < groupNames.size(); ++groupIndex)
+        for (TGUITreeNode const& node : nodes)
         {
-            std::vector<size_t> const testIndexes = m_TestList.TestsInGroup(groupNames[groupIndex]);
-            if (testIndexes.empty())
-                continue;
+            TTreeNode* const parent = node.Parent.has_value() ? treeNodes[*node.Parent] : nullptr;
+            treeNodes.push_back(AddTreeNode(TV_Tests->Items, parent, node.Text, NodeData(node.Ref)));
 
-            std::string const suitePath = m_TestList.GroupSuitePath(groupNames[groupIndex]);
-            TTreeNode* const groupNode = AddTreeNode(TV_Tests->Items, suiteNode(suitePath),
-                NameInSuite(groupNames[groupIndex], suitePath), NodeData(TNodeKind::Group, groupIndex));
-
-            for (size_t testIndex : testIndexes)
-            {
-                m_TestNodes[testIndex] = AddTreeNode(TV_Tests->Items, groupNode, m_TestList.Test(testIndex).TestName,
-                    NodeData(TNodeKind::Test, testIndex));
-            }
+            if (node.Ref.Kind == TGUINodeKind::Test)
+                m_TestNodes[node.Ref.Index] = treeNodes.back();
         }
 
         // The nodes just added are the tree's current ones, even if its window was recreated before this.
@@ -661,9 +751,8 @@ void TFormASWUnitTestsGUIMain::BuildTestTree()
     RefreshAllNodeImages();
     SyncTreeChecks();
 
-    // e.g. while the filter hides every test.
-    Act_CollapseAll->Enabled = (TV_Tests->Items->Count > 0);
-    Act_ExpandAll->Enabled = (TV_Tests->Items->Count > 0);
+    // Expand All and Collapse All, e.g. while the filter hides every test.
+    UpdateCommands();
 
     if (TV_Tests->Items->Count > 0)
         TV_Tests->Items->GetFirstNode()->MakeVisible();
@@ -732,8 +821,8 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 
     if (::GetWindowPlacement(Handle, &placement))
     {
-        TRect const bounds = WorkspaceToScreen(TRect(placement.rcNormalPosition), Screen->PrimaryMonitor->BoundsRect,
-            Screen->PrimaryMonitor->WorkareaRect);
+        TGUIRect const bounds = WorkspaceToScreen(ToGUIRect(TRect(placement.rcNormalPosition)),
+            ToGUIRect(Screen->PrimaryMonitor->BoundsRect), ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
 
         TGUIWindowBounds window;
         window.Height = ScaleTo96(bounds.Height(), pixelsPerInch);
@@ -751,9 +840,33 @@ TGUILayout TFormASWUnitTestsGUIMain::CurrentLayout()
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::Edt_FilterChange(TObject* /*Sender*/)
 {
+    if (m_SettingFilterText)
+        return; // Start() builds the tree once it has set the text.
+
     RunGuarded("the filter box", [this]()
     {
         ApplyFilterBox();
+    });
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::DarkThemeItemClick
+
+    Not while the Theme actions are disabled, during a run, as for them.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::DarkThemeItemClick(TObject* Sender)
+{
+    RunGuarded("Theme > Dark Theme", [this, Sender]()
+    {
+        TMenuItem const* const item = dynamic_cast<TMenuItem const*>(Sender);
+
+        if (item == nullptr || !Act_ThemeDark->Enabled || item->Tag < 0 ||
+            static_cast<size_t>(item->Tag) >= m_DarkThemeNames.size())
+        {
+            return;
+        }
+
+        SetDarkTheme(m_DarkThemeNames[static_cast<size_t>(item->Tag)]);
     });
 }
 //---------------------------------------------------------------------------
@@ -769,19 +882,79 @@ void TFormASWUnitTestsGUIMain::FailRunOnUnhandledException(std::string const& de
     // The test that was running when the exception escaped never finished, so it's the one that failed.
     if (m_CurrentTestIndex.has_value())
     {
-        TTestId const& test = m_TestList.Test(*m_CurrentTestIndex);
-        m_TestList.SetResult(*m_CurrentTestIndex, TTestCaseRecord{ test.GroupName, test.TestName, 0.0,
-                                                                   TTestOutcome::Fail, "Unhandled exception: " + description,
-                                                                   test.SuitePath }, std::string());
+        m_TestList.SetResult(*m_CurrentTestIndex,
+            GUIUnhandledExceptionRecord(m_TestList.Test(*m_CurrentTestIndex), description), std::string());
         UpdateTestNodeImages(*m_CurrentTestIndex);
         AddFailureItem(*m_CurrentTestIndex);
         m_CurrentTestIndex.reset();
     }
 
     PB_Progress->State = pbsError;
-    m_StatusMessage = "The run was ended by an unhandled exception: " + description;
+    m_StatusMessage = GUIUnhandledExceptionStatus(description);
     AppendLog(m_StatusMessage + "\n");
     UpdateDetail();
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::FillDarkThemeMenu
+
+    The built-in themes first (see BuiltInGUIDarkThemeNames()), Carbon at the top, then a line and the VCL style
+    files in GUIThemesFolderPath() (see GUIThemeNames()), so a file added or removed since shows at once, above
+    Open Themes Folder; the chosen one is checked. A chosen theme whose file is missing is still listed, so
+    choosing it again reports why it isn't used.
+*/
+void TFormASWUnitTestsGUIMain::FillDarkThemeMenu()
+{
+    for (TMenuItem* const item : m_DarkThemeItems)
+        delete item;
+
+    m_DarkThemeItems.clear();
+
+    std::vector<std::string> names = BuiltInGUIDarkThemeNames();
+    size_t const builtInCount = names.size();
+    std::vector<std::string> const files = GUIThemeNames(FileNamesInFolder(GUIThemesFolderPath()), ".vsf", names);
+    names.insert(names.end(), files.begin(), files.end());
+
+    // Windows' file names ignore case, so a name saved in another case is still that file's.
+    std::vector<std::string>::const_iterator chosen = std::find_if(names.begin(), names.end(),
+        [this](std::string const& name)
+    {
+        return System::Sysutils::AnsiSameText(FromUTF8(name), FromUTF8(m_DarkTheme));
+    });
+
+    if (chosen == names.end())
+        chosen = names.insert(names.end(), m_DarkTheme);
+
+    size_t const chosenIndex = static_cast<size_t>(chosen - names.begin());
+    // A built-in theme's accelerator, other than Open Themes Folder's O; a style file's name has none.
+    std::vector<std::string> const builtInCaptions = GUIMenuItemTextsWithAccelerators(
+        std::vector<std::string>(names.begin(), names.begin() + static_cast<std::ptrdiff_t>(builtInCount)), "o");
+    int position = 0;
+
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+        // A line between the built-in themes and the files.
+        if (i == builtInCount)
+        {
+            TMenuItem* const line = new TMenuItem(this);
+            m_DarkThemeItems.push_back(line);
+            line->Caption = "-";
+            MI_ViewDarkTheme->Insert(position++, line);
+        }
+
+        TMenuItem* const item = new TMenuItem(this);
+        m_DarkThemeItems.push_back(item);
+
+        item->Caption = FromUTF8(i < builtInCount ? builtInCaptions[i] : GUIMenuItemText(names[i]));
+        item->Checked = i == chosenIndex;
+        item->Enabled = Act_ThemeDark->Enabled;
+        item->OnClick = DarkThemeItemClick;
+        item->RadioItem = true;
+        item->Tag = static_cast<NativeInt>(i);
+        MI_ViewDarkTheme->Insert(position++, item);
+    }
+
+    m_DarkThemeNames = names;
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::FormClose(TObject* /*Sender*/, TCloseAction& /*Action*/)
@@ -819,6 +992,45 @@ void __fastcall TFormASWUnitTestsGUIMain::FormCloseQuery(TObject* /*Sender*/, bo
 }
 //---------------------------------------------------------------------------
 /*
+    TFormASWUnitTestsGUIMain::FormWindowProc
+
+    Follows the theme as it changes:
+    - TStyleManager posts CM_CUSTOMSTYLECHANGED to each visible form when the style changes, and the form
+      handles it by recreating its windows in the new style. Its log text and tree nodes are kept, but the
+      log's lines keep the colors chosen for the old style, so they're colored again, and the tree's check
+      boxes and status images are set again. VCL changes the message to CM_STYLECHANGED as it handles it, so
+      it's noted first.
+    - With Use Windows Setting, a WM_SETTINGCHANGE about the app mode or high contrast applies the theme
+      again.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::FormWindowProc(TMessage& message)
+{
+    bool const styleChanged = (message.Msg == CM_CUSTOMSTYLECHANGED);
+    bool const settingChanged = (message.Msg == WM_SETTINGCHANGE) &&
+        IsThemeSettingChange(message.WParam, message.LParam);
+
+    m_FormWindowProc(message);
+
+    if (styleChanged)
+    {
+        RunGuarded("changing the theme", [this]()
+        {
+            RecolorLog();
+            SyncTreeChecks();
+            RefreshAllNodeImages();
+            LV_Failures->Invalidate();
+        });
+    }
+    else if (settingChanged && m_Theme == EGUITheme::Windows)
+    {
+        RunGuarded("following Windows' theme setting", [this]()
+        {
+            ApplyTheme();
+        });
+    }
+}
+//---------------------------------------------------------------------------
+/*
     TFormASWUnitTestsGUIMain::LoadLayout
 
     Called from Start(), before the window is first shown. The panel sizes are applied once it's showing,
@@ -834,8 +1046,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
         if (!System::Sysutils::FileExists(path))
             return;
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        layout = LoadGUILayout(*ini);
+        layout = LoadGUILayout(TGUIINIDocument(ReadFileBytes(path)));
     }
     catch (...)
     {
@@ -845,7 +1056,7 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
     if (layout.Window.has_value())
     {
         TGUIWindowBounds const& window = *layout.Window;
-        TRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
+        TGUIRect const bounds(window.Left, window.Top, window.Left + ScaleFrom96(window.Width, CurrentPPI),
             window.Top + ScaleFrom96(window.Height, CurrentPPI));
 
         // Not where it can't be reached, e.g. on a monitor that's since been disconnected. Set as the window
@@ -856,8 +1067,8 @@ void TFormASWUnitTestsGUIMain::LoadLayout()
 
         if (IsWindowReachable(bounds, MonitorWorkAreas()) && ::GetWindowPlacement(Handle, &placement))
         {
-            TRect const normal = ScreenToWorkspace(bounds, Screen->PrimaryMonitor->BoundsRect,
-                Screen->PrimaryMonitor->WorkareaRect);
+            TGUIRect const normal = ScreenToWorkspace(bounds, ToGUIRect(Screen->PrimaryMonitor->BoundsRect),
+                ToGUIRect(Screen->PrimaryMonitor->WorkareaRect));
             placement.rcNormalPosition.left = normal.Left;
             placement.rcNormalPosition.top = normal.Top;
             placement.rcNormalPosition.right = normal.Right;
@@ -901,7 +1112,7 @@ void TFormASWUnitTestsGUIMain::LoadSelection()
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresCustomDrawItem(TCustomListView* Sender, TListItem* Item,
-    TCustomDrawState /*State*/, bool& /*DefaultDraw*/)
+    TCustomDrawState State, bool& /*DefaultDraw*/)
 {
     // Not RunGuarded(): this runs while painting, where showing an error would only cause more painting.
     // An item it can't match to a test is simply drawn in the default color.
@@ -910,7 +1121,12 @@ void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresCustomDrawItem(TCustomListV
         return;
 
     bool const failed = m_TestList.Status(index) == TGUITestStatus::Failed;
-    Sender->Canvas->Font->Color = failed ? FailureColor : SkipColor;
+    Sender->Canvas->Font->Color = failed ? FailureColor() : SkipColor();
+
+    // Otherwise a styled list view paints an item that's neither selected nor hot in the canvas's default,
+    // light, color.
+    if (!State.Contains(cdsSelected) && !State.Contains(cdsHot))
+        Sender->Canvas->Brush->Color = Vcl::Themes::TStyleManager::ActiveStyle->GetSystemColor(clWindow);
 }
 //---------------------------------------------------------------------------
 /*
@@ -944,6 +1160,19 @@ void __fastcall TFormASWUnitTestsGUIMain::LV_FailuresDblClick(TObject* /*Sender*
     });
 }
 //---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::MI_ViewDarkThemeClick
+
+    The VCL calls a parent item's OnClick as its submenu opens.
+*/
+void __fastcall TFormASWUnitTestsGUIMain::MI_ViewDarkThemeClick(TObject* /*Sender*/)
+{
+    RunGuarded("the Dark Theme menu", [this]()
+    {
+        FillDarkThemeMenu();
+    });
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::OnTestFinished(TTestCaseRecord const& record, std::string const& testLog)
 {
     std::optional<size_t> const index = m_TestList.IndexOf(record.GroupName, record.TestName);
@@ -958,7 +1187,7 @@ void TFormASWUnitTestsGUIMain::OnTestFinished(TTestCaseRecord const& record, std
 
     m_CurrentTestIndex.reset();
     ++m_RunFinishedCount;
-    PB_Progress->Position = static_cast<int>(m_RunFinishedCount);
+    SetProgressPosition(static_cast<int>(m_RunFinishedCount));
 
     if (record.Outcome == TTestOutcome::Fail)
         PB_Progress->State = pbsError;
@@ -994,13 +1223,58 @@ void TFormASWUnitTestsGUIMain::RebuildNodeCache()
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
     {
-        size_t const index = NodeIndex(node->Data);
+        TGUINodeRef const ref = NodeRef(node->Data);
 
-        if (NodeKind(node->Data) == TNodeKind::Test && index < m_TestNodes.size())
-            m_TestNodes[index] = node;
+        if (ref.Kind == TGUINodeKind::Test && ref.Index < m_TestNodes.size())
+            m_TestNodes[ref.Index] = node;
     }
 
     m_TreeNodesStale = false;
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::RecolorLog
+
+    AppendLog() colored each line for the style active then. Every line is given the text color first, in one
+    step, then each failure and skip line its own color. Lines are found by their index, which counts a line
+    break as one character, as SelStart does.
+*/
+void TFormASWUnitTestsGUIMain::RecolorLog()
+{
+    struct TEndUpdate
+    {
+        TStrings* const Lines;
+
+        ~TEndUpdate()
+        {
+            Lines->EndUpdate();
+        }
+    };
+
+    int const selStart = RE_Log->SelStart;
+    int const selLength = RE_Log->SelLength;
+
+    RE_Log->Lines->BeginUpdate();
+    TEndUpdate const endUpdate{ RE_Log->Lines };
+
+    RE_Log->SelectAll();
+    RE_Log->SelAttributes->Color = LogTextColor();
+
+    for (int i = 0; i < RE_Log->Lines->Count; ++i)
+    {
+        System::UnicodeString const text = RE_Log->Lines->Strings[i];
+        std::string const line = ToUTF8(text);
+
+        if (ClassifyGUILogLine(line) == TGUILogLineKind::Normal)
+            continue;
+
+        RE_Log->SelStart = static_cast<int>(::SendMessage(RE_Log->Handle, EM_LINEINDEX, static_cast<WPARAM>(i), 0));
+        RE_Log->SelLength = text.Length();
+        RE_Log->SelAttributes->Color = LogLineColor(line);
+    }
+
+    RE_Log->SelStart = selStart;
+    RE_Log->SelLength = selLength;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::RefreshAllNodeImages()
@@ -1113,9 +1387,11 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
     m_RunEnd.reset();
     m_LastRunJUnitTestCases.reset();
 
-    PB_Progress->Max = static_cast<int>(std::max<size_t>(m_RunTotalCount, 1));
-    PB_Progress->Position = 0;
+    // Back to the normal state first, since the error state wouldn't draw the new position; see
+    // SetProgressPosition().
     PB_Progress->State = pbsNormal;
+    PB_Progress->Max = static_cast<int>(std::max<size_t>(m_RunTotalCount, 1));
+    SetProgressPosition(0);
 
     m_Observer.ResetStop();
     m_StatusMessage = "Running...";
@@ -1128,20 +1404,11 @@ void TFormASWUnitTestsGUIMain::RunTests(TestFilter const& filter, std::string co
             m_Options.CLI.TestTimeoutSeconds, m_Options.CLI.CatchCrashes);
         m_Observer.Flush();
 
-        // A timed-out test's abandoned thread may still be running one of the groups' tests, and a crash may have
-        // left their state corrupted, so nothing runs again until the GUI is restarted (see WasRunAborted()).
-        m_RunAborted = results.TimedOut || results.Crashed;
-
-        if (results.Stopped)
-            m_StatusMessage = "Stopped before every test ran.";
-        else if (results.TimedOut)
-            m_StatusMessage = "A test timed out, so the rest of the run was abandoned. Restart to run tests again.";
-        else if (results.Crashed)
-            m_StatusMessage = "A test crashed, so the rest of the run was abandoned. Restart to run tests again.";
-        else
-            m_StatusMessage = "Done.";
-
-        m_LastRunExitCode = ExitCodeForResults(results);
+        // After an aborted run, nothing runs again until the GUI is restarted (see WasRunAborted()).
+        TGUIRunSummary const summary = SummarizeGUIRun(results);
+        m_RunAborted = summary.Aborted;
+        m_StatusMessage = summary.StatusMessage;
+        m_LastRunExitCode = summary.ExitCode;
         m_LastRunJUnitTestCases = ToJUnitTestCases(results.CaseRecords);
 
         // A failure is only noted in the log, so it can't hold up --exit.
@@ -1190,9 +1457,10 @@ void TFormASWUnitTestsGUIMain::SaveLayout()
         System::UnicodeString const path = GUILayoutFilePath();
         System::Sysutils::ForceDirectories(System::Sysutils::ExtractFileDir(path));
 
-        std::unique_ptr<TMemIniFile> const ini(new TMemIniFile(path));
-        SaveGUILayout(*ini, CurrentLayout());
-        ini->UpdateFile();
+        // Starting from the file's current text keeps any other values in it.
+        TGUIINIDocument ini(System::Sysutils::FileExists(path) ? ReadFileBytes(path) : std::string());
+        SaveGUILayout(ini, CurrentLayout());
+        WriteFileBytes(path, ini.Text());
     }
     catch (...)
     {
@@ -1216,64 +1484,97 @@ void TFormASWUnitTestsGUIMain::SaveSelection()
     }
 }
 //---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetDarkTheme
+
+    Applied at once while dark; while light, its file is still loaded, so its problems show in the log, and the
+    status bar says it shows once the theme is dark. A VCL style file already loaded isn't read again (see
+    LoadGUIDarkStyle()).
+*/
+void TFormASWUnitTestsGUIMain::SetDarkTheme(std::string const& name)
+{
+    m_DarkTheme = name;
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIDarkThemeToLayoutFile(GUILayoutFilePath(), name);
+
+    std::vector<std::string> problems;
+    m_DarkStyle = LoadGUIDarkStyle(GUIThemesFolderPath(), name, problems);
+    ApplyTheme();
+
+    if (GUIThemeIsDark(m_Theme, WindowsAppsUseDarkTheme(), WindowsHighContrast()))
+        m_StatusMessage = "Dark theme: " + name + ".";
+    else
+        m_StatusMessage = "Dark theme: " + name + ", shown while the theme is dark.";
+
+    for (std::string const& problem : problems)
+        AppendLog(problem + "\n");
+
+    UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetNodeImage(TTreeNode* node)
 {
-    size_t const index = NodeIndex(node->Data);
-    TGUITestStatus status = TGUITestStatus::NotRun;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            status = m_TestList.SuiteStatus(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            status = m_TestList.GroupStatus(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            status = m_TestList.Status(index);
-            break;
-    }
-
-    int const image = static_cast<int>(status);
+    int const image = static_cast<int>(GUINodeStatus(m_TestList, NodeRef(node->Data)));
     node->ImageIndex = image;
     node->SelectedIndex = image;
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetProgressPosition
+
+    In the error state (red), a themed progress bar takes a new position without drawing it, so it stays where
+    it was when it turned red, and back in the normal state it then shows the position it last took. Setting the
+    position a second time draws it. Found by experiment on Windows 10 with Common Controls 6; the VCL passes
+    Position straight to the control.
+*/
+void TFormASWUnitTestsGUIMain::SetProgressPosition(int position)
+{
+    PB_Progress->Position = position;
+
+    if (PB_Progress->State != pbsNormal)
+        PB_Progress->Position = position;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::SetRunning(bool running)
 {
     m_Running = running;
-
-    // A modal dialog opened mid-run would hold up the rest of the run until it was closed, since the tests
-    // run on this thread.
-    Act_About->Enabled = !running;
-    Act_CommandLineOptions->Enabled = !running;
-    Act_ExportJUnitReport->Enabled = !running && m_LastRunJUnitTestCases.has_value();
-
-    // Nor once a run has been aborted; see RunTests().
-    Act_RunFailed->Enabled = !running && !m_RunAborted && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_RunSelected->Enabled = !running && !m_RunAborted;
-    Act_SelectAll->Enabled = !running;
-    Act_SelectFailed->Enabled = !running && m_TestList.StatusCount(TGUITestStatus::Failed) > 0;
-    Act_SelectNone->Enabled = !running;
-    Act_Stop->Enabled = running;
-
-    // The run in progress already has its order, so a change now would only mislead.
-    Act_ShuffleOrder->Enabled = !running;
-    Act_ShuffleSeed->Enabled = !running;
-
-    // Rebuilding the tree mid-run would discard the nodes the run is updating.
-    Act_FocusFilter->Enabled = !running;
-    Edt_Filter->Enabled = !running;
-
+    UpdateCommands();
     UpdateStatusBar();
+
+    // Windows' setting changed during the run; see ApplyTheme().
+    if (!running && m_ThemeChangePending)
+        ApplyTheme();
+}
+//---------------------------------------------------------------------------
+/*
+    TFormASWUnitTestsGUIMain::SetTheme
+
+    Saved at once, rather than with the layout as the window closes, so the choice is kept even if the window
+    doesn't get to close normally.
+*/
+void TFormASWUnitTestsGUIMain::SetTheme(EGUITheme theme)
+{
+    m_Theme = theme;
+    ShowThemeState();
+
+    if (!m_Options.LayoutIgnore)
+        SaveGUIThemeToLayoutFile(GUILayoutFilePath(), theme);
+
+    ApplyTheme();
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::ShowShuffleState()
 {
     Act_ShuffleOrder->Checked = m_Shuffle.Enabled();
     UpdateStatusBar();
+}
+//---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::ShowThemeState()
+{
+    Act_ThemeDark->Checked = (m_Theme == EGUITheme::Dark);
+    Act_ThemeLight->Checked = (m_Theme == EGUITheme::Light);
+    Act_ThemeWindows->Checked = (m_Theme == EGUITheme::Windows);
 }
 //---------------------------------------------------------------------------
 /*
@@ -1284,9 +1585,14 @@ void TFormASWUnitTestsGUIMain::ShowShuffleState()
     and --shuffle and --shuffle-seed to the Options menu. Also restores the window layout saved when it
     last closed.
 */
-void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
+void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options, EGUITheme theme, std::string const& darkTheme,
+    System::UnicodeString const& darkStyle, std::vector<std::string> const& themeProblems)
 {
     m_Options = options;
+    m_Theme = theme;
+    m_DarkTheme = darkTheme;
+    m_DarkStyle = darkStyle;
+    ShowThemeState();
 
     m_Observer.LogTextCallback = [this](std::string const& text)
         {
@@ -1327,17 +1633,11 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     if (m_KeepSelection)
         LoadSelection();
 
-    for (std::string const& ignored : m_Options.IgnoredOptions)
-        AppendLog("Note: " + ignored + " has no effect in the GUI, so it was ignored.\n");
+    for (std::string const& note : GUICommandLineNotes(m_Options, "VCL forms or controls"))
+        AppendLog(note + "\n");
 
-    if (m_Options.CLI.TestTimeoutSeconds.has_value())
-    {
-        AppendLog("Note: --test-timeout-seconds runs each test on a worker thread, so a test that creates VCL "
-            "forms or controls won't work with it.\n");
-    }
-
-    if (m_Options.LayoutIgnore)
-        AppendLog("Note: --layout-ignore: the window layout isn't loaded or saved, so it opens with the defaults.\n");
+    for (std::string const& problem : themeProblems)
+        AppendLog(problem + "\n");
 
     if (m_Options.LayoutReset)
         ResetSavedLayout();
@@ -1351,10 +1651,14 @@ void TFormASWUnitTestsGUIMain::Start(TGUIOptions const& options)
     // The filter box's case-insensitive contains-match shows every test --filter's pattern matches (and
     // maybe a few more, left unchecked), so seeding it with the pattern never hides a checked test.
     if (m_Options.CLI.HasFilter)
+    {
+        // Without OnChange's rebuild, which may or may not happen before the window is showing, so the tree
+        // is built once either way, just below.
+        TScopedFlag const settingFilterText(m_SettingFilterText);
         Edt_Filter->Text = FromUTF8(m_Options.CLI.FilterPattern);
+    }
 
-    // Called directly, since setting the text above doesn't necessarily raise OnChange before the window
-    // is showing. Builds the tree.
+    // Builds the tree.
     ApplyFilterBox();
 
     // Centered here rather than with the DFM's Position, which is poDesigned because LoadLayout() would
@@ -1397,24 +1701,7 @@ void TFormASWUnitTestsGUIMain::SyncTreeChecks()
     TScopedFlag const syncing(m_SyncingChecks);
 
     for (TTreeNode* node = TV_Tests->Items->GetFirstNode(); node != nullptr; node = node->GetNext())
-    {
-        size_t const index = NodeIndex(node->Data);
-
-        switch (NodeKind(node->Data))
-        {
-            case TNodeKind::Suite:
-                node->CheckState = ToNodeCheckState(m_TestList.SuiteCheckState(m_TestList.SuitePaths()[index]));
-                break;
-
-            case TNodeKind::Group:
-                node->CheckState = ToNodeCheckState(m_TestList.GroupCheckState(m_TestList.GroupNames()[index]));
-                break;
-
-            case TNodeKind::Test:
-                node->CheckState = m_TestList.IsChecked(index) ? ncsChecked : ncsUnchecked;
-                break;
-        }
-    }
+        node->CheckState = ToNodeCheckState(GUINodeCheckState(m_TestList, NodeRef(node->Data)));
 
     UpdateStatusBar(); // For its checked count.
 }
@@ -1457,23 +1744,7 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsCheckStateChanging(TCustomTree
         if (m_Running)
             return;
 
-        bool const check = (OldCheckState != ncsChecked);
-        size_t const index = NodeIndex(Node->Data);
-
-        switch (NodeKind(Node->Data))
-        {
-            case TNodeKind::Suite:
-                m_TestList.SetSuiteChecked(m_TestList.SuitePaths()[index], check);
-                break;
-
-            case TNodeKind::Group:
-                m_TestList.SetGroupChecked(m_TestList.GroupNames()[index], check);
-                break;
-
-            case TNodeKind::Test:
-                m_TestList.SetChecked(index, check);
-                break;
-        }
+        SetGUINodeChecked(m_TestList, NodeRef(Node->Data), OldCheckState != ncsChecked);
 
         // Changing check boxes from inside the tree's own change notification isn't safe, so the update
         // waits until this click has been fully handled.
@@ -1502,26 +1773,51 @@ void __fastcall TFormASWUnitTestsGUIMain::TV_TestsWindowProc(TMessage& message)
     m_TreeViewWindowProc(message);
 }
 //---------------------------------------------------------------------------
-/*
-    TFormASWUnitTestsGUIMain::UpdateCaption
-
-    "ASWUnitTests - Framework version: <version>", plus " - <project name>" when --project-name gave one
-    other than the default.
-*/
 void TFormASWUnitTestsGUIMain::UpdateCaption()
 {
-    std::string caption = "ASWUnitTests - Framework version: " + TTestHandler::GetVersionStr();
+    Caption = FromUTF8(GUICaption(m_Options.CLI.ProjectName));
+}
+//---------------------------------------------------------------------------
+void TFormASWUnitTestsGUIMain::UpdateCommands()
+{
+    TGUICommandContext context;
+    context.FailedCount = m_TestList.StatusCount(TGUITestStatus::Failed);
+    context.HasReport = m_LastRunJUnitTestCases.has_value();
+    context.HasSelection = (TV_Tests->Selected != nullptr);
+    context.RunAborted = m_RunAborted;
+    context.Running = m_Running;
+    context.TreeHasNodes = (TV_Tests->Items->Count > 0);
 
-    if (m_Options.CLI.ProjectName != TCLIOptions().ProjectName)
-        caption += " - " + m_Options.CLI.ProjectName;
+    TGUICommandStates const states = GUICommandStates(context);
 
-    Caption = FromUTF8(caption);
+    Act_About->Enabled = states.About;
+    Act_CollapseAll->Enabled = states.CollapseAll;
+    Act_CommandLineOptions->Enabled = states.CommandLineOptions;
+    Act_CopyDetails->Enabled = states.CopyDetails;
+    Act_Exit->Enabled = states.Exit;
+    Act_ExpandAll->Enabled = states.ExpandAll;
+    Act_ExportJUnitReport->Enabled = states.ExportJUnitReport;
+    Act_FocusFilter->Enabled = states.FocusFilter;
+    Act_ResetLayout->Enabled = states.ResetLayout;
+    Act_RunFailed->Enabled = states.RunFailed;
+    Act_RunSelected->Enabled = states.RunSelected;
+    Act_SelectAll->Enabled = states.SelectAll;
+    Act_SelectFailed->Enabled = states.SelectFailed;
+    Act_SelectNone->Enabled = states.SelectNone;
+    Act_ShuffleOrder->Enabled = states.ShuffleOrder;
+    Act_ShuffleSeed->Enabled = states.ShuffleSeed;
+    Act_Stop->Enabled = states.Stop;
+    Act_OpenThemesFolder->Enabled = states.Theme;
+    Act_ThemeDark->Enabled = states.Theme;
+    Act_ThemeLight->Enabled = states.Theme;
+    Act_ThemeWindows->Enabled = states.Theme;
+    Edt_Filter->Enabled = states.FilterBox;
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateDetail()
 {
     TTreeNode* const node = TV_Tests->Selected;
-    Act_CopyDetails->Enabled = (node != nullptr);
+    UpdateCommands(); // Copy Details, with or without a selection.
 
     if (node == nullptr)
     {
@@ -1529,56 +1825,25 @@ void TFormASWUnitTestsGUIMain::UpdateDetail()
         return;
     }
 
-    size_t const index = NodeIndex(node->Data);
-    std::string text;
-
-    switch (NodeKind(node->Data))
-    {
-        case TNodeKind::Suite:
-            text = m_TestList.SuiteDetailText(m_TestList.SuitePaths()[index]);
-            break;
-
-        case TNodeKind::Group:
-            text = m_TestList.GroupDetailText(m_TestList.GroupNames()[index]);
-            break;
-
-        case TNodeKind::Test:
-            text = m_TestList.DetailText(index);
-            break;
-    }
-
-    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(text));
+    Mem_Detail->Text = System::Sysutils::AdjustLineBreaks(FromUTF8(GUINodeDetailText(m_TestList,
+        NodeRef(node->Data))));
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateStatusBar()
 {
-    auto setPanel = [this](int panel, std::string const& text)
-        {
-            SB_Status->Panels->Items[panel]->Text = FromUTF8(text);
-        };
-
-    // Counts only the tests the filter box shows, since those are the ones Run Selected runs.
-    std::string checked = "Checked: " + std::to_string(m_TestList.CheckedCount()) + " / " +
-        std::to_string(m_TestList.VisibleCount());
-    if (m_TestList.VisibleCount() != m_TestList.Count())
-        checked += " shown";
-    setPanel(0, checked);
-    setPanel(1, "Run: " + std::to_string(m_RunFinishedCount) + " / " + std::to_string(m_RunTotalCount));
-    setPanel(2, "Passed: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Passed)));
-    setPanel(3, "Failed: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Failed)));
-    setPanel(4, "Skipped: " + std::to_string(m_TestList.StatusCount(TGUITestStatus::Skipped)));
-
-    std::string elapsed;
+    std::optional<double> elapsedSeconds;
 
     if (m_RunStart.has_value())
     {
         std::chrono::steady_clock::time_point const end = m_RunEnd.value_or(std::chrono::steady_clock::now());
-        elapsed = FormatSeconds(std::chrono::duration<double>(end - *m_RunStart).count());
+        elapsedSeconds = std::chrono::duration<double>(end - *m_RunStart).count();
     }
 
-    setPanel(5, elapsed);
-    setPanel(6, m_Shuffle.StatusText());
-    setPanel(7, m_StatusMessage);
+    std::vector<std::string> const panels = GUIStatusPanels(m_TestList, m_RunFinishedCount, m_RunTotalCount,
+        elapsedSeconds, m_Shuffle.StatusText(), m_StatusMessage);
+
+    for (size_t i = 0; i < panels.size() && static_cast<int>(i) < SB_Status->Panels->Count; ++i)
+        SB_Status->Panels->Items[static_cast<int>(i)]->Text = FromUTF8(panels[i]);
 }
 //---------------------------------------------------------------------------
 void TFormASWUnitTestsGUIMain::UpdateTestNodeImages(size_t testIndex)
@@ -1600,8 +1865,8 @@ bool TFormASWUnitTestsGUIMain::WasRunAborted() const
 /*
     TFormASWUnitTestsGUIMain::WriteJUnitReport
 
-    Writes the file itself, rather than with TJUnitReportWriter::Write(), whose std::ofstream can't open a
-    path with characters outside the system code page (e.g. a user folder's name) from a std::string.
+    Writes the file itself, rather than with TJUnitReportWriter::Write(), so a failure can say why: Write() only
+    returns false.
 */
 bool TFormASWUnitTestsGUIMain::WriteJUnitReport(System::UnicodeString const& path, std::string& error)
 {

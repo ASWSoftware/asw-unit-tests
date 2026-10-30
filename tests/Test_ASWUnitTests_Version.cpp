@@ -24,11 +24,11 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_Version.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <cstddef>
 #include <string>
 #include <string_view>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Handler.h"
 #include "ASWUnitTests_Version.h"
@@ -37,7 +37,16 @@ limitations under the License.
 namespace
 {
 
-// A SemVer pre-release identifier: not empty, only [0-9A-Za-z-], and no leading zero if it's all digits.
+//---------------------------------------------------------------------------
+
+bool IsValidPreReleaseIdentifier(std::string_view identifier);
+
+//---------------------------------------------------------------------------
+/*
+    IsValidPreReleaseIdentifier
+
+    A SemVer pre-release identifier: not empty, only [0-9A-Za-z-], and no leading zero if it's all digits.
+*/
 bool IsValidPreReleaseIdentifier(std::string_view identifier)
 {
     if (identifier.empty())
@@ -56,8 +65,11 @@ bool IsValidPreReleaseIdentifier(std::string_view identifier)
 
     return !isNumeric || identifier.size() == 1 || identifier.front() != '0';
 }
+//---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {

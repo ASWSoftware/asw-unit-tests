@@ -14,7 +14,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   method and registers it with its group, so a test can't be written but left out of the group's
   constructor.
 - **[Test suites](#organizing-groups-into-suites)** - `TSuitePath` puts groups in nested suites, so
-  `--filter "Framework.*"` selects a whole suite, and the VCL GUI runner shows suites in its tree.
+  `--filter "Framework.*"` selects a whole suite, and the GUI runners show suites in their tree.
 - **Check and Assert methods** - `Check*` records a failure and lets the test continue; `Assert*`
   fails the test immediately. Covers `Equals`/`NotEquals`, `True`/`False`, `Null`/`NotNull`,
   `Same`/`NotSame`, `Empty`/`NotEmpty`, `IsType`/`IsNotType`, `Near`/`NotNear`,
@@ -26,7 +26,7 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   `std::source_location` report the caller's function and line, without passing
   `__func__, __LINE__`.
 - **[Floating-point comparison](#comparing-floating-point-values)** - `CheckNear()`/`AssertNear()`
-  compare `float` and `double` values within a tolerance.
+  compare two values within a tolerance: floating point, integers, or a mix.
 - **[Expected exceptions](#expecting-a-specific-exception-type-or-message)** -
   `SetExceptionExpected()`, with an optional check of the exception's type and message, and
   [`CheckThrows()`/`CheckNoThrow()`](#checking-that-a-call-throws) for a single call.
@@ -53,8 +53,10 @@ Requires C++17 or higher; the project itself is built and tested at C++20.
   failed test instead of losing the whole process.
 - **Unexpected exceptions** - An exception a test throws without expecting it fails only that test,
   with the exception's message, and the run carries on.
-- **[VCL GUI runner](#vcl-gui-runner)** - A RAD Studio VCL app that runs the same tests, with a
-  checkbox tree to choose them, live pass/fail/skip status, and each failure's details and log.
+- **[GUI runners](#gui-runners)** - A Windows app that runs the same tests, with a checkbox tree to
+  choose them, live pass/fail/skip status, and each failure's details and log: the
+  [Win32 GUI runner](#win32-gui-runner), built with CMake or RAD Studio, or the
+  [VCL GUI runner](#vcl-gui-runner), a RAD Studio VCL app.
 
 ## Reporting
 
@@ -111,17 +113,19 @@ cmake --build build --config Release
 ```
 
 The executable is written to `build/bin/Release/ASWUnitTests.exe` with multi-configuration
-generators. The RAD Studio project writes its final executable to the same `build/bin/<Config>`
-directory.
+generators. On Windows it also builds the [Win32 GUI runner](#win32-gui-runner),
+`ASWUnitTests_Win32_GUI.exe`, in the same directory. The RAD Studio project writes its final
+executable to the same `build/bin/<Config>` directory.
 
 The CMake project does not need a separate version declaration (see [Versions](#versions)) because
 it currently builds the test executable directly rather than packaging or installing it.
 
 ## Versions
 
-ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the VCL
-GUI's caption. Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop` branch
-carries the next planned version with a pre-release, e.g. `1.2.0-dev.1`, which comes before `1.2.0`.
+ASWUnitTests follows [Semantic Versioning](https://semver.org), shown by `--version` and the GUI
+runners' caption. Releases are tagged on `main` (e.g. `v1.1.0`). Between releases, the `develop`
+branch carries the next planned version with a pre-release, e.g. `1.2.0-dev.1`, which comes before
+`1.2.0`.
 `src/ASWUnitTests_Version.h` has the version as macros, for code that supports several ASWUnitTests
 versions, and as constants in the `ASWUnitTests` namespace:
 
@@ -206,6 +210,12 @@ listing tests, and `--list` reports how many tests/groups matched out of the tot
 when output is redirected to a file, there's a record of why fewer tests ran or were listed than
 expected. Likewise, it always states whether shuffle is enabled and, if so, the seed in use.
 
+On Windows, the console runner reads its arguments from the UTF-16 command line rather than the C
+runtime's `argv`, which holds them in the ANSI code page, so a `--filter` pattern, a
+`--project-name` or a `--report-junit` path can hold any character. While it runs, it also sets the
+console's output code page to UTF-8, and restores it afterwards, so non-ASCII test names and
+messages show correctly. Output redirected to a file or a pipe is UTF-8 either way.
+
 `--shuffle` is a sanity check against hidden inter-test/inter-group coupling. The deterministic
 alphabetical default (see [Registering Tests](#registering-tests)) is for readable, reproducible
 output day-to-day, while `--shuffle` deliberately breaks that to surface tests that secretly depend
@@ -232,9 +242,10 @@ partition, the same way `--list` can preview `--filter`.
 `--test-timeout-seconds` guards against a single test hanging (e.g. an infinite loop) forever. There
 is no default; without it, a hung test blocks the run indefinitely. When given, each test runs on
 its own worker thread while the main thread waits with that timeout; a test that finishes normally
-(whether it passes, fails, or throws) is completely unaffected. A test that doesn't finish in time
-is recorded as failed, with a message naming it and the timeout that was exceeded, and the run stops
-there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
+(whether it passes, fails, or throws) is completely unaffected. The worker thread starts with the
+main thread's floating-point environment, such as its rounding mode. A test that doesn't finish in
+time is recorded as failed, with a message naming it and the timeout that was exceeded, and the run
+stops there: no further tests or groups run, and the process exits with a dedicated exit code (`5`)
 distinct from an ordinary test failure (`1`). If `--report-junit` was also given, the report still
 gets written, covering every test that completed before the timeout, plus the timed-out test's own
 synthetic failure entry. The abandoned worker thread itself is never joined or forcibly stopped,
@@ -314,13 +325,14 @@ that would have run fails, with `SetUp_Group() exception: ` and the exception's 
 detail, `TearDown_Group()` still runs, and the run carries on with the next group (exit code `1`).
 Skipped tests never affect the exit code.
 
-## VCL GUI Runner
+## GUI Runners
 
-`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj` builds a RAD Studio VCL application that runs the same
-tests as the console runner, in a window for choosing tests and reading their results. It runs this
-repository's full self-test suite, and its `Build_*.bat` scripts write the executable to
-`vcl\gui\rad370\<Platform>\<Config>`. `vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj` opens it
-together with the VCL console project.
+Two GUI runners run the same tests as the console runner, in a window for choosing tests and
+reading their results: the [VCL GUI runner](#vcl-gui-runner), a RAD Studio VCL application, and the
+[Win32 GUI runner](#win32-gui-runner), which uses only what ships with Windows and builds with CMake
+(MSVC, MinGW, Clang) or RAD Studio. They look and work the same, so this section describes both, and
+their own sections cover building them and running your own tests in them. Each of this
+repository's builds of them runs its full self-test suite.
 
 The window shows:
 
@@ -346,8 +358,10 @@ The toolbar, whose commands are also in the Run and Tests menus:
 - **Select All** and **Select None** check or uncheck every shown test, and **Select Failed** checks
   only the shown tests that failed in the latest run.
 - **Copy Details** (Ctrl+Shift+C) copies the detail pane to the clipboard.
-- **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, ignoring case,
-  with the same `*` and `?` wildcards as `--filter`. While it hides tests, checking them and Run
+- **Filter** (Ctrl+F) shows only the tests whose `Group.Test` name contains its text, with the same
+  `*` and `?` wildcards as `--filter`. It ignores the case of the ASCII letters, as
+  [`CheckEqualsIC`](#comparing-strings-ignoring-case) does, so other letters, such as an accented
+  capital and small E, still have to match exactly. While it hides tests, checking them and Run
   Selected only apply to the shown ones, and hidden tests keep their check marks.
 
 **File > Export JUnit Report** saves the latest run's results as the same JUnit XML report
@@ -365,7 +379,51 @@ When the window closes, it saves its size, position, maximized state, and panel 
 `%APPDATA%\ASWUnitTests\<exe name>.ini`, and restores them the next time it opens. A position on a
 monitor that's no longer connected is ignored. An `--exit` run doesn't save the layout. **View >
 Reset Layout** restores the default layout right away; `--layout-ignore` and `--layout-reset`
-(below) control this from the command line.
+(below) control this from the command line. Since the file is named after the executable, the two
+GUI runners, and each project's own build of them, keep separate layouts.
+
+In both GUI runners, **View > Theme** chooses a light or dark look. **Use Windows Setting**, the
+default, follows Windows' app mode setting (Settings > Personalization > Colors), and switches as
+soon as it changes, but stays light while high contrast is on, so the window shows high contrast's
+own colors. **Light** and **Dark** keep that look whatever Windows is set to. Light is the standard
+Windows look. Dark is RAD Studio's Carbon VCL style in the VCL GUI runner, and the Win32 GUI runner
+paints the same colors itself. A choice applies right away and is saved in the layout file at once,
+so the next session starts with it; **View > Reset Layout** leaves it as it is. The Theme commands
+are disabled during a run, and a change of the Windows setting during one applies when it ends. In
+the Win32 GUI runner's dark look, the title bar is dark unless Windows shows the accent color on
+title bars, which it then keeps while the window is active, and the Export JUnit Report dialog,
+Windows' own, stays light.
+
+**View > Theme > Dark Theme** chooses the dark look's colors: a built-in theme or a theme file of
+your own, used whenever the look is dark, with Dark or with Use Windows Setting (high contrast keeps
+its own colors). Both runners have five of RAD Studio's dark VCL styles built in: Carbon, Charcoal
+Dark Slate, Cobalt XEMedia, Onyx Blue and Tablet Dark, which the Win32 GUI runner paints in their
+colors. The Win32 GUI runner also has four tints of Carbon: Ember (warm brown), Forest (green),
+Midnight (blue) and Plum (purple), which keep Carbon's colors for how tests did. Theme files go in
+`%APPDATA%\ASWUnitTests\Themes`, which **Open Themes Folder** opens, and are shared by every test
+app; the menu lists each one by its file name, below the built-in themes, and leaves out a file
+named like one of them. The choice is saved in the layout file with the theme, and a problem with a
+theme file, such as a misspelled role, a color that isn't one or a missing file, is reported in the
+Log tab, with Carbon's colors used in its place.
+
+The Win32 GUI runner's theme files are INI files, `<Name>.ini`, and **Save Theme Template...** saves
+Carbon's colors as one to start from, every role listed under a comment on what its group colors:
+
+```ini
+[Theme]
+Base=Dark
+
+[Colors]
+Window=#0F2238
+Panel=#1B3350
+```
+
+`Base=Dark` is required. Each line under `[Colors]` sets a role's color as `#RRGGBB`, and a role
+left out keeps Carbon's color. Choosing the theme again reads its file again, so a change shows at
+once. The VCL GUI runner's theme files are VCL style files, `<Name>.vsf`, made with RAD Studio's
+Bitmap Style Designer. Each needs a style name of its own, not that of a style the project already
+has, such as Carbon. A style file is loaded once per session, so a change to it shows after a
+restart.
 
 The window also remembers which tests are checked, in `%APPDATA%\ASWUnitTests\<exe name>.selection`,
 as long as the command line doesn't choose them itself (no `--run`, `--filter`, or partition
@@ -380,9 +438,9 @@ box itself starts empty. Since tests come and go between sessions, it adapts:
 The log notes what was restored. So **Select Failed**, closing the window, fixing the code, and
 reopening it leaves just those tests checked for Run Selected.
 
-Tests run on the main (VCL) thread, so a test can create forms and controls.
-`--test-timeout-seconds` runs each test on a worker thread instead, so it can't be combined with
-tests like that; the log says so when it's given.
+Tests run on the GUI's main thread, the one that runs its window, so a test can create windows (or,
+in the VCL GUI runner, forms and controls). `--test-timeout-seconds` runs each test on a worker
+thread instead, so it can't be combined with tests like that; the log says so when it's given.
 
 A run that a test's timeout or crash abandoned leaves **Run Selected** and **Run Failed** disabled
 until the GUI is restarted, since the timed-out test may still be running, and a crash may have left
@@ -407,30 +465,106 @@ these differences:
 - `--exit` (GUI-only, requires `--run`) closes the window when that run finishes, and exits with the
   same code the console runner would; a run ended with Stop exits with `1`. Without `--exit`, the
   GUI always exits with `0`.
-- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, so the window opens with
-  the defaults and the saved layout is left as it is.
-- `--layout-reset` (GUI-only) deletes the saved window layout and opens with the defaults, which is
-  a way to recover if a saved layout ever causes a problem. The layout is saved again when the
-  window closes.
+- `--layout-ignore` (GUI-only) neither loads nor saves the window layout, or the theme, so the
+  window opens with the defaults and the saved ones are left as they are. A theme chosen in the View
+  menu then lasts only until the window closes.
+- `--layout-reset` (GUI-only) deletes the saved window layout, and with it the theme, and opens with
+  the defaults, which is a way to recover if a saved layout ever causes a problem. The layout is
+  saved again when the window closes.
 
 A GUI process doesn't make a Windows command prompt wait for it, so a script that needs `--exit`'s
-exit code should start it with `start /wait` (or its own language's equivalent):
+exit code should start it with `start /wait` (or its own language's equivalent; Bash, including Git
+Bash, waits for it anyway):
 
 ```
 start /wait ASWUnitTests_VCL_GUI.exe --filter "*String*" --run --exit --report-junit results.xml
 echo %ERRORLEVEL%
 ```
 
-To run your own tests in the GUI, create a RAD Studio VCL application that defines
-`ASWUNITTESTS_RTL_EXCEPTIONS`, and add to it: the framework's `src` files except `main.cpp`; the
-files in `vcl\gui\src`, including `ASWUnitTests_GUI_MainForm.dfm`; your own test modules; and a
-`WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line and
-starts the main form.
-
-The GUI is built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
+The GUI runners are built on `ITestRunObserver` (in `src\ASWUnitTests_TestBase.h`), set with
 `TTestHandler::SetRunObserver()`. An observer receives the log output that would otherwise go to
 `std::cout`, as plain text without the console's color codes, is told as each test starts and
 finishes, and can stop a run between tests, so it can drive other kinds of runners too.
+
+### VCL GUI Runner
+
+`vcl\gui\rad370\ASWUnitTests_VCL_GUI.cbproj` builds the VCL GUI runner, for Win32 and Win64x, and
+its `Build_*.bat` scripts write the executable to `vcl\gui\rad370\<Platform>\<Config>`.
+`vcl\gui\rad370\ASWUnitTests_VCL_Group.groupproj` opens it together with the VCL console project.
+It defines `ASWUNITTESTS_RTL_EXCEPTIONS`, so it has
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), and its tests can use the VCL.
+
+To run your own tests in it, create a RAD Studio VCL application that defines
+`ASWUNITTESTS_RTL_EXCEPTIONS`, and add to it: the framework's `src` files except `main.cpp`; the
+files in `gui\src` (shared by the GUI runners) and `vcl\gui\src`, including
+`ASWUnitTests_GUI_MainForm.dfm`, with both folders on the include path; your own test modules; and
+a `WinMain()` modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp`, which parses the command line,
+applies the saved theme and starts the main form. For the dark theme, also add RAD Studio's Carbon
+style to the application (Project > Options > Application > Appearance, which this repository's
+project has as `Custom_Styles`); without it, Dark shows the light look. The other built-in dark
+themes (Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and Tablet Dark) are listed only if their
+styles are added too. For the ASWUnitTests icon, set the application's icon to
+`resource\ASWUnitTests.ico` there too, as this repository's project does.
+
+### Win32 GUI Runner
+
+The Win32 GUI runner uses only the Windows API, with the common controls and dialogs that ship with
+Windows, and no VCL or third-party code, so it builds with the [CMake](#cmake) toolchains on Windows
+(MSVC, MinGW, Clang) as well as with RAD Studio. It needs Windows 10 version 1703 or later. Win32 is
+the name of the API: it builds as a 32-bit or a 64-bit program. Since it doesn't link the VCL, it
+has no [RTL exception support](#rad-studio-rtl-exceptions-vclfmx); tests of VCL code belong in the
+[VCL GUI runner](#vcl-gui-runner).
+
+On Windows, this repository's CMake project builds it as the `ASWUnitTests_Win32_GUI` target, next
+to the console runner (e.g. `build/bin/Release/ASWUnitTests_Win32_GUI.exe`).
+`win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj` builds it with RAD Studio, for Win32 and Win64x,
+and its `Build_*.bat` scripts write the executable to `win32\gui\rad370\<Platform>\<Config>`.
+
+To run your own tests in it with CMake, include `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`
+after `project()`. Its `ASWUNITTESTS_WIN32_GUI_SOURCES` lists the framework's `src` files except
+`main.cpp`, the files in `gui\src` (shared by the GUI runners) and `win32\gui\src`, including the
+runner's own `WinMain()`, its manifest, and `resource\ASWUnitTests_Icon.rc`, which gives the
+executable the ASWUnitTests icon. It also exports the include path (which has the `resource` folder,
+for the icon), libraries and linker options they need:
+
+```cmake
+include(third_party/asw-unit-tests/win32/gui/src/ASWUnitTests_Win32GUI_Sources.cmake)
+
+add_executable(MyTestsGUI WIN32
+    ${ASWUNITTESTS_WIN32_GUI_SOURCES}
+    tests/Test_MyClass.cpp
+)
+
+target_include_directories(MyTestsGUI PRIVATE
+    ${ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS}
+    tests
+)
+
+target_link_libraries(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LIBRARIES})
+target_link_options(MyTestsGUI PRIVATE ${ASWUNITTESTS_WIN32_GUI_LINK_OPTIONS})
+```
+
+Link `Threads::Threads` too, as for the console runner (see [CMake](#cmake-1) under Submodule
+Integration). With MinGW, also link its runtime statically
+(`-static-libgcc -static-libstdc++ -static`, as this repository's `cmake\CMakeLists.txt` does) or
+put its DLLs next to the executable, or the GUI may load another program's older `libstdc++-6.dll`
+from `PATH` and fail to start.
+
+For an icon of your own, remove the ASWUnitTests one from the list before `add_executable()`, and
+add a resource script of your own whose icon is named `MAINICON`, which the window then shows:
+
+```cmake
+list(REMOVE_ITEM ASWUNITTESTS_WIN32_GUI_SOURCES "${ASWUNITTESTS_RESOURCE_DIR}/ASWUnitTests_Icon.rc")
+```
+
+With RAD Studio, the simplest start is a copy of `win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj`,
+with its paths and test files changed. It's a C++ application with no framework
+(`FrameworkType None`), with `TCHAR` mapped to `char`, since the runner's entry point is
+`WinMain()`. It compiles the framework's `src` files except `main.cpp`, the files in `gui\src` and
+`win32\gui\src`, with all three folders on the include path, and the test modules. Its manifest is
+`win32\gui\src\ASWUnitTests_Win32GUI.manifest`, with DPI awareness set to None, so RAD Studio uses
+the manifest as it is (the manifest declares per-monitor DPI awareness itself). Its icon is
+`resource\ASWUnitTests.ico`, which RAD Studio embeds as `MAINICON`.
 
 ## Registering Tests
 
@@ -497,8 +631,8 @@ group's qualified name, `Framework.Console.TTest_TConsole`, starts all of its te
 - `--filter "Framework.*"` runs every test in suite `Framework`, including those in `Console`, and
   `--filter "Framework.Console.*"` runs just those in `Console`.
 - `--list`, the console log and the `--report-junit` report show its tests as
-  `Framework.Console.TTest_TConsole.TestName`, and the [VCL GUI runner](#vcl-gui-runner)'s test tree
-  shows each suite as a node, whose check box checks or unchecks all of its tests.
+  `Framework.Console.TTest_TConsole.TestName`, and the [GUI runners](#gui-runners)' test tree shows
+  each suite as a node, whose check box checks or unchecks all of its tests.
 
 The registration can name the suite instead, leaving the constructor as it is:
 
@@ -533,11 +667,21 @@ int32_t i = TStrTool::StrToInt32(invalid);
 ```
 
 If the wrong exception type is thrown, or its message doesn't contain the given substring, the test
-fails with a message showing what was actually caught. This only works for exceptions deriving from
-`std::exception`, or from RAD Studio's RTL `Exception` class when
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled. A thrown object that doesn't
-can't be inspected, so a type/message expectation against it fails with an explanatory message
-rather than silently passing.
+fails with a message showing what was actually caught. The type can be any type that can be thrown:
+a `std::exception` class, RAD Studio's RTL `Exception` class or a subclass when
+[RTL exception support](#rad-studio-rtl-exceptions-vclfmx) is enabled, a class of your own, or even
+`int` or `char const*` (the type a string literal is thrown as):
+
+```
+SetExceptionExpected<int>(__func__, __LINE__, "the legacy parser throws its error code");
+LegacyParse("x");
+```
+
+Only a `std::exception` (its `what()`) and an RTL exception (its `Message`) have a message, so
+expecting a substring from any other type fails, naming the type that was caught (e.g.
+`caught an exception without a message: an object of type "int"`). A class that doesn't derive from
+`std::exception` also matches a `std::exception` subclass derived from it, whose `what()` is then
+checked.
 
 An expected exception never hides a failure elsewhere in the test. A failed `Assert*` still fails
 the test rather than counting as the expected exception, and so does a failed `Check*` earlier in
@@ -557,11 +701,11 @@ CheckEquals(3u, list.Count(), __func__, __LINE__, "a failed call leaves the list
 CheckNoThrow([&] { list.At(2); }, __func__, __LINE__, "last index");
 ```
 
-The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, and with
-[RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL exception types too. A failed
-`Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the thrown exception; it ends the
-test as usual, unless the requested type is that framework exception (e.g.
-`CheckThrows<TExceptTrue>`).
+The type is matched like `SetExceptionExpected<TException>()`'s: polymorphically, of any type (e.g.
+`CheckThrows<int>`), and with [RTL exception support](#rad-studio-rtl-exceptions-vclfmx), RTL
+exception types too. A failed `Assert*`, `Fail()` or `Skip()` inside the lambda isn't taken as the
+thrown exception; it ends the test as usual, unless the requested type is that framework exception
+(e.g. `CheckThrows<TExceptTrue>`).
 
 ### RAD Studio RTL Exceptions (VCL/FMX)
 
@@ -617,10 +761,10 @@ writes its executable to `vcl\console\rad370\<Platform>\<Config>`. The
 ### Comparing System::String (VCL/FMX)
 
 The same `ASWUNITTESTS_RTL_EXCEPTIONS` define (see [above](#rad-studio-rtl-exceptions-vclfmx)) also
-lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`): `Equals`,
-`Contains`, `StartsWith`, `EndsWith`, and their `Not` and `IC` forms. At least one of the two texts
-must be a `System::String`. The other may also be a `std::string`, `std::wstring` or C string,
-including a literal:
+lets the string `Check`/`Assert` methods take a `System::String` (`UnicodeString`), an `AnsiString`,
+a `UTF8String` or another `AnsiStringT`: `Equals`, `Contains`, `StartsWith`, `EndsWith`, `Matches`,
+and their `Not` and `IC` forms. The other text may be any of those, or a `std::string`,
+`std::wstring` or C string, including a literal:
 
 ```
 CheckEquals("Ready", Label1->Caption, __func__, __LINE__, "status after loading");
@@ -628,11 +772,13 @@ CheckStartsWithIC(Edit1->Text, L"https://", __func__, __LINE__, "a secure URL");
 ```
 
 Both texts are converted to UTF-8 and compared as two `std::string` values, so a failure shows them
-the same way. Narrow text is read as UTF-8, as elsewhere in the framework, and a null C string is
-empty text, as it is for `System::String`. A `System::String` converts implicitly from a number or a
-character, but these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile
-error rather than a comparison with `"5"`. Other RTL string types, such as `AnsiString`, need
-converting to `System::String` first, and the message is still a `std::string`.
+the same way, as for [other strings of different types](#comparing-strings-of-different-types). An
+`AnsiString` is converted from its code page, and narrow text is read as UTF-8, as elsewhere in the
+framework. `CheckMatches` matches with `std::wregex`, so `.` matches one UTF-16 code unit. A null C
+string isn't empty text: it follows the [C string rules](#comparing-c-strings), so it doesn't equal
+an empty `System::String`. A `System::String` converts implicitly from a number or a character, but
+these methods don't accept either, so `CheckEquals(Edit1->Text, 5, ...)` is a compile error rather
+than a comparison with `"5"`. The message is still a `std::string`.
 
 ### Omitting the Method and Line (C++20)
 
@@ -688,17 +834,43 @@ A failed `CheckEquals` shows both strings, and a failed `CheckNotEquals` the val
 strings, `std::string` and `std::wstring` alike. Wide text is converted to UTF-8, and a null pointer
 is shown as `(null)`.
 
-The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring)
-and [prefix and suffix](#checking-the-start-or-end-of-a-string) checks take two C strings too. In
+The [case-insensitive](#comparing-strings-ignoring-case), [substring](#checking-for-a-substring),
+[prefix and suffix](#checking-the-start-or-end-of-a-string) and
+[regular expression](#matching-a-regular-expression) checks take two C strings too. In
 `CheckEqualsIC` and `CheckNotEqualsIC`, a null pointer only matches another null pointer, as in
-`CheckEquals`. In `CheckContains`, `CheckStartsWith` and `CheckEndsWith`, and their `IC` forms, a
-null pointer, as either the text or the part, matches nothing, so they fail and their `Not` forms
-pass:
+`CheckEquals`. In `CheckContains`, `CheckStartsWith`, `CheckEndsWith` and `CheckMatches`, and their
+`IC` forms, a null pointer, as either the text or the part, matches nothing, so they fail and their
+`Not` forms pass:
 
 ```
 char const* const name = FindName(); // null if not found
 CheckStartsWith(name, "ASW", __func__, __LINE__, "fails, rather than crashing, when not found");
 ```
+
+The same rules apply when a C string is compared with
+[a string of another type](#comparing-strings-of-different-types).
+
+### Comparing Strings of Different Types
+
+The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+and `IC` forms) also take two texts of different types: a `std::string` with a C string, narrow text
+(`std::string`, `char const*`) with wide text (`std::wstring`, `wchar_t const*`), and, in
+[RTL builds](#comparing-systemstring-vclfmx), the RTL string types. Narrow text is read as UTF-8, as
+elsewhere in the framework. Two narrow texts, or two wide ones, are compared as they are. Any other
+pair is converted to UTF-8 and compared as two `std::string` values, so a failure shows both texts
+the same way:
+
+```
+std::wstring const title = window.Title();
+CheckEquals("Settings", title, __func__, __LINE__, "the window's title");
+```
+
+`CheckMatches` and `CheckNotMatches` match two narrow texts with `std::regex`, where `.` matches one
+byte of UTF-8, and any other pair with `std::wregex`, where `.` matches one wide character. On
+Windows, that's one UTF-16 code unit, so a character beyond U+FFFF is two.
+
+A null C string follows the [same rules](#comparing-c-strings) whatever it's compared with: it
+equals only another null C string, narrow or wide, and matches nothing in the other checks.
 
 ### Comparing Pointers
 
@@ -735,8 +907,8 @@ CheckIsType<TCircle>(shape, __func__, __LINE__, "the factory makes a circle");
 // Check failed for: "Test_Create" (42): Expected type "TCircle" but was "TSquare". the factory makes a circle
 ```
 
-Type names come from `std::type_info::name()`, demangled with GCC and Clang, so their exact form
-(e.g. a namespace or `class ` prefix) depends on the compiler. With
+Type names come from `std::type_info::name()`, demangled with GCC, Clang and RAD Studio's
+compilers, so their exact form (e.g. a namespace or `class ` prefix) depends on the compiler. With
 [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) enabled, a `TObject` descendant is named
 by its `ClassName()` instead (e.g. `TStringList`), the same with every compiler.
 
@@ -818,7 +990,8 @@ CheckMatches(stamp, R"(\d{4}-\d{2}-\d{2})", __func__, __LINE__, "an ISO 8601 dat
 
 Wide text is matched with `std::wregex`, so `.` matches one wide character, and a failure shows it
 as UTF-8. An invalid pattern fails the check, showing `std::regex_error`'s description, rather than
-throwing.
+throwing. The text and the pattern may also be [C strings](#comparing-c-strings), or
+[of different types](#comparing-strings-of-different-types).
 
 ### Comparing Integers of Different Types
 
@@ -884,6 +1057,20 @@ sensible tolerance depends heavily on the magnitude and accumulated error of the
 A NaN is near nothing, not even another NaN, so `CheckNear` fails and `CheckNotNear` passes when
 either value is a NaN, whatever the tolerance. Equal infinities are near each other.
 
+A negative or NaN tolerance is a mistake in the test, so both `CheckNear` and `CheckNotNear` fail
+with it, showing the tolerance (e.g. `Invalid tolerance -0.100000: it must be zero or more`).
+
+The three values can be of any integer or floating-point types except `bool`, in any mix, such as
+`CheckNear(2.0, aFloat, 0.01, ...)` or `CheckNear(10, count, 1, ...)`. When any of them is floating
+point, all three are compared as their common type, as the built-in operators do, so an all-`float`
+call keeps `float` arithmetic. Three integers are compared exactly, whatever their types, so
+`-1` and `1u` are 2 apart, and a failure shows them as integers:
+
+```
+CheckNear(10, count, 1, __func__, __LINE__, "about ten");
+// Check failed for: "Test_Count" (42): Expected "10 (tolerance 1)" but was "12 (diff 2)". about ten
+```
+
 ### Comparing Greater Than and Less Than
 
 `CheckGreaterThan`, `CheckGreaterThanOrEqual`, `CheckLessThan` and `CheckLessThanOrEqual`, and their
@@ -904,16 +1091,26 @@ built-in operators do, and a NaN fails every check.
 ### Checking for Empty
 
 `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take anything with an `empty()`
-member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, and with
-[RTL support](#comparing-systemstring-vclfmx), a `System::String`. Unlike
-`CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element count of a
-container with a `size()`:
+member, such as a `std::string`, `std::wstring`, `std::vector` or `std::map`, a C string
+(`char const*` or `wchar_t const*`, including character arrays), and with
+[RTL support](#comparing-systemstring-vclfmx), a `System::String`, `AnsiString` or `UTF8String`.
+Unlike `CheckTrue(list.empty(), ...)`, a failure shows what was there: the text, or the element
+count of a container with a `size()`:
 
 ```
 CheckEmpty(errors, __func__, __LINE__, "no errors reported");
 // Check failed for: "Test_Load" (42): Expected empty but had 2 elements. no errors reported
 CheckEmpty(GetWarning(), __func__, __LINE__, "no warning");
 // Check failed for: "Test_Load" (43): Expected empty but was "low disk space". no warning
+```
+
+A character array is checked as the text it holds, whatever its size, so `char name[32] = ""` is
+empty. A null C string is neither empty nor not empty: both checks fail, showing it as `(null)`:
+
+```
+char const* name = nullptr;
+CheckNotEmpty(name, __func__, __LINE__, "has a name");
+// Check failed for: "Test_Load" (44): Expected not empty but was "(null)". has a name
 ```
 
 ### Checking for Null
@@ -1022,7 +1219,7 @@ void TTest_TMyClassToTest::TearDown_Test(ITestCase& /*testCase*/)
 A test name can be registered only once per group. Registering one again (with `RegisterTest()`,
 `RegisterTestCases()` or `ASW_TEST`) throws `TExceptDuplicateTestName` from the group's constructor,
 which stops the run at startup with a message naming the group and the test, since `--filter`,
-`--list`, the JUnit report and the VCL GUI runner couldn't tell the two tests apart.
+`--list`, the JUnit report and the GUI runners couldn't tell the two tests apart.
 
 ### Self-Registering Test Methods
 
@@ -1076,7 +1273,7 @@ doesn't derive from `TAutoTestGroup<ClassName>`.
 The order is deterministic: a group runs its `ASW_TEST` tests first, in alphabetical order by name
 (whatever order they're defined in), then any tests its constructor registers with `RegisterTest()`
 or `RegisterTestCases()`, in the order it registers them, so the two styles can be mixed in one
-group. `--shuffle`, `--filter`, `--list`, the JUnit report and the VCL GUI runner treat `ASW_TEST`
+group. `--shuffle`, `--filter`, `--list`, the JUnit report and the GUI runners treat `ASW_TEST`
 tests exactly like any other. Parameterized tests are still registered in the constructor with
 `RegisterTestCases()`, next to their data.
 
@@ -1127,18 +1324,21 @@ especially useful for reading `--filter` matches or a failing row's name in CI o
 ## Submodule Integration
 
 This repository's own `cmake\CMakeLists.txt`, `rad370\ASWUnitTests.cbproj`, and the RAD Studio
-projects under `vcl` only build *this* repo's own example tests and `toTest` code for its own
-development and CI. Don't use them from a consuming project, and don't modify them. Doing either
-means your changes live inside the submodule and get lost or conflict the next time you update it.
-Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and reference
-its `src` files from your own project's build file, alongside your own test modules:
+projects under `vcl` and `win32` only build *this* repo's own example tests and `toTest` code for
+its own development and CI. Don't use them from a consuming project, and don't modify them. Doing
+either means your changes live inside the submodule and get lost or conflict the next time you
+update it. Instead, add ASWUnitTests as a git submodule (e.g. into `third_party\asw-unit-tests`) and
+reference its `src` files from your own project's build file, alongside your own test modules:
 
 ```
 my-project/
 +-- third_party/asw-unit-tests/   <- git submodule, never modified, freely updated
 |   +-- src/                      <- framework core (never touched)
+|   +-- gui/src/                  <- shared by the GUI runners, if you use one (never touched)
 |   +-- vcl/gui/src/              <- VCL GUI runner, if you use it (never touched)
-|   `-- cmake/, rad370/, tests/, toTest/, other vcl/ folders   <- this framework's own example build, unused by you
+|   +-- win32/gui/src/            <- Win32 GUI runner, if you use it (never touched)
+|   +-- resource/                 <- the ASWUnitTests icon, for a runner's executable (never touched)
+|   `-- cmake/, rad370/, tests/, toTest/, other vcl/ and win32/ folders   <- this framework's own example build, unused by you
 +-- tests/                        <- your own test modules (Test_MyClass.cpp/.h), self-registered
 `-- CMakeLists.txt / .cbproj      <- your own build file, in your own repo
 ```
@@ -1176,16 +1376,26 @@ find_package(Threads REQUIRED)
 target_link_libraries(MyTests PRIVATE Threads::Threads)
 ```
 
+`ASWUNITTESTS_CORE_SOURCES` lists the same files without `main.cpp`, for a runner with an entry
+point of its own. For a GUI target, `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake` does the
+same for the [Win32 GUI runner](#win32-gui-runner); see that section.
+
 ### RAD Studio / Visual Studio / other IDE projects
 
 Add the same files listed in `ASWUNITTESTS_SOURCES` from the submodule's `src` folder to your own
 project, plus your own test modules. Check `src\ASWUnitTests_Sources.cmake` for added files after
 updating the submodule.
 
+On Windows, `main.cpp` defines `_tmain` (`main` elsewhere), so a project that maps `TCHAR` to
+`wchar_t`, such as a RAD Studio project with "TCHAR maps to" set to `wchar_t`, links as well as one
+that maps it to `char`. On Windows, the framework also uses `CommandLineToArgvW()`, from `shell32`,
+which MSVC, MinGW and RAD Studio link by default.
+
 For a C++Builder project that links the VCL or FMX, also define `ASWUNITTESTS_RTL_EXCEPTIONS` to
 enable [RTL exception support](#rad-studio-rtl-exceptions-vclfmx) and
 [`System::String` comparisons](#comparing-systemstring-vclfmx). To run your tests in the
-[VCL GUI runner](#vcl-gui-runner) instead of a console, see that section for the files it needs.
+[VCL GUI runner](#vcl-gui-runner) or the [Win32 GUI runner](#win32-gui-runner) instead of a console,
+see its section for the files it needs.
 
 # Coding Standards
 

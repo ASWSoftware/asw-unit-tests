@@ -141,11 +141,15 @@ TConsoleColor GetColorFor(TLogKind kind)
     {
         case TLogKind::Pass:
             return g_PassColor;
+
         case TLogKind::Fail:
             return g_FailColor;
+
         case TLogKind::Skip:
             return g_SkipColor;
+
         case TLogKind::Info:
+
         default:
             return TConsoleColor::Default;
     }
@@ -243,13 +247,17 @@ void TConsole::SetColor(TLogKind kind, TConsoleColor color)
         case TLogKind::Pass:
             g_PassColor = color;
             break;
+
         case TLogKind::Fail:
             g_FailColor = color;
             break;
+
         case TLogKind::Skip:
             g_SkipColor = color;
             break;
+
         case TLogKind::Info:
+
         default:
             break; // Info is never colored
     }
@@ -287,6 +295,45 @@ std::string TConsole::StripColor(std::string const& text)
     }
 
     return result;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TConsoleUTF8Output
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+/*
+    TConsoleUTF8Output::TConsoleUTF8Output
+
+    SetConsoleOutputCP() fails without a console, and then nothing is changed or restored. The console is the one
+    the process shares with whatever started it (cmd.exe, say), so its code page must be put back afterwards.
+*/
+TConsoleUTF8Output::TConsoleUTF8Output()
+    : m_OriginalCodePage(0)
+{
+#if defined(_WIN32)
+    UINT const original = GetConsoleOutputCP();
+
+    if (original != 0 && original != CP_UTF8 && SetConsoleOutputCP(CP_UTF8))
+        m_OriginalCodePage = original;
+#endif
+}
+//---------------------------------------------------------------------------
+TConsoleUTF8Output::~TConsoleUTF8Output()
+{
+    Restore();
+}
+//---------------------------------------------------------------------------
+void TConsoleUTF8Output::Restore()
+{
+#if defined(_WIN32)
+    if (m_OriginalCodePage != 0)
+        SetConsoleOutputCP(m_OriginalCodePage);
+#endif
+
+    m_OriginalCodePage = 0;
 }
 //---------------------------------------------------------------------------
 

@@ -51,7 +51,7 @@ enum class TConsoleColor
     BrightBlue,
     BrightMagenta,
     BrightCyan,
-    BrightWhite
+    BrightWhite,
 };
 
 
@@ -62,7 +62,7 @@ enum class TColorMode
 {
     Auto,   // color only if stdout is an interactive terminal that supports it
     Always,
-    Never
+    Never,
 };
 
 
@@ -77,7 +77,7 @@ enum class TLogKind
     Info,
     Pass,
     Fail,
-    Skip
+    Skip,
 };
 
 
@@ -113,6 +113,33 @@ public:
     // Returns 'text' without the ANSI color sequences Colorize() adds (ESC '[', digits and ';', then 'm'), as a
     // run observer gets the log. Any other text, an incomplete sequence included, is left as it is.
     static std::string StripColor(std::string const& text);
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TConsoleUTF8Output
+//
+// Sets the Windows console's output code page to UTF-8 for as long as it
+// exists, so the UTF-8 text the framework writes (such as a non-ASCII test
+// name or message) shows correctly in a console that uses another code
+// page, then restores the console's own. Output redirected to a file or a
+// pipe gets the same bytes either way. Does nothing without a console, or
+// on Linux, where terminals already expect UTF-8.
+/////////////////////////////////////////////////////////////////////////////
+class TConsoleUTF8Output
+{
+private:
+    unsigned int m_OriginalCodePage; // The code page to restore, or 0 when there's nothing to restore.
+
+public:
+    TConsoleUTF8Output();
+    TConsoleUTF8Output(TConsoleUTF8Output const&) = delete;
+    TConsoleUTF8Output& operator=(TConsoleUTF8Output const&) = delete;
+    ~TConsoleUTF8Output();
+
+    // Restores the console's own code page now, e.g. before std::_Exit(), which skips destructors. Does nothing
+    // once it's restored.
+    void Restore();
 };
 
 } // namespace ASWUnitTests

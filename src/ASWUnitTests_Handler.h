@@ -126,6 +126,10 @@ public:
     // it, always run together. Groups that tie on both keep their order in 'groups'. Throws
     // TExceptInvalidSuitePath for an invalid suite path (see TSuitePath).
     static std::vector<size_t> CanonicalGroupOrder(std::vector<TTestGroupOrderKey> const& groups);
+    // Returns "64-bit" or "32-bit": the pointer size this framework was built for.
+    static std::string GetAppBitsStr();
+    // Returns the operating system this framework was built for: "Windows" or "Linux" ("Unknown" for any other).
+    static std::string GetBuildOS();
     static std::string GetUTCTimeISO8601();
     static std::string GetVersionFullStr();
     static std::string GetVersionStr();

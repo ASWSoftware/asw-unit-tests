@@ -24,13 +24,13 @@ limitations under the License.
 // Module header
 #include "Test_ASWUnitTests_AutoTest.h"
 //---------------------------------------------------------------------------
-#include "ASWUnitTests_Registry.h"
-//---------------------------------------------------------------------------
 #include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
@@ -41,7 +41,17 @@ namespace ASWUnitTests
 namespace
 {
 
-// 'names' joined with ", ", so a whole list can be compared, and shown on failure, as one string.
+//---------------------------------------------------------------------------
+
+std::string JoinNames(std::vector<std::string> const& names);
+std::vector<std::string> RegisteredNames(ITestGroup& group);
+
+//---------------------------------------------------------------------------
+/*
+    JoinNames
+
+    'names' joined with ", ", so a whole list can be compared, and shown on failure, as one string.
+*/
 std::string JoinNames(std::vector<std::string> const& names)
 {
     std::string joined;
@@ -55,8 +65,12 @@ std::string JoinNames(std::vector<std::string> const& names)
 
     return joined;
 }
+//---------------------------------------------------------------------------
+/*
+    RegisteredNames
 
-// The registered test names of 'group', in registration order.
+    The registered test names of 'group', in registration order.
+*/
 std::vector<std::string> RegisteredNames(ITestGroup& group)
 {
     std::vector<std::string> names;
@@ -66,8 +80,32 @@ std::vector<std::string> RegisteredNames(ITestGroup& group)
 
     return names;
 }
+//---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_AutoAndExplicitDuplicate
+//
+// A never-registered fixture group that registers the ASW_TEST test "Same"
+// again in its constructor, so constructing it throws.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_AutoAndExplicitDuplicate : public TAutoTestGroup<TFixture_AutoAndExplicitDuplicate>
+{
+private:
+    typedef TAutoTestGroup<TFixture_AutoAndExplicitDuplicate> inherited;
+
+public:
+    void Test_Same();
+
+public:
+    TFixture_AutoAndExplicitDuplicate();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -99,6 +137,77 @@ public:
     void SetUp_Group() override {}
     void TearDown_Group() override {}
 };
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_ExplicitDuplicate
+//
+// A never-registered fixture group, not a TAutoTestGroup, whose constructor
+// registers two different methods under the same test name, so
+// constructing it throws.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_ExplicitDuplicate : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_First() {}
+    void Test_Second() {}
+
+public:
+    TFixture_ExplicitDuplicate();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_TestCasesDuplicate
+//
+// A never-registered fixture group whose RegisterTestCases() name generator
+// gives two rows the same label, so constructing it throws.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_TestCasesDuplicate : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_Case(int const& /*value*/) {}
+
+public:
+    TFixture_TestCasesDuplicate();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_AutoAndExplicitDuplicate
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFixture_AutoAndExplicitDuplicate::TFixture_AutoAndExplicitDuplicate()
+    : inherited("Fixture_AutoAndExplicitDuplicate")
+{
+    SetLogSuppressed(true);
+
+    RegisterTest(&TFixture_AutoAndExplicitDuplicate::Test_Same, "Same");
+}
+//---------------------------------------------------------------------------
+ASW_TEST(TFixture_AutoAndExplicitDuplicate, Same)
+{
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_AutoTests
+/////////////////////////////////////////////////////////////////////////////
 
 //---------------------------------------------------------------------------
 TFixture_AutoTests::TFixture_AutoTests()
@@ -138,63 +247,8 @@ void TFixture_AutoTests::Test_Explicit_B()
 
 
 /////////////////////////////////////////////////////////////////////////////
-// TFixture_AutoAndExplicitDuplicate
-//
-// A never-registered fixture group that registers the ASW_TEST test "Same"
-// again in its constructor, so constructing it throws.
-/////////////////////////////////////////////////////////////////////////////
-class TFixture_AutoAndExplicitDuplicate : public TAutoTestGroup<TFixture_AutoAndExplicitDuplicate>
-{
-private:
-    typedef TAutoTestGroup<TFixture_AutoAndExplicitDuplicate> inherited;
-
-public:
-    void Test_Same();
-
-public:
-    TFixture_AutoAndExplicitDuplicate();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
-
-//---------------------------------------------------------------------------
-TFixture_AutoAndExplicitDuplicate::TFixture_AutoAndExplicitDuplicate()
-    : inherited("Fixture_AutoAndExplicitDuplicate")
-{
-    SetLogSuppressed(true);
-
-    RegisterTest(&TFixture_AutoAndExplicitDuplicate::Test_Same, "Same");
-}
-//---------------------------------------------------------------------------
-ASW_TEST(TFixture_AutoAndExplicitDuplicate, Same)
-{
-}
-//---------------------------------------------------------------------------
-
-
-/////////////////////////////////////////////////////////////////////////////
 // TFixture_ExplicitDuplicate
-//
-// A never-registered fixture group, not a TAutoTestGroup, whose constructor
-// registers two different methods under the same test name, so
-// constructing it throws.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_ExplicitDuplicate : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_First() {}
-    void Test_Second() {}
-
-public:
-    TFixture_ExplicitDuplicate();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_ExplicitDuplicate::TFixture_ExplicitDuplicate()
@@ -210,24 +264,7 @@ TFixture_ExplicitDuplicate::TFixture_ExplicitDuplicate()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_TestCasesDuplicate
-//
-// A never-registered fixture group whose RegisterTestCases() name generator
-// gives two rows the same label, so constructing it throws.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_TestCasesDuplicate : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_Case(int const& /*value*/) {}
-
-public:
-    TFixture_TestCasesDuplicate();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_TestCasesDuplicate::TFixture_TestCasesDuplicate()

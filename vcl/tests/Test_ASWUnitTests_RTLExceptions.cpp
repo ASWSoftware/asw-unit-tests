@@ -45,21 +45,6 @@ namespace
 
 using namespace ASWUnitTests;
 
-bool NameEndsWith(std::string const& name, std::string const& suffix);
-
-//---------------------------------------------------------------------------
-
-// True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
-// "..._Fails") documents its expected outcome, and the outer verifying test can check every
-// registered test generically instead of hand-maintaining a separate expected-outcome table.
-bool NameEndsWith(std::string const& name, std::string const& suffix)
-{
-    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-//---------------------------------------------------------------------------
-
-
 /////////////////////////////////////////////////////////////////////////////
 // TFixtureObject
 //
@@ -75,8 +60,6 @@ public:
     }
 };
 
-//---------------------------------------------------------------------------
-
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_RTLExceptionExpectations
@@ -86,9 +69,10 @@ public:
 // with an exact match (thrown from C++ and raised from Delphi RTL code), a polymorphic base-type match, a
 // wrong sibling type, a message substring that's present, absent, non-ASCII, or only in the class name,
 // a std::exception, and a non-exception throw; plus a std::exception type expected but an RTL exception
-// thrown, and an earlier Check* failure followed by the expected RTL exception; plus, where supported, the
-// std::source_location form of SetExceptionExpected(). Every test name ends with "_Passes" or "_Fails",
-// read generically by CheckFixtureOutcomes().
+// thrown, and an earlier Check* failure followed by the expected RTL exception; plus int expected and an int,
+// an RTL exception or one raised from Delphi RTL code thrown, which must reach the RTL handler without ever
+// being rethrown; plus, where supported, the std::source_location form of SetExceptionExpected(). Every test
+// name ends with "_Passes" or "_Fails", read generically by CheckFixtureOutcomes().
 /////////////////////////////////////////////////////////////////////////////
 class TFixture_RTLExceptionExpectations : public TTestGroupBase
 {
@@ -99,6 +83,9 @@ private:
     void Test_CheckFailedThenExpectedRTLExceptionThrown_Fails();
     void Test_ExceptionExpectedButNoneThrown_Fails();
     void Test_GenericExceptionExpected_RTLExceptionThrown_Passes();
+    void Test_IntTypeExpected_IntThrown_Passes();
+    void Test_IntTypeExpected_RaisedFromDelphiCode_Fails();
+    void Test_IntTypeExpected_RTLExceptionThrown_Fails();
     void Test_RTLTypeExpected_ExactTypeThrown_Passes();
     void Test_RTLTypeExpected_MessageSubstringAbsent_Fails();
     void Test_RTLTypeExpected_MessageSubstringOnlyInClassName_Fails();
@@ -122,6 +109,129 @@ public:
     void TearDown_Group() override {}
 };
 
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLThrowsChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckThrows()/AssertThrows()/
+// CheckNoThrow() with RTL exceptions: an exact type (thrown from C++ and raised from Delphi RTL code), a base
+// type, a message substring that's absent, a wrong sibling type, RTL and std types crossed either way, and int
+// expected but an RTL exception raised from Delphi RTL code. Test names self-document expected outcome via
+// NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_RTLThrowsChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_AssertThrows_ExactType_Passes();
+    void Test_CheckNoThrow_RTLExceptionThrown_Fails();
+    void Test_CheckThrows_BaseType_Passes();
+    void Test_CheckThrows_IntTypeExpected_RaisedFromDelphiCode_Fails();
+    void Test_CheckThrows_MessageSubstringAbsent_Fails();
+    void Test_CheckThrows_RaisedFromDelphiCode_Passes();
+    void Test_CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails();
+    void Test_CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails();
+    void Test_CheckThrows_WrongSiblingType_Fails();
+
+public:
+    TFixture_RTLThrowsChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLTypeChecks
+//
+// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckIsType()/CheckIsNotType() with RTL
+// (Delphi) classes, held as their base class System::Sysutils::Exception: a subclass, a sibling, and a reference;
+// and a C++-declared TObject descendant, held as a TObject, with a Delphi class as the expected type, and the reverse.
+// Test names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_RTLTypeChecks : public TTestGroupBase
+{
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_CheckIsNotType_Sibling_Passes();
+    void Test_CheckIsNotType_Subclass_Fails();
+    void Test_CheckIsType_CppDeclaredClass_Fails();
+    void Test_CheckIsType_DelphiClass_Fails();
+    void Test_CheckIsType_Reference_Passes();
+    void Test_CheckIsType_Sibling_Fails();
+    void Test_CheckIsType_Subclass_Passes();
+
+public:
+    TFixture_RTLTypeChecks();
+
+    void SetUp_Group() override {}
+    void TearDown_Group() override {}
+};
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_UnexpectedRTLException
+//
+// A never-registered fixture group whose first test meets an RTL exception it doesn't expect, from where
+// 'ThrowFrom' says: the test itself, SetUp_Test(), or TearDown_Test() after the test threw the RTL exception it
+// expects. The second test records whether it ran. The first only fails its own test; the other two escape
+// Run() intact, ending the run.
+/////////////////////////////////////////////////////////////////////////////
+class TFixture_UnexpectedRTLException : public TTestGroupBase
+{
+public:
+    enum class TThrowFrom
+    {
+        Test,
+        SetUp,
+        TearDownAfterExpectedException
+    };
+
+private:
+    typedef TTestGroupBase inherited;
+
+private:
+    void Test_RunsAfterThrowingTest();
+    void Test_Throws();
+
+public:
+    bool RunsAfterThrowingTestReached = false;
+    TThrowFrom const ThrowFrom;
+
+public:
+    explicit TFixture_UnexpectedRTLException(TThrowFrom throwFrom);
+
+    void SetUp_Group() override {}
+    void SetUp_Test(ITestCase& testCase) override;
+    void TearDown_Group() override {}
+    void TearDown_Test(ITestCase& testCase) override;
+};
+
+//---------------------------------------------------------------------------
+
+bool NameEndsWith(std::string const& name, std::string const& suffix);
+
+//---------------------------------------------------------------------------
+/*
+    NameEndsWith
+
+    True if 'name' ends with 'suffix'. Used below so a fixture test's own name ("..._Passes"/
+    "..._Fails") documents its expected outcome, and the outer verifying test can check every
+    registered test generically instead of hand-maintaining a separate expected-outcome table.
+*/
+bool NameEndsWith(std::string const& name, std::string const& suffix)
+{
+    return name.size() >= suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFixture_RTLExceptionExpectations
+/////////////////////////////////////////////////////////////////////////////
+
 //---------------------------------------------------------------------------
 TFixture_RTLExceptionExpectations::TFixture_RTLExceptionExpectations()
     : inherited("Fixture_RTLExceptionExpectations")
@@ -134,6 +244,12 @@ TFixture_RTLExceptionExpectations::TFixture_RTLExceptionExpectations()
         "ExceptionExpectedButNoneThrown_Fails");
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_GenericExceptionExpected_RTLExceptionThrown_Passes,
         "GenericExceptionExpected_RTLExceptionThrown_Passes");
+    RegisterTest(&TFixture_RTLExceptionExpectations::Test_IntTypeExpected_IntThrown_Passes,
+        "IntTypeExpected_IntThrown_Passes");
+    RegisterTest(&TFixture_RTLExceptionExpectations::Test_IntTypeExpected_RaisedFromDelphiCode_Fails,
+        "IntTypeExpected_RaisedFromDelphiCode_Fails");
+    RegisterTest(&TFixture_RTLExceptionExpectations::Test_IntTypeExpected_RTLExceptionThrown_Fails,
+        "IntTypeExpected_RTLExceptionThrown_Fails");
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_ExactTypeThrown_Passes,
         "RTLTypeExpected_ExactTypeThrown_Passes");
     RegisterTest(&TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_MessageSubstringAbsent_Fails,
@@ -181,6 +297,24 @@ void TFixture_RTLExceptionExpectations::Test_GenericExceptionExpected_RTLExcepti
 {
     SetExceptionExpected(true, __func__, __LINE__, "generic expectation, RTL exception thrown");
     throw System::Sysutils::EConvertError(L"whatever");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLExceptionExpectations::Test_IntTypeExpected_IntThrown_Passes()
+{
+    SetExceptionExpected<int>(__func__, __LINE__, "int expected and thrown");
+    throw 42;
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLExceptionExpectations::Test_IntTypeExpected_RaisedFromDelphiCode_Fails()
+{
+    SetExceptionExpected<int>(__func__, __LINE__, "int expected, StrToInt raises EConvertError");
+    static_cast<void>(System::Sysutils::StrToInt(L"not a number"));
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLExceptionExpectations::Test_IntTypeExpected_RTLExceptionThrown_Fails()
+{
+    SetExceptionExpected<int>(__func__, __LINE__, "int expected, RTL exception thrown");
+    throw System::Sysutils::EConvertError(L"boom");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLExceptionExpectations::Test_RTLTypeExpected_ExactTypeThrown_Passes()
@@ -274,33 +408,7 @@ void TFixture_RTLExceptionExpectations::Test_StdTypeExpected_RTLExceptionThrown_
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_RTLThrowsChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckThrows()/AssertThrows()/
-// CheckNoThrow() with RTL exceptions: an exact type (thrown from C++ and raised from Delphi RTL code), a base
-// type, a message substring that's absent, a wrong sibling type, and RTL and std types crossed either way. Test
-// names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_RTLThrowsChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_AssertThrows_ExactType_Passes();
-    void Test_CheckNoThrow_RTLExceptionThrown_Fails();
-    void Test_CheckThrows_BaseType_Passes();
-    void Test_CheckThrows_MessageSubstringAbsent_Fails();
-    void Test_CheckThrows_RaisedFromDelphiCode_Passes();
-    void Test_CheckThrows_RTLTypeExpected_StdExceptionThrown_Fails();
-    void Test_CheckThrows_StdTypeExpected_RTLExceptionThrown_Fails();
-    void Test_CheckThrows_WrongSiblingType_Fails();
-
-public:
-    TFixture_RTLThrowsChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_RTLThrowsChecks::TFixture_RTLThrowsChecks()
@@ -312,6 +420,8 @@ TFixture_RTLThrowsChecks::TFixture_RTLThrowsChecks()
     RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckNoThrow_RTLExceptionThrown_Fails,
         "CheckNoThrow_RTLExceptionThrown_Fails");
     RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_BaseType_Passes, "CheckThrows_BaseType_Passes");
+    RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_IntTypeExpected_RaisedFromDelphiCode_Fails,
+        "CheckThrows_IntTypeExpected_RaisedFromDelphiCode_Fails");
     RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_MessageSubstringAbsent_Fails,
         "CheckThrows_MessageSubstringAbsent_Fails");
     RegisterTest(&TFixture_RTLThrowsChecks::Test_CheckThrows_RaisedFromDelphiCode_Passes,
@@ -345,6 +455,14 @@ void TFixture_RTLThrowsChecks::Test_CheckThrows_BaseType_Passes()
             throw System::Sysutils::EConvertError(L"boom");
         }, __func__,
         __LINE__, "base type expected, derived type thrown");
+}
+//---------------------------------------------------------------------------
+void TFixture_RTLThrowsChecks::Test_CheckThrows_IntTypeExpected_RaisedFromDelphiCode_Fails()
+{
+    CheckThrows<int>([] {
+            static_cast<void>(System::Sysutils::StrToInt(L"not a number"));
+        },
+        __func__, __LINE__, "int expected, StrToInt raises EConvertError");
 }
 //---------------------------------------------------------------------------
 void TFixture_RTLThrowsChecks::Test_CheckThrows_MessageSubstringAbsent_Fails()
@@ -392,32 +510,7 @@ void TFixture_RTLThrowsChecks::Test_CheckThrows_WrongSiblingType_Fails()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_RTLTypeChecks
-//
-// A never-registered (no ASW_REGISTER_TEST_GROUP) fixture group testing CheckIsType()/CheckIsNotType() with RTL
-// (Delphi) classes, held as their base class System::Sysutils::Exception: a subclass, a sibling, and a reference;
-// and a C++-declared TObject descendant, held as a TObject, with a Delphi class as the expected type, and the reverse.
-// Test names self-document expected outcome via NameEndsWith(), as in TFixture_RTLExceptionExpectations above.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_RTLTypeChecks : public TTestGroupBase
-{
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_CheckIsNotType_Sibling_Passes();
-    void Test_CheckIsNotType_Subclass_Fails();
-    void Test_CheckIsType_CppDeclaredClass_Fails();
-    void Test_CheckIsType_DelphiClass_Fails();
-    void Test_CheckIsType_Reference_Passes();
-    void Test_CheckIsType_Sibling_Fails();
-    void Test_CheckIsType_Subclass_Passes();
-
-public:
-    TFixture_RTLTypeChecks();
-
-    void SetUp_Group() override {}
-    void TearDown_Group() override {}
-};
 
 //---------------------------------------------------------------------------
 TFixture_RTLTypeChecks::TFixture_RTLTypeChecks()
@@ -482,41 +575,7 @@ void TFixture_RTLTypeChecks::Test_CheckIsType_Subclass_Passes()
 
 /////////////////////////////////////////////////////////////////////////////
 // TFixture_UnexpectedRTLException
-//
-// A never-registered fixture group whose first test meets an RTL exception it doesn't expect, from where
-// 'ThrowFrom' says: the test itself, SetUp_Test(), or TearDown_Test() after the test threw the RTL exception it
-// expects. The second test records whether it ran. The first only fails its own test; the other two escape
-// Run() intact, ending the run.
 /////////////////////////////////////////////////////////////////////////////
-class TFixture_UnexpectedRTLException : public TTestGroupBase
-{
-public:
-    enum class TThrowFrom
-    {
-        Test,
-        SetUp,
-        TearDownAfterExpectedException
-    };
-
-private:
-    typedef TTestGroupBase inherited;
-
-private:
-    void Test_RunsAfterThrowingTest();
-    void Test_Throws();
-
-public:
-    bool RunsAfterThrowingTestReached = false;
-    TThrowFrom const ThrowFrom;
-
-public:
-    explicit TFixture_UnexpectedRTLException(TThrowFrom throwFrom);
-
-    void SetUp_Group() override {}
-    void SetUp_Test(ITestCase& testCase) override;
-    void TearDown_Group() override {}
-    void TearDown_Test(ITestCase& testCase) override;
-};
 
 //---------------------------------------------------------------------------
 TFixture_UnexpectedRTLException::TFixture_UnexpectedRTLException(TThrowFrom throwFrom)
@@ -623,9 +682,9 @@ void TTest_ASWUnitTests_RTLExceptions::CheckFixtureOutcomes(std::optional<unsign
 
     TTestResults const& results = fixture.Results();
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
-    size_t const expectedCount = 16;
+    size_t const expectedCount = 19;
 #else
-    size_t const expectedCount = 14;
+    size_t const expectedCount = 17;
 #endif
     CheckEquals(expectedCount, results.CaseRecords.size(), method, line, "one record per registered test");
 
@@ -959,7 +1018,7 @@ void TTest_ASWUnitTests_RTLExceptions::Test_Throws_MatchesRTLTypeAndMessage()
 
     // Assert
     TTestResults const& results = fixture.Results();
-    CheckEquals(static_cast<size_t>(8), results.CaseRecords.size(), __func__, __LINE__,
+    CheckEquals(static_cast<size_t>(9), results.CaseRecords.size(), __func__, __LINE__,
         "one record per registered test");
 
     for (TTestCaseRecord const& record : results.CaseRecords)
@@ -976,6 +1035,9 @@ void TTest_ASWUnitTests_RTLExceptions::Test_Throws_MatchesRTLTypeAndMessage()
     CheckEndsWith(findMessage("CheckNoThrow_RTLExceptionThrown_Fails"),
         "): Expected no exception but caught: EConvertError: boom. must not throw", __func__, __LINE__,
         "CheckNoThrow shows the RTL exception's class and message");
+    CheckContains(findMessage("CheckThrows_IntTypeExpected_RaisedFromDelphiCode_Fails"),
+        "): Expected a different exception type but caught: EConvertError: ", __func__, __LINE__,
+        "an RTL exception raised from Delphi code is a wrong type for int");
     CheckEndsWith(findMessage("CheckThrows_MessageSubstringAbsent_Fails"),
         "): Expected the exception message to contain \"needle\" but caught: EConvertError: boom. "
         "message must contain 'needle'", __func__, __LINE__, "a message mismatch shows the RTL exception");

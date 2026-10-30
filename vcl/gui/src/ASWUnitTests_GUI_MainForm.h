@@ -54,6 +54,7 @@ limitations under the License.
 #include "ASWUnitTests_GUI_RunObserver.h"
 #include "ASWUnitTests_GUI_Shuffle.h"
 #include "ASWUnitTests_GUI_TestList.h"
+#include "ASWUnitTests_GUI_Theme.h"
 //---------------------------------------------------------------------------
 
 /////////////////////////////////////////////////////////////////////////////
@@ -73,6 +74,7 @@ __published: // IDE-managed Components
     TAction* Act_ExpandAll;
     TAction* Act_ExportJUnitReport;
     TAction* Act_FocusFilter;
+    TAction* Act_OpenThemesFolder;
     TAction* Act_ResetLayout;
     TAction* Act_RunFailed;
     TAction* Act_RunSelected;
@@ -82,6 +84,9 @@ __published: // IDE-managed Components
     TAction* Act_ShuffleOrder;
     TAction* Act_ShuffleSeed;
     TAction* Act_Stop;
+    TAction* Act_ThemeDark;
+    TAction* Act_ThemeLight;
+    TAction* Act_ThemeWindows;
     TActionList* AL_Main;
     TButton* Btn_CopyDetails;
     TButton* Btn_RunFailed;
@@ -118,9 +123,18 @@ __published: // IDE-managed Components
     TMenuItem* MI_TestsSeparator1;
     TMenuItem* MI_View;
     TMenuItem* MI_ViewCollapseAll;
+    TMenuItem* MI_ViewDarkTheme;
+    TMenuItem* MI_ViewDarkThemeOpenFolder;
+    TMenuItem* MI_ViewDarkThemeSeparator1;
     TMenuItem* MI_ViewExpandAll;
     TMenuItem* MI_ViewResetLayout;
     TMenuItem* MI_ViewSeparator1;
+    TMenuItem* MI_ViewSeparator2;
+    TMenuItem* MI_ViewTheme;
+    TMenuItem* MI_ViewThemeDark;
+    TMenuItem* MI_ViewThemeLight;
+    TMenuItem* MI_ViewThemeSeparator1;
+    TMenuItem* MI_ViewThemeWindows;
     TMainMenu* MM_Main;
     TProgressBar* PB_Progress;
     TPageControl* PC_Results;
@@ -142,6 +156,7 @@ __published: // IDE-managed Components
     void __fastcall Act_ExpandAllExecute(TObject* Sender);
     void __fastcall Act_ExportJUnitReportExecute(TObject* Sender);
     void __fastcall Act_FocusFilterExecute(TObject* Sender);
+    void __fastcall Act_OpenThemesFolderExecute(TObject* Sender);
     void __fastcall Act_ResetLayoutExecute(TObject* Sender);
     void __fastcall Act_RunFailedExecute(TObject* Sender);
     void __fastcall Act_RunSelectedExecute(TObject* Sender);
@@ -151,12 +166,16 @@ __published: // IDE-managed Components
     void __fastcall Act_ShuffleOrderExecute(TObject* Sender);
     void __fastcall Act_ShuffleSeedExecute(TObject* Sender);
     void __fastcall Act_StopExecute(TObject* Sender);
+    void __fastcall Act_ThemeDarkExecute(TObject* Sender);
+    void __fastcall Act_ThemeLightExecute(TObject* Sender);
+    void __fastcall Act_ThemeWindowsExecute(TObject* Sender);
     void __fastcall Edt_FilterChange(TObject* Sender);
     void __fastcall FormClose(TObject* Sender, TCloseAction& Action);
     void __fastcall FormCloseQuery(TObject* Sender, bool& CanClose);
     void __fastcall LV_FailuresCustomDrawItem(TCustomListView* Sender, TListItem* Item, TCustomDrawState State,
         bool& DefaultDraw);
     void __fastcall LV_FailuresDblClick(TObject* Sender);
+    void __fastcall MI_ViewDarkThemeClick(TObject* Sender);
     void __fastcall TV_TestsChange(TObject* Sender, TTreeNode* Node);
     void __fastcall TV_TestsCheckStateChanging(TCustomTreeView* Sender, TTreeNode* Node,
         TNodeCheckState NewCheckState, TNodeCheckState OldCheckState, bool& AllowChange);
@@ -171,8 +190,17 @@ private: // User declarations
     bool m_CloseAfterRun;
     // The test that has started but not yet finished, if any.
     std::optional<size_t> m_CurrentTestIndex;
+    // The VCL style m_DarkTheme is (see LoadGUIDarkStyle()), which ApplyTheme() uses while the theme is dark.
+    System::UnicodeString m_DarkStyle;
+    // The View > Theme > Dark Theme choice: GUIDefaultDarkThemeName() or a VCL style file's name.
+    std::string m_DarkTheme;
+    // The items FillDarkThemeMenu() added to View > Theme > Dark Theme, one per dark theme, by index into
+    // m_DarkThemeNames, which each one's Tag is.
+    std::vector<TMenuItem*> m_DarkThemeItems;
+    std::vector<std::string> m_DarkThemeNames;
     // The layout from the DFM, at 96 DPI, captured before the saved one is applied, for Reset Layout.
     ASWUnitTests::TGUILayout m_DefaultLayout;
+    TWndMethod m_FormWindowProc; // The form's own WindowProc, which FormWindowProc() passes messages on to.
     // Set when the command line doesn't choose the tests itself (no --run, --filter, or partition options), so
     // the saved test selection is restored at start and saved again at close.
     bool m_KeepSelection;
@@ -189,6 +217,9 @@ private: // User declarations
     bool m_Running;
     std::optional<std::chrono::steady_clock::time_point> m_RunStart;
     size_t m_RunTotalCount;
+    // True while Start() puts --filter's pattern in the filter box, so Edt_FilterChange() leaves building the
+    // tree to Start(), which then builds it once.
+    bool m_SettingFilterText;
     // Whether runs are shuffled, and with which seed; starts from --shuffle and --shuffle-seed.
     ASWUnitTests::TGUIShuffle m_Shuffle;
     std::string m_StatusMessage;
@@ -198,6 +229,10 @@ private: // User declarations
     // By index into m_TestList; nullptr while hidden. Read through TestNode(), which rebuilds it when the
     // tree's window has been recreated.
     std::vector<TTreeNode*> m_TestNodes;
+    // The View > Theme menu's choice.
+    ASWUnitTests::EGUITheme m_Theme;
+    // Set when Windows' setting changed during a run, so ApplyTheme() applies it once the run has ended.
+    bool m_ThemeChangePending;
     // Set when the tree's window is destroyed, which frees every TTreeNode, so m_TestNodes points at freed
     // nodes until RebuildNodeCache() finds the ones the recreated window loaded in their place.
     bool m_TreeNodesStale;
@@ -212,13 +247,21 @@ private:
     void ApplyFilterBox();
     // Sets the test tree width and detail pane height that 'layout' has, fitted to the window's current size.
     void ApplyPanelSizes(ASWUnitTests::TGUILayout const& layout);
+    // Sets the style for m_Theme and Windows' current setting; see the definition.
+    void ApplyTheme();
     void BuildTestTree();
     void CenterOnMonitor(int width, int height);
     void CreateStatusImages();
     // The window's layout as it is now, for saving.
     ASWUnitTests::TGUILayout CurrentLayout();
+    // Chooses the dark theme of the View > Theme > Dark Theme item 'Sender'.
+    void __fastcall DarkThemeItemClick(TObject* Sender);
     // Ends a run that an unhandled exception escaped from, described by 'description'.
     void FailRunOnUnhandledException(std::string const& description);
+    // Lists Carbon and the VCL style files in View > Theme > Dark Theme, as it opens; see the definition.
+    void FillDarkThemeMenu();
+    // Follows the theme as it changes; see the definition.
+    void __fastcall FormWindowProc(TMessage& message);
     // Restores the layout SaveLayout() saved, if any; see the definition.
     void LoadLayout();
     // Restores the test selection SaveSelection() saved, if any, noting what it restored in the log.
@@ -227,6 +270,8 @@ private:
     void OnTestStarted(std::string const& groupName, std::string const& testName);
     // Refills m_TestNodes from the tree's test nodes, by the index each one holds in its Data.
     void RebuildNodeCache();
+    // Colors the log's lines again, for the style now active.
+    void RecolorLog();
     void RefreshAllNodeImages();
     // Deletes the saved layout, for --layout-reset, noting the outcome in the log.
     void ResetSavedLayout();
@@ -240,18 +285,29 @@ private:
     void SaveLayout();
     // Saves which tests are checked and shown for the next start, ignoring any error.
     void SaveSelection();
+    // Chooses View > Theme > Dark Theme's 'name', saving it, unless --layout-ignore, and applies it; see the
+    // definition.
+    void SetDarkTheme(std::string const& name);
     // Sets a tree node's status image from m_TestList: a test's own status, or a group's or suite's, from its
     // tests.
     void SetNodeImage(TTreeNode* node);
+    // Sets the progress bar's position so it's also drawn in the error state; see the definition.
+    void SetProgressPosition(int position);
     void SetRunning(bool running);
+    // Chooses the theme, as the View > Theme menu does: saves it, unless --layout-ignore, and applies it.
+    void SetTheme(ASWUnitTests::EGUITheme theme);
     // Shows m_Shuffle's state: Run in Shuffled Order's check mark, and the status bar.
     void ShowShuffleState();
+    // Shows m_Theme as the View > Theme menu's checked item.
+    void ShowThemeState();
     void SyncTreeChecks();
     // The test's tree node, or nullptr while it's hidden.
     TTreeNode* TestNode(size_t testIndex);
     // Watches for the tree's window being destroyed; see m_TreeNodesStale.
     void __fastcall TV_TestsWindowProc(TMessage& message);
     void UpdateCaption();
+    // Enables or disables every action, and the filter box, by GUICommandStates()'s rules.
+    void UpdateCommands();
     // Shows the selected test's, group's or suite's details in the detail pane.
     void UpdateDetail();
     void UpdateStatusBar();
@@ -268,8 +324,11 @@ public: // User declarations
     // The process exit code: with --exit, what the console runner would have returned for the --run run;
     // otherwise ExitCode_Success, since the GUI was used interactively.
     int ExitCode() const;
-    // Loads the registered tests and applies 'options' (see WinMain()). Call once, right after creating the form.
-    void Start(ASWUnitTests::TGUIOptions const& options);
+    // Loads the registered tests and applies 'options' (see WinMain()), and shows 'theme' and 'darkTheme', the
+    // choices WinMain() applied, in the View > Theme menu, with 'darkStyle', the VCL style LoadGUIDarkStyle() gave
+    // for 'darkTheme', and the problems it found in the log. Call once, right after creating the form.
+    void Start(ASWUnitTests::TGUIOptions const& options, ASWUnitTests::EGUITheme theme, std::string const& darkTheme,
+        System::UnicodeString const& darkStyle, std::vector<std::string> const& themeProblems);
     // True once a run has ended with a test that timed out or crashed. A timed-out test's abandoned thread may then
     // still be running, using its group, so WinMain() ends the process without destroying the groups, as the console
     // runner does.

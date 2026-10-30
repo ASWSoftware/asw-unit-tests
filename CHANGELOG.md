@@ -10,6 +10,160 @@ versioned baseline.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-30
+
+### Added
+
+- A Win32 GUI runner, `ASWUnitTests_Win32_GUI`, with the same window, features and command line
+  options as the VCL GUI runner, built on the Windows API alone, so it needs neither the VCL nor
+  RAD Studio: it builds with CMake (MSVC, MinGW, Clang) as well as with RAD Studio, for Win32 and
+  Win64x. It needs Windows 10 version 1703 or later. This repository's CMake project builds it on
+  Windows, and a project of your own can build it with your tests by including
+  `win32\gui\src\ASWUnitTests_Win32GUI_Sources.cmake`; the README's "Win32 GUI Runner" section
+  covers both, and RAD Studio.
+- Themes in both GUI runners, chosen in **View > Theme**: **Use Windows Setting** (the default)
+  follows Windows' app mode setting, switching as soon as it changes, and **Light** and **Dark**
+  override it. **View > Theme > Dark Theme** chooses the dark look's colors: one of five of RAD
+  Studio's dark VCL styles (Carbon, the default, Charcoal Dark Slate, Cobalt XEMedia, Onyx Blue and
+  Tablet Dark), in the Win32 GUI runner also one of four tints of Carbon (Ember, Forest, Midnight
+  and Plum), or a theme file of your own in `%APPDATA%\ASWUnitTests\Themes`, shared by every test
+  app, which **Open Themes Folder** opens. The Win32 GUI runner's theme files are INI files that set
+  any of its colors by role, and **Save Theme Template...** saves Carbon's as one to start from; the
+  VCL GUI runner's are VCL style files (`.vsf`). The choice applies without a restart and is saved
+  in the layout file, `--layout-ignore` and `--layout-reset` cover it as they do the layout, and a
+  theme file's problems are reported in the log. The Win32 GUI runner paints the themes itself, so
+  it needs nothing more. The VCL GUI runner uses the VCL styles, so a project of your own that runs
+  its tests in it needs them among its custom styles (Project > Options > Application >
+  Appearance), Carbon at least, without which Dark shows the light look, and a `WinMain()` that
+  applies the saved theme (see Changed). The README's "GUI Runners" section has the details.
+- An ASWUnitTests icon, `resource\ASWUnitTests.ico`, which this repository's console and GUI
+  runners have on Windows, with the PNGs it's made from and `resource\make_icon.ps1`, which draws
+  them. `ASWUNITTESTS_WIN32_GUI_SOURCES` includes `resource\ASWUnitTests_Icon.rc`, so a Win32 GUI
+  runner of your own built with CMake gets the icon too, in Explorer, its title bar and the taskbar;
+  to use your own, remove that script from the list (the README's "Win32 GUI Runner" shows how) and
+  name your icon `MAINICON`. `ASWUNITTESTS_RESOURCE_DIR` is the `resource` folder, which
+  `ASWUNITTESTS_WIN32_GUI_INCLUDE_DIRS` includes.
+- `ASWUNITTESTS_CORE_SOURCES` in `src\ASWUnitTests_Sources.cmake`: the framework's sources without
+  `main.cpp`, for a runner with its own entry point (`ASWUNITTESTS_SOURCES` lists the same files as
+  before), and `gui\src\ASWUnitTests_GUI_Sources.cmake`, which lists the GUI runners' shared units
+  as `ASWUNITTESTS_GUI_SOURCES`.
+- The string checks (`Equals`, `Contains`, `StartsWith`, `EndsWith` and `Matches`, with their `Not`
+  and `IC` forms) take two texts of different types: a `std::string` with a C string, and narrow
+  text with wide text, which didn't compile before. Two narrow or two wide texts are compared as
+  they are; any other pair as UTF-8. The README's "Comparing Strings of Different Types" has the
+  details.
+- `Matches` and `NotMatches` take two C strings, narrow or wide, and in RTL builds a
+  `System::String`.
+- In RTL builds, the string checks also take an `AnsiString`, a `UTF8String` or another
+  `AnsiStringT`, and two RTL strings or an RTL string with any other text.
+- `CheckEmpty`/`AssertEmpty` and `CheckNotEmpty`/`AssertNotEmpty` take a C string, narrow or wide,
+  including a character array, which is checked as the text it holds rather than by its size. A
+  null C string fails both, shown as `(null)`. In RTL builds they also take an `AnsiString`, a
+  `UTF8String` or another `AnsiStringT`.
+- A `TExceptNotEmpty` constructor that takes a detail, which `AssertNotEmpty` uses for a null C
+  string.
+- `CheckNear`/`AssertNear` and `CheckNotNear`/`AssertNotNear` take any three integer or
+  floating-point types except `bool`, in any mix, e.g. `CheckNear(2.0, aFloat, 0.01, ...)` or
+  `CheckNear(10, count, 1, ...)`, which were ambiguous before, and `long double`. With any
+  floating-point value, all three are compared as their common type; three integers are compared
+  exactly and shown as integers.
+- `SetExceptionExpected<TException>()`, `CheckThrows<TException>` and `AssertThrows<TException>`
+  take any type that can be thrown, e.g. `int`, `char const*` or a class that doesn't derive from
+  `std::exception`. Before, the Throws methods didn't compile with one, and
+  `SetExceptionExpected<TException>()` didn't compile with `int` and never matched a class.
+  Expecting a message substring from a type with no message (neither a `std::exception` nor an RTL
+  exception) fails, naming the type that was caught, e.g. `an object of type "int"`. A class also
+  matches a `std::exception` subclass derived from it, whose `what()` is then checked.
+- A `TCLIParser::ParseArguments()` overload that takes the arguments as a
+  `std::vector<std::string>`, the program name first, as in `argv`.
+- `UTF8ToWide()` in `ASWUnitTests_Utils.h`, which converts UTF-8 to wide text (UTF-16 on Windows,
+  UTF-32 on Linux), and, on Windows, `CommandLineArguments()` and `SystemErrorText()`: a command
+  line split into UTF-8 arguments, and a `GetLastError()` code's description.
+- `TConsoleUTF8Output` (`ASWUnitTests_Console.h`), which sets the Windows console's output code page
+  to UTF-8 while it exists and then restores it. The console runner uses it for the whole run.
+- `TTestHandler::GetAppBitsStr()`, which returns `"64-bit"` or `"32-bit"`, and
+  `TTestHandler::GetBuildOS()`, which returns `"Windows"` or `"Linux"` (`"Unknown"` for any other
+  operating system), describing the build the framework was compiled for.
+
+### Changed
+
+- The first line of the banner `TTestHandler::Initialize()` logs now also shows the app bits and
+  build OS, e.g. `ASWUnitTests - Version 1.5.0 - 64-bit - Windows`.
+- The VCL GUI runner's units that don't need the VCL moved from `vcl\gui\src` to a new `gui\src`
+  folder, shared with the Win32 GUI runner: `ASWUnitTests_GUI_CommandLine`,
+  `ASWUnitTests_GUI_Layout`, `ASWUnitTests_GUI_RunObserver`, `ASWUnitTests_GUI_Selection`,
+  `ASWUnitTests_GUI_Shuffle` and `ASWUnitTests_GUI_TestList`, beside the new
+  `ASWUnitTests_GUI_Commands`, `ASWUnitTests_GUI_INIDocument`, `ASWUnitTests_GUI_Theme`,
+  `ASWUnitTests_GUI_Tree` and `ASWUnitTests_GUI_View`. A project that builds the VCL GUI runner
+  must compile them from `gui\src` and add that folder to its include path. Their VCL-only parts
+  moved to the new `vcl\gui\src\ASWUnitTests_GUI_VCLSystem.cpp`, which the project must also
+  compile: `GUILayoutFilePath()`, `GUISelectionFilePath()`, and
+  `TGUICommandLine::ProcessArguments()`, now the free function `ProcessArguments()`. A `WinMain()`
+  modeled on `vcl\gui\rad370\ASWUnitTests_VCL_GUI.cpp` must follow the new one: it includes
+  `ASWUnitTests_GUI_Theme.h` and `ASWUnitTests_GUI_VCLSystem.h`, calls
+  `ASWUnitTests::ProcessArguments()`, applies the saved theme before creating the main form, and
+  passes the theme to the form's `Start()`, which now takes it as well as the options. The layout
+  functions now take a `TGUIINIDocument` instead of a `TCustomIniFile`, and a `TGUIRect` instead of
+  a `TRect`.
+- The VCL GUI runner reads and writes its layout file (`%APPDATA%\ASWUnitTests\<exe name>.ini`)
+  itself, the same way `TMemIniFile` did, so files saved by earlier versions load as before and are
+  written the same way. A size or position written in hexadecimal by hand is now ignored, as an
+  invalid value. The selection file's first line, a comment, now reads "ASWUnitTests GUI test
+  selection" instead of "ASWUnitTests VCL GUI test selection"; files saved before still load.
+- On Windows, the console runner reads its arguments from the UTF-16 command line instead of
+  `argv`, which holds them in the ANSI code page, so a `--filter` pattern, `--project-name` or
+  `--report-junit` path can hold characters outside that code page; before, those became `?` or a
+  lookalike. While it runs, it also sets the console's output code page to UTF-8, so non-ASCII test
+  names and messages show correctly, and restores it afterwards.
+- On Windows, `main.cpp` defines `_tmain` instead of `main`, so a project whose `TCHAR` maps to
+  `wchar_t` (in RAD Studio, "TCHAR maps to" set to `wchar_t`) links too. It stays `main` elsewhere.
+- `TJUnitReportWriter::Write()` now takes its path as UTF-8 on Windows too, as the console runner
+  passes it. Code that calls it with a path in the ANSI code page that has non-ASCII characters must
+  convert the path to UTF-8 first.
+- In RTL builds, a null C string compared with a `System::String` follows the same rules as with any
+  other text, instead of being empty text: it equals only another null C string, so it no longer
+  equals an empty `System::String`, and it matches nothing in `Contains`, `StartsWith` and
+  `EndsWith`. A test that relied on it being empty text must compare with an empty string instead.
+- A negative or NaN tolerance now fails `CheckNotNear`/`AssertNotNear` as well as
+  `CheckNear`/`AssertNear`, with "Invalid tolerance ...: it must be zero or more". Before, the
+  NotNear methods passed with one, whatever the values. A test that passes a negative tolerance must
+  pass its absolute value instead.
+- When a test expects a specific type with `SetExceptionExpected<TException>()` and throws an object
+  of another type that is neither a `std::exception` nor an RTL exception, the failure now reads
+  "expected exception type was not thrown (caught a different exception): a non-std::exception
+  object", as for any other wrong type, instead of "expected a specific exception type, but a
+  non-std::exception object was thrown instead."
+- In RTL builds, `SetExceptionExpected<TException>()` no longer compiles with an RTL class that
+  isn't an `Exception` or a subclass (e.g. `TStringList`), which could never match, as the Throws
+  methods already didn't. Expect `Exception` or the class that's actually raised instead.
+
+### Fixed
+
+- The VCL GUI runner's progress bar kept showing the progress it had when a test first failed and it
+  turned red, instead of following the rest of the run, and the next run could then start with it
+  full. It now shows every finished test, and starts each run empty.
+- The VCL GUI runner's tooltips for Run Selected and Copy Details showed their keyboard shortcut
+  twice, e.g. "(F9) (F9)".
+- The VCL GUI runner's status bar cut off its first panel's text, e.g. "Checked: 44 / 44 show", and
+  now has room for up to "Checked: 9999 / 9999 shown".
+- With `--catch-crashes` and `--test-timeout-seconds` together, a crash that came while a test was
+  logging or recording a result, such as one in a run observer's `OnLog()`, left the run waiting
+  forever at the next test. The run now continues with the next test, as after any other crash.
+- A null C string compared with a `std::string` or `std::wstring` (e.g.
+  `CheckEquals(expectedText, nameOrNull, ...)`), or given to `Matches`, was converted to a string,
+  which is undefined behavior and usually crashed. It now follows the same rules as two C strings:
+  it equals only another null C string, matches nothing in the other checks, and a failure shows it
+  as `(null)`.
+- With `--test-timeout-seconds`, on Windows, a test ran with the default floating-point environment
+  instead of the one the run started with: rounding to nearest, whatever rounding mode was set, and
+  with llvm-mingw, `long double` arithmetic at `double` precision. Each test now starts with the
+  floating-point environment of the thread that runs the tests, as it does without a timeout.
+- With RAD Studio's 32-bit compiler (`bcc32c`), type names in failure messages, such as
+  `CheckIsType`'s, were shown as the compiler mangles them, e.g. `$N@TShape` or `$i`. They're now
+  shown as written, e.g. `N::TShape` or `int`, as with the other compilers. A pointer to a `const`
+  or `volatile` class, and a template whose argument is in an anonymous namespace, are still shown
+  as mangled.
+
 ## [1.4.0] - 2026-10-14
 
 ### Added
@@ -521,7 +675,8 @@ Initial versioned release, switching the project to semantic versioning and addi
 (test group registration, `Check`/`Assert` methods, RAD Studio and CMake build support, etc.) is
 treated as the baseline and is not itemized commit-by-commit.
 
-[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/ASWSoftware/asw-unit-tests/compare/v1.2.0...v1.2.1

@@ -51,40 +51,6 @@ limitations under the License.
 namespace
 {
 
-// Calls 'callable' and returns a description of what it threw: what() for a std::exception (this framework's own
-// failure signals, such as an Assert* failure, included), or "ClassName: Message" for an RTL exception (see
-// DescribeRTLException()); or nullopt when it threw nothing. Each exception is caught exactly once, never rethrown
-// and caught again, since an RTL exception object is freed when the first handler that catches it ends.
-std::optional<std::string> CallAndDescribeException(std::function<void()> const& callable)
-{
-    try
-    {
-        callable();
-    }
-    catch (std::exception const& ex)
-    {
-        return std::string(ex.what());
-    }
-#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
-    catch (System::Sysutils::Exception& ex)
-    {
-        return ASWUnitTests::DescribeRTLException(ex);
-    }
-    catch (...)
-    {
-        return std::string("an object that is neither a std::exception nor an RTL Exception");
-    }
-#else
-    catch (...)
-    {
-        return std::string("a non-std::exception object");
-    }
-#endif
-
-    return std::nullopt;
-}
-
-
 /////////////////////////////////////////////////////////////////////////////
 // TUncreatableTestGroup
 //
@@ -116,7 +82,52 @@ public:
     }
 };
 
+//---------------------------------------------------------------------------
+
+std::optional<std::string> CallAndDescribeException(std::function<void()> const& callable);
+
+//---------------------------------------------------------------------------
+/*
+    CallAndDescribeException
+
+    Calls 'callable' and returns a description of what it threw: what() for a std::exception (this framework's own
+    failure signals, such as an Assert* failure, included), or "ClassName: Message" for an RTL exception (see
+    DescribeRTLException()); or nullopt when it threw nothing. Each exception is caught exactly once, never rethrown
+    and caught again, since an RTL exception object is freed when the first handler that catches it ends.
+*/
+std::optional<std::string> CallAndDescribeException(std::function<void()> const& callable)
+{
+    try
+    {
+        callable();
+    }
+    catch (std::exception const& ex)
+    {
+        return std::string(ex.what());
+    }
+#if defined(ASWUNITTESTS_RTL_EXCEPTIONS_ENABLED)
+    catch (System::Sysutils::Exception& ex)
+    {
+        return ASWUnitTests::DescribeRTLException(ex);
+    }
+    catch (...)
+    {
+        return std::string("an object that is neither a std::exception nor an RTL Exception");
+    }
+#else
+    catch (...)
+    {
+        return std::string("a non-std::exception object");
+    }
+#endif
+
+    return std::nullopt;
+}
+//---------------------------------------------------------------------------
+
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -300,6 +311,25 @@ std::vector<std::string> TTestHandler::GetAllTestFullNames()
         fullNames.push_back(test.GroupName + "." + test.TestName);
 
     return fullNames;
+}
+//---------------------------------------------------------------------------
+std::string TTestHandler::GetAppBitsStr()
+{
+    if constexpr (sizeof(void*) == 8)
+        return "64-bit";
+    else
+        return "32-bit";
+}
+//---------------------------------------------------------------------------
+std::string TTestHandler::GetBuildOS()
+{
+#if defined(_WIN32)
+    return "Windows";
+#elif defined(__linux__)
+    return "Linux";
+#else
+    return "Unknown";
+#endif
 }
 //---------------------------------------------------------------------------
 std::string const& TTestHandler::GetProjectName() const
@@ -515,7 +545,7 @@ void TTestHandler::Initialize(std::string const& projectName)
 {
     m_ProjectName = projectName;
 
-    Log(GetVersionFullStr());
+    Log(GetVersionFullStr() + " - " + GetAppBitsStr() + " - " + GetBuildOS());
 
     Log("Initializing test handler and registering test groups for " + m_ProjectName + "...");
     RegisterTestGroups();

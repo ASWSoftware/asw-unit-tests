@@ -1,0 +1,553 @@
+/* **************************************************************************
+ASWUnitTests_Win32GUI_System.cpp
+Author: Anthony S. West - ASW Software
+
+What the Win32 GUI runner needs from its process and system: text
+conversion between the framework's UTF-8 and Windows' UTF-16, its
+command-line arguments, where it keeps its settings, and file access
+through wide paths.
+
+Copyright 2026 ASW Software
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+************************************************************************** */
+
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Win32GUI_Windows.h"
+//---------------------------------------------------------------------------
+// Module header
+#include "ASWUnitTests_Win32GUI_System.h"
+//---------------------------------------------------------------------------
+#include <algorithm>
+#include <cstddef>
+#include <cwchar>
+#include <limits>
+#include <stdexcept>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Utils.h"
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_INIDocument.h"
+//---------------------------------------------------------------------------
+
+namespace ASWUnitTests
+{
+
+namespace
+{
+
+// The most bytes one ReadFile() or WriteFile() call is asked to transfer.
+DWORD const MaxFileChunk = 1u << 30;
+
+//---------------------------------------------------------------------------
+
+/////////////////////////////////////////////////////////////////////////////
+// TFileHandle
+//
+// Closes a file handle when it goes out of scope.
+/////////////////////////////////////////////////////////////////////////////
+class TFileHandle
+{
+private:
+    HANDLE const m_Handle;
+
+public:
+    explicit TFileHandle(HANDLE handle);
+    ~TFileHandle();
+
+    TFileHandle(TFileHandle const&) = delete;
+    TFileHandle& operator=(TFileHandle const&) = delete;
+
+    HANDLE Get() const;
+    bool IsValid() const;
+};
+
+//---------------------------------------------------------------------------
+
+std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error);
+std::string FolderOf(std::string const& path);
+std::string WithExtension(std::string const& path, std::string const& extension);
+
+//---------------------------------------------------------------------------
+/*
+    FileError
+
+    The error to throw when a file operation fails, e.g. "Couldn't read C:\x.ini: Access is denied."
+*/
+std::runtime_error FileError(std::string const& action, std::string const& path, DWORD error)
+{
+    return std::runtime_error("Couldn't " + action + " " + path + ": " + SystemErrorText(error));
+}
+//---------------------------------------------------------------------------
+/*
+    FolderOf
+
+    The folder the path's file is in, without a trailing separator, e.g. "a\b" for "a\b\c.ini"; empty if the
+    path has no folder.
+*/
+std::string FolderOf(std::string const& path)
+{
+    std::size_t const separator = path.find_last_of("\\/");
+
+    return separator == std::string::npos ? std::string() : path.substr(0, separator);
+}
+//---------------------------------------------------------------------------
+/*
+    WithExtension
+
+    The path with its file name's extension replaced, or added if it has none, e.g. "a\b.exe" and ".ini" give
+    "a\b.ini".
+*/
+std::string WithExtension(std::string const& path, std::string const& extension)
+{
+    std::size_t const separator = path.find_last_of("\\/:");
+    std::size_t const dot = path.find_last_of('.');
+
+    if (dot == std::string::npos || (separator != std::string::npos && dot < separator))
+        return path + extension;
+
+    return path.substr(0, dot) + extension;
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TFileHandle
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TFileHandle::TFileHandle(HANDLE handle)
+    : m_Handle(handle)
+{
+}
+//---------------------------------------------------------------------------
+TFileHandle::~TFileHandle()
+{
+    if (IsValid())
+        CloseHandle(m_Handle);
+}
+//---------------------------------------------------------------------------
+HANDLE TFileHandle::Get() const
+{
+    return m_Handle;
+}
+//---------------------------------------------------------------------------
+bool TFileHandle::IsValid() const
+{
+    return m_Handle != INVALID_HANDLE_VALUE;
+}
+//---------------------------------------------------------------------------
+
+} // namespace
+
+//---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+std::string AdjustLineBreaks(std::string const& text)
+{
+    std::string adjusted;
+    adjusted.reserve(text.size() + text.size() / 16);
+
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] == '\r' || text[i] == '\n')
+        {
+            adjusted += "\r\n";
+
+            // A CRLF pair is one line break.
+            if (text[i] == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                ++i;
+        }
+        else
+        {
+            adjusted += text[i];
+        }
+    }
+
+    return adjusted;
+}
+//---------------------------------------------------------------------------
+void CreateFolderPath(std::string const& folderPath)
+{
+    std::wstring path = UTF8ToWide(folderPath);
+    std::replace(path.begin(), path.end(), L'/', L'\\');
+
+    // Each folder from the top down. Creating a drive or a share ("C:", "\\server") fails, as does creating a
+    // folder that exists, so only whether the whole path ends up a folder decides success.
+    DWORD lastError = ERROR_SUCCESS;
+
+    for (std::size_t end = path.find(L'\\'); ; end = path.find(L'\\', end + 1))
+    {
+        std::wstring const folder = path.substr(0, end);
+
+        if (!folder.empty() && CreateDirectoryW(folder.c_str(), nullptr) == 0)
+            lastError = GetLastError();
+
+        if (end == std::wstring::npos)
+            break;
+    }
+
+    DWORD const attributes = GetFileAttributesW(path.c_str());
+
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        throw FileError("create the folder", folderPath, lastError != ERROR_SUCCESS ? lastError : ERROR_PATH_NOT_FOUND);
+}
+//---------------------------------------------------------------------------
+std::string ExeFileName()
+{
+    std::wstring path(MAX_PATH, L'\0');
+
+    for (;;)
+    {
+        DWORD const length = GetModuleFileNameW(nullptr, &path[0], static_cast<DWORD>(path.size()));
+
+        if (length == 0)
+            throw std::runtime_error("Couldn't get the executable's path: " + SystemErrorText(GetLastError()));
+
+        // A truncated path fills the whole buffer.
+        if (length < path.size())
+        {
+            path.resize(length);
+            break;
+        }
+
+        path.resize(path.size() * 2);
+    }
+
+    std::size_t const separator = path.find_last_of(L"\\/");
+
+    return WideToUTF8(separator == std::wstring::npos ? path : path.substr(separator + 1));
+}
+//---------------------------------------------------------------------------
+std::string ExpandFileName(std::string const& path)
+{
+    std::wstring const relative = UTF8ToWide(path);
+    // The length GetFullPathNameW() needs, including the terminating null; 0 if the path isn't valid.
+    DWORD const needed = GetFullPathNameW(relative.c_str(), 0, nullptr, nullptr);
+
+    if (needed == 0)
+        throw FileError("expand the path", path, GetLastError());
+
+    std::wstring full(needed, L'\0');
+    DWORD const length = GetFullPathNameW(relative.c_str(), needed, &full[0], nullptr);
+
+    if (length == 0 || length >= needed)
+        throw FileError("expand the path", path, length == 0 ? GetLastError() : ERROR_INSUFFICIENT_BUFFER);
+
+    full.resize(length);
+    return WideToUTF8(full);
+}
+//---------------------------------------------------------------------------
+bool FileExists(std::string const& path)
+{
+    DWORD const attributes = GetFileAttributesW(UTF8ToWide(path).c_str());
+
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> FileNamesInFolder(std::string const& folderPath)
+{
+    std::vector<std::string> names;
+    WIN32_FIND_DATAW found = {};
+    HANDLE const search = FindFirstFileW(UTF8ToWide(folderPath + "\\*").c_str(), &found);
+
+    if (search == INVALID_HANDLE_VALUE)
+        return names;
+
+    for (bool more = true; more; more = FindNextFileW(search, &found) != 0)
+    {
+        if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            names.push_back(WideToUTF8(found.cFileName));
+    }
+
+    FindClose(search);
+    return names;
+}
+//---------------------------------------------------------------------------
+std::string GUILayoutFilePath()
+{
+    return GUISettingsFolderPath() + "\\" + WithExtension(ExeFileName(), ".ini");
+}
+//---------------------------------------------------------------------------
+std::string GUISelectionFilePath()
+{
+    return WithExtension(GUILayoutFilePath(), ".selection");
+}
+//---------------------------------------------------------------------------
+std::string GUISettingsFolderPath()
+{
+    // The same folder the VCL GUI runner's System::Ioutils::TPath::GetHomePath() gives.
+    wchar_t appData[MAX_PATH] = {};
+    HRESULT const result = SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, appData);
+
+    if (FAILED(result))
+        throw std::runtime_error("Couldn't find the AppData folder: " + SystemErrorText(static_cast<DWORD>(result)));
+
+    return WideToUTF8(appData) + "\\ASWUnitTests";
+}
+//---------------------------------------------------------------------------
+std::string GUIThemesFolderPath()
+{
+    return GUISettingsFolderPath() + "\\Themes";
+}
+//---------------------------------------------------------------------------
+bool IsThemeSettingChange(WPARAM wParam, LPARAM lParam)
+{
+    if (wParam == SPI_SETHIGHCONTRAST)
+        return true;
+
+    wchar_t const* const area = reinterpret_cast<wchar_t const*>(lParam);
+
+    return area != nullptr && std::wcscmp(area, L"ImmersiveColorSet") == 0;
+}
+//---------------------------------------------------------------------------
+std::string LoadGUIDarkThemeFromLayoutFile(std::string const& layoutPath)
+{
+    try
+    {
+        if (!FileExists(layoutPath))
+            return GUIDefaultDarkThemeName();
+
+        return LoadGUIDarkTheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
+    }
+    catch (...)
+    {
+        return GUIDefaultDarkThemeName();
+    }
+}
+//---------------------------------------------------------------------------
+EGUITheme LoadGUIThemeFromLayoutFile(std::string const& layoutPath)
+{
+    try
+    {
+        if (!FileExists(layoutPath))
+            return EGUITheme::Windows;
+
+        return LoadGUITheme(TGUIINIDocument(ReadFileBytes(layoutPath)));
+    }
+    catch (...)
+    {
+        return EGUITheme::Windows;
+    }
+}
+//---------------------------------------------------------------------------
+HICON MainIcon()
+{
+    return LoadIconW(GetModuleHandleW(nullptr), L"MAINICON");
+}
+//---------------------------------------------------------------------------
+/*
+    OpenFolderInExplorer
+
+    ShellExecuteW() returns a value above 32 on success, and otherwise an error code that, as documented, isn't
+    always GetLastError()'s, so the error is described from GetLastError() only when it has one.
+*/
+void OpenFolderInExplorer(HWND owner, std::string const& folderPath)
+{
+    SetLastError(ERROR_SUCCESS);
+    INT_PTR const result = reinterpret_cast<INT_PTR>(ShellExecuteW(owner, L"open", UTF8ToWide(folderPath).c_str(),
+        nullptr, nullptr, SW_SHOWNORMAL));
+
+    if (result <= 32)
+    {
+        DWORD const error = GetLastError();
+        throw FileError("open the folder", folderPath, error != ERROR_SUCCESS ? error : ERROR_PATH_NOT_FOUND);
+    }
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> ProcessArguments()
+{
+    return CommandLineArguments(GetCommandLineW());
+}
+//---------------------------------------------------------------------------
+std::string ReadFileBytes(std::string const& path)
+{
+    TFileHandle const file(CreateFileW(UTF8ToWide(path).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+
+    if (!file.IsValid())
+        throw FileError("open", path, GetLastError());
+
+    LARGE_INTEGER size;
+
+    if (GetFileSizeEx(file.Get(), &size) == 0)
+        throw FileError("read", path, GetLastError());
+
+    if (static_cast<unsigned long long>(size.QuadPart) > (std::numeric_limits<std::size_t>::max)() / 2)
+        throw std::runtime_error("Couldn't read " + path + ": the file is too large");
+
+    std::string bytes(static_cast<std::size_t>(size.QuadPart), '\0');
+    std::size_t total = 0;
+
+    while (total < bytes.size())
+    {
+        DWORD const chunk = static_cast<DWORD>((std::min)(bytes.size() - total, static_cast<std::size_t>(MaxFileChunk)));
+        DWORD read = 0;
+
+        if (ReadFile(file.Get(), &bytes[total], chunk, &read, nullptr) == 0)
+            throw FileError("read", path, GetLastError());
+
+        // The file got shorter since its size was read.
+        if (read == 0)
+            break;
+
+        total += read;
+    }
+
+    bytes.resize(total);
+    return bytes;
+}
+//---------------------------------------------------------------------------
+bool RemoveFile(std::string const& path)
+{
+    return DeleteFileW(UTF8ToWide(path).c_str()) != 0;
+}
+//---------------------------------------------------------------------------
+void SaveGUIDarkThemeToLayoutFile(std::string const& layoutPath, std::string const& name)
+{
+    try
+    {
+        std::string const folder = FolderOf(layoutPath);
+
+        if (!folder.empty())
+            CreateFolderPath(folder);
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
+        SaveGUIDarkTheme(ini, name);
+        WriteFileBytes(layoutPath, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default dark theme.
+    }
+}
+//---------------------------------------------------------------------------
+void SaveGUIThemeToLayoutFile(std::string const& layoutPath, EGUITheme theme)
+{
+    try
+    {
+        std::string const folder = FolderOf(layoutPath);
+
+        if (!folder.empty())
+            CreateFolderPath(folder);
+
+        // Starting from the file's current text keeps the layout and any other values in it.
+        TGUIINIDocument ini(FileExists(layoutPath) ? ReadFileBytes(layoutPath) : std::string());
+        SaveGUITheme(ini, theme);
+        WriteFileBytes(layoutPath, ini.Text());
+    }
+    catch (...)
+    {
+        // Not saving it (e.g. a read-only profile) only means the next start uses the default theme.
+    }
+}
+//---------------------------------------------------------------------------
+/*
+    SetClipboardText
+
+    Puts the text on the clipboard as CF_UNICODETEXT, which Windows also offers to programs that ask for
+    CF_TEXT. Once SetClipboardData() succeeds, the clipboard owns the memory.
+*/
+void SetClipboardText(HWND owner, std::string const& text)
+{
+    std::wstring const wide = UTF8ToWide(text);
+    HGLOBAL const memory = GlobalAlloc(GMEM_MOVEABLE, (wide.size() + 1) * sizeof(wchar_t));
+
+    if (memory == nullptr)
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(GetLastError()));
+
+    wchar_t* const target = static_cast<wchar_t*>(GlobalLock(memory));
+
+    if (target == nullptr)
+    {
+        DWORD const error = GetLastError();
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(error));
+    }
+
+    std::copy(wide.c_str(), wide.c_str() + wide.size() + 1, target);
+    GlobalUnlock(memory);
+
+    if (OpenClipboard(owner) == 0)
+    {
+        DWORD const error = GetLastError();
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't open the clipboard: " + SystemErrorText(error));
+    }
+
+    EmptyClipboard();
+    bool const placed = SetClipboardData(CF_UNICODETEXT, memory) != nullptr;
+    DWORD const error = GetLastError();
+    CloseClipboard();
+
+    if (!placed)
+    {
+        GlobalFree(memory);
+        throw std::runtime_error("Couldn't copy to the clipboard: " + SystemErrorText(error));
+    }
+}
+//---------------------------------------------------------------------------
+std::string WindowText(HWND window)
+{
+    std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(window)) + 1, L'\0');
+    text.resize(static_cast<std::size_t>(GetWindowTextW(window, &text[0], static_cast<int>(text.size()))));
+
+    return WideToUTF8(text);
+}
+//---------------------------------------------------------------------------
+bool WindowsAppsUseDarkTheme()
+{
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+
+    LSTATUS const status = RegGetValueW(HKEY_CURRENT_USER,
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme", RRF_RT_REG_DWORD,
+        nullptr, &value, &size);
+
+    return status == ERROR_SUCCESS && value == 0;
+}
+//---------------------------------------------------------------------------
+bool WindowsHighContrast()
+{
+    HIGHCONTRASTW highContrast = {};
+    highContrast.cbSize = sizeof(highContrast);
+
+    return SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0) != 0 &&
+        (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
+}
+//---------------------------------------------------------------------------
+void WriteFileBytes(std::string const& path, std::string const& bytes)
+{
+    TFileHandle const file(CreateFileW(UTF8ToWide(path).c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL, nullptr));
+
+    if (!file.IsValid())
+        throw FileError("create", path, GetLastError());
+
+    std::size_t total = 0;
+
+    while (total < bytes.size())
+    {
+        DWORD const chunk = static_cast<DWORD>((std::min)(bytes.size() - total, static_cast<std::size_t>(MaxFileChunk)));
+        DWORD written = 0;
+
+        if (WriteFile(file.Get(), bytes.data() + total, chunk, &written, nullptr) == 0)
+            throw FileError("write", path, GetLastError());
+
+        total += written;
+    }
+}
+//---------------------------------------------------------------------------
+
+} // namespace ASWUnitTests

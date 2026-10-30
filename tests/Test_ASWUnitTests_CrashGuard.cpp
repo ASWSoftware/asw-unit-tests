@@ -25,25 +25,44 @@ limitations under the License.
 #include "Test_ASWUnitTests_CrashGuard.h"
 //---------------------------------------------------------------------------
 #include <stdexcept>
+#include <string>
+#include <thread>
+//---------------------------------------------------------------------------
+#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_CrashGuard.h"
-#include "ASWUnitTests_Registry.h"
 //---------------------------------------------------------------------------
 
 namespace
 {
 
-// Written through by CrashInsideTryBlock() below. At namespace scope, not a local: GCC 13 and 14 at
-// -O3 drop the write through a local 'int* volatile' initialized to nullptr in the same function, so
-// nothing crashes (seen in the Linux CI build; GCC 15 and Clang keep it).
+// Written through by CrashInsideTryBlock() and RecurseDeeplyThenCrash() below. volatile, so no
+// compiler can prove the write is through a null pointer, which is undefined behavior it may assume
+// never happens: Clang in a Release build (RAD Studio's bcc64x, llvm-mingw) treated the branch that
+// wrote through a plain local null pointer in RecurseDeeplyThenCrash() as unreachable and dropped it
+// with its depth check, so the recursion never stopped and overflowed the stack instead. At namespace
+// scope, not a local: GCC 13 and 14 at -O3 drop the write through a local 'int* volatile' initialized
+// to nullptr in the same function, so nothing crashes (seen in the Linux CI build; GCC 15 and Clang
+// keep it).
 int* volatile g_NullPointer = nullptr;
 
-// A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
-// while it's entered, so this crashes with the chain's head pointing into this function's stack
-// frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
-// since the framework calls each test from inside its own try blocks. The crash is called through a
-// volatile pointer so no compiler can see it can't throw and drop the try block. Used by
-// Test_Run_AccessViolation_LaterExceptionStillCaught() below.
+//---------------------------------------------------------------------------
+
+void CrashInsideTryBlock();
+int RecurseDeeplyThenCrash(int depth);
+int RecurseUntilStackOverflows(int depth);
+
+//---------------------------------------------------------------------------
+/*
+    CrashInsideTryBlock
+
+    A try block's handler is linked into Win32's chain of exception handlers (NT_TIB::ExceptionList)
+    while it's entered, so this crashes with the chain's head pointing into this function's stack
+    frame, which the jump out of the crash abandons. A test run by the framework crashes like this,
+    since the framework calls each test from inside its own try blocks. The crash is called through a
+    volatile pointer so no compiler can see it can't throw and drop the try block. Used by
+    Test_Run_AccessViolation_LaterExceptionStillCaught() below.
+*/
 void CrashInsideTryBlock()
 {
     using TCrash = void (*)();
@@ -60,14 +79,42 @@ void CrashInsideTryBlock()
     {
     }
 }
+//---------------------------------------------------------------------------
+/*
+    RecurseDeeplyThenCrash
 
-// Not a tail call: 'buffer[0]' is read again after the recursive call returns, so no compiler can
-// turn this into a loop with constant stack usage the way it could a simple tail-recursive
-// version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
-// MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
-// permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
-// about here is the deliberate point, not a mistake, hence silencing just that one warning.
-// bcc32c is Clang-based but, unlike bcc64x, doesn't define __GNUC__, so it needs its own branch.
+    A small per-frame footprint (unlike RecurseUntilStackOverflows() below), so 20 frames of this
+    use only a few tens of KB and never overflows the stack on its own; the crash at the bottom is
+    an ordinary access violation, deliberately reached from deep in the call stack. It writes through
+    g_NullPointer, not a local null pointer, so the optimizer can't drop it (see g_NullPointer). Used
+    by Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
+*/
+int RecurseDeeplyThenCrash(int depth)
+{
+    volatile char buffer[16];
+    buffer[0] = static_cast<char>(depth);
+
+    if (depth >= 20)
+    {
+        *g_NullPointer = 1;
+        return buffer[0];
+    }
+
+    int const deeper = RecurseDeeplyThenCrash(depth + 1);
+    return deeper + buffer[0];
+}
+//---------------------------------------------------------------------------
+/*
+    RecurseUntilStackOverflows
+
+    Not a tail call: 'buffer[0]' is read again after the recursive call returns, so no compiler can
+    turn this into a loop with constant stack usage the way it could a simple tail-recursive
+    version. Verified to genuinely overflow the stack (rather than hang) under -O2 and -O3 on GCC/
+    MinGW and under RAD Studio's bcc32c/bcc64, before this was trusted enough to commit as a
+    permanent test - see the commit that added this file. The infinite recursion GCC/Clang/MSVC warn
+    about here is the deliberate point, not a mistake, hence silencing just that one warning.
+    bcc32c is Clang-based but, unlike bcc64x, doesn't define __GNUC__, so it needs its own branch.
+*/
 #if defined(__GNUC__)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Winfinite-recursion"
@@ -92,28 +139,11 @@ int RecurseUntilStackOverflows(int depth)
 #elif defined(_MSC_VER)
 #  pragma warning(pop)
 #endif
-
-// A small per-frame footprint (unlike RecurseUntilStackOverflows() above), so 20 frames of this
-// use only a few tens of KB and never overflows the stack on its own; the crash at the bottom is
-// an ordinary access violation, deliberately reached from deep in the call stack. Used by
-// Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort() below.
-int RecurseDeeplyThenCrash(int depth)
-{
-    volatile char buffer[16];
-    buffer[0] = static_cast<char>(depth);
-
-    if (depth >= 20)
-    {
-        int* const nullPointer = nullptr;
-        *const_cast<int*>(nullPointer) = 1;
-        return buffer[0];
-    }
-
-    int const deeper = RecurseDeeplyThenCrash(depth + 1);
-    return deeper + buffer[0];
-}
+//---------------------------------------------------------------------------
 
 } // namespace
+
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
@@ -182,6 +212,8 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_CaughtAndDoesNotAbo
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "a null-pointer write is caught");
 #if defined(_WIN32)
+    CheckEquals(std::string("access violation"), result.Description, __func__, __LINE__,
+        "the null-pointer write itself crashed, not something the optimizer turned it into");
     CheckFalse(result.ShouldAbortRun, __func__, __LINE__,
         "an ordinary access violation isn't severe enough to force an abort");
 #else
@@ -231,25 +263,15 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_AccessViolation_LaterExceptionStill
 /*
     TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort
 
-    Not merely a handful of frames deep, deliberately: an ordinary crash a couple thousand frames
-    deep was found to be misclassified as abort-worthy specifically on RAD Studio's Clang-based
-    compilers (bcc32c/bcc64) in a Release build, while MinGW handled the exact same code correctly
-    at every depth tried. bcc64x remains unreliable at this specifically, in ways further tuning (a
-    larger SetThreadStackGuarantee(), a shallower depth) did not resolve cleanly - see Skip() below
-    and the commit that added it for the full investigation. This test is Skip()ped on that compiler
-    rather than deleted, since MinGW, bcc32c (and, unverified so far, MSVC) still need real coverage
-    of "an ordinary crash, meaningfully deep, still doesn't force an abort." bcc32c passes it in
-    Debug and Release builds, while bcc64x still fails it in a Release build (checked 2026-10-14,
-    RAD Studio 13.1).
+    Not merely a handful of frames deep, deliberately: an ordinary crash deep in the call stack is
+    still only an access violation, not a stack overflow, and mustn't force an abort. This test was
+    once skipped on RAD Studio's bcc64x, whose Release build reported a stack overflow: Clang had
+    dropped the helper's write through a plain null pointer as undefined behavior, and the depth
+    check with it, so the recursion never stopped (see g_NullPointer). The description is checked
+    so a crash that turns into a different fault fails with a clear message.
 */
 void TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNotAbort()
 {
-#if defined(__BORLANDC__) && defined(_WIN64)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's bcc64x in a Release build: an ordinary crash this deep was "
-        "misclassified as abort-worthy. MinGW and bcc32c handle this correctly; investigation ongoing.");
-#endif
-
     // Arrange, Act
     TCrashGuardResult const result = TCrashGuard::Run([]()
         {
@@ -259,6 +281,8 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_DeepAccessViolation_CaughtAndDoesNo
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "an access violation 20 stack frames deep is still caught");
 #if defined(_WIN32)
+    CheckEquals(std::string("access violation"), result.Description, __func__, __LINE__,
+        "the null-pointer write at the bottom crashed, not a stack overflow from unbounded recursion");
     CheckFalse(result.ShouldAbortRun, __func__, __LINE__,
         "an ordinary access violation, even this deep, still isn't severe enough to force an abort");
 #else
@@ -330,28 +354,28 @@ void TTest_ASWUnitTests_CrashGuard::Test_Run_NormalException_PropagatesUnaffecte
 /*
     TTest_ASWUnitTests_CrashGuard::Test_Run_StackOverflow_CaughtAndAbortsRun
 
-    Skip()ped on RAD Studio's Clang-based compilers (bcc32c/bcc64): in a Release build, a genuine
-    stack overflow here was found to not be caught at all, taking the whole process down for real,
-    despite the exact same mechanism working correctly for every other fault type on those same
-    compilers, and for this exact scenario on MinGW. A larger SetThreadStackGuarantee() didn't fix
-    it cleanly (see the commit that added this Skip() for the full investigation); this is Skip()ped
-    rather than deleted since MinGW (and, unverified so far, MSVC) still need real coverage of stack
-    overflow recovery, and because letting this run for real on an unfixed compiler would crash this
-    very test process rather than merely fail a test.
+    The stack overflows on a thread of its own, never on the thread running the tests. A thread's
+    stack takes one overflow at most: the first uses up its guard page, and a second one ends the
+    process. So on the thread running the tests, a second run of this test in one process, as a GUI
+    runner's Run Selected does, ended the GUI (0xC0000005 in the Win32 GUI runner). TCrashGuard::Run()
+    sets up its stack guarantee (Windows) and alternate signal stack (POSIX) on each thread it runs
+    on, so the new thread is guarded the same way.
 */
 void TTest_ASWUnitTests_CrashGuard::Test_Run_StackOverflow_CaughtAndAbortsRun()
 {
-#if defined(__BORLANDC__)
-    Skip(__func__, __LINE__,
-        "Unreliable on RAD Studio's bcc32c/bcc64 in a Release build: a genuine stack overflow was not "
-        "caught at all, crashing the process for real. MinGW handles this correctly; investigation ongoing.");
-#endif
-
-    // Arrange, Act
-    TCrashGuardResult const result = TCrashGuard::Run([]()
+    // Arrange
+    auto const overflow = []()
         {
             RecurseUntilStackOverflows(0);
-        });
+        };
+    TCrashGuardResult result;
+    auto const runGuarded = [&]()
+        {
+            result = TCrashGuard::Run(overflow);
+        };
+
+    // Act
+    std::thread(runGuarded).join();
 
     // Assert
     CheckTrue(result.Crashed, __func__, __LINE__, "a genuine stack overflow is caught");

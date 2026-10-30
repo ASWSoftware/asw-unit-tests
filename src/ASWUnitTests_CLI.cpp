@@ -34,10 +34,11 @@ limitations under the License.
 namespace
 {
 
+//---------------------------------------------------------------------------
+
 void PrintUsage();
 
 //---------------------------------------------------------------------------
-
 void PrintUsage()
 {
     std::cout
@@ -191,9 +192,14 @@ TestFilter TCLIParser::BuildTestFilter(TTestHandler& tester, TCLIOptions const& 
 //---------------------------------------------------------------------------
 std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOptions& options)
 {
-    for (int i = 1; i < argc; ++i)
+    return ParseArguments(std::vector<std::string>(argv, argv + argc), options);
+}
+//---------------------------------------------------------------------------
+std::optional<int> TCLIParser::ParseArguments(std::vector<std::string> const& args, TCLIOptions& options)
+{
+    for (std::size_t i = 1; i < args.size(); ++i)
     {
-        std::string_view arg = argv[i];
+        std::string_view const arg = args[i];
 
         if (arg == "--version")
         {
@@ -211,13 +217,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--filter")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --filter requires a pattern argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            options.FilterPattern = argv[++i];
+            options.FilterPattern = args[++i];
             options.HasFilter = true;
         }
         else if (arg.rfind("--filter=", 0) == 0)
@@ -235,13 +241,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--shuffle-seed")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --shuffle-seed requires a numeric argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            options.ShuffleSeed = ParseUnsignedInt(argv[++i]);
+            options.ShuffleSeed = ParseUnsignedInt(args[++i]);
             if (!options.ShuffleSeed.has_value())
             {
                 std::cout << "Error: --shuffle-seed requires a non-negative integer argument.\n";
@@ -263,13 +269,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--partition-index")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --partition-index requires a numeric argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(args[++i]);
             if (!parsed.has_value())
             {
                 std::cout << "Error: --partition-index requires a positive integer argument.\n";
@@ -293,13 +299,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--partition-count")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --partition-count requires a numeric argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(args[++i]);
             if (!parsed.has_value())
             {
                 std::cout << "Error: --partition-count requires a positive integer argument.\n";
@@ -323,13 +329,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--test-timeout-seconds")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --test-timeout-seconds requires a numeric argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            std::optional<unsigned int> const parsed = ParseUnsignedInt(argv[++i]);
+            std::optional<unsigned int> const parsed = ParseUnsignedInt(args[++i]);
             if (!parsed.has_value() || *parsed == 0)
             {
                 std::cout << "Error: --test-timeout-seconds requires a positive integer argument.\n";
@@ -359,13 +365,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--color")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --color requires \"auto\", \"always\", or \"never\".\n";
                 return ExitCode_InvalidArguments;
             }
 
-            std::optional<TColorMode> const parsed = ParseColorMode(argv[++i]);
+            std::optional<TColorMode> const parsed = ParseColorMode(args[++i]);
             if (!parsed.has_value())
             {
                 std::cout << "Error: --color requires \"auto\", \"always\", or \"never\".\n";
@@ -387,13 +393,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--color-pass" || arg == "--color-fail" || arg == "--color-skip")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: " << arg << " requires a color name argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            std::optional<TConsoleColor> const parsed = TConsole::ParseColorName(argv[++i]);
+            std::optional<TConsoleColor> const parsed = TConsole::ParseColorName(args[++i]);
             if (!parsed.has_value())
             {
                 std::cout << "Error: " << arg << " was given an unrecognized color name.\n";
@@ -429,13 +435,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--report-junit")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --report-junit requires a file path argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            options.JunitReportPath = argv[++i];
+            options.JunitReportPath = args[++i];
         }
         else if (arg.rfind("--report-junit=", 0) == 0)
         {
@@ -443,13 +449,13 @@ std::optional<int> TCLIParser::ParseArguments(int argc, char* argv[], TCLIOption
         }
         else if (arg == "--project-name")
         {
-            if (i + 1 >= argc)
+            if (i + 1 >= args.size())
             {
                 std::cout << "Error: --project-name requires a name argument.\n";
                 return ExitCode_InvalidArguments;
             }
 
-            options.ProjectName = argv[++i];
+            options.ProjectName = args[++i];
         }
         else if (arg.rfind("--project-name=", 0) == 0)
         {

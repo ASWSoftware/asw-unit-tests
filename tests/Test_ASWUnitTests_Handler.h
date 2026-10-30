@@ -40,7 +40,10 @@ private: // Test methods
     void Test_CanonicalGroupOrder_KeepsSuitesTogether();
     void Test_CanonicalGroupOrder_RejectsInvalidSuitePath();
     void Test_CanonicalGroupOrder_WithoutSuites_SortsByOrderThenName();
+    void Test_GetAppBitsStr_MatchesPointerSize();
+    void Test_GetBuildOS_MatchesPlatform();
     void Test_GetTests_MatchesGetAllTestFullNames();
+    void Test_Initialize_LogsVersionBitsAndOS();
     void Test_Initialize_ReplacesGroupWhoseConstructorThrows();
     void Test_Run_FailsGroupTestsWhenSetUpGroupThrows();
     void Test_Run_ShuffleKeepsOrderWhenFiltered();

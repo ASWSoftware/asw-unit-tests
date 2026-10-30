@@ -26,19 +26,47 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <cstddef>
 #include <cstdint>
+#include <cwchar>
 #include <random>
 #include <utility>
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+#  include <memory>
+#  include <stdexcept>
+#  if !defined(NOMINMAX)
+#    define NOMINMAX
+#  endif
+#  if !defined(WIN32_LEAN_AND_MEAN)
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#  include <shellapi.h>
+#endif
 //---------------------------------------------------------------------------
 
 namespace
 {
 
+#if defined(_WIN32)
+// A buffer from CommandLineToArgvW() or FormatMessageW(), freed with LocalFree().
+template <typename T>
+using TLocalPtr = std::unique_ptr<T, HLOCAL(WINAPI*)(HLOCAL)>;
+#endif
+
+//---------------------------------------------------------------------------
+
 void AppendUTF8(std::string& text, uint32_t codePoint);
+void AppendWide(std::wstring& text, uint32_t codePoint);
+std::size_t DecodeUTF8Sequence(std::string const& text, std::size_t start, uint32_t& codePoint);
 bool IsHighSurrogate(uint32_t codeUnit);
 bool IsLowSurrogate(uint32_t codeUnit);
 
 //---------------------------------------------------------------------------
-// Appends 'codePoint', which must be a valid code point, to 'text' as UTF-8.
+/*
+    AppendUTF8
+
+    Appends 'codePoint', which must be a valid code point, to 'text' as UTF-8.
+*/
 void AppendUTF8(std::string& text, uint32_t codePoint)
 {
     if (codePoint < 0x80)
@@ -64,26 +92,142 @@ void AppendUTF8(std::string& text, uint32_t codePoint)
         text += static_cast<char>(0x80 | (codePoint & 0x3F));
     }
 }
+//---------------------------------------------------------------------------
+/*
+    AppendWide
 
+    Appends 'codePoint', which must be a valid code point, to 'text': as is where wchar_t is 32 bits, and as a
+    surrogate pair, above U+FFFF, where it's 16.
+*/
+void AppendWide(std::wstring& text, uint32_t codePoint)
+{
+#if WCHAR_MAX > 0xFFFF
+    text += static_cast<wchar_t>(codePoint);
+#else
+    if (codePoint < 0x10000)
+    {
+        text += static_cast<wchar_t>(codePoint);
+        return;
+    }
+
+    text += static_cast<wchar_t>(0xD800 + ((codePoint - 0x10000) >> 10));
+    text += static_cast<wchar_t>(0xDC00 + ((codePoint - 0x10000) & 0x3FF));
+#endif
+}
+//---------------------------------------------------------------------------
+/*
+    DecodeUTF8Sequence
+
+    Decodes the UTF-8 sequence at 'start' in 'text', which must be within it, into 'codePoint', and returns how many
+    bytes it took. A maximal ill-formed sequence (a byte that can't start a sequence, or a sequence's valid start
+    before it breaks off or 'text' ends) gives U+FFFD and takes just those bytes, so the next sequence starts at the
+    byte that broke it off. The second byte's range depends on the first, which rules out overlong sequences,
+    surrogates and values above U+10FFFF (the Unicode standard's table 3-7, "Well-Formed UTF-8 Byte Sequences").
+*/
+std::size_t DecodeUTF8Sequence(std::string const& text, std::size_t start, uint32_t& codePoint)
+{
+    uint32_t const replacementCharacter = 0xFFFD;
+    unsigned char const lead = static_cast<unsigned char>(text[start]);
+
+    if (lead < 0x80)
+    {
+        codePoint = lead;
+        return 1;
+    }
+
+    std::size_t length = 0;
+    unsigned char secondLow = 0x80;
+    unsigned char secondHigh = 0xBF;
+
+    if (lead >= 0xC2 && lead <= 0xDF)
+    {
+        length = 2;
+    }
+    else if (lead >= 0xE0 && lead <= 0xEF)
+    {
+        length = 3;
+        secondLow = (lead == 0xE0) ? 0xA0 : 0x80;
+        secondHigh = (lead == 0xED) ? 0x9F : 0xBF;
+    }
+    else if (lead >= 0xF0 && lead <= 0xF4)
+    {
+        length = 4;
+        secondLow = (lead == 0xF0) ? 0x90 : 0x80;
+        secondHigh = (lead == 0xF4) ? 0x8F : 0xBF;
+    }
+    else
+    {
+        codePoint = replacementCharacter; // A continuation byte, or one never used in UTF-8.
+        return 1;
+    }
+
+    codePoint = lead & (0xFFu >> (length + 1));
+
+    for (std::size_t i = 1; i < length; ++i)
+    {
+        if (start + i >= text.size())
+        {
+            codePoint = replacementCharacter;
+            return i;
+        }
+
+        unsigned char const next = static_cast<unsigned char>(text[start + i]);
+        unsigned char const low = (i == 1) ? secondLow : 0x80;
+        unsigned char const high = (i == 1) ? secondHigh : 0xBF;
+
+        if (next < low || next > high)
+        {
+            codePoint = replacementCharacter;
+            return i;
+        }
+
+        codePoint = (codePoint << 6) | (next & 0x3Fu);
+    }
+
+    return length;
+}
 //---------------------------------------------------------------------------
 bool IsHighSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
 }
-
 //---------------------------------------------------------------------------
 bool IsLowSurrogate(uint32_t codeUnit)
 {
     return codeUnit >= 0xDC00 && codeUnit <= 0xDFFF;
 }
-
 //---------------------------------------------------------------------------
 
 } // namespace
 
+//---------------------------------------------------------------------------
+
 namespace ASWUnitTests
 {
 
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+std::vector<std::string> CommandLineArguments(std::wstring const& commandLine)
+{
+    // CommandLineToArgvW() splits an empty command line as if it were this executable's path, unquoted, so a path
+    // with a space in it would become a program name and an argument.
+    if (commandLine.empty())
+        return std::vector<std::string>();
+
+    int count = 0;
+    TLocalPtr<wchar_t*> const argv(CommandLineToArgvW(commandLine.c_str(), &count), &LocalFree);
+
+    if (argv == nullptr)
+        throw std::runtime_error("Couldn't split the command line: " + SystemErrorText(GetLastError()));
+
+    std::vector<std::string> args;
+
+    for (int i = 1; i < count; ++i)
+        args.push_back(WideToUTF8(argv.get()[i]));
+
+    return args;
+}
+#endif
 //---------------------------------------------------------------------------
 uint32_t FNV1aHash(std::string const& text)
 {
@@ -128,6 +272,42 @@ std::vector<std::size_t> ShuffledIndices(std::size_t count, unsigned int seed)
     }
 
     return indices;
+}
+//---------------------------------------------------------------------------
+#if defined(_WIN32)
+std::string SystemErrorText(unsigned long error)
+{
+    wchar_t* buffer = nullptr;
+    DWORD const length = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, error, 0, reinterpret_cast<wchar_t*>(&buffer), 0, nullptr);
+
+    if (length == 0 || buffer == nullptr)
+        return "error " + std::to_string(error);
+
+    TLocalPtr<wchar_t> const owner(buffer, &LocalFree);
+    std::wstring text(buffer, length);
+
+    // FormatMessageW() ends the text with a line break.
+    while (!text.empty() && (text.back() == L'\r' || text.back() == L'\n' || text.back() == L' '))
+        text.pop_back();
+
+    return WideToUTF8(text);
+}
+#endif
+//---------------------------------------------------------------------------
+std::wstring UTF8ToWide(std::string const& text)
+{
+    std::wstring wide;
+    wide.reserve(text.size());
+
+    for (std::size_t i = 0; i < text.size(); )
+    {
+        uint32_t codePoint = 0;
+        i += DecodeUTF8Sequence(text, i, codePoint);
+        AppendWide(wide, codePoint);
+    }
+
+    return wide;
 }
 //---------------------------------------------------------------------------
 std::string WideToUTF8(std::wstring const& text)

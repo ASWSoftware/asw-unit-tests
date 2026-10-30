@@ -64,15 +64,19 @@ private: // Test methods
     void Test_Fail_AbortsTestAsFailed();
     void Test_IsType_UsesDynamicTypeAndShowsNames();
     void Test_Matches_MatchesWholeTextAndShowsPattern();
+    void Test_Near_ComparesMixedTypesAndRejectsInvalidTolerance();
     void Test_Near_HandlesNaNAndInfinity();
     void Test_NullCStrings_MatchNothingInTextChecks();
     void Test_NullNotNull_FailureNamesTheExpectedValue();
     void Test_Ordering_ComparesByValueAndShowsBoth();
     void Test_Run_AbandonsHungTestAndAbortsGroupOnTimeout();
     void Test_Run_AppliesFilterToSkipNonMatchingTests();
+    void Test_Run_ContinuesAfterCrashInRunObserverUnderTimeout();
     void Test_Run_ContinuesAfterCrashWhenCatchCrashesIsSet();
     void Test_Run_CountsTestRecordingItsOutcomeAtTimeoutAsFinished();
+    void Test_Run_CrashInRunObserverDoesNotBlockLaterRunOnAnotherThread();
     void Test_Run_EndsRunOnSetUpOrTearDownTestException();
+    void Test_Run_GivesTimedTestTheCallersFloatingPointEnvironment();
     void Test_Run_IgnoresTestThatEndsAfterItsTimeout();
     void Test_Run_LogsEachCheckFailureOnce();
     void Test_Run_RecordsCheckFailuresInFailedTestDetail();
@@ -90,6 +94,7 @@ private: // Test methods
     void Test_Same_ComparesAddressesNotContent();
     void Test_SetExceptionExpected_AssertFailureStillFailsAndIsRecorded();
     void Test_SetExceptionExpected_EarlierCheckFailureStillFailsAndIsRecorded();
+    void Test_SetExceptionExpected_MatchesAnyType();
     void Test_SetExceptionExpected_MatchesTypeAndMessage();
     void Test_SetLogSuppressed_SilencesFixtureOutput();
 #if defined(ASWUNITTESTS_SOURCE_LOCATION_ENABLED)
@@ -97,7 +102,9 @@ private: // Test methods
 #endif
     void Test_StartsWithIC_IgnoresASCIICaseOnly();
     void Test_StartsWith_ShowsTextAndPrefix();
+    void Test_StringChecks_CompareMixedTypesAsTextAndKeepNullRules();
     void Test_Throws_ChecksTypeAndMessageAndContinues();
+    void Test_Throws_MatchesAnyType();
     void Test_TrueFalse_FailureNamesTheExpectedValue();
 
 public:
