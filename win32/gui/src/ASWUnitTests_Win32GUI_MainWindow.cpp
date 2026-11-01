@@ -41,6 +41,7 @@ limitations under the License.
 #include "ASWUnitTests_Utils.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_GUI_INIDocument.h"
+#include "ASWUnitTests_GUI_Palette.h"
 #include "ASWUnitTests_GUI_Selection.h"
 #include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_GUI_Tree.h"
@@ -1151,7 +1152,7 @@ void TWin32GUIMainWindow::CreateMenuBar()
 */
 void TWin32GUIMainWindow::CreateStatusImages()
 {
-    TWin32GUIPalette const palette = m_Theme.IsDark() ? m_Theme.Palette() : CarbonPalette();
+    TWin32GUIPalette const palette = m_Theme.IsDark() ? m_Theme.Palette() : ToWin32Palette(CarbonGUIPalette());
 
     // In TGUITestStatus order: NotRun, Running, Passed, Failed, Skipped.
     COLORREF const colors[] = {
@@ -1528,7 +1529,7 @@ void TWin32GUIMainWindow::FillDarkThemeMenu()
 {
     std::vector<std::string> names;
 
-    for (TWin32GUIBuiltInTheme const& theme : BuiltInDarkThemes())
+    for (TGUIBuiltInTheme const& theme : GUIBuiltInDarkThemes())
         names.push_back(theme.Name);
 
     std::size_t const builtInCount = names.size();
@@ -2582,7 +2583,7 @@ void TWin32GUIMainWindow::SaveSelection()
 /*
     TWin32GUIMainWindow::SaveThemeTemplate
 
-    Writes CarbonThemeFileText() where the user chooses, starting in GUIThemesFolderPath(), created if needed,
+    Writes CarbonGUIThemeFileText() where the user chooses, starting in GUIThemesFolderPath(), created if needed,
     where View > Theme > Dark Theme lists it once it's saved there.
 */
 void TWin32GUIMainWindow::SaveThemeTemplate()
@@ -2598,7 +2599,7 @@ void TWin32GUIMainWindow::SaveThemeTemplate()
 
     try
     {
-        WriteFileBytes(*path, CarbonThemeFileText());
+        WriteFileBytes(*path, CarbonGUIThemeFileText());
     }
     catch (std::exception const& exception)
     {

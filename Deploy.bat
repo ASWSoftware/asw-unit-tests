@@ -59,6 +59,10 @@ call :CopyFile "gui\src\ASWUnitTests_GUI_Layout.cpp" "gui\src\ASWUnitTests_GUI_L
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_Layout.h" "gui\src\ASWUnitTests_GUI_Layout.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Palette.cpp" "gui\src\ASWUnitTests_GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\src\ASWUnitTests_GUI_Palette.h" "gui\src\ASWUnitTests_GUI_Palette.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.cpp" "gui\src\ASWUnitTests_GUI_RunObserver.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\src\ASWUnitTests_GUI_RunObserver.h" "gui\src\ASWUnitTests_GUI_RunObserver.h"
@@ -104,6 +108,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Layout.cpp" "gui\tests\Test_ASWUnitTests_GUI_Layout.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Layout.h" "gui\tests\Test_ASWUnitTests_GUI_Layout.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Palette.cpp" "gui\tests\Test_ASWUnitTests_GUI_Palette.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_Palette.h" "gui\tests\Test_ASWUnitTests_GUI_Palette.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp" "gui\tests\Test_ASWUnitTests_GUI_RunObserver.cpp"
 if errorlevel 1 exit /b 1

@@ -78,7 +78,7 @@ enum class EWin32GUIThemedControl
 // TWin32GUITheme
 //
 // Whether the GUI is light (Windows' standard look, in the system colors) or
-// dark (painted in CarbonPalette()'s colors, or a theme file's; see
+// dark (painted in CarbonGUIPalette()'s colors, or a theme file's; see
 // SetDarkTheme()), applied to the windows and controls attached to it, and
 // switched live by SetDark() and SetDarkTheme(). Dark has:
 //   - the title bar Windows draws dark (DWMWA_USE_IMMERSIVE_DARK_MODE);
@@ -236,7 +236,7 @@ public:
     void RefreshMenu(HMENU menu);
     // Switches to the dark look or back to the light one, and redraws everything attached.
     void SetDark(bool dark);
-    // Makes 'name' the dark theme: one of BuiltInDarkThemes() (ignoring case), or a theme file in
+    // Makes 'name' the dark theme: one of GUIBuiltInDarkThemes() (ignoring case), or a theme file in
     // GUIThemesFolderPath(), "<name>.ini", over Carbon's colors (see SetPalette()). Returns its problems as lines
     // for the log (see GUIThemeProblemLine()): the file's (see ReadGUIThemeFile()), or that it's missing or can't
     // be read, so Carbon is used.

@@ -10,6 +10,19 @@ versioned baseline.
 
 ## [Unreleased]
 
+### Changed
+
+- The dark themes' colors, the built-in dark themes and the theme file roles moved from the Win32
+  GUI runner into the GUI runners' shared core, as `gui\src\ASWUnitTests_GUI_Palette.cpp` and
+  `.h`, so that other GUI runners can share them. The Win32 GUI runner looks and works as before. A
+  RAD Studio project of your own that builds the Win32 GUI runner must add
+  `gui\src\ASWUnitTests_GUI_Palette.cpp` to its files; one that builds the VCL GUI runner can add it
+  too, as the README lists every `gui\src` file for it, though the VCL GUI runner doesn't use it.
+  CMake projects get it through `ASWUNITTESTS_WIN32_GUI_SOURCES`. Code that called the Win32 GUI
+  runner's palette functions finds them in `ASWUnitTests_GUI_Palette.h`, with "GUI" in their names
+  (e.g. `CarbonGUIPalette()`) and colors as `0xRRGGBB`; `ToWin32Palette()` converts a palette to
+  `COLORREF`s.
+
 ## [1.5.0] - 2026-10-30
 
 ### Added

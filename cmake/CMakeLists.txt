@@ -16,6 +16,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../gui/tests/Test_ASWUnitTests_GUI_Commands.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_INIDocument.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Layout.cpp
+    ../gui/tests/Test_ASWUnitTests_GUI_Palette.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_RunObserver.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Selection.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Shuffle.cpp

@@ -34,6 +34,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <vsstyle.h>
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_GUI_Palette.h"
 #include "ASWUnitTests_GUI_Theme.h"
 //---------------------------------------------------------------------------
 #include "ASWUnitTests_Win32GUI_Glyphs.h"
@@ -590,7 +591,7 @@ TWin32GUITheme::TWin32GUITheme()
       m_MenuBrush(nullptr),
       m_MenuFontDPI(0),
       m_MenuHook(nullptr),
-      m_Palette(CarbonPalette()),
+      m_Palette(ToWin32Palette(CarbonGUIPalette())),
       m_PanelBrush(nullptr),
       m_WindowBrush(nullptr)
 {
@@ -2600,8 +2601,8 @@ void TWin32GUITheme::SetDark(bool dark)
 std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
 {
     std::vector<std::string> problems;
-    TWin32GUIPalette palette = CarbonPalette();
-    TWin32GUIBuiltInTheme const* const builtIn = FindBuiltInDarkTheme(name);
+    TGUIPalette palette = CarbonGUIPalette();
+    TGUIBuiltInTheme const* const builtIn = FindGUIBuiltInDarkTheme(name);
 
     if (builtIn != nullptr)
     {
@@ -2620,12 +2621,12 @@ std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
             }
             else
             {
-                TGUIThemeFile const file = ReadGUIThemeFile(ReadFileBytes(path), PaletteRoleNames());
+                TGUIThemeFile const file = ReadGUIThemeFile(ReadFileBytes(path), GUIPaletteRoleNames());
 
                 for (std::string const& problem : file.Problems)
                     problems.push_back(GUIThemeProblemLine(name, problem));
 
-                palette = PaletteWithThemeColors(palette, file.Colors);
+                palette = GUIPaletteWithThemeColors(palette, file.Colors);
             }
         }
         catch (std::exception const& exception)
@@ -2635,7 +2636,7 @@ std::vector<std::string> TWin32GUITheme::SetDarkTheme(std::string const& name)
         }
     }
 
-    SetPalette(palette);
+    SetPalette(ToWin32Palette(palette));
     return problems;
 }
 //---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ set(ASWUNITTESTS_GUI_SOURCES
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_Commands.cpp"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_INIDocument.cpp"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_Layout.cpp"
+    "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_Palette.cpp"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_RunObserver.cpp"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_Selection.cpp"
     "${ASWUNITTESTS_GUI_SOURCE_DIR}/ASWUnitTests_GUI_Shuffle.cpp"

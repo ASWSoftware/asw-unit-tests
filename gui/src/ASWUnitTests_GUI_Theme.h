@@ -110,7 +110,7 @@ std::vector<std::string> GUIThemeNames(std::vector<std::string> const& fileNames
 std::string GUIThemeProblemLine(std::string const& themeName, std::string const& problem);
 // The dark themes both runners have built in besides Carbon, sorted: RAD Studio's dark VCL styles, by their
 // style names, which the VCL GUI runner links in and the Win32 GUI runner has the colors of
-// (BuiltInDarkThemes()).
+// (GUIBuiltInDarkThemes()).
 std::vector<std::string> GUIVCLStyleDarkThemeNames();
 // Reads the dark theme SaveGUIDarkTheme() wrote to 'ini', its [View] section's DarkTheme key: the name of a
 // theme file, or GUIDefaultDarkThemeName() when it's missing or empty, or is that name in another case.

@@ -31,7 +31,7 @@ namespace ASWUnitTests
 /////////////////////////////////////////////////////////////////////////////
 // TTest_ASWUnitTests_Win32GUI_Palette
 //
-// Exercises the Win32 GUI runner's dark theme colors
+// Exercises the Win32 GUI runner's dark theme colors as COLORREFs
 // (win32/gui/src/ASWUnitTests_Win32GUI_Palette.h). Compiled by the Windows
 // console runners as well as the Win32 GUI, so it runs without the GUI.
 /////////////////////////////////////////////////////////////////////////////
@@ -42,16 +42,8 @@ private:
 
 private: // Test methods
     void Test_BlendColors_MixesEachChannelInProportion();
-    void Test_BuiltInDarkThemes_AreCarbonThenItsTints();
-    void Test_BuiltInDarkThemes_KeepTextReadable();
-    void Test_CarbonPalette_HasCarbonsColors();
-    void Test_CarbonThemeFileText_ReadsBackAsCarbon();
     void Test_FailureAndSkipTextColorOn_AreLighterOnADarkBackground();
-    void Test_FindBuiltInDarkTheme_IgnoresCase();
-    void Test_IsDarkColor_IsByTheLuma();
-    void Test_PaletteRoles_ListEveryMemberOnce();
-    void Test_PaletteWithThemeColors_SetsOnlyTheirRoles();
-    void Test_TintedCarbonPalette_TintsOnlyTheGraysAndTheAccent();
+    void Test_ToWin32Palette_ConvertsEveryRole();
 
 public:
     TTest_ASWUnitTests_Win32GUI_Palette();
