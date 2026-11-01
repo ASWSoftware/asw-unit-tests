@@ -63,9 +63,9 @@
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <Multithreaded>true</Multithreaded>
         <SanitizedProjectName>ASWUnitTests</SanitizedProjectName>
-        <IncludePath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;$(IncludePath)</IncludePath>
+        <IncludePath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;..\web\gui\src\;..\web\tests\;$(IncludePath)</IncludePath>
         <_TCHARMapping>char</_TCHARMapping>
-        <ILINK_LibraryPath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+        <ILINK_LibraryPath>..\src\;..\tests\;..\toTest\;..\gui\src\;..\gui\tests\;..\win32\gui\src\;..\win32\tests\;..\web\gui\src\;..\web\tests\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
         <BCC_AllWarnings>true</BCC_AllWarnings>
         <BCC_SelectedWarnings>false</BCC_SelectedWarnings>
         <BCC_SelectedWarnings_v15>false</BCC_SelectedWarnings_v15>
@@ -355,6 +355,14 @@
         <CppCompile Include="..\toTest\ASWTools_String.cpp">
             <DependentOn>..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>4</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\web\gui\src\ASWUnitTests_WebGUI_JSON.cpp">
+            <DependentOn>..\web\gui\src\ASWUnitTests_WebGUI_JSON.h</DependentOn>
+            <BuildOrder>66</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp">
+            <DependentOn>..\web\tests\Test_ASWUnitTests_WebGUI_JSON.h</DependentOn>
+            <BuildOrder>67</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.cpp">
             <DependentOn>..\win32\gui\src\ASWUnitTests_Win32GUI_DialogTemplate.h</DependentOn>

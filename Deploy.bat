@@ -22,7 +22,7 @@ if not exist "%TARGET_DIR%\." (
     )
 )
 
-for %%D in (build cmake gui\src gui\tests rad370 resource src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests win32\gui\rad370 win32\gui\src win32\tests) do (
+for %%D in (build cmake gui\src gui\tests rad370 resource src tests toTest vcl\console\rad370 vcl\gui\rad370 vcl\gui\src vcl\tests web\gui\src web\tests win32\gui\rad370 win32\gui\src win32\tests) do (
     if not exist "%TARGET_DIR%\%%D\." (
         echo Creating %%D folder...
         mkdir "%TARGET_DIR%\%%D"
@@ -342,6 +342,16 @@ if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp" "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.h" "vcl\tests\Test_ASWUnitTests_RTLStrings.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.cpp" "web\gui\src\ASWUnitTests_WebGUI_JSON.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.h" "web\gui\src\ASWUnitTests_WebGUI_JSON.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake" "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp" "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_JSON.h" "web\tests\Test_ASWUnitTests_WebGUI_JSON.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj" "win32\gui\rad370\ASWUnitTests_Win32_GUI.cbproj"
 if errorlevel 1 exit /b 1

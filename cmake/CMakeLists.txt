@@ -8,10 +8,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../src/ASWUnitTests_Sources.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../gui/src/ASWUnitTests_GUI_Sources.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../web/gui/src/ASWUnitTests_WebGUI_Sources.cmake)
 
-# The framework's self-tests, the shared GUI core's tests and the example code they test, which every runner
-# compiles.
+# The framework's self-tests, the shared GUI core's tests, the Web GUI runner's core and its tests, and the
+# example code they test, which every runner compiles.
 set(ASWUNITTESTS_SELF_TEST_SOURCES
+    ${ASWUNITTESTS_WEB_GUI_CORE_SOURCES}
     ../gui/tests/Test_ASWUnitTests_GUI_CommandLine.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_Commands.cpp
     ../gui/tests/Test_ASWUnitTests_GUI_INIDocument.cpp
@@ -42,6 +44,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp
     ../toTest/ASWTools_String.cpp
+    ../web/tests/Test_ASWUnitTests_WebGUI_JSON.cpp
 )
 
 add_executable(ASWUnitTests
@@ -56,6 +59,8 @@ target_include_directories(ASWUnitTests PRIVATE
     ../src
     ../tests
     ../toTest
+    ../web/gui/src
+    ../web/tests
 )
 
 # --test-timeout-seconds (ASWUnitTests_TestBase.cpp) uses std::thread/std::future, which needs an
@@ -142,6 +147,8 @@ if(WIN32)
         ../gui/tests
         ../tests
         ../toTest
+        ../web/gui/src
+        ../web/tests
         ../win32/tests
     )
 
