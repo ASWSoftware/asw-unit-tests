@@ -437,6 +437,10 @@
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_JSON.h</DependentOn>
             <BuildOrder>62</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.cpp">
+            <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.h</DependentOn>
+            <BuildOrder>66</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.h</DependentOn>
             <BuildOrder>65</BuildOrder>
@@ -444,6 +448,10 @@
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.h</DependentOn>
             <BuildOrder>63</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_SSE.cpp">
+            <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_SSE.h</DependentOn>
+            <BuildOrder>67</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.cpp">
             <DependentOn>..\..\tests\Test_ASWUnitTests_GUI_VCLSystem.h</DependentOn>

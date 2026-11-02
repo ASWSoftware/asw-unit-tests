@@ -46,6 +46,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../toTest/ASWTools_String.cpp
     ../web/tests/Test_ASWUnitTests_WebGUI_HTTP.cpp
     ../web/tests/Test_ASWUnitTests_WebGUI_JSON.cpp
+    ../web/tests/Test_ASWUnitTests_WebGUI_SSE.cpp
 )
 
 add_executable(ASWUnitTests
