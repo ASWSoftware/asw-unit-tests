@@ -44,6 +44,7 @@ set(ASWUNITTESTS_SELF_TEST_SOURCES
     ../toTest/ASWTools_Common.cpp
     ../toTest/ASWTools_Random.cpp
     ../toTest/ASWTools_String.cpp
+    ../web/tests/Test_ASWUnitTests_WebGUI_HTTP.cpp
     ../web/tests/Test_ASWUnitTests_WebGUI_JSON.cpp
 )
 

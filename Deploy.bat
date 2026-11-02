@@ -343,11 +343,19 @@ call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.cpp" "vcl\tests\Test_ASWU
 if errorlevel 1 exit /b 1
 call :CopyFile "vcl\tests\Test_ASWUnitTests_RTLStrings.h" "vcl\tests\Test_ASWUnitTests_RTLStrings.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_HTTP.cpp" "web\gui\src\ASWUnitTests_WebGUI_HTTP.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_HTTP.h" "web\gui\src\ASWUnitTests_WebGUI_HTTP.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.cpp" "web\gui\src\ASWUnitTests_WebGUI_JSON.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.h" "web\gui\src\ASWUnitTests_WebGUI_JSON.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake" "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_HTTP.cpp" "web\tests\Test_ASWUnitTests_WebGUI_HTTP.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_HTTP.h" "web\tests\Test_ASWUnitTests_WebGUI_HTTP.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp" "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp"
 if errorlevel 1 exit /b 1

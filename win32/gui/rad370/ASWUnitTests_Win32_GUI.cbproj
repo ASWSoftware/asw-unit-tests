@@ -340,9 +340,17 @@
             <DependentOn>..\..\..\toTest\ASWTools_String.h</DependentOn>
             <BuildOrder>46</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_HTTP.cpp">
+            <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_HTTP.h</DependentOn>
+            <BuildOrder>74</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_JSON.cpp">
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_JSON.h</DependentOn>
             <BuildOrder>72</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.cpp">
+            <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.h</DependentOn>
+            <BuildOrder>75</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.h</DependentOn>
