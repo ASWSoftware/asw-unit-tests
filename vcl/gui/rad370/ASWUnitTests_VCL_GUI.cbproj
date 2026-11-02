@@ -429,6 +429,10 @@
             <DependentOn>..\..\..\gui\tests\Test_ASWUnitTests_GUI_View.h</DependentOn>
             <BuildOrder>55</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_API.cpp">
+            <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_API.h</DependentOn>
+            <BuildOrder>70</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_HTTP.cpp">
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_HTTP.h</DependentOn>
             <BuildOrder>64</BuildOrder>
@@ -444,6 +448,10 @@
         <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.cpp">
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.h</DependentOn>
             <BuildOrder>66</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_API.cpp">
+            <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_API.h</DependentOn>
+            <BuildOrder>71</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_HTTP.h</DependentOn>
