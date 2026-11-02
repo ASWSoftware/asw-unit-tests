@@ -42,8 +42,11 @@ private:
 private: // Test methods
     void Test_CommandStates_AsIfANodeWereSelected();
     void Test_DetailAndNodeIds_NameEachNode();
+    void Test_Log_AppendKeepsWholeLines();
+    void Test_Log_EventSendsLinesFromAnIndex();
     void Test_SnapshotEvent_HoldsEverything();
     void Test_StateEvent_CommandsPanelsProgressShuffleTheme();
+    void Test_TestEvents_StatusOfEachNodeTheTestChanges();
     void Test_TreeAndChecksEvents_FollowTheTestList();
 
 public:

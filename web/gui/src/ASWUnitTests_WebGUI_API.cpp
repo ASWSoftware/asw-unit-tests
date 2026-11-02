@@ -24,6 +24,7 @@ limitations under the License.
 // Module header
 #include "ASWUnitTests_WebGUI_API.h"
 //---------------------------------------------------------------------------
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
@@ -40,12 +41,30 @@ namespace
 
 //---------------------------------------------------------------------------
 
+void CheckTestIndex(ASWUnitTests::TWebGUIState const& state, std::size_t index, char const* function);
 std::string ChecksText(ASWUnitTests::TGUITestList const& testList,
     std::vector<ASWUnitTests::TGUITreeNode> const& nodes);
 std::string ThemeChoiceName(ASWUnitTests::EGUITheme theme);
 void WriteCommandStates(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TGUICommandStates const& states);
+void WriteFailureRow(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state,
+    std::size_t index);
+void WriteLogLines(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUILog const& log, std::size_t from);
 void WriteStateMembers(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state);
+void WriteTestEventMembers(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state,
+    std::size_t index, char const* type);
 void WriteTreeMembers(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state);
+
+//---------------------------------------------------------------------------
+/*
+    CheckTestIndex
+
+    Throws std::logic_error, naming 'function', if 'index' isn't one of the state's tests.
+*/
+void CheckTestIndex(ASWUnitTests::TWebGUIState const& state, std::size_t index, char const* function)
+{
+    if (index >= state.TestList.Count())
+        throw std::logic_error(std::string(function) + ": " + std::to_string(index) + " isn't a test's index");
+}
 
 //---------------------------------------------------------------------------
 /*
@@ -132,6 +151,47 @@ void WriteCommandStates(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::T
 }
 //---------------------------------------------------------------------------
 /*
+    WriteFailureRow
+
+    The Failures & Skips row of the test at 'index', as an array: its id, its status's name, its full name and
+    the first line of its message, as the Win32 GUI runner's columns show them.
+*/
+void WriteFailureRow(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state,
+    std::size_t index)
+{
+    ASWUnitTests::TTestId const& test = state.TestList.Test(index);
+    ASWUnitTests::TGUITestResult const* const result = state.TestList.Result(index);
+
+    writer.BeginArray();
+    writer.String(ASWUnitTests::WebGUINodeId(ASWUnitTests::TGUINodeRef { index, ASWUnitTests::TGUINodeKind::Test }));
+    writer.String(ASWUnitTests::StatusName(state.TestList.Status(index)));
+    writer.String(test.GroupName + "." + test.TestName);
+    writer.String(result != nullptr ? ASWUnitTests::GUIFirstLine(result->Record.Message) : std::string());
+    writer.EndArray();
+}
+//---------------------------------------------------------------------------
+/*
+    WriteLogLines
+
+    The log's lines from 'from' on, as an array of [text, kind] arrays.
+*/
+void WriteLogLines(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUILog const& log, std::size_t from)
+{
+    std::vector<std::string> const& lines = log.Lines();
+    writer.BeginArray();
+
+    for (std::size_t i = from; i < lines.size(); ++i)
+    {
+        writer.BeginArray();
+        writer.String(lines[i]);
+        writer.UInt(static_cast<unsigned int>(ASWUnitTests::ClassifyGUILogLine(lines[i])));
+        writer.EndArray();
+    }
+
+    writer.EndArray();
+}
+//---------------------------------------------------------------------------
+/*
     WriteStateMembers
 
     The state event's members (see WebGUIStateEvent()), into the object 'writer' is writing.
@@ -184,6 +244,53 @@ void WriteStateMembers(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TW
     writer.String(ThemeChoiceName(state.Theme));
     writer.Key("dark");
     writer.String(state.DarkTheme);
+    writer.EndObject();
+}
+//---------------------------------------------------------------------------
+/*
+    WriteTestEventMembers
+
+    The started event's members (see WebGUITestStartedEvent()) for the test at 'index', with 'type' as the
+    event's type, into the object 'writer' is writing. The test's group and suites have nodes whenever it's
+    visible, since a group or suite gets one for any visible test.
+*/
+void WriteTestEventMembers(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state,
+    std::size_t index, char const* type)
+{
+    ASWUnitTests::TGUITestList const& testList = state.TestList;
+    std::vector<ASWUnitTests::TGUINodeRef> refs;
+
+    if (testList.IsVisible(index))
+    {
+        std::string const& groupName = testList.Test(index).GroupName;
+        std::vector<std::string> const& groupNames = testList.GroupNames();
+        std::size_t const group = static_cast<std::size_t>(std::find(groupNames.begin(), groupNames.end(),
+            groupName) - groupNames.begin());
+
+        refs.push_back(ASWUnitTests::TGUINodeRef { index, ASWUnitTests::TGUINodeKind::Test });
+        refs.push_back(ASWUnitTests::TGUINodeRef { group, ASWUnitTests::TGUINodeKind::Group });
+
+        for (std::string suite = testList.GroupSuitePath(groupName); !suite.empty();
+             suite = ASWUnitTests::ParentSuitePath(suite))
+        {
+            refs.push_back(ASWUnitTests::TGUINodeRef { testList.SuiteIndexOf(suite).value(),
+                                                       ASWUnitTests::TGUINodeKind::Suite });
+        }
+    }
+
+    writer.Key("type");
+    writer.String(type);
+    writer.Key("test");
+    writer.String(ASWUnitTests::WebGUINodeId(ASWUnitTests::TGUINodeRef { index, ASWUnitTests::TGUINodeKind::Test }));
+    writer.Key("nodes");
+    writer.BeginObject();
+
+    for (ASWUnitTests::TGUINodeRef const& ref : refs)
+    {
+        writer.Key(ASWUnitTests::WebGUINodeId(ref));
+        writer.UInt(static_cast<unsigned int>(ASWUnitTests::GUINodeStatus(testList, ref)));
+    }
+
     writer.EndObject();
 }
 //---------------------------------------------------------------------------
@@ -282,6 +389,23 @@ std::string WebGUIDetailJSON(TWebGUIState const& state, TGUINodeRef const& ref)
     return writer.Text();
 }
 //---------------------------------------------------------------------------
+std::string WebGUILogEvent(TWebGUIState const& state, std::size_t from)
+{
+    if (from > state.Log.Lines().size())
+        throw std::logic_error("WebGUILogEvent: line " + std::to_string(from) + " is past the log's end");
+
+    TWebGUIJSONWriter writer;
+    writer.BeginObject();
+    writer.Key("type");
+    writer.String("log");
+    writer.Key("from");
+    writer.UInt(from);
+    writer.Key("lines");
+    WriteLogLines(writer, state.Log, from);
+    writer.EndObject();
+    return writer.Text();
+}
+//---------------------------------------------------------------------------
 std::string WebGUINodeId(TGUINodeRef const& ref)
 {
     char const letter = ref.Kind == TGUINodeKind::Suite ? 's' : ref.Kind == TGUINodeKind::Group ? 'g' : 't';
@@ -298,25 +422,16 @@ std::string WebGUISnapshotEvent(TWebGUIState const& state)
     writer.String(GUICaption(state.ProjectName));
     WriteTreeMembers(writer, state);
     WriteStateMembers(writer, state);
+    writer.Key("log");
+    WriteLogLines(writer, state.Log, 0);
 
     writer.Key("failures");
     writer.BeginArray();
 
     for (std::size_t const index : state.FailureOrder)
     {
-        if (index >= state.TestList.Count())
-            throw std::logic_error("WebGUISnapshotEvent: FailureOrder has " + std::to_string(index) +
-                ", which isn't a test's index");
-
-        TTestId const& test = state.TestList.Test(index);
-        TGUITestResult const* const result = state.TestList.Result(index);
-
-        writer.BeginArray();
-        writer.String(WebGUINodeId(TGUINodeRef { index, TGUINodeKind::Test }));
-        writer.String(StatusName(state.TestList.Status(index)));
-        writer.String(test.GroupName + "." + test.TestName);
-        writer.String(result != nullptr ? GUIFirstLine(result->Record.Message) : std::string());
-        writer.EndArray();
+        CheckTestIndex(state, index, "WebGUISnapshotEvent");
+        WriteFailureRow(writer, state, index);
     }
 
     writer.EndArray();
@@ -335,6 +450,36 @@ std::string WebGUIStateEvent(TWebGUIState const& state)
     return writer.Text();
 }
 //---------------------------------------------------------------------------
+std::string WebGUITestFinishedEvent(TWebGUIState const& state, std::size_t index)
+{
+    CheckTestIndex(state, index, "WebGUITestFinishedEvent");
+
+    TGUITestStatus const status = state.TestList.Status(index);
+    TWebGUIJSONWriter writer;
+    writer.BeginObject();
+    WriteTestEventMembers(writer, state, index, "finished");
+
+    if (status == TGUITestStatus::Failed || status == TGUITestStatus::Skipped)
+    {
+        writer.Key("failure");
+        WriteFailureRow(writer, state, index);
+    }
+
+    writer.EndObject();
+    return writer.Text();
+}
+//---------------------------------------------------------------------------
+std::string WebGUITestStartedEvent(TWebGUIState const& state, std::size_t index)
+{
+    CheckTestIndex(state, index, "WebGUITestStartedEvent");
+
+    TWebGUIJSONWriter writer;
+    writer.BeginObject();
+    WriteTestEventMembers(writer, state, index, "started");
+    writer.EndObject();
+    return writer.Text();
+}
+//---------------------------------------------------------------------------
 std::string WebGUITreeEvent(TWebGUIState const& state)
 {
     TWebGUIJSONWriter writer;
@@ -344,6 +489,67 @@ std::string WebGUITreeEvent(TWebGUIState const& state)
     WriteTreeMembers(writer, state);
     writer.EndObject();
     return writer.Text();
+}
+//---------------------------------------------------------------------------
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TWebGUILog
+/////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------------------------------------------------
+TWebGUILog::TWebGUILog()
+    : m_LastLineOpen(false)
+{
+}
+//---------------------------------------------------------------------------
+void TWebGUILog::Append(std::string const& text)
+{
+    if (text.empty())
+        return;
+
+    std::size_t const first = m_LastLineOpen ? m_Lines.size() - 1 : m_Lines.size();
+
+    if (!m_FirstUnsentLine.has_value() || first < *m_FirstUnsentLine)
+        m_FirstUnsentLine = first;
+
+    std::size_t start = 0;
+
+    while (start < text.size())
+    {
+        std::size_t const end = text.find('\n', start);
+        std::string const piece = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+
+        if (m_LastLineOpen)
+            m_Lines.back() += piece;
+        else
+            m_Lines.push_back(piece);
+
+        m_LastLineOpen = end == std::string::npos;
+        start = end == std::string::npos ? text.size() : end + 1;
+    }
+}
+//---------------------------------------------------------------------------
+void TWebGUILog::Clear()
+{
+    m_Lines.clear();
+    m_LastLineOpen = false;
+    m_FirstUnsentLine = 0;
+}
+//---------------------------------------------------------------------------
+std::optional<std::size_t> TWebGUILog::FirstUnsentLine() const
+{
+    return m_FirstUnsentLine;
+}
+//---------------------------------------------------------------------------
+std::vector<std::string> const& TWebGUILog::Lines() const
+{
+    return m_Lines;
+}
+//---------------------------------------------------------------------------
+void TWebGUILog::MarkSent()
+{
+    m_FirstUnsentLine.reset();
 }
 //---------------------------------------------------------------------------
 

@@ -57,8 +57,9 @@ std::string const RunningCommands = "{\"About\":false,\"CollapseAll\":true,\"Com
 
 //---------------------------------------------------------------------------
 
+std::string DescribeLog(ASWUnitTests::TWebGUILog const& log);
 std::string ExpectedSnapshot(ASWUnitTests::TWebGUIState const& state, std::string const& projectName,
-    std::string const& failures);
+    std::string const& log, std::string const& failures);
 std::vector<ASWUnitTests::TTestId> FixtureTests();
 std::string JSONStrings(std::vector<std::string> const& texts);
 ASWUnitTests::TWebGUIState RunState();
@@ -66,13 +67,29 @@ unsigned int SevenSeed();
 
 //---------------------------------------------------------------------------
 /*
+    DescribeLog
+
+    The log's lines joined by '|', then " @" and its first unsent line, or "-" for none, e.g. "a|b @1".
+*/
+std::string DescribeLog(ASWUnitTests::TWebGUILog const& log)
+{
+    std::string text;
+
+    for (std::string const& line : log.Lines())
+        text += (&line == &log.Lines().front() ? "" : "|") + line;
+
+    std::optional<std::size_t> const unsent = log.FirstUnsentLine();
+    return text + " @" + (unsent.has_value() ? std::to_string(*unsent) : std::string("-"));
+}
+//---------------------------------------------------------------------------
+/*
     ExpectedSnapshot
 
     The snapshot 'state' should give: its type, the caption for 'projectName', the tree event's members and the
-    state event's (each tested on its own), and 'failures', the rows' JSON array.
+    state event's (each tested on its own), and 'log' and 'failures', the lines' and the rows' JSON arrays.
 */
 std::string ExpectedSnapshot(ASWUnitTests::TWebGUIState const& state, std::string const& projectName,
-    std::string const& failures)
+    std::string const& log, std::string const& failures)
 {
     std::string const tree = ASWUnitTests::WebGUITreeEvent(state);
     std::string const stateEvent = ASWUnitTests::WebGUIStateEvent(state);
@@ -81,7 +98,8 @@ std::string ExpectedSnapshot(ASWUnitTests::TWebGUIState const& state, std::strin
 
     return "{\"type\":\"snapshot\",\"caption\":" + ASWUnitTests::WebGUIJSONString(ASWUnitTests::GUICaption(
         projectName)) + "," + tree.substr(treeStart, tree.size() - treeStart - 1) + "," +
-        stateEvent.substr(stateStart, stateEvent.size() - stateStart - 1) + ",\"failures\":" + failures + "}";
+        stateEvent.substr(stateStart, stateEvent.size() - stateStart - 1) + ",\"log\":" + log + ",\"failures\":" +
+        failures + "}";
 }
 //---------------------------------------------------------------------------
 /*
@@ -116,7 +134,8 @@ std::string JSONStrings(std::vector<std::string> const& texts)
     RunState
 
     FixtureTests() partway through a run of 4 tests, 1.5 s in: t0 running, t1 passed, t3 skipped, then t2
-    failed; t2 and t3 unchecked; shuffled with seed 42; the Dark theme, with dark theme "Nord"; project "Demo".
+    failed; t2 and t3 unchecked; three log lines, a failure's among them, the last one unfinished; shuffled with
+    seed 42; the Dark theme, with dark theme "Nord"; project "Demo".
 */
 ASWUnitTests::TWebGUIState RunState()
 {
@@ -132,6 +151,7 @@ ASWUnitTests::TWebGUIState RunState()
     state.TestList.SetChecked(2, false);
     state.TestList.SetChecked(3, false);
     state.FailureOrder = { 3, 2 };
+    state.Log.Append("Starting\n***Test failed in Thr" "\xC3\xA9" "e\nStill runn");
     state.ElapsedSeconds = 1.5;
     state.ProjectName = "Demo";
     state.RunFinishedCount = 3;
@@ -175,9 +195,14 @@ TTest_ASWUnitTests_WebGUI_API::TTest_ASWUnitTests_WebGUI_API()
         "CommandStates_AsIfANodeWereSelected");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_DetailAndNodeIds_NameEachNode,
         "DetailAndNodeIds_NameEachNode");
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_Log_AppendKeepsWholeLines, "Log_AppendKeepsWholeLines");
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_Log_EventSendsLinesFromAnIndex,
+        "Log_EventSendsLinesFromAnIndex");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_SnapshotEvent_HoldsEverything, "SnapshotEvent_HoldsEverything");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_StateEvent_CommandsPanelsProgressShuffleTheme,
         "StateEvent_CommandsPanelsProgressShuffleTheme");
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_TestEvents_StatusOfEachNodeTheTestChanges,
+        "TestEvents_StatusOfEachNodeTheTestChanges");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_TreeAndChecksEvents_FollowTheTestList,
         "TreeAndChecksEvents_FollowTheTestList");
 }
@@ -273,6 +298,109 @@ void TTest_ASWUnitTests_WebGUI_API::Test_DetailAndNodeIds_NameEachNode()
         "a failed test's detail has its whole message");
 }
 //---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_Log_AppendKeepsWholeLines()
+{
+    // Arrange
+    TWebGUILog log;
+    std::vector<std::string> steps;
+
+    // Act: each step's log, as DescribeLog() gives it.
+    steps.push_back(DescribeLog(log));
+    log.Append("");
+    steps.push_back(DescribeLog(log));
+    log.Append("a\nb");
+    steps.push_back(DescribeLog(log));
+    log.MarkSent();
+    steps.push_back(DescribeLog(log));
+    log.Append("c\n");
+    steps.push_back(DescribeLog(log));
+    log.Append("d");
+    steps.push_back(DescribeLog(log));
+    log.MarkSent();
+    log.Append("\n");
+    steps.push_back(DescribeLog(log));
+    log.Append("\n");
+    steps.push_back(DescribeLog(log));
+    log.MarkSent();
+    log.Append("e\n\nf\r\n");
+    steps.push_back(DescribeLog(log));
+    log.Clear();
+    steps.push_back(DescribeLog(log));
+    log.Append("x");
+    steps.push_back(DescribeLog(log));
+    log.MarkSent();
+    log.Clear();
+    log.MarkSent();
+    steps.push_back(DescribeLog(log));
+    log.Append("y");
+    steps.push_back(DescribeLog(log));
+
+    // Assert
+    std::string const expected[] = {
+        " @-",
+        " @-",
+        "a|b @0",
+        "a|b @-",
+        "a|bc @1",
+        "a|bc|d @1",
+        "a|bc|d @2",
+        "a|bc|d| @2",
+        "a|bc|d||e||f\r @4",
+        " @0",
+        "x @0",
+        " @-",
+        "y @0",
+    };
+    char const* const names[] = {
+        "a new log",
+        "empty text changes nothing",
+        "two lines, the second unfinished",
+        "sent",
+        "text continues the unfinished line, which ends",
+        "a new line after a finished one: the first unsent stays the earliest",
+        "a line break alone ends the unfinished line",
+        "another adds an empty line",
+        "several lines at once, empty ones kept, a CR kept",
+        "cleared: the page is sent the log from line 0",
+        "a line after clearing",
+        "cleared and sent: nothing unsent",
+        "cleared while a line was unfinished: text starts a new line",
+    };
+
+    for (std::size_t i = 0; i < steps.size(); ++i)
+        CheckEquals(expected[i], steps[i], __func__, __LINE__, names[i]);
+
+    CheckEquals(std::size_t(13), steps.size(), __func__, __LINE__, "every step checked");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_Log_EventSendsLinesFromAnIndex()
+{
+    // Arrange
+    TWebGUIState state;
+    state.Log.Append("Running G.T\n***Test failed: boom\n***Test skipped: why\nFinished test: \"G.T\" - fai");
+    std::string const before = WebGUILogEvent(state, 0);
+    std::string const unfinished = WebGUILogEvent(state, 3);
+
+    // Act
+    state.Log.Append("led (1 ms)\n");
+
+    // Assert
+    CheckEquals(std::string("{\"type\":\"log\",\"from\":0,\"lines\":[[\"Running G.T\",0],"
+        "[\"***Test failed: boom\",1],[\"***Test skipped: why\",2],[\"Finished test: \\\"G.T\\\" - fai\",0]]}"),
+        before, __func__, __LINE__, "every line with its kind: normal, failure, skip, and an unfinished line");
+    CheckEquals(std::string("{\"type\":\"log\",\"from\":3,\"lines\":[[\"Finished test: \\\"G.T\\\" - fai\",0]]}"),
+        unfinished, __func__, __LINE__, "from an index");
+    CheckEquals(std::string("{\"type\":\"log\",\"from\":3,\"lines\":"
+        "[[\"Finished test: \\\"G.T\\\" - failed (1 ms)\",1]]}"), WebGUILogEvent(state, 3), __func__, __LINE__,
+        "the line, finished, sent whole again: a failure now");
+    CheckEquals(std::string("{\"type\":\"log\",\"from\":4,\"lines\":[]}"), WebGUILogEvent(state, 4), __func__,
+        __LINE__, "from the end: no lines, as after Clear()");
+    CheckThrows<std::logic_error>([&state]
+        {
+            WebGUILogEvent(state, 5);
+        }, __func__, __LINE__, "past the end", "past the log's end");
+}
+//---------------------------------------------------------------------------
 void TTest_ASWUnitTests_WebGUI_API::Test_SnapshotEvent_HoldsEverything()
 {
     // Arrange
@@ -288,10 +416,11 @@ void TTest_ASWUnitTests_WebGUI_API::Test_SnapshotEvent_HoldsEverything()
     std::string const snapshot = WebGUISnapshotEvent(state);
 
     // Assert
-    CheckEquals(ExpectedSnapshot(state, "Demo", "[[\"t3\",\"Skipped\",\"Other.Mid.Bad" "\xEF\xBF\xBD" "\","
-        "\"not here\"],[\"t2\",\"Failed\",\"Outer.Inner.Deep.Thr" "\xC3\xA9" "e\",\"line one\"]]"), snapshot,
-        __func__, __LINE__, "the caption, the tree, the state, and the failures in the order they finished");
-    CheckEquals(ExpectedSnapshot(fresh, "ASWUnitTests", "[]"), WebGUISnapshotEvent(fresh), __func__, __LINE__,
+    CheckEquals(ExpectedSnapshot(state, "Demo", "[[\"Starting\",0],[\"***Test failed in Thr" "\xC3\xA9" "e\",1],"
+        "[\"Still runn\",0]]", "[[\"t3\",\"Skipped\",\"Other.Mid.Bad" "\xEF\xBF\xBD" "\",\"not here\"],"
+        "[\"t2\",\"Failed\",\"Outer.Inner.Deep.Thr" "\xC3\xA9" "e\",\"line one\"]]"), snapshot, __func__, __LINE__,
+        "the caption, the tree, the state, every log line, and the failures in the order they finished");
+    CheckEquals(ExpectedSnapshot(fresh, "ASWUnitTests", "[]", "[]"), WebGUISnapshotEvent(fresh), __func__, __LINE__,
         "a new state: no tests, no failures, the default project");
     CheckThrows<std::logic_error>([&broken]
         {
@@ -328,6 +457,46 @@ void TTest_ASWUnitTests_WebGUI_API::Test_StateEvent_CommandsPanelsProgressShuffl
         __LINE__, "the Light theme");
     CheckEquals(std::string("Shuffle: seed 42"), running.Shuffle.StatusText(), __func__, __LINE__,
         "the shuffle panel's text the expectation uses");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_TestEvents_StatusOfEachNodeTheTestChanges()
+{
+    // Arrange
+    TWebGUIState const state = RunState();
+
+    TWebGUIState starting;
+    starting.TestList.Load(FixtureTests());
+    starting.TestList.SetStatus(2, TGUITestStatus::Running);
+
+    TWebGUIState filtered = RunState();
+    filtered.TestList.SetVisibleFilter(GUIFilterBoxFilter("two"));
+
+    std::string const failedRow = "[\"t2\",\"Failed\",\"Outer.Inner.Deep.Thr" "\xC3\xA9" "e\",\"line one\"]";
+
+    // Act, Assert
+    CheckEquals(std::string("{\"type\":\"started\",\"test\":\"t0\",\"nodes\":{\"t0\":1,\"g0\":1}}"),
+        WebGUITestStartedEvent(state, 0), __func__, __LINE__, "a top-level group's test: itself and its group");
+    CheckEquals(std::string("{\"type\":\"started\",\"test\":\"t2\",\"nodes\":{\"t2\":1,\"g1\":1,\"s1\":1,\"s0\":1}}"),
+        WebGUITestStartedEvent(starting, 2), __func__, __LINE__, "a nested suite's test: its suites, innermost first");
+    CheckEquals(std::string("{\"type\":\"finished\",\"test\":\"t1\",\"nodes\":{\"t1\":2,\"g1\":3,\"s1\":3,\"s0\":3}}"),
+        WebGUITestFinishedEvent(state, 1), __func__, __LINE__, "passed: no failure row; the group's status as it is");
+    CheckEquals("{\"type\":\"finished\",\"test\":\"t2\",\"nodes\":{\"t2\":3,\"g1\":3,\"s1\":3,\"s0\":3},\"failure\":" +
+        failedRow + "}", WebGUITestFinishedEvent(state, 2), __func__, __LINE__, "failed: its row");
+    CheckEquals(std::string("{\"type\":\"finished\",\"test\":\"t3\",\"nodes\":{\"t3\":4,\"g2\":4,\"s2\":4},"
+        "\"failure\":[\"t3\",\"Skipped\",\"Other.Mid.Bad" "\xEF\xBF\xBD" "\",\"not here\"]}"),
+        WebGUITestFinishedEvent(state, 3), __func__, __LINE__, "skipped: its row");
+    CheckEquals(std::string("{\"type\":\"started\",\"test\":\"t0\",\"nodes\":{}}"), WebGUITestStartedEvent(filtered, 0),
+        __func__, __LINE__, "hidden by the filter box: no node changes");
+    CheckEquals("{\"type\":\"finished\",\"test\":\"t2\",\"nodes\":{},\"failure\":" + failedRow + "}",
+        WebGUITestFinishedEvent(filtered, 2), __func__, __LINE__, "hidden: still in the Failures & Skips list");
+    CheckThrows<std::logic_error>([&state]
+        {
+            WebGUITestStartedEvent(state, 4);
+        }, __func__, __LINE__, "started: not a test", "isn't a test's index");
+    CheckThrows<std::logic_error>([&state]
+        {
+            WebGUITestFinishedEvent(state, 4);
+        }, __func__, __LINE__, "finished: not a test", "isn't a test's index");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_WebGUI_API::Test_TreeAndChecksEvents_FollowTheTestList()

@@ -47,6 +47,44 @@ namespace ASWUnitTests
 {
 
 /////////////////////////////////////////////////////////////////////////////
+// TWebGUILog
+//
+// The Web GUI runner's log, as whole lines, so each line's kind
+// (ClassifyGUILogLine()) is that of all its text: log text arrives in
+// pieces that needn't end with a line break, and a piece that continues
+// the last line changes that line, which is then sent again whole. It
+// keeps where the lines not yet sent to the page start, so each flush sends
+// one log event for all of them (see WebGUILogEvent()). Nothing is dropped,
+// as in the other GUI runners.
+/////////////////////////////////////////////////////////////////////////////
+class TWebGUILog
+{
+private:
+    // The first line changed since MarkSent(); empty if none was.
+    std::optional<std::size_t> m_FirstUnsentLine;
+    // Whether the last line has no line break yet, so the next text continues it.
+    bool m_LastLineOpen;
+    // The lines, without their line breaks.
+    std::vector<std::string> m_Lines;
+
+public:
+    TWebGUILog();
+
+    // Adds 'text', in which each '\n' ends a line; text after the last one starts a line, or continues the
+    // last one if it had no line break yet, which the next text continues.
+    void Append(std::string const& text);
+    // Removes every line, e.g. at the start of a run; the page is then sent the log from line 0.
+    void Clear();
+    // The first line that changed (was added, continued or ended) or, after Clear(), 0, since MarkSent();
+    // empty if nothing changed.
+    std::optional<std::size_t> FirstUnsentLine() const;
+    std::vector<std::string> const& Lines() const;
+    // Records that the page was sent every line, after a flush.
+    void MarkSent();
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
 // TWebGUIState
 //
 // What the Web GUI runner shows, beyond each tab's own selection, expanded
@@ -68,6 +106,7 @@ struct TWebGUIState
     std::string FilterText;
     // Whether a finished run's JUnit report can be exported.
     bool HasReport = false;
+    TWebGUILog Log;
     // --project-name's name, for the caption.
     std::string ProjectName = TCLIOptions().ProjectName;
     // Whether a run has ended with a test that timed out or crashed, after which no further run can start.
@@ -96,13 +135,19 @@ TGUICommandStates WebGUICommandStates(TWebGUIState const& state);
 // The answer to the page's request for a node's detail text: {"node":"<id>","text":"..."}, the text being
 // GUINodeDetailText()'s. 'ref' must be a node of the state's test list.
 std::string WebGUIDetailJSON(TWebGUIState const& state, TGUINodeRef const& ref);
+// The "log" event, sent when the log changed: {"type":"log","from":<from>,"lines":[[text, kind], ...]}, the log's
+// lines from index 'from' on, each with its TGUILogLineKind's value. The page drops its lines from 'from' on and
+// adds these, so sending a line twice changes nothing, and after Clear() 'from' is 0. Throws std::logic_error if
+// 'from' is past the log's end.
+std::string WebGUILogEvent(TWebGUIState const& state, std::size_t from);
 // A node's id in the page's JSON: its kind's letter ('s', 'g' or 't') and its index, e.g. "g3", so it stays
 // the same while the test list does, whatever the filter box hides.
 std::string WebGUINodeId(TGUINodeRef const& ref);
 // The first event of every event stream, with all the page shows: {"type":"snapshot",...} with the caption,
-// the tree event's members, the state event's members, and "failures", the Failures & Skips list's rows, in
-// FailureOrder's order, each [id, status name, "Group.Test", the first line of its message]. Throws
-// std::logic_error if FailureOrder has an index that isn't a test's, which would be a bug in the server.
+// the tree event's members, the state event's members, "log", every line of the log as the log event writes
+// them, and "failures", the Failures & Skips list's rows, in FailureOrder's order, each [id, status name,
+// "Group.Test", the first line of its message]. Throws std::logic_error if FailureOrder has an index that
+// isn't a test's, which would be a bug in the server.
 std::string WebGUISnapshotEvent(TWebGUIState const& state);
 // The "state" event, sent whenever anything changed: {"type":"state",...} with "commands" (each of
 // WebGUICommandStates()' flags, named as TGUICommandStates' members), "panels" (GUIStatusPanels()' texts),
@@ -110,6 +155,15 @@ std::string WebGUISnapshotEvent(TWebGUIState const& state);
 // "shuffle" ("enabled", "fixedSeed" or null, and "seedToShow", Shuffle Seed...'s offer) and "theme"
 // ("choice", "Windows", "Light" or "Dark", and "dark", the dark theme's name).
 std::string WebGUIStateEvent(TWebGUIState const& state);
+// The "finished" event, sent when the test at 'index' finished: the started event's members, as they are now,
+// and, if it failed or was skipped, "failure", its Failures & Skips row as the snapshot writes it. Throws
+// std::logic_error if 'index' isn't a test's.
+std::string WebGUITestFinishedEvent(TWebGUIState const& state, std::size_t index);
+// The "started" event, sent when the test at 'index' started: {"type":"started","test":"<id>","nodes":{...}},
+// "nodes" giving the status of each node the test's status changes, by id: its own, its group's and its suites',
+// innermost first; none while the filter box hides it, since a group's or suite's status is that of its visible
+// tests. Throws std::logic_error if 'index' isn't a test's.
+std::string WebGUITestStartedEvent(TWebGUIState const& state, std::size_t index);
 // The "tree" event, sent after the filter box changes: {"type":"tree",...} with "filter", the filter box's
 // text, "nodes", BuildGUITree()'s nodes in order, each {"id","parent","text"} ("parent" being null for a
 // top-level node), and "statuses" and "checks", one digit per node in the same order, each its
