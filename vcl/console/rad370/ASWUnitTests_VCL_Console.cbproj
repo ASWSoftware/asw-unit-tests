@@ -383,6 +383,10 @@
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_JSON.h</DependentOn>
             <BuildOrder>59</BuildOrder>
         </CppCompile>
+        <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_Security.cpp">
+            <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_Security.h</DependentOn>
+            <BuildOrder>65</BuildOrder>
+        </CppCompile>
         <CppCompile Include="..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.cpp">
             <DependentOn>..\..\..\web\gui\src\ASWUnitTests_WebGUI_SSE.h</DependentOn>
             <BuildOrder>63</BuildOrder>
@@ -394,6 +398,10 @@
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_JSON.h</DependentOn>
             <BuildOrder>60</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_Security.cpp">
+            <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_Security.h</DependentOn>
+            <BuildOrder>66</BuildOrder>
         </CppCompile>
         <CppCompile Include="..\..\..\web\tests\Test_ASWUnitTests_WebGUI_SSE.cpp">
             <DependentOn>..\..\..\web\tests\Test_ASWUnitTests_WebGUI_SSE.h</DependentOn>

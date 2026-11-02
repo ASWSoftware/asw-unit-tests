@@ -351,6 +351,10 @@ call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.cpp" "web\gui\src\ASWUnitTe
 if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_JSON.h" "web\gui\src\ASWUnitTests_WebGUI_JSON.h"
 if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_Security.cpp" "web\gui\src\ASWUnitTests_WebGUI_Security.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_Security.h" "web\gui\src\ASWUnitTests_WebGUI_Security.h"
+if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake" "web\gui\src\ASWUnitTests_WebGUI_Sources.cmake"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\gui\src\ASWUnitTests_WebGUI_SSE.cpp" "web\gui\src\ASWUnitTests_WebGUI_SSE.cpp"
@@ -364,6 +368,10 @@ if errorlevel 1 exit /b 1
 call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp" "web\tests\Test_ASWUnitTests_WebGUI_JSON.cpp"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_JSON.h" "web\tests\Test_ASWUnitTests_WebGUI_JSON.h"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_Security.cpp" "web\tests\Test_ASWUnitTests_WebGUI_Security.cpp"
+if errorlevel 1 exit /b 1
+call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_Security.h" "web\tests\Test_ASWUnitTests_WebGUI_Security.h"
 if errorlevel 1 exit /b 1
 call :CopyFile "web\tests\Test_ASWUnitTests_WebGUI_SSE.cpp" "web\tests\Test_ASWUnitTests_WebGUI_SSE.cpp"
 if errorlevel 1 exit /b 1
