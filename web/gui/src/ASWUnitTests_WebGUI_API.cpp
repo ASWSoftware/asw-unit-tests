@@ -26,6 +26,7 @@ limitations under the License.
 //---------------------------------------------------------------------------
 #include <algorithm>
 #include <cstddef>
+#include <initializer_list>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -39,11 +40,29 @@ limitations under the License.
 namespace
 {
 
+/////////////////////////////////////////////////////////////////////////////
+// TCommandInfo
+//
+// A command the page sends: its kind, its name and the form fields it takes
+// besides "command".
+/////////////////////////////////////////////////////////////////////////////
+struct TCommandInfo
+{
+    // The fields' names, nullptr where it takes fewer than two.
+    char const* Fields[2];
+    ASWUnitTests::EWebGUICommand Kind;
+    char const* Name;
+};
+
 //---------------------------------------------------------------------------
 
 void CheckTestIndex(ASWUnitTests::TWebGUIState const& state, std::size_t index, char const* function);
 std::string ChecksText(ASWUnitTests::TGUITestList const& testList,
     std::vector<ASWUnitTests::TGUITreeNode> const& nodes);
+std::vector<TCommandInfo> const& CommandInfos();
+std::nullopt_t Fail(std::string& error, std::string const& message);
+std::string const* FindField(std::vector<ASWUnitTests::TWebGUIField> const& fields, std::string const& name);
+bool ParseFlag(std::string const& text, bool& value);
 std::string ThemeChoiceName(ASWUnitTests::EGUITheme theme);
 void WriteCommandStates(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TGUICommandStates const& states);
 void WriteFailureRow(ASWUnitTests::TWebGUIJSONWriter& writer, ASWUnitTests::TWebGUIState const& state,
@@ -65,7 +84,6 @@ void CheckTestIndex(ASWUnitTests::TWebGUIState const& state, std::size_t index, 
     if (index >= state.TestList.Count())
         throw std::logic_error(std::string(function) + ": " + std::to_string(index) + " isn't a test's index");
 }
-
 //---------------------------------------------------------------------------
 /*
     ChecksText
@@ -82,6 +100,76 @@ std::string ChecksText(ASWUnitTests::TGUITestList const& testList,
         text += static_cast<char>('0' + static_cast<int>(ASWUnitTests::GUINodeCheckState(testList, node.Ref)));
 
     return text;
+}
+//---------------------------------------------------------------------------
+/*
+    CommandInfos
+
+    Every command the page sends, in EWebGUICommand's order.
+*/
+std::vector<TCommandInfo> const& CommandInfos()
+{
+    static std::vector<TCommandInfo> const infos = {
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::CopyDetails, "CopyDetails" },
+        { { "name", nullptr }, ASWUnitTests::EWebGUICommand::DarkTheme, "DarkTheme" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::Exit, "Exit" },
+        { { "text", nullptr }, ASWUnitTests::EWebGUICommand::Filter, "Filter" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::ResetLayout, "ResetLayout" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::RunFailed, "RunFailed" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::RunSelected, "RunSelected" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::SelectAll, "SelectAll" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::SelectFailed, "SelectFailed" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::SelectNone, "SelectNone" },
+        { { "node", "checked" }, ASWUnitTests::EWebGUICommand::SetChecked, "SetChecked" },
+        { { "enabled", nullptr }, ASWUnitTests::EWebGUICommand::ShuffleOrder, "ShuffleOrder" },
+        { { "newSeedEachRun", "seed" }, ASWUnitTests::EWebGUICommand::ShuffleSeed, "ShuffleSeed" },
+        { { nullptr, nullptr }, ASWUnitTests::EWebGUICommand::Stop, "Stop" },
+        { { "theme", nullptr }, ASWUnitTests::EWebGUICommand::Theme, "Theme" },
+    };
+
+    return infos;
+}
+//---------------------------------------------------------------------------
+/*
+    Fail
+
+    Sets 'error' to 'message' and returns std::nullopt, for ParseWebGUICommand() to return.
+*/
+std::nullopt_t Fail(std::string& error, std::string const& message)
+{
+    error = message;
+    return std::nullopt;
+}
+//---------------------------------------------------------------------------
+/*
+    FindField
+
+    The value of the field named 'name', or nullptr if there's none.
+*/
+std::string const* FindField(std::vector<ASWUnitTests::TWebGUIField> const& fields, std::string const& name)
+{
+    for (ASWUnitTests::TWebGUIField const& field : fields)
+    {
+        if (field.Name == name)
+            return &field.Value;
+    }
+
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+/*
+    ParseFlag
+
+    Whether 'text' is "1" or "0", as the page sends a check box's state, setting 'value' to which. Not a
+    std::optional<bool>, which RAD Studio's 32-bit compiler can't construct from a bool.
+*/
+bool ParseFlag(std::string const& text, bool& value)
+{
+    if (text != "1" && text != "0")
+        return false;
+
+    value = text == "1";
+    return true;
 }
 //---------------------------------------------------------------------------
 /*
@@ -347,6 +435,224 @@ namespace ASWUnitTests
 {
 
 //---------------------------------------------------------------------------
+bool IsWebGUICommandEnabled(TGUICommandStates const& states, EWebGUICommand command)
+{
+    switch (command)
+    {
+        case EWebGUICommand::CopyDetails:
+            return states.CopyDetails;
+
+        case EWebGUICommand::DarkTheme:
+        case EWebGUICommand::Theme:
+            return states.Theme;
+
+        case EWebGUICommand::Exit:
+            return states.Exit;
+
+        case EWebGUICommand::Filter:
+            return states.FilterBox;
+
+        case EWebGUICommand::ResetLayout:
+            return states.ResetLayout;
+
+        case EWebGUICommand::RunFailed:
+            return states.RunFailed;
+
+        case EWebGUICommand::RunSelected:
+            return states.RunSelected;
+
+        case EWebGUICommand::SelectAll:
+        case EWebGUICommand::SetChecked:
+            return states.SelectAll;
+
+        case EWebGUICommand::SelectFailed:
+            return states.SelectFailed;
+
+        case EWebGUICommand::SelectNone:
+            return states.SelectNone;
+
+        case EWebGUICommand::ShuffleOrder:
+            return states.ShuffleOrder;
+
+        case EWebGUICommand::ShuffleSeed:
+            return states.ShuffleSeed;
+
+        case EWebGUICommand::Stop:
+            return states.Stop;
+    }
+
+    return false;
+}
+//---------------------------------------------------------------------------
+/*
+    ParseWebGUICommand
+
+    Strict, so a mistake in the page shows at once: every field a command takes is required, and no other may
+    come with it.
+*/
+std::optional<TWebGUICommand> ParseWebGUICommand(std::vector<TWebGUIField> const& fields,
+    TWebGUIState const& state, std::string& error)
+{
+    for (std::size_t i = 0; i < fields.size(); ++i)
+    {
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            if (fields[j].Name == fields[i].Name)
+                return Fail(error, "\"" + fields[i].Name + "\" given twice");
+        }
+    }
+
+    std::string const* const name = FindField(fields, "command");
+
+    if (name == nullptr)
+        return Fail(error, "no \"command\" field");
+
+    TCommandInfo const* info = nullptr;
+
+    for (TCommandInfo const& candidate : CommandInfos())
+    {
+        if (*name == candidate.Name)
+            info = &candidate;
+    }
+
+    if (info == nullptr)
+        return Fail(error, "unknown command \"" + *name + "\"");
+
+    for (TWebGUIField const& field : fields)
+    {
+        bool const taken = field.Name == "command" || (info->Fields[0] != nullptr && field.Name == info->Fields[0]) ||
+            (info->Fields[1] != nullptr && field.Name == info->Fields[1]);
+
+        if (!taken)
+            return Fail(error, *name + " has no \"" + field.Name + "\" field");
+    }
+
+    for (char const* const fieldName : info->Fields)
+    {
+        if (fieldName != nullptr && FindField(fields, fieldName) == nullptr)
+            return Fail(error, *name + " needs a \"" + fieldName + "\" field");
+    }
+
+    TWebGUICommand command;
+    command.Kind = info->Kind;
+
+    switch (info->Kind)
+    {
+        case EWebGUICommand::DarkTheme:
+            command.Text = *FindField(fields, "name");
+
+            if (command.Text.empty())
+                return Fail(error, "DarkTheme's \"name\" is empty");
+
+            break;
+
+        case EWebGUICommand::Filter:
+            command.Text = *FindField(fields, "text");
+            break;
+
+        case EWebGUICommand::SetChecked:
+        {
+            std::string const& nodeId = *FindField(fields, "node");
+            std::optional<TGUINodeRef> const node = ParseWebGUINodeId(nodeId, state);
+
+            if (!node.has_value())
+                return Fail(error, "\"node\" isn't a node: \"" + nodeId + "\"");
+
+            if (!ParseFlag(*FindField(fields, "checked"), command.Checked))
+                return Fail(error, "\"checked\" isn't 0 or 1");
+
+            command.Node = *node;
+            break;
+        }
+
+        case EWebGUICommand::ShuffleOrder:
+            if (!ParseFlag(*FindField(fields, "enabled"), command.Enabled))
+                return Fail(error, "\"enabled\" isn't 0 or 1");
+
+            break;
+
+        case EWebGUICommand::ShuffleSeed:
+            if (!ParseFlag(*FindField(fields, "newSeedEachRun"), command.NewSeedEachRun))
+                return Fail(error, "\"newSeedEachRun\" isn't 0 or 1");
+
+            command.Text = *FindField(fields, "seed");
+            break;
+
+        case EWebGUICommand::Theme:
+        {
+            std::string const& theme = *FindField(fields, "theme");
+            bool found = false;
+
+            for (EGUITheme const candidate : { EGUITheme::Windows, EGUITheme::Light, EGUITheme::Dark })
+            {
+                if (theme == ThemeChoiceName(candidate))
+                {
+                    command.Theme = candidate;
+                    found = true;
+                }
+            }
+
+            if (!found)
+                return Fail(error, "\"theme\" isn't Windows, Light or Dark");
+
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    return command;
+}
+//---------------------------------------------------------------------------
+/*
+    ParseWebGUINodeId
+
+    The index stops growing as soon as it reaches the count, so a long number can't overflow.
+*/
+std::optional<TGUINodeRef> ParseWebGUINodeId(std::string const& id, TWebGUIState const& state)
+{
+    if (id.size() < 2 || (id[1] == '0' && id.size() > 2))
+        return std::nullopt;
+
+    TGUINodeRef ref;
+    std::size_t count = 0;
+
+    switch (id[0])
+    {
+        case 's':
+            ref.Kind = TGUINodeKind::Suite;
+            count = state.TestList.SuitePaths().size();
+            break;
+
+        case 'g':
+            ref.Kind = TGUINodeKind::Group;
+            count = state.TestList.GroupNames().size();
+            break;
+
+        case 't':
+            ref.Kind = TGUINodeKind::Test;
+            count = state.TestList.Count();
+            break;
+
+        default:
+            return std::nullopt;
+    }
+
+    for (std::size_t i = 1; i < id.size(); ++i)
+    {
+        if (id[i] < '0' || id[i] > '9')
+            return std::nullopt;
+
+        ref.Index = ref.Index * 10 + static_cast<std::size_t>(id[i] - '0');
+
+        if (ref.Index >= count)
+            return std::nullopt;
+    }
+
+    return ref;
+}
+//---------------------------------------------------------------------------
 std::string WebGUIChecksEvent(TWebGUIState const& state)
 {
     TWebGUIJSONWriter writer;
@@ -357,6 +663,17 @@ std::string WebGUIChecksEvent(TWebGUIState const& state)
     writer.String(ChecksText(state.TestList, BuildGUITree(state.TestList)));
     writer.EndObject();
     return writer.Text();
+}
+//---------------------------------------------------------------------------
+std::string WebGUICommandName(EWebGUICommand command)
+{
+    for (TCommandInfo const& info : CommandInfos())
+    {
+        if (info.Kind == command)
+            return info.Name;
+    }
+
+    return std::string();
 }
 //---------------------------------------------------------------------------
 /*

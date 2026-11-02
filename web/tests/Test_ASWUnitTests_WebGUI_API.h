@@ -40,10 +40,13 @@ private:
     typedef TTestGroupBase inherited;
 
 private: // Test methods
+    void Test_CommandEnabled_FollowsTheCommandStates();
     void Test_CommandStates_AsIfANodeWereSelected();
     void Test_DetailAndNodeIds_NameEachNode();
     void Test_Log_AppendKeepsWholeLines();
     void Test_Log_EventSendsLinesFromAnIndex();
+    void Test_NodeIds_ParseOnlyTheListsNodes();
+    void Test_ParseCommand_EveryCommandAndItsFields();
     void Test_SnapshotEvent_HoldsEverything();
     void Test_StateEvent_CommandsPanelsProgressShuffleTheme();
     void Test_TestEvents_StatusOfEachNodeTheTestChanges();

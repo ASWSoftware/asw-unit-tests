@@ -43,6 +43,24 @@ namespace
 
 //---------------------------------------------------------------------------
 
+// Every command the page sends, in EWebGUICommand's order.
+ASWUnitTests::EWebGUICommand const AllCommands[] = {
+    ASWUnitTests::EWebGUICommand::CopyDetails,
+    ASWUnitTests::EWebGUICommand::DarkTheme,
+    ASWUnitTests::EWebGUICommand::Exit,
+    ASWUnitTests::EWebGUICommand::Filter,
+    ASWUnitTests::EWebGUICommand::ResetLayout,
+    ASWUnitTests::EWebGUICommand::RunFailed,
+    ASWUnitTests::EWebGUICommand::RunSelected,
+    ASWUnitTests::EWebGUICommand::SelectAll,
+    ASWUnitTests::EWebGUICommand::SelectFailed,
+    ASWUnitTests::EWebGUICommand::SelectNone,
+    ASWUnitTests::EWebGUICommand::SetChecked,
+    ASWUnitTests::EWebGUICommand::ShuffleOrder,
+    ASWUnitTests::EWebGUICommand::ShuffleSeed,
+    ASWUnitTests::EWebGUICommand::Stop,
+    ASWUnitTests::EWebGUICommand::Theme,
+};
 // The commands while idle, with no failure and no report, and during a run, as the state event writes them.
 std::string const IdleCommands = "{\"About\":true,\"CollapseAll\":true,\"CommandLineOptions\":true,"
     "\"CopyDetails\":true,\"Exit\":true,\"ExpandAll\":true,\"ExportJUnitReport\":false,\"FilterBox\":true,"
@@ -57,7 +75,9 @@ std::string const RunningCommands = "{\"About\":false,\"CollapseAll\":true,\"Com
 
 //---------------------------------------------------------------------------
 
+std::string DescribeCommand(std::string const& form, ASWUnitTests::TWebGUIState const& state);
 std::string DescribeLog(ASWUnitTests::TWebGUILog const& log);
+std::string EnabledCommands(ASWUnitTests::TGUICommandStates const& states);
 std::string ExpectedSnapshot(ASWUnitTests::TWebGUIState const& state, std::string const& projectName,
     std::string const& log, std::string const& failures);
 std::vector<ASWUnitTests::TTestId> FixtureTests();
@@ -65,6 +85,29 @@ std::string JSONStrings(std::vector<std::string> const& texts);
 ASWUnitTests::TWebGUIState RunState();
 unsigned int SevenSeed();
 
+//---------------------------------------------------------------------------
+/*
+    DescribeCommand
+
+    The command the form body 'form' gives, for comparing in one check: its name, then '|' and its flags
+    Checked, Enabled and NewSeedEachRun as digits, its node's id, its text and its theme's value, e.g.
+    "SetChecked|100|g1||0"; or "error: " and the error.
+*/
+std::string DescribeCommand(std::string const& form, ASWUnitTests::TWebGUIState const& state)
+{
+    std::optional<std::vector<ASWUnitTests::TWebGUIField> > const fields = ASWUnitTests::DecodeWebGUIForm(form);
+    std::string error;
+    std::optional<ASWUnitTests::TWebGUICommand> const command = ASWUnitTests::ParseWebGUICommand(fields.value(),
+        state, error);
+
+    if (!command.has_value())
+        return "error: " + error;
+
+    return ASWUnitTests::WebGUICommandName(command->Kind) + "|" + (command->Checked ? "1" : "0") +
+        (command->Enabled ? "1" : "0") + (command->NewSeedEachRun ? "1" : "0") + "|" +
+        ASWUnitTests::WebGUINodeId(command->Node) + "|" + command->Text + "|" +
+        std::to_string(static_cast<int>(command->Theme));
+}
 //---------------------------------------------------------------------------
 /*
     DescribeLog
@@ -80,6 +123,24 @@ std::string DescribeLog(ASWUnitTests::TWebGUILog const& log)
 
     std::optional<std::size_t> const unsent = log.FirstUnsentLine();
     return text + " @" + (unsent.has_value() ? std::to_string(*unsent) : std::string("-"));
+}
+//---------------------------------------------------------------------------
+/*
+    EnabledCommands
+
+    The names of the commands IsWebGUICommandEnabled() allows in 'states', separated by spaces.
+*/
+std::string EnabledCommands(ASWUnitTests::TGUICommandStates const& states)
+{
+    std::string names;
+
+    for (ASWUnitTests::EWebGUICommand const command : AllCommands)
+    {
+        if (ASWUnitTests::IsWebGUICommandEnabled(states, command))
+            names += (names.empty() ? "" : " ") + ASWUnitTests::WebGUICommandName(command);
+    }
+
+    return names;
 }
 //---------------------------------------------------------------------------
 /*
@@ -191,6 +252,8 @@ namespace ASWUnitTests
 TTest_ASWUnitTests_WebGUI_API::TTest_ASWUnitTests_WebGUI_API()
     : inherited("ASWUnitTests_WebGUI_API_Tests")
 {
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_CommandEnabled_FollowsTheCommandStates,
+        "CommandEnabled_FollowsTheCommandStates");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_CommandStates_AsIfANodeWereSelected,
         "CommandStates_AsIfANodeWereSelected");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_DetailAndNodeIds_NameEachNode,
@@ -198,6 +261,9 @@ TTest_ASWUnitTests_WebGUI_API::TTest_ASWUnitTests_WebGUI_API()
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_Log_AppendKeepsWholeLines, "Log_AppendKeepsWholeLines");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_Log_EventSendsLinesFromAnIndex,
         "Log_EventSendsLinesFromAnIndex");
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_NodeIds_ParseOnlyTheListsNodes, "NodeIds_ParseOnlyTheListsNodes");
+    RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_ParseCommand_EveryCommandAndItsFields,
+        "ParseCommand_EveryCommandAndItsFields");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_SnapshotEvent_HoldsEverything, "SnapshotEvent_HoldsEverything");
     RegisterTest(&TTest_ASWUnitTests_WebGUI_API::Test_StateEvent_CommandsPanelsProgressShuffleTheme,
         "StateEvent_CommandsPanelsProgressShuffleTheme");
@@ -230,6 +296,58 @@ void TTest_ASWUnitTests_WebGUI_API::TearDown_Test(ITestCase& /*testCase*/)
 
 // /////// Begin tests after this line ///////////////////////
 
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_CommandEnabled_FollowsTheCommandStates()
+{
+    // Arrange: states with one flag set each, and the commands that flag allows.
+    struct TCase
+    {
+        bool TGUICommandStates::* Flag;
+        char const* Enabled;
+    };
+
+    TCase const cases[] = {
+        { &TGUICommandStates::About, "" },
+        { &TGUICommandStates::CollapseAll, "" },
+        { &TGUICommandStates::CommandLineOptions, "" },
+        { &TGUICommandStates::CopyDetails, "CopyDetails" },
+        { &TGUICommandStates::Exit, "Exit" },
+        { &TGUICommandStates::ExpandAll, "" },
+        { &TGUICommandStates::ExportJUnitReport, "" },
+        { &TGUICommandStates::FilterBox, "Filter" },
+        { &TGUICommandStates::FocusFilter, "" },
+        { &TGUICommandStates::ResetLayout, "ResetLayout" },
+        { &TGUICommandStates::RunFailed, "RunFailed" },
+        { &TGUICommandStates::RunSelected, "RunSelected" },
+        { &TGUICommandStates::SelectAll, "SelectAll SetChecked" },
+        { &TGUICommandStates::SelectFailed, "SelectFailed" },
+        { &TGUICommandStates::SelectNone, "SelectNone" },
+        { &TGUICommandStates::ShuffleOrder, "ShuffleOrder" },
+        { &TGUICommandStates::ShuffleSeed, "ShuffleSeed" },
+        { &TGUICommandStates::Stop, "Stop" },
+        { &TGUICommandStates::Theme, "DarkTheme Theme" },
+    };
+
+    TWebGUIState idle;
+    idle.TestList.Load(FixtureTests());
+    TWebGUIState const running = RunState();
+
+    // Act, Assert
+    for (std::size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        TGUICommandStates states;
+        states.*cases[i].Flag = true;
+        CheckEquals(std::string(cases[i].Enabled), EnabledCommands(states), __func__, __LINE__,
+            "only flag " + std::to_string(i) + " set");
+    }
+
+    CheckEquals(std::string(), EnabledCommands(TGUICommandStates()), __func__, __LINE__, "no flag set");
+    CheckEquals(std::string("CopyDetails DarkTheme Exit Filter ResetLayout RunSelected SelectAll SelectNone "
+        "SetChecked ShuffleOrder ShuffleSeed Theme"), EnabledCommands(WebGUICommandStates(idle)), __func__,
+        __LINE__, "idle, no failure: no Run Failed, Select Failed or Stop");
+    CheckEquals(std::string("CopyDetails Exit ResetLayout Stop"), EnabledCommands(WebGUICommandStates(running)),
+        __func__, __LINE__, "during a run: no check box changes, as in the Win32 GUI runner");
+}
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_WebGUI_API::Test_CommandStates_AsIfANodeWereSelected()
 {
@@ -399,6 +517,135 @@ void TTest_ASWUnitTests_WebGUI_API::Test_Log_EventSendsLinesFromAnIndex()
         {
             WebGUILogEvent(state, 5);
         }, __func__, __LINE__, "past the end", "past the log's end");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_NodeIds_ParseOnlyTheListsNodes()
+{
+    // Arrange: the fixture has 3 suites, 3 groups and 4 tests. Each id, and the node it names, or "none".
+    TWebGUIState const state = RunState();
+    TWebGUIState const empty;
+
+    struct TCase
+    {
+        char const* Id;
+        char const* Node;
+    };
+
+    TCase const cases[] = {
+        { "s0", "s0" }, { "s2", "s2" }, { "s3", "none" },
+        { "g0", "g0" }, { "g2", "g2" }, { "g3", "none" },
+        { "t0", "t0" }, { "t3", "t3" }, { "t4", "none" },
+        { "t00", "none" }, { "t01", "none" }, { "t", "none" }, { "", "none" },
+        { "x0", "none" }, { "T0", "none" }, { "S0", "none" },
+        { "t-1", "none" }, { "t+1", "none" }, { "t1 ", "none" }, { " t1", "none" }, { "t1x", "none" },
+        { "t18446744073709551616", "none" }, { "t99999999999999999999999999999999", "none" },
+    };
+
+    // Act, Assert
+    for (TCase const& testCase : cases)
+    {
+        std::optional<TGUINodeRef> const ref = ParseWebGUINodeId(testCase.Id, state);
+        CheckEquals(std::string(testCase.Node), ref.has_value() ? WebGUINodeId(*ref) : std::string("none"), __func__,
+            __LINE__, std::string("\"") + testCase.Id + "\"");
+    }
+
+    for (TGUITreeNode const& node : BuildGUITree(state.TestList))
+    {
+        std::optional<TGUINodeRef> const ref = ParseWebGUINodeId(WebGUINodeId(node.Ref), state);
+        CheckTrue(ref.has_value() && ref->Kind == node.Ref.Kind && ref->Index == node.Ref.Index, __func__, __LINE__,
+            "every node's id names it: " + WebGUINodeId(node.Ref));
+    }
+
+    CheckFalse(ParseWebGUINodeId("t0", empty).has_value(), __func__, __LINE__, "no tests: no node");
+
+    // With 100 tests, a character just past '9' would make an index that's in range ("t1:" as 1 * 10 + 10).
+    TWebGUIState big;
+    std::vector<TTestId> tests;
+
+    for (int i = 0; i < 100; ++i)
+        tests.push_back({ "Big", "T" + std::to_string(i), "" });
+
+    big.TestList.Load(tests);
+    CheckEquals(std::string("t99"), WebGUINodeId(ParseWebGUINodeId("t99", big).value_or(TGUINodeRef())), __func__,
+        __LINE__, "100 tests: the last");
+    CheckFalse(ParseWebGUINodeId("t100", big).has_value(), __func__, __LINE__, "100 tests: past the last");
+    CheckFalse(ParseWebGUINodeId("t1:", big).has_value(), __func__, __LINE__, "100 tests: a character past '9'");
+    CheckFalse(ParseWebGUINodeId("t05", big).has_value(), __func__, __LINE__, "100 tests: a leading zero");
+}
+//---------------------------------------------------------------------------
+void TTest_ASWUnitTests_WebGUI_API::Test_ParseCommand_EveryCommandAndItsFields()
+{
+    // Arrange: each form body, and the command it gives (see DescribeCommand()).
+    TWebGUIState const state = RunState();
+
+    struct TCase
+    {
+        char const* Form;
+        char const* Command;
+    };
+
+    TCase const cases[] = {
+        { "command=CopyDetails", "CopyDetails|000|t0||0" },
+        { "command=Exit", "Exit|000|t0||0" },
+        { "command=ResetLayout", "ResetLayout|000|t0||0" },
+        { "command=RunFailed", "RunFailed|000|t0||0" },
+        { "command=RunSelected", "RunSelected|000|t0||0" },
+        { "command=SelectAll", "SelectAll|000|t0||0" },
+        { "command=SelectFailed", "SelectFailed|000|t0||0" },
+        { "command=SelectNone", "SelectNone|000|t0||0" },
+        { "command=Stop", "Stop|000|t0||0" },
+        { "command=DarkTheme&name=Nord+Dark", "DarkTheme|000|t0|Nord Dark|0" },
+        { "command=Filter&text=", "Filter|000|t0||0" },
+        { "command=Filter&text=a%26b+c", "Filter|000|t0|a&b c|0" },
+        { "command=SetChecked&node=g1&checked=1", "SetChecked|100|g1||0" },
+        { "command=SetChecked&node=s2&checked=0", "SetChecked|000|s2||0" },
+        { "checked=1&node=t3&command=SetChecked", "SetChecked|100|t3||0" },
+        { "command=ShuffleOrder&enabled=1", "ShuffleOrder|010|t0||0" },
+        { "command=ShuffleOrder&enabled=0", "ShuffleOrder|000|t0||0" },
+        { "command=ShuffleSeed&newSeedEachRun=0&seed=+42+", "ShuffleSeed|000|t0| 42 |0" },
+        { "command=ShuffleSeed&newSeedEachRun=1&seed=", "ShuffleSeed|001|t0||0" },
+        { "command=Theme&theme=Windows", "Theme|000|t0||0" },
+        { "command=Theme&theme=Light", "Theme|000|t0||1" },
+        { "command=Theme&theme=Dark", "Theme|000|t0||2" },
+        { "", "error: no \"command\" field" },
+        { "node=g1", "error: no \"command\" field" },
+        { "command=Run", "error: unknown command \"Run\"" },
+        { "command=runselected", "error: unknown command \"runselected\"" },
+        { "command=", "error: unknown command \"\"" },
+        { "command=Stop&command=Stop", "error: \"command\" given twice" },
+        { "command=SetChecked&node=g1&checked=1&checked=1", "error: \"checked\" given twice" },
+        { "command=Stop&x=1", "error: Stop has no \"x\" field" },
+        { "command=Stop&Command=Stop", "error: Stop has no \"Command\" field" },
+        { "command=Filter&name=a", "error: Filter has no \"name\" field" },
+        { "command=Filter", "error: Filter needs a \"text\" field" },
+        { "command=SetChecked&node=g1", "error: SetChecked needs a \"checked\" field" },
+        { "command=SetChecked&checked=1", "error: SetChecked needs a \"node\" field" },
+        { "command=SetChecked&node=g9&checked=1", "error: \"node\" isn't a node: \"g9\"" },
+        { "command=SetChecked&node=g1&checked=yes", "error: \"checked\" isn't 0 or 1" },
+        { "command=SetChecked&node=g1&checked=", "error: \"checked\" isn't 0 or 1" },
+        { "command=ShuffleOrder&enabled=2", "error: \"enabled\" isn't 0 or 1" },
+        { "command=ShuffleSeed&newSeedEachRun=true&seed=1", "error: \"newSeedEachRun\" isn't 0 or 1" },
+        { "command=ShuffleSeed&newSeedEachRun=1", "error: ShuffleSeed needs a \"seed\" field" },
+        { "command=DarkTheme&name=", "error: DarkTheme's \"name\" is empty" },
+        { "command=Theme&theme=dark", "error: \"theme\" isn't Windows, Light or Dark" },
+        { "command=Theme&theme=", "error: \"theme\" isn't Windows, Light or Dark" },
+    };
+
+    std::string names;
+
+    for (EWebGUICommand const command : AllCommands)
+        names += WebGUICommandName(command) + " ";
+
+    // Act, Assert
+    for (TCase const& testCase : cases)
+    {
+        CheckEquals(std::string(testCase.Command), DescribeCommand(testCase.Form, state), __func__, __LINE__,
+            std::string("\"") + testCase.Form + "\"");
+    }
+
+    CheckEquals(std::string("CopyDetails DarkTheme Exit Filter ResetLayout RunFailed RunSelected SelectAll "
+        "SelectFailed SelectNone SetChecked ShuffleOrder ShuffleSeed Stop Theme "), names, __func__, __LINE__,
+        "every command's name");
 }
 //---------------------------------------------------------------------------
 void TTest_ASWUnitTests_WebGUI_API::Test_SnapshotEvent_HoldsEverything()

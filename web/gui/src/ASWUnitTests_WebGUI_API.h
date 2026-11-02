@@ -42,9 +42,67 @@ limitations under the License.
 #include "ASWUnitTests_GUI_Theme.h"
 #include "ASWUnitTests_GUI_Tree.h"
 //---------------------------------------------------------------------------
+#include "ASWUnitTests_WebGUI_HTTP.h"
+//---------------------------------------------------------------------------
 
 namespace ASWUnitTests
 {
+
+/////////////////////////////////////////////////////////////////////////////
+// EWebGUICommand
+//
+// A command the page sends the server, as a POST of form fields (see
+// ParseWebGUICommand()): those of the Win32 GUI runner's commands that
+// change what the server keeps, named as in TGUICommandStates, plus
+// SetChecked, a test tree check box's click, and DarkTheme, an item of
+// View > Theme > Dark Theme. The rest are each tab's own (Expand All,
+// Collapse All, Focus Filter), or the page asks for what they show (About,
+// Command Line Options, Export JUnit Report).
+/////////////////////////////////////////////////////////////////////////////
+enum class EWebGUICommand
+{
+    CopyDetails, // Sent after the page copied the details, for the status bar's message.
+    DarkTheme,
+    Exit,
+    Filter,
+    ResetLayout,
+    RunFailed,
+    RunSelected,
+    SelectAll,
+    SelectFailed,
+    SelectNone,
+    SetChecked,
+    ShuffleOrder,
+    ShuffleSeed,
+    Stop,
+    Theme,
+};
+
+
+/////////////////////////////////////////////////////////////////////////////
+// TWebGUICommand
+//
+// A command from the page, as ParseWebGUICommand() read it: its kind, and
+// the parameters that kind has.
+/////////////////////////////////////////////////////////////////////////////
+struct TWebGUICommand
+{
+    // SetChecked's: whether to check the node's test, or its group's or suite's visible tests, or uncheck them.
+    bool Checked = false;
+    // ShuffleOrder's: whether to run in shuffled order.
+    bool Enabled = false;
+    EWebGUICommand Kind = EWebGUICommand::CopyDetails;
+    // ShuffleSeed's: whether each run gets a new random seed, rather than Text.
+    bool NewSeedEachRun = false;
+    // SetChecked's node.
+    TGUINodeRef Node;
+    // Filter's text, DarkTheme's theme name, or ShuffleSeed's seed as typed (TGUIShuffle::ApplySeedChoice()
+    // checks it).
+    std::string Text;
+    // Theme's choice.
+    EGUITheme Theme = EGUITheme::Windows;
+};
+
 
 /////////////////////////////////////////////////////////////////////////////
 // TWebGUILog
@@ -126,9 +184,28 @@ struct TWebGUIState
 
 //---------------------------------------------------------------------------
 
+// Whether 'command' may run in 'states' (WebGUICommandStates()'), as the Win32 GUI runner refuses a disabled
+// command whatever sent it: each by its TGUICommandStates flag, DarkTheme by Theme's, Filter by FilterBox's,
+// and SetChecked by SelectAll's, since check boxes only change outside a run.
+bool IsWebGUICommandEnabled(TGUICommandStates const& states, EWebGUICommand command);
+// The command 'fields' (a POST's form fields, DecodeWebGUIForm()'s) give: "command", the command's name
+// (WebGUICommandName()), and its parameters, each required:
+// - SetChecked: "node" (ParseWebGUINodeId()) and "checked" ("0" or "1");
+// - ShuffleOrder: "enabled" ("0" or "1");
+// - ShuffleSeed: "newSeedEachRun" ("0" or "1") and "seed" (any text);
+// - Filter: "text" (any text); DarkTheme: "name" (not empty); Theme: "theme" ("Windows", "Light" or "Dark").
+// A missing, repeated, unknown or malformed field gives std::nullopt, with 'error' saying which, since the page
+// never sends one; the server answers 400.
+std::optional<TWebGUICommand> ParseWebGUICommand(std::vector<TWebGUIField> const& fields,
+    TWebGUIState const& state, std::string& error);
+// The node 'id' names (see WebGUINodeId()), or std::nullopt unless it's a kind's letter and, in decimal with no
+// sign or leading zero, the index of one of the state's suites, groups or tests, so each node has one id.
+std::optional<TGUINodeRef> ParseWebGUINodeId(std::string const& id, TWebGUIState const& state);
 // The "checks" event, sent after any check box changes: {"type":"checks","checks":"..."}, one digit per node of
 // BuildGUITree()'s tree, in its order, each its TGUICheckState's value.
 std::string WebGUIChecksEvent(TWebGUIState const& state);
+// A command's name, as the page sends it, e.g. "SetChecked".
+std::string WebGUICommandName(EWebGUICommand command);
 // The command states the page is sent: GUICommandStates() as if a node were selected, since the selection is
 // each tab's own, so the page enables Copy Details only while its tab has one too.
 TGUICommandStates WebGUICommandStates(TWebGUIState const& state);
